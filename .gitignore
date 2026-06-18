@@ -1,0 +1,27 @@
+# Claude Code internals
+.claude/
+
+# Shell artifacts
+done
+echo
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+dist/
+build/
+.env
+.env.local
+
+# Node / Next.js
+node_modules/
+.next/
+out/
+.vercel/
+
+# Misc
+.DS_Store
+*.log
