@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import BookingCard from '@/components/booking/BookingCard';
+import { BookingCard } from '@/components/booking/BookingCard';
 
 const TABS = ['Overview', 'Bookings', 'Profile'];
 

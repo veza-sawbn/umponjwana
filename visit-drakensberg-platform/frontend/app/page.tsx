@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { SearchBar } from '@/components/search/SearchBar'
+import SearchBar from '@/components/search/SearchBar'
 import { ListingCard } from '@/components/listings/ListingCard'
 import { Mountain, Tent, Footprints, Car, Package, Star, Shield, MapPin } from 'lucide-react'
 
