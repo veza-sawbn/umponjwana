@@ -8,14 +8,17 @@ const TABS = ['Overview', 'Bookings', 'Profile'];
 
 const upcomingBooking = {
   id: 'b1',
-  listing: 'Cathedral Peak Mountain Lodge',
-  location: 'Cathedral Peak, Northern Berg',
+  listing: {
+    id: 'l1',
+    title: 'Cathedral Peak Mountain Lodge',
+    location: 'Cathedral Peak, Northern Berg',
+    images: ['https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=400'],
+  },
   check_in: '2025-07-15',
   check_out: '2025-07-18',
   guests: 2,
   total_price: 8214,
   status: 'confirmed' as const,
-  image: 'https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=400',
 };
 
 export default function DashboardPage() {
