@@ -1,8 +1,7 @@
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sessionmaker
 from sqlalchemy.orm import DeclarativeBase
-from supabase import create_client, Client
 from upstash_redis import Redis
-from typing import AsyncGenerator
+from typing import AsyncGenerator, Optional
 
 from app.core.config import settings
 
@@ -39,12 +38,17 @@ async def get_db() -> AsyncGenerator[AsyncSession, None]:
             await session.close()
 
 
-# Supabase client
-supabase: Client = create_client(settings.SUPABASE_URL, settings.SUPABASE_KEY)
+# Supabase client — lazy initialized to avoid startup crash on bad key
+_supabase_client = None
+
+
+def get_supabase():
+    global _supabase_client
+    if _supabase_client is None:
+        from supabase import create_client
+        _supabase_client = create_client(settings.SUPABASE_URL, settings.SUPABASE_KEY)
+    return _supabase_client
 
 
 # Upstash Redis client
-redis = Redis.from_env() if not settings.REDIS_URL else Redis(
-    url=settings.REDIS_URL.split("?")[0] if "?" in settings.REDIS_URL else settings.REDIS_URL,
-    token=settings.REDIS_URL.split("token=")[1] if "token=" in settings.REDIS_URL else "",
-)
+redis = Redis(url=settings.REDIS_URL, token=settings.REDIS_TOKEN)
