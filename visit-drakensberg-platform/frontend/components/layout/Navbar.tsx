@@ -74,15 +74,32 @@ export default function Navbar() {
                 </button>
                 {dropdownOpen && (
                   <div className="absolute right-0 mt-2 w-52 bg-white rounded-xl shadow-lg border border-gray-100 py-1 z-50">
-                    <Link href="/dashboard" className="flex items-center gap-2 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50" onClick={() => setDropdownOpen(false)}>
-                      <LayoutDashboard className="h-4 w-4" /> Dashboard
-                    </Link>
-                    <Link href="/dashboard/bookings" className="flex items-center gap-2 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50" onClick={() => setDropdownOpen(false)}>
-                      <CalendarDays className="h-4 w-4" /> My Bookings
-                    </Link>
-                    <Link href="/dashboard/notifications" className="flex items-center gap-2 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50" onClick={() => setDropdownOpen(false)}>
-                      <Bell className="h-4 w-4" /> Notifications
-                    </Link>
+                    {user.user_metadata?.role === 'supplier' ? (
+                      <>
+                        <Link href="/supplier" className="flex items-center gap-2 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50" onClick={() => setDropdownOpen(false)}>
+                          <LayoutDashboard className="h-4 w-4" /> Supplier Dashboard
+                        </Link>
+                        <Link href="/supplier/listings" className="flex items-center gap-2 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50" onClick={() => setDropdownOpen(false)}>
+                          <CalendarDays className="h-4 w-4" /> My Listings
+                        </Link>
+                        <Link href="/supplier/listings/new" className="flex items-center gap-2 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50" onClick={() => setDropdownOpen(false)}>
+                          <Bell className="h-4 w-4" /> Add Listing
+                        </Link>
+                      </>
+                    ) : user.user_metadata?.role === 'admin' ? (
+                      <Link href="/admin" className="flex items-center gap-2 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50" onClick={() => setDropdownOpen(false)}>
+                        <LayoutDashboard className="h-4 w-4" /> Admin Dashboard
+                      </Link>
+                    ) : (
+                      <>
+                        <Link href="/dashboard" className="flex items-center gap-2 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50" onClick={() => setDropdownOpen(false)}>
+                          <LayoutDashboard className="h-4 w-4" /> Dashboard
+                        </Link>
+                        <Link href="/dashboard/bookings" className="flex items-center gap-2 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50" onClick={() => setDropdownOpen(false)}>
+                          <CalendarDays className="h-4 w-4" /> My Bookings
+                        </Link>
+                      </>
+                    )}
                     <div className="border-t my-1" />
                     <button onClick={handleSignOut} className="flex items-center gap-2 w-full px-4 py-2.5 text-sm text-red-500 hover:bg-red-50">
                       <LogOut className="h-4 w-4" /> Sign Out

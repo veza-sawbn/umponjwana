@@ -30,8 +30,15 @@ export default function LoginPage() {
   const onSubmit = async (data: LoginFormData) => {
     setAuthError(null);
     try {
-      await signIn(data.email, data.password);
-      router.push('/dashboard');
+      const result = await signIn(data.email, data.password);
+      const role = result?.user?.user_metadata?.role;
+      if (role === 'supplier') {
+        router.push('/supplier');
+      } else if (role === 'admin') {
+        router.push('/admin');
+      } else {
+        router.push('/dashboard');
+      }
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Sign in failed. Please try again.';
       setAuthError(message);
