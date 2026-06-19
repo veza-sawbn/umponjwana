@@ -224,7 +224,7 @@ export default function ListingDetailPage({ params }: Props) {
                   </span>
                   <span className="text-gray-500 text-sm">/ night</span>
                 </div>
-                <BookingWidget listing={{ id: params.id, title: listing.title, price_per_unit: listing.price, unit_type: listing.unit_type ?? "per_night", max_guests: listing.max_guests ?? 10 }} />
+                <BookingWidget listing={{ id: params.id, title: listing.title, price_per_unit: listing.price, unit_type: "per_night", max_guests: 10 }} />
               </div>
             </div>
           </div>
