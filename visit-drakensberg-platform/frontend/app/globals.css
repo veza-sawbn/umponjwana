@@ -1,13 +1,13 @@
-@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;0,700;1,300;1,400;1,500;1,600;1,700&family=Inter:wght@300;400;500;600&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,300;1,9..40,400&display=swap');
 
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 :root {
-  --color-forest: #1C2B1E;
+  --color-forest: #000000;
   --color-gold: #C9A96E;
-  --color-mist: #F0EDE8;
+  --color-mist: #F7F5F2;
   --color-sage: #4A7251;
   --primary: #4A7251;
   --primary-light: #f2f7f3;
@@ -19,13 +19,13 @@ html {
 
 body {
   @apply antialiased;
-  font-family: 'Inter', system-ui, sans-serif;
-  background-color: #F0EDE8;
-  color: #1C2B1E;
+  font-family: 'DM Sans', system-ui, sans-serif;
+  background-color: #F7F5F2;
+  color: #000000;
 }
 
 .font-display {
-  font-family: 'Cormorant Garamond', Georgia, serif;
+  font-family: 'DM Serif Display', Georgia, serif;
 }
 
 /* Custom scrollbar */
@@ -34,7 +34,7 @@ body {
   height: 6px;
 }
 ::-webkit-scrollbar-track {
-  background: #F0EDE8;
+  background: #F7F5F2;
 }
 ::-webkit-scrollbar-thumb {
   background: #C9A96E;
@@ -47,7 +47,7 @@ body {
 /* Selection */
 ::selection {
   background-color: #C9A96E;
-  color: #1C2B1E;
+  color: #000000;
 }
 
 @layer components {
@@ -58,17 +58,17 @@ body {
     @apply border-2 border-sage text-sage px-6 py-3 rounded-lg font-semibold hover:bg-primary-50 transition-colors;
   }
   .btn-gold {
-    @apply bg-gold text-forest px-6 py-3 rounded-lg font-semibold hover:bg-brown-600 transition-colors;
+    @apply bg-gold text-black px-6 py-3 rounded-lg font-semibold hover:bg-brown-600 transition-colors;
   }
   .card {
     @apply bg-white rounded-2xl shadow-card hover:shadow-card-hover transition-shadow;
   }
   .section-title {
-    font-family: 'Cormorant Garamond', Georgia, serif;
-    @apply text-4xl font-bold text-forest mb-2;
+    font-family: 'DM Serif Display', Georgia, serif;
+    @apply text-4xl font-bold text-black mb-2;
   }
   .section-subtitle {
-    @apply text-forest/60 text-lg mb-8 font-sans font-light;
+    @apply text-black/50 text-lg mb-8 font-sans font-light;
   }
   .gold-accent-line::before {
     content: '';

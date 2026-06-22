@@ -9,9 +9,9 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        forest: '#1C2B1E',
+        forest: '#000000',
         gold: '#C9A96E',
-        mist: '#F0EDE8',
+        mist: '#F7F5F2',
         sage: '#4A7251',
         primary: {
           50: '#f2f7f3',
@@ -24,7 +24,7 @@ const config: Config = {
           600: '#3a5c41',
           700: '#2f4a34',
           800: '#253b29',
-          900: '#1C2B1E',
+          900: '#000000',
         },
         brown: {
           300: '#dbc098',
@@ -52,8 +52,8 @@ const config: Config = {
         },
       },
       fontFamily: {
-        display: ['Cormorant Garamond', 'Georgia', 'serif'],
-        sans: ['Inter', 'system-ui', 'sans-serif'],
+        display: ['DM Serif Display', 'Georgia', 'serif'],
+        sans: ['DM Sans', 'system-ui', 'sans-serif'],
       },
       boxShadow: {
         card: '0 2px 16px rgba(0,0,0,0.08)',
