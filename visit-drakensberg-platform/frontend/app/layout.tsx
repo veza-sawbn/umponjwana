@@ -1,11 +1,9 @@
 'use client'
 import './globals.css'
-import { Inter } from 'next/font/google'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { Toaster } from 'react-hot-toast'
 import { useState } from 'react'
-
-const inter = Inter({ subsets: ['latin'] })
+import Navbar from '@/components/layout/Navbar'
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   const [queryClient] = useState(() => new QueryClient({
@@ -20,8 +18,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         <link rel="icon" href="/favicon.ico" />
       </head>
-      <body className={inter.className}>
+      <body>
         <QueryClientProvider client={queryClient}>
+          <Navbar />
           {children}
           <Toaster position="top-right" toastOptions={{ duration: 4000 }} />
         </QueryClientProvider>

@@ -1,41 +1,81 @@
+@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;0,700;1,300;1,400;1,500;1,600;1,700&family=Inter:wght@300;400;500;600&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 :root {
-  --primary: #2D6A4F;
-  --primary-light: #f0faf5;
-  --brown: #8B5E3C;
-  --mountain: #4A90D9;
-  --sand: #F5E6C8;
+  --color-forest: #1C2B1E;
+  --color-gold: #C9A96E;
+  --color-mist: #F0EDE8;
+  --color-sage: #4A7251;
+  --primary: #4A7251;
+  --primary-light: #f2f7f3;
 }
 
-html { scroll-behavior: smooth; }
+html {
+  scroll-behavior: smooth;
+}
 
 body {
-  @apply bg-white text-gray-900 antialiased;
+  @apply antialiased;
   font-family: 'Inter', system-ui, sans-serif;
+  background-color: #F0EDE8;
+  color: #1C2B1E;
 }
 
-::-webkit-scrollbar { width: 6px; height: 6px; }
-::-webkit-scrollbar-track { @apply bg-gray-100; }
-::-webkit-scrollbar-thumb { @apply bg-gray-300 rounded-full; }
-::-webkit-scrollbar-thumb:hover { @apply bg-gray-400; }
+.font-display {
+  font-family: 'Cormorant Garamond', Georgia, serif;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: #F0EDE8;
+}
+::-webkit-scrollbar-thumb {
+  background: #C9A96E;
+  border-radius: 9999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #b8935a;
+}
+
+/* Selection */
+::selection {
+  background-color: #C9A96E;
+  color: #1C2B1E;
+}
 
 @layer components {
   .btn-primary {
-    @apply bg-primary-500 text-white px-6 py-3 rounded-lg font-semibold hover:bg-primary-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed;
+    @apply bg-sage text-white px-6 py-3 rounded-lg font-semibold hover:bg-primary-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed;
   }
   .btn-secondary {
-    @apply border-2 border-primary-500 text-primary-500 px-6 py-3 rounded-lg font-semibold hover:bg-primary-50 transition-colors;
+    @apply border-2 border-sage text-sage px-6 py-3 rounded-lg font-semibold hover:bg-primary-50 transition-colors;
+  }
+  .btn-gold {
+    @apply bg-gold text-forest px-6 py-3 rounded-lg font-semibold hover:bg-brown-600 transition-colors;
   }
   .card {
     @apply bg-white rounded-2xl shadow-card hover:shadow-card-hover transition-shadow;
   }
   .section-title {
-    @apply text-3xl font-bold text-gray-900 mb-2;
+    font-family: 'Cormorant Garamond', Georgia, serif;
+    @apply text-4xl font-bold text-forest mb-2;
   }
   .section-subtitle {
-    @apply text-gray-500 text-lg mb-8;
+    @apply text-forest/60 text-lg mb-8 font-sans font-light;
+  }
+  .gold-accent-line::before {
+    content: '';
+    display: block;
+    width: 48px;
+    height: 2px;
+    background-color: #C9A96E;
+    margin-bottom: 16px;
   }
 }
