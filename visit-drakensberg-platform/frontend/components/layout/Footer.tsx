@@ -1,97 +1,111 @@
 import Link from 'next/link'
-import { Mountain, Facebook, Instagram, Twitter, Youtube } from 'lucide-react'
+import { Instagram, Facebook, Youtube } from 'lucide-react'
 
-const EXPLORE = [
-  { href: '/stays', label: 'Stays' },
-  { href: '/activities', label: 'Activities' },
-  { href: '/hikes', label: 'Hikes' },
-  { href: '/shuttles', label: 'Shuttles' },
-  { href: '/packages', label: 'Holiday Packages' },
-]
-
-const COMPANY = [
-  { href: '/about', label: 'About Us' },
-  { href: '/contact', label: 'Contact' },
-  { href: '/blog', label: 'Blog' },
-  { href: '/careers', label: 'Careers' },
-]
-
-const LEGAL = [
-  { href: '/privacy', label: 'Privacy Policy' },
-  { href: '/terms', label: 'Terms of Service' },
-  { href: '/cookies', label: 'Cookie Policy' },
+const COLUMNS = [
+  {
+    heading: 'Explore',
+    links: [
+      { label: 'Stays', href: '/stays' },
+      { label: 'Hikes', href: '/hikes' },
+      { label: 'Activities', href: '/activities' },
+      { label: 'Packages', href: '/packages' },
+      { label: 'Nature Reserves', href: '/nature-reserves' },
+    ],
+  },
+  {
+    heading: 'Regions',
+    links: [
+      { label: 'Northern Berg', href: '/regions#northern' },
+      { label: 'Central Berg', href: '/regions#central' },
+      { label: 'Southern Berg', href: '/regions#southern' },
+      { label: 'Royal Natal', href: '/regions#royal-natal' },
+    ],
+  },
+  {
+    heading: 'Discover',
+    links: [
+      { label: 'Stories', href: '/stories' },
+      { label: 'Plan Your Trip', href: '/plan' },
+      { label: 'Trail Map', href: '/hikes' },
+      { label: 'Rock Art', href: '/activities' },
+    ],
+  },
+  {
+    heading: 'Company',
+    links: [
+      { label: 'About', href: '/about' },
+      { label: 'List Property', href: '/supplier' },
+      { label: 'Privacy Policy', href: '/privacy' },
+      { label: 'Terms of Use', href: '/terms' },
+    ],
+  },
 ]
 
 export default function Footer() {
   return (
-    <footer className="bg-primary-700 text-white">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-14">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-10">
-          {/* Brand */}
-          <div>
-            <div className="flex items-center gap-2 mb-4">
-              <Mountain className="h-7 w-7 text-sand-200" />
-              <span className="font-bold text-lg">Visit Drakensberg</span>
-            </div>
-            <p className="text-primary-200 text-sm leading-relaxed mb-6">
-              Your gateway to the breathtaking Drakensberg — Africa&apos;s premier mountain destination. Book stays, activities, and adventures.
-            </p>
-            <div className="flex items-center gap-4">
-              {[Facebook, Instagram, Twitter, Youtube].map((Icon, i) => (
-                <a key={i} href="#" className="text-primary-300 hover:text-white transition-colors">
-                  <Icon className="h-5 w-5" />
-                </a>
-              ))}
-            </div>
-          </div>
-
-          {/* Explore */}
-          <div>
-            <h3 className="font-semibold mb-4">Explore</h3>
-            <ul className="space-y-2.5">
-              {EXPLORE.map(l => (
-                <li key={l.href}>
-                  <Link href={l.href} className="text-primary-200 hover:text-white text-sm transition-colors">{l.label}</Link>
-                </li>
-              ))}
-            </ul>
-          </div>
-
-          {/* Company */}
-          <div>
-            <h3 className="font-semibold mb-4">Company</h3>
-            <ul className="space-y-2.5">
-              {COMPANY.map(l => (
-                <li key={l.href}>
-                  <Link href={l.href} className="text-primary-200 hover:text-white text-sm transition-colors">{l.label}</Link>
-                </li>
-              ))}
-            </ul>
-          </div>
-
-          {/* Newsletter */}
-          <div>
-            <h3 className="font-semibold mb-4">Stay in the loop</h3>
-            <p className="text-primary-200 text-sm mb-4">Get deals and travel inspiration delivered to your inbox.</p>
-            <form className="flex gap-2" onSubmit={(e) => e.preventDefault()}>
-              <input
-                type="email"
-                placeholder="Your email"
-                className="flex-1 rounded-lg px-3 py-2 text-sm text-gray-900 bg-white outline-none focus:ring-2 focus:ring-sand-200"
-              />
-              <button type="submit" className="bg-sand-200 text-primary-700 font-semibold text-sm px-4 py-2 rounded-lg hover:bg-sand-300 transition-colors whitespace-nowrap">
-                Subscribe
-              </button>
-            </form>
-          </div>
+    <footer className="bg-forest text-white">
+      <div className="max-w-[1440px] mx-auto px-6 lg:px-12 py-16">
+        {/* Top row */}
+        <div className="flex flex-col sm:flex-row sm:items-end gap-2 mb-10">
+          <Link href="/" className="font-display italic text-3xl text-gold leading-none">
+            Visit Drakensberg
+          </Link>
+          <span className="font-sans text-sm text-white/30 sm:ml-4 mb-0.5">
+            Africa&apos;s alpine wilderness
+          </span>
         </div>
 
-        <div className="border-t border-primary-600 mt-12 pt-8 flex flex-col md:flex-row items-center justify-between gap-4 text-sm text-primary-300">
-          <span>© {new Date().getFullYear()} Visit Drakensberg. All rights reserved.</span>
-          <div className="flex items-center gap-6">
-            {LEGAL.map(l => (
-              <Link key={l.href} href={l.href} className="hover:text-white transition-colors">{l.label}</Link>
-            ))}
+        <div className="h-px bg-white/10 mb-10" />
+
+        {/* Nav grid */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-8 mb-14">
+          {COLUMNS.map((col) => (
+            <div key={col.heading}>
+              <p className="font-sans text-[10px] tracking-[0.18em] uppercase text-white/30 mb-4">
+                {col.heading}
+              </p>
+              <ul className="space-y-3">
+                {col.links.map((link) => (
+                  <li key={link.href}>
+                    <Link
+                      href={link.href}
+                      className="font-sans text-sm text-white/55 hover:text-white transition-colors"
+                    >
+                      {link.label}
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ))}
+        </div>
+
+        <div className="h-px bg-white/10 mb-6" />
+
+        {/* Bottom bar */}
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+          <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-5">
+            <p className="font-sans text-xs text-white/25">
+              &copy; {new Date().getFullYear()} visitdrakensberg.com
+            </p>
+            <span className="hidden sm:block text-white/15">·</span>
+            <p className="font-sans text-xs text-white/25">
+              KwaZulu-Natal, South Africa
+            </p>
+          </div>
+          <div className="flex items-center gap-5">
+            <a href="https://instagram.com" target="_blank" rel="noopener noreferrer" aria-label="Instagram"
+               className="text-white/25 hover:text-white transition-colors">
+              <Instagram className="w-4 h-4" />
+            </a>
+            <a href="https://facebook.com" target="_blank" rel="noopener noreferrer" aria-label="Facebook"
+               className="text-white/25 hover:text-white transition-colors">
+              <Facebook className="w-4 h-4" />
+            </a>
+            <a href="https://youtube.com" target="_blank" rel="noopener noreferrer" aria-label="YouTube"
+               className="text-white/25 hover:text-white transition-colors">
+              <Youtube className="w-4 h-4" />
+            </a>
           </div>
         </div>
       </div>
