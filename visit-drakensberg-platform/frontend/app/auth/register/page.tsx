@@ -1,218 +1,130 @@
-'use client';
+'use client'
+import { useState } from 'react'
+import Link from 'next/link'
+import { useRouter } from 'next/navigation'
+import { useForm } from 'react-hook-form'
+import { zodResolver } from '@hookform/resolvers/zod'
+import { z } from 'zod'
+import { signUp } from '@/lib/auth'
 
-import { useState } from 'react';
-import Link from 'next/link';
-import { useRouter } from 'next/navigation';
-import { useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import { z } from 'zod';
-import { signUp } from '@/lib/auth';
+const schema = z.object({
+  fullName: z.string().min(2, 'At least 2 characters'),
+  email: z.string().email('Enter a valid email'),
+  password: z.string().min(8, 'At least 8 characters').regex(/[A-Z]/, 'Needs an uppercase letter').regex(/[0-9]/, 'Needs a number'),
+  confirmPassword: z.string(),
+  role: z.enum(['guest', 'supplier']),
+}).refine((d) => d.password === d.confirmPassword, { message: 'Passwords do not match', path: ['confirmPassword'] })
 
-const registerSchema = z
-  .object({
-    fullName: z.string().min(2, 'Full name must be at least 2 characters'),
-    email: z.string().email('Please enter a valid email address'),
-    password: z
-      .string()
-      .min(8, 'Password must be at least 8 characters')
-      .regex(/[A-Z]/, 'Password must contain at least one uppercase letter')
-      .regex(/[0-9]/, 'Password must contain at least one number'),
-    confirmPassword: z.string(),
-    role: z.enum(['guest', 'supplier'], { required_error: 'Please select a role' }),
-  })
-  .refine((data) => data.password === data.confirmPassword, {
-    message: 'Passwords do not match',
-    path: ['confirmPassword'],
-  });
-
-type RegisterFormData = z.infer<typeof registerSchema>;
+type Form = z.infer<typeof schema>
 
 export default function RegisterPage() {
-  const router = useRouter();
-  const [authError, setAuthError] = useState<string | null>(null);
-  const [success, setSuccess] = useState(false);
-
-  const {
-    register,
-    handleSubmit,
-    formState: { errors, isSubmitting },
-  } = useForm<RegisterFormData>({
-    resolver: zodResolver(registerSchema),
+  const router = useRouter()
+  const [authError, setAuthError] = useState<string | null>(null)
+  const { register, handleSubmit, watch, formState: { errors, isSubmitting } } = useForm<Form>({
+    resolver: zodResolver(schema),
     defaultValues: { role: 'guest' },
-  });
+  })
 
-  const onSubmit = async (data: RegisterFormData) => {
-    setAuthError(null);
+  const role = watch('role')
+
+  const onSubmit = async (data: Form) => {
+    setAuthError(null)
     try {
-      await signUp(data.email, data.password, data.fullName, data.role);
-      setSuccess(true);
+      await signUp(data.email, data.password, data.fullName, data.role)
+      router.push(data.role === 'supplier' ? '/supplier' : '/dashboard')
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Registration failed. Please try again.';
-      setAuthError(message);
+      setAuthError(err instanceof Error ? err.message : 'Registration failed')
     }
-  };
-
-  if (success) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4">
-        <div className="max-w-md w-full bg-white rounded-2xl shadow-sm border border-gray-200 p-10 text-center">
-          <div className="w-16 h-16 bg-[#2D6A4F] rounded-full flex items-center justify-center mx-auto mb-4">
-            <svg className="w-8 h-8 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-            </svg>
-          </div>
-          <h2 className="text-xl font-bold text-gray-900 mb-2">Check your email!</h2>
-          <p className="text-gray-500 text-sm mb-6">
-            We&apos;ve sent a confirmation link to your email address. Click it to activate your account.
-          </p>
-          <Link
-            href="/auth/login"
-            className="block w-full bg-[#2D6A4F] text-white py-3 rounded-xl font-semibold text-sm hover:bg-[#245a42] transition-colors"
-          >
-            Back to Login
-          </Link>
-        </div>
-      </div>
-    );
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4 py-10">
-      <div className="max-w-md w-full">
-        <div className="text-center mb-8">
-          <Link href="/" className="inline-block">
-            <span className="text-2xl font-bold text-[#2D6A4F]">Visit Drakensberg</span>
-          </Link>
-          <h1 className="text-xl font-semibold text-gray-800 mt-4">Create your account</h1>
-          <p className="text-gray-500 text-sm mt-1">Join thousands of Drakensberg adventurers</p>
+    <div className="min-h-screen bg-mist flex">
+      {/* Left */}
+      <div className="hidden lg:block relative w-1/2">
+        <img
+          src="https://images.unsplash.com/photo-1551632811-561732d1e306?w=1200&q=85"
+          alt="Drakensberg"
+          className="absolute inset-0 w-full h-full object-cover"
+        />
+        <div className="absolute inset-0 bg-forest/40" />
+        <div className="absolute bottom-12 left-12 right-12">
+          <Link href="/" className="font-display italic text-2xl text-gold">Visit Drakensberg</Link>
+          <p className="font-sans text-sm text-white/60 mt-3 leading-relaxed">
+            Join thousands of guests and local suppliers on South Africa&apos;s mountain travel platform.
+          </p>
         </div>
+      </div>
 
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-8">
+      {/* Right */}
+      <div className="flex-1 flex items-center justify-center px-6 py-16 overflow-y-auto">
+        <div className="w-full max-w-sm">
+          <Link href="/" className="lg:hidden font-display italic text-xl text-forest block mb-10">
+            Visit Drakensberg
+          </Link>
+          <p className="font-sans text-xs tracking-[0.2em] uppercase text-forest/40 mb-2">Get started</p>
+          <h1 className="font-display text-4xl text-forest mb-8">Create account</h1>
+
           {authError && (
-            <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
+            <div className="mb-6 px-4 py-3 bg-red-50 border border-red-200 font-sans text-sm text-red-700">
               {authError}
             </div>
           )}
 
-          <form onSubmit={handleSubmit(onSubmit)} className="space-y-4" noValidate>
+          <form onSubmit={handleSubmit(onSubmit)} className="space-y-5" noValidate>
+            {/* Role selector */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Full Name</label>
-              <input
-                {...register('fullName')}
-                type="text"
-                placeholder="Jane Doe"
-                autoComplete="name"
-                className={`w-full border rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#2D6A4F] ${
-                  errors.fullName ? 'border-red-400' : 'border-gray-300'
-                }`}
-              />
-              {errors.fullName && (
-                <p className="text-xs text-red-500 mt-1">{errors.fullName.message}</p>
-              )}
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Email address</label>
-              <input
-                {...register('email')}
-                type="email"
-                placeholder="you@example.com"
-                autoComplete="email"
-                className={`w-full border rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#2D6A4F] ${
-                  errors.email ? 'border-red-400' : 'border-gray-300'
-                }`}
-              />
-              {errors.email && (
-                <p className="text-xs text-red-500 mt-1">{errors.email.message}</p>
-              )}
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Password</label>
-              <input
-                {...register('password')}
-                type="password"
-                placeholder="Minimum 8 characters"
-                autoComplete="new-password"
-                className={`w-full border rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#2D6A4F] ${
-                  errors.password ? 'border-red-400' : 'border-gray-300'
-                }`}
-              />
-              {errors.password && (
-                <p className="text-xs text-red-500 mt-1">{errors.password.message}</p>
-              )}
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Confirm Password
-              </label>
-              <input
-                {...register('confirmPassword')}
-                type="password"
-                placeholder="Re-enter your password"
-                autoComplete="new-password"
-                className={`w-full border rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#2D6A4F] ${
-                  errors.confirmPassword ? 'border-red-400' : 'border-gray-300'
-                }`}
-              />
-              {errors.confirmPassword && (
-                <p className="text-xs text-red-500 mt-1">{errors.confirmPassword.message}</p>
-              )}
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">I am a…</label>
+              <p className="font-sans text-xs tracking-[0.1em] uppercase text-forest/50 mb-3">I am a</p>
               <div className="grid grid-cols-2 gap-3">
-                {[
-                  { value: 'guest', label: 'Guest', icon: '🧳', desc: 'Looking to book' },
-                  { value: 'supplier', label: 'Supplier', icon: '🏡', desc: 'Listing property' },
-                ].map((opt) => (
-                  <label
-                    key={opt.value}
-                    className="relative flex flex-col items-center p-3 border rounded-lg cursor-pointer has-[:checked]:border-[#2D6A4F] has-[:checked]:bg-green-50 border-gray-200 hover:border-gray-300 transition-colors"
-                  >
-                    <input
-                      {...register('role')}
-                      type="radio"
-                      value={opt.value}
-                      className="sr-only"
-                    />
-                    <span className="text-2xl mb-1">{opt.icon}</span>
-                    <span className="text-sm font-medium text-gray-800">{opt.label}</span>
-                    <span className="text-xs text-gray-500">{opt.desc}</span>
+                {(['guest', 'supplier'] as const).map((r) => (
+                  <label key={r}
+                    className={`flex items-center justify-center gap-2 border px-4 py-3 cursor-pointer transition-colors ${role === r ? 'border-forest bg-forest text-white' : 'border-black/15 bg-white text-forest/60 hover:border-forest'}`}>
+                    <input {...register('role')} type="radio" value={r} className="sr-only" />
+                    <span className="font-sans text-sm capitalize">{r === 'guest' ? 'Guest / Traveller' : 'Property / Activity Supplier'}</span>
                   </label>
                 ))}
               </div>
-              {errors.role && (
-                <p className="text-xs text-red-500 mt-1">{errors.role.message}</p>
-              )}
             </div>
 
-            <button
-              type="submit"
-              disabled={isSubmitting}
-              className="w-full bg-[#2D6A4F] text-white py-3 rounded-xl font-semibold text-sm hover:bg-[#245a42] transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 mt-2"
-            >
-              {isSubmitting ? (
-                <>
-                  <span className="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full" />
-                  Creating account…
-                </>
-              ) : (
-                'Create Account'
-              )}
+            <div>
+              <label className="font-sans text-xs tracking-[0.1em] uppercase text-forest/50 block mb-2">Full name</label>
+              <input {...register('fullName')} type="text" placeholder="Your name"
+                className={`w-full bg-white border px-4 py-3 font-sans text-sm text-forest placeholder:text-forest/25 focus:outline-none focus:border-forest transition-colors ${errors.fullName ? 'border-red-400' : 'border-black/15'}`} />
+              {errors.fullName && <p className="font-sans text-xs text-red-500 mt-1.5">{errors.fullName.message}</p>}
+            </div>
+
+            <div>
+              <label className="font-sans text-xs tracking-[0.1em] uppercase text-forest/50 block mb-2">Email address</label>
+              <input {...register('email')} type="email" placeholder="you@example.com"
+                className={`w-full bg-white border px-4 py-3 font-sans text-sm text-forest placeholder:text-forest/25 focus:outline-none focus:border-forest transition-colors ${errors.email ? 'border-red-400' : 'border-black/15'}`} />
+              {errors.email && <p className="font-sans text-xs text-red-500 mt-1.5">{errors.email.message}</p>}
+            </div>
+
+            <div>
+              <label className="font-sans text-xs tracking-[0.1em] uppercase text-forest/50 block mb-2">Password</label>
+              <input {...register('password')} type="password" placeholder="Min. 8 characters"
+                className={`w-full bg-white border px-4 py-3 font-sans text-sm text-forest placeholder:text-forest/25 focus:outline-none focus:border-forest transition-colors ${errors.password ? 'border-red-400' : 'border-black/15'}`} />
+              {errors.password && <p className="font-sans text-xs text-red-500 mt-1.5">{errors.password.message}</p>}
+            </div>
+
+            <div>
+              <label className="font-sans text-xs tracking-[0.1em] uppercase text-forest/50 block mb-2">Confirm password</label>
+              <input {...register('confirmPassword')} type="password" placeholder="••••••••"
+                className={`w-full bg-white border px-4 py-3 font-sans text-sm text-forest placeholder:text-forest/25 focus:outline-none focus:border-forest transition-colors ${errors.confirmPassword ? 'border-red-400' : 'border-black/15'}`} />
+              {errors.confirmPassword && <p className="font-sans text-xs text-red-500 mt-1.5">{errors.confirmPassword.message}</p>}
+            </div>
+
+            <button type="submit" disabled={isSubmitting}
+              className="w-full bg-forest text-white py-3.5 font-sans text-sm hover:bg-sage transition-colors disabled:opacity-50 mt-2">
+              {isSubmitting ? 'Creating account…' : 'Create account'}
             </button>
           </form>
 
-          <p className="text-center text-sm text-gray-500 mt-6">
+          <p className="font-sans text-sm text-forest/50 text-center mt-8">
             Already have an account?{' '}
-            <Link href="/auth/login" className="text-[#2D6A4F] font-medium hover:underline">
-              Sign in
-            </Link>
+            <Link href="/auth/login" className="text-forest hover:text-gold transition-colors font-medium">Sign in</Link>
           </p>
         </div>
       </div>
     </div>
-  );
+  )
 }

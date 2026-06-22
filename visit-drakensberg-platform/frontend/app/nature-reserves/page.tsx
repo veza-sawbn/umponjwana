@@ -1,9 +1,10 @@
 'use client'
 import { useState } from 'react'
 import Link from 'next/link'
-import { ArrowLeft, Info, ShieldCheck, Sunrise } from 'lucide-react'
+import { Info, ShieldCheck, Sunrise } from 'lucide-react'
 import PanoramaViewer from '@/components/panorama/PanoramaViewer'
 import TrailCard from '@/components/trails/TrailCard'
+import Footer from '@/components/layout/Footer'
 import type { Trail } from '@/components/trails/TrailCard'
 
 /* ─── Reserve data ───────────────────────────────────────────────────────── */
@@ -298,40 +299,21 @@ export default function NatureReservesPage() {
   const reserve = RESERVES.find((r) => r.id === selectedId) ?? RESERVES[0]
 
   return (
-    <main className="bg-mist min-h-screen">
+    <main className="bg-mist min-h-screen pt-16">
 
       {/* ── Hero ─────────────────────────────────────────────────────────── */}
-      <section
-        className="relative h-[55vh] flex flex-col justify-end pb-16"
-        style={{
-          backgroundImage: `url(${reserve.image})`,
-          backgroundSize: 'cover',
-          backgroundPosition: 'center 40%',
-          transition: 'background-image 0.3s ease',
-        }}
-      >
-        <div className="absolute inset-0 bg-gradient-to-b from-forest/30 via-forest/40 to-forest/85" />
-        <div className="relative z-10 max-w-7xl mx-auto px-4 w-full">
-          <Link
-            href="/"
-            className="inline-flex items-center gap-2 font-sans text-sm text-white/60 hover:text-white transition-colors mb-6"
-          >
-            <ArrowLeft className="h-4 w-4" /> Back to Home
-          </Link>
-          <p className="font-sans text-gold text-sm font-medium tracking-[0.2em] uppercase mb-3">
-            Drakensberg · KwaZulu-Natal
-          </p>
-          <h1 className="font-display text-5xl md:text-7xl font-bold text-white leading-none mb-3">
-            Nature Reserves
-          </h1>
-          <p className="font-sans text-white/60 font-light text-lg max-w-2xl">
-            Explore South Africa's most iconic mountain wilderness through interactive panoramas, named peaks, and curated trails.
+      <section className="bg-forest text-white py-16 px-6 lg:px-12">
+        <div className="max-w-[1440px] mx-auto">
+          <p className="font-sans text-xs tracking-[0.2em] uppercase text-white/30 mb-3">Protected wilderness</p>
+          <h1 className="font-display text-5xl lg:text-6xl text-white leading-none mb-4">Nature Reserves</h1>
+          <p className="font-sans text-sm text-white/50 max-w-2xl">
+            Explore South Africa&apos;s most iconic mountain wilderness through interactive panoramas, named peaks, and curated trails.
           </p>
         </div>
       </section>
 
       {/* ── Reserve selector ─────────────────────────────────────────────── */}
-      <div className="sticky top-0 z-40 bg-white border-b border-forest/10 shadow-sm">
+      <div className="sticky top-16 z-40 bg-white border-b border-black/8">
         <div className="max-w-7xl mx-auto px-4">
           <div className="flex gap-1 overflow-x-auto py-1">
             {RESERVES.map((r) => (
@@ -352,7 +334,7 @@ export default function NatureReservesPage() {
       </div>
 
       {/* ── Reserve content ──────────────────────────────────────────────── */}
-      <div className="max-w-7xl mx-auto px-4 py-12">
+      <div className="max-w-[1440px] mx-auto px-6 lg:px-12 py-12">
 
         {/* Reserve header */}
         <div className="mb-10">
@@ -470,6 +452,7 @@ export default function NatureReservesPage() {
           </div>
         </div>
       </div>
+      <Footer />
     </main>
   )
 }

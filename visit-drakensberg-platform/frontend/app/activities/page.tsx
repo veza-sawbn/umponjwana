@@ -1,307 +1,73 @@
-'use client';
+'use client'
+import Link from 'next/link'
+import Footer from '@/components/layout/Footer'
 
-import { useState } from 'react';
+const CATEGORIES = [
+  { label: 'Adventure', slug: 'adventure' },
+  { label: 'Wildlife', slug: 'wildlife' },
+  { label: 'Cultural', slug: 'cultural' },
+  { label: 'Family', slug: 'family' },
+  { label: 'Wellness', slug: 'wellness' },
+]
 
-const sampleActivities = [
-  {
-    id: 'a1',
-    title: 'Cathedral Peak Guided Hike',
-    location: 'Cathedral Peak, Northern Berg',
-    price: 650,
-    rating: 4.9,
-    reviewCount: 88,
-    image: 'https://images.unsplash.com/photo-1551632811-561732d1e306?w=800',
-    type: 'guided',
-    duration: 'full day',
-    difficulty: 'moderate',
-  },
-  {
-    id: 'a2',
-    title: 'Fly Fishing on the Thukela',
-    location: 'Royal Natal, Drakensberg',
-    price: 890,
-    rating: 4.7,
-    reviewCount: 34,
-    image: 'https://images.unsplash.com/photo-1504198453898-bc81c78e8a39?w=800',
-    type: 'guided',
-    duration: 'half day',
-    difficulty: 'easy',
-  },
-  {
-    id: 'a3',
-    title: 'Rock Climbing – Monk\'s Cowl',
-    location: "Monk's Cowl, Central Berg",
-    price: 1200,
-    rating: 4.8,
-    reviewCount: 21,
-    image: 'https://images.unsplash.com/photo-1522163182402-834f871fd851?w=800',
-    type: 'guided',
-    duration: 'full day',
-    difficulty: 'hard',
-  },
-  {
-    id: 'a4',
-    title: 'Self-Guided San Art Trail',
-    location: 'Giants Castle, Drakensberg',
-    price: 120,
-    rating: 4.5,
-    reviewCount: 57,
-    image: 'https://images.unsplash.com/photo-1598300042247-d088f8ab3a91?w=800',
-    type: 'self-guided',
-    duration: 'half day',
-    difficulty: 'easy',
-  },
-  {
-    id: 'a5',
-    title: 'Sani Pass 4x4 Adventure',
-    location: 'Sani Pass, Southern Berg',
-    price: 1800,
-    rating: 4.9,
-    reviewCount: 112,
-    image: 'https://images.unsplash.com/photo-1469474968028-56623f02e42e?w=800',
-    type: 'guided',
-    duration: 'full day',
-    difficulty: 'moderate',
-  },
-  {
-    id: 'a6',
-    title: 'Multi-Day Drakensberg Traverse',
-    location: 'Central & Northern Berg',
-    price: 3500,
-    rating: 5.0,
-    reviewCount: 8,
-    image: 'https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?w=800',
-    type: 'guided',
-    duration: 'multi-day',
-    difficulty: 'extreme',
-  },
-];
-
-const SORT_OPTIONS = ['Price: Low to High', 'Price: High to Low', 'Rating', 'Most Reviewed'];
-const TYPES = ['guided', 'self-guided'];
-const DURATIONS = ['half day', 'full day', 'multi-day'];
-const DIFFICULTIES = ['easy', 'moderate', 'hard', 'extreme'];
-
-const DIFFICULTY_COLORS: Record<string, string> = {
-  easy: 'bg-green-100 text-green-700',
-  moderate: 'bg-yellow-100 text-yellow-700',
-  hard: 'bg-orange-100 text-orange-700',
-  extreme: 'bg-red-100 text-red-700',
-};
+const ACTIVITIES = [
+  { id: 'a1', title: 'San Rock Art Tour', location: 'Giants Castle', category: 'Cultural', price: 380, duration: '3 h', img: 'https://images.unsplash.com/photo-1529946179074-1f3cf40c0a0e?w=800&q=80', rating: 4.9, reviews: 87 },
+  { id: 'a2', title: 'Abseiling at the Amphitheatre', location: 'Royal Natal', category: 'Adventure', price: 650, duration: '4 h', img: 'https://images.unsplash.com/photo-1542587222-e14b891ee40b?w=800&q=80', rating: 4.8, reviews: 43 },
+  { id: 'a3', title: 'Bearded Vulture Hide', location: 'Giants Castle GR', category: 'Wildlife', price: 290, duration: '3 h', img: 'https://images.unsplash.com/photo-1508739773434-c26b3d09e071?w=800&q=80', rating: 4.9, reviews: 61 },
+  { id: 'a4', title: 'Fly-Fishing — Trout in the Berg', location: 'Champagne Valley', category: 'Adventure', price: 1200, duration: 'Full day', img: 'https://images.unsplash.com/photo-1503614472-8c93d56e92ce?w=800&q=80', rating: 4.6, reviews: 29 },
+  { id: 'a5', title: 'Sani Pass 4x4 Day Tour', location: 'Sani Pass', category: 'Adventure', price: 950, duration: 'Full day', img: 'https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?w=800&q=80', rating: 4.8, reviews: 112 },
+  { id: 'a6', title: 'Horse Riding in the Foothills', location: 'Central Berg', category: 'Family', price: 480, duration: '2 h', img: 'https://images.unsplash.com/photo-1551632811-561732d1e306?w=800&q=80', rating: 4.5, reviews: 38 },
+  { id: 'a7', title: 'Sunrise Yoga & Meditation', location: 'Champagne Valley', category: 'Wellness', price: 220, duration: '2 h', img: 'https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=800&q=80', rating: 4.7, reviews: 22 },
+  { id: 'a8', title: 'Stargazing Experience', location: 'Northern Berg', category: 'Family', price: 300, duration: '2.5 h', img: 'https://images.unsplash.com/photo-1516426122078-c23e76319801?w=800&q=80', rating: 4.9, reviews: 74 },
+]
 
 export default function ActivitiesPage() {
-  const [view, setView] = useState<'grid' | 'map'>('grid');
-  const [sortBy, setSortBy] = useState(SORT_OPTIONS[0]);
-  const [selectedTypes, setSelectedTypes] = useState<string[]>([]);
-  const [selectedDurations, setSelectedDurations] = useState<string[]>([]);
-  const [selectedDifficulties, setSelectedDifficulties] = useState<string[]>([]);
-  const [priceRange, setPriceRange] = useState([0, 5000]);
-
-  const toggle = (list: string[], setList: (v: string[]) => void, val: string) =>
-    setList(list.includes(val) ? list.filter((x) => x !== val) : [...list, val]);
-
-  const filtered = [...sampleActivities]
-    .sort((a, b) => {
-      if (sortBy === 'Price: Low to High') return a.price - b.price;
-      if (sortBy === 'Price: High to Low') return b.price - a.price;
-      if (sortBy === 'Rating') return b.rating - a.rating;
-      if (sortBy === 'Most Reviewed') return b.reviewCount - a.reviewCount;
-      return 0;
-    })
-    .filter((a) => {
-      if (a.price < priceRange[0] || a.price > priceRange[1]) return false;
-      if (selectedTypes.length && !selectedTypes.includes(a.type)) return false;
-      if (selectedDurations.length && !selectedDurations.includes(a.duration)) return false;
-      if (selectedDifficulties.length && !selectedDifficulties.includes(a.difficulty)) return false;
-      return true;
-    });
-
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="bg-[#8B5E3C] text-white py-10 px-6">
-        <div className="max-w-7xl mx-auto">
-          <h1 className="text-3xl font-bold">Activities & Adventures</h1>
-          <p className="mt-2 text-orange-100">
-            Guided tours, rock climbing, fly fishing and more across the Drakensberg
-          </p>
+    <main className="bg-mist min-h-screen pt-16">
+      <section className="bg-forest text-white py-16 px-6 lg:px-12">
+        <div className="max-w-[1440px] mx-auto">
+          <p className="font-sans text-xs tracking-[0.2em] uppercase text-white/30 mb-3">Things to do</p>
+          <h1 className="font-display text-5xl lg:text-6xl text-white leading-none mb-4">Activities</h1>
+          <p className="font-sans text-sm text-white/50">Guided experiences, tours and adventures across the Drakensberg</p>
+        </div>
+      </section>
+
+      <section className="bg-white border-b border-black/8 px-6 lg:px-12">
+        <div className="max-w-[1440px] mx-auto flex gap-8 overflow-x-auto">
+          {CATEGORIES.map((c) => (
+            <button key={c.slug}
+              className="font-sans text-sm text-forest/50 hover:text-forest py-4 border-b-2 border-transparent hover:border-forest transition-all whitespace-nowrap">
+              {c.label}
+            </button>
+          ))}
+        </div>
+      </section>
+
+      <div className="max-w-[1440px] mx-auto px-6 lg:px-12 py-12">
+        <p className="font-sans text-sm text-forest/50 mb-8">
+          <span className="text-forest font-medium">{ACTIVITIES.length}</span> experiences
+        </p>
+        <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-x-6 gap-y-10">
+          {ACTIVITIES.map((a) => (
+            <Link key={a.id} href={`/activities/${a.id}`} className="group block">
+              <div className="relative overflow-hidden aspect-square mb-4">
+                <img src={a.img} alt={a.title}
+                  className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" />
+                <span className="absolute top-3 left-3 font-sans text-[10px] tracking-[0.1em] uppercase bg-white/90 text-forest px-2.5 py-1">
+                  {a.category}
+                </span>
+              </div>
+              <p className="font-sans text-[10px] tracking-[0.15em] uppercase text-gold mb-1">{a.location} · {a.duration}</p>
+              <h3 className="font-display text-lg text-forest leading-snug mb-2 group-hover:text-sage transition-colors">{a.title}</h3>
+              <div className="flex items-center justify-between">
+                <span className="font-sans text-xs text-forest/40">★ {a.rating} ({a.reviews})</span>
+                <span className="font-display text-base text-forest">R{a.price.toLocaleString()}<span className="font-sans text-xs text-forest/40"> /p</span></span>
+              </div>
+            </Link>
+          ))}
         </div>
       </div>
-
-      <div className="max-w-7xl mx-auto px-4 py-8 flex gap-8">
-        {/* Sidebar */}
-        <aside className="w-72 shrink-0">
-          <div className="bg-white rounded-xl shadow-sm p-6 sticky top-6 space-y-6">
-            <h2 className="font-semibold text-gray-800 text-lg">Filters</h2>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Price (R)</label>
-              <div className="flex items-center gap-2 text-sm text-gray-600 mb-1">
-                <span>R{priceRange[0]}</span>
-                <span className="mx-auto">–</span>
-                <span>R{priceRange[1]}</span>
-              </div>
-              <input
-                type="range"
-                min={0}
-                max={5000}
-                step={100}
-                value={priceRange[1]}
-                onChange={(e) => setPriceRange([0, Number(e.target.value)])}
-                className="w-full accent-[#8B5E3C]"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Type</label>
-              {TYPES.map((t) => (
-                <label key={t} className="flex items-center gap-2 cursor-pointer mb-1">
-                  <input
-                    type="checkbox"
-                    checked={selectedTypes.includes(t)}
-                    onChange={() => toggle(selectedTypes, setSelectedTypes, t)}
-                    className="accent-[#8B5E3C]"
-                  />
-                  <span className="text-sm text-gray-600 capitalize">{t}</span>
-                </label>
-              ))}
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Duration</label>
-              {DURATIONS.map((d) => (
-                <label key={d} className="flex items-center gap-2 cursor-pointer mb-1">
-                  <input
-                    type="checkbox"
-                    checked={selectedDurations.includes(d)}
-                    onChange={() => toggle(selectedDurations, setSelectedDurations, d)}
-                    className="accent-[#8B5E3C]"
-                  />
-                  <span className="text-sm text-gray-600 capitalize">{d}</span>
-                </label>
-              ))}
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Difficulty</label>
-              {DIFFICULTIES.map((d) => (
-                <label key={d} className="flex items-center gap-2 cursor-pointer mb-1">
-                  <input
-                    type="checkbox"
-                    checked={selectedDifficulties.includes(d)}
-                    onChange={() => toggle(selectedDifficulties, setSelectedDifficulties, d)}
-                    className="accent-[#8B5E3C]"
-                  />
-                  <span className="text-sm text-gray-600 capitalize">{d}</span>
-                </label>
-              ))}
-            </div>
-
-            <button
-              onClick={() => {
-                setSelectedTypes([]);
-                setSelectedDurations([]);
-                setSelectedDifficulties([]);
-                setPriceRange([0, 5000]);
-              }}
-              className="w-full text-sm text-[#8B5E3C] underline"
-            >
-              Clear all filters
-            </button>
-          </div>
-        </aside>
-
-        {/* Main */}
-        <main className="flex-1">
-          <div className="flex items-center justify-between mb-6">
-            <p className="text-gray-600 text-sm">
-              <span className="font-semibold text-gray-800">{filtered.length}</span> activities found
-            </p>
-            <div className="flex items-center gap-3">
-              <div className="flex border border-gray-300 rounded-lg overflow-hidden">
-                <button
-                  onClick={() => setView('grid')}
-                  className={`px-3 py-1.5 text-sm ${view === 'grid' ? 'bg-[#8B5E3C] text-white' : 'bg-white text-gray-600'}`}
-                >
-                  Grid
-                </button>
-                <button
-                  onClick={() => setView('map')}
-                  className={`px-3 py-1.5 text-sm ${view === 'map' ? 'bg-[#8B5E3C] text-white' : 'bg-white text-gray-600'}`}
-                >
-                  Map
-                </button>
-              </div>
-              <select
-                value={sortBy}
-                onChange={(e) => setSortBy(e.target.value)}
-                className="border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#8B5E3C]"
-              >
-                {SORT_OPTIONS.map((o) => <option key={o}>{o}</option>)}
-              </select>
-            </div>
-          </div>
-
-          {view === 'grid' ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-              {filtered.map((act) => (
-                <a key={act.id} href={`/listings/${act.id}`} className="block group">
-                  <div className="bg-white rounded-xl overflow-hidden shadow-sm hover:shadow-md transition-shadow">
-                    <div className="relative h-48 overflow-hidden">
-                      <img
-                        src={act.image}
-                        alt={act.title}
-                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                      />
-                      <span
-                        className={`absolute top-3 left-3 text-xs px-2 py-1 rounded-full font-medium ${DIFFICULTY_COLORS[act.difficulty]}`}
-                      >
-                        {act.difficulty}
-                      </span>
-                    </div>
-                    <div className="p-4">
-                      <div className="flex items-start justify-between">
-                        <div>
-                          <h3 className="font-semibold text-gray-800 text-sm">{act.title}</h3>
-                          <p className="text-xs text-gray-500 mt-0.5">{act.location}</p>
-                        </div>
-                        <span className="flex items-center gap-1 text-xs font-medium text-gray-700 shrink-0">
-                          <span className="text-yellow-500">★</span>
-                          {act.rating}
-                        </span>
-                      </div>
-                      <div className="mt-2 flex gap-2">
-                        <span className="text-xs bg-orange-50 text-[#8B5E3C] px-2 py-0.5 rounded-full capitalize">
-                          {act.type}
-                        </span>
-                        <span className="text-xs bg-orange-50 text-[#8B5E3C] px-2 py-0.5 rounded-full capitalize">
-                          {act.duration}
-                        </span>
-                      </div>
-                      <p className="mt-3 text-sm">
-                        <span className="font-bold text-gray-900">R{act.price.toLocaleString()}</span>
-                        <span className="text-gray-500"> / person</span>
-                      </p>
-                    </div>
-                  </div>
-                </a>
-              ))}
-            </div>
-          ) : (
-            <div className="bg-gradient-to-br from-orange-50 to-green-100 rounded-xl h-96 flex items-center justify-center border border-gray-200">
-              <div className="text-center">
-                <p className="text-gray-500 text-sm mb-4">Map view — {filtered.length} activities</p>
-                <div className="flex flex-wrap gap-2 justify-center max-w-sm">
-                  {filtered.map((a) => (
-                    <span key={a.id} className="bg-[#8B5E3C] text-white text-xs px-2 py-1 rounded-full">
-                      📍 {a.title}
-                    </span>
-                  ))}
-                </div>
-              </div>
-            </div>
-          )}
-        </main>
-      </div>
-    </div>
-  );
+      <Footer />
+    </main>
+  )
 }

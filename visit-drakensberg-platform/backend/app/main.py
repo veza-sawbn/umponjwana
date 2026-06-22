@@ -16,6 +16,8 @@ from app.api.v1 import (
     reviews,
     notifications,
     admin,
+    messages,
+    discounts,
 )
 
 logger = logging.getLogger(__name__)
@@ -64,6 +66,8 @@ app.include_router(payments.router, prefix=API_PREFIX)
 app.include_router(reviews.router, prefix=API_PREFIX)
 app.include_router(notifications.router, prefix=API_PREFIX)
 app.include_router(admin.router, prefix=API_PREFIX)
+app.include_router(messages.router, prefix=API_PREFIX)
+app.include_router(discounts.router, prefix=API_PREFIX)
 
 
 # ---------------------------------------------------------------------------
