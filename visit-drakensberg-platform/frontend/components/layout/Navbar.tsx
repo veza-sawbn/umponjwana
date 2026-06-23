@@ -82,7 +82,7 @@ export default function Navbar() {
         <div className="max-w-[1440px] mx-auto px-6 lg:px-12 h-16 flex items-center justify-between">
           {/* Logo */}
           <Link href="/" aria-label="Visit Drakensberg — Home">
-            <Logo className={`h-2 lg:h-8 w-auto transition-colors duration-300 ${logoColor}`} />
+            <Logo className={`h-3 lg:h-8 w-auto transition-colors duration-300 ${logoColor}`} />
           </Link>
 
           {/* Desktop nav */}
@@ -209,7 +209,7 @@ export default function Navbar() {
           >
             <div className="h-16 flex items-center justify-between px-6 border-b border-black/8">
               <Link href="/" aria-label="Visit Drakensberg — Home">
-                <Logo className="h-2 lg:h-8 w-auto text-forest" />
+                <Logo className="h-3 lg:h-8 w-auto text-forest" />
               </Link>
               <motion.button
                 onClick={() => setMobileOpen(false)}

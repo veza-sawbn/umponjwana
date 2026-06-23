@@ -181,7 +181,7 @@ export default function HomePage() {
 
         {/* Content */}
         <motion.div
-          className="relative flex-1 flex flex-col justify-end pb-20 px-6 lg:px-20 max-w-[1440px] mx-auto w-full"
+          className="relative flex-1 flex flex-col justify-end pb-32 lg:pb-20 px-6 lg:px-20 max-w-[1440px] mx-auto w-full"
           variants={staggerContainer(0.12, 0.2)}
           initial="hidden"
           animate="show"
@@ -189,7 +189,7 @@ export default function HomePage() {
           <motion.p variants={fadeUp} className="font-sans text-xs tracking-[0.2em] uppercase text-gold mb-4">
             {hero.location_label}
           </motion.p>
-          <motion.h1 variants={fadeUp} className="font-display text-5xl sm:text-7xl lg:text-8xl text-white leading-[0.9] mb-6 max-w-3xl" style={{ whiteSpace: 'pre-line' }}>
+          <motion.h1 variants={fadeUp} className="font-display text-4xl sm:text-7xl lg:text-8xl text-white leading-[0.9] mb-6 max-w-3xl" style={{ whiteSpace: 'pre-line' }}>
             {hero.headline}
           </motion.h1>
           <motion.p variants={fadeUp} className="font-sans text-base text-white/70 max-w-md mb-10 font-light leading-relaxed">
