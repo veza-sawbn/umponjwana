@@ -7,6 +7,7 @@ import { supabase, signOut } from '@/lib/auth'
 import type { User as SupabaseUser } from '@supabase/supabase-js'
 import { AnimatePresence, motion } from 'framer-motion'
 import { scaleFade, fade, staggerContainer, staggerChild } from '@/lib/motion'
+import Logo from '@/components/Logo'
 
 const NAV_LINKS = [
   { label: 'Stays', href: '/stays' },
@@ -80,11 +81,8 @@ export default function Navbar() {
       >
         <div className="max-w-[1440px] mx-auto px-6 lg:px-12 h-16 flex items-center justify-between">
           {/* Logo */}
-          <Link
-            href="/"
-            className={`font-display italic text-xl leading-none transition-colors duration-300 ${logoColor}`}
-          >
-            Visit Drakensberg
+          <Link href="/" aria-label="Visit Drakensberg — Home">
+            <Logo className={`h-8 w-auto transition-colors duration-300 ${logoColor}`} />
           </Link>
 
           {/* Desktop nav */}
@@ -210,8 +208,8 @@ export default function Navbar() {
             exit="exit"
           >
             <div className="h-16 flex items-center justify-between px-6 border-b border-black/8">
-              <Link href="/" className="font-display italic text-xl text-forest">
-                Visit Drakensberg
+              <Link href="/" aria-label="Visit Drakensberg — Home">
+                <Logo className="h-8 w-auto text-forest" />
               </Link>
               <motion.button
                 onClick={() => setMobileOpen(false)}
