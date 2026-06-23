@@ -4,6 +4,8 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { Toaster } from 'react-hot-toast'
 import { useState } from 'react'
 import Navbar from '@/components/layout/Navbar'
+import { BookingProvider } from '@/lib/booking-context'
+import BookingBar from '@/components/booking/BookingBar'
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   const [queryClient] = useState(() => new QueryClient({
@@ -20,9 +22,12 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       </head>
       <body>
         <QueryClientProvider client={queryClient}>
-          <Navbar />
-          {children}
-          <Toaster position="top-right" toastOptions={{ duration: 4000 }} />
+          <BookingProvider>
+            <Navbar />
+            {children}
+            <BookingBar />
+            <Toaster position="top-right" toastOptions={{ duration: 4000 }} />
+          </BookingProvider>
         </QueryClientProvider>
       </body>
     </html>

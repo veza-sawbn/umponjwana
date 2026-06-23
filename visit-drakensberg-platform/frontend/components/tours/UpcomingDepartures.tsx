@@ -2,7 +2,8 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
-import { Calendar, Users, Tag, ChevronRight, UserCircle, Package, Sparkles } from 'lucide-react'
+import { Calendar, Users, Tag, ChevronRight, UserCircle, Package, Sparkles, Check, Plus } from 'lucide-react'
+import { useBooking } from '@/lib/booking-context'
 
 export type TourDate = {
   id: string
@@ -37,6 +38,7 @@ function formatDate(iso: string) {
 
 export default function UpcomingDepartures({ dates, context }: { dates: TourDate[]; context?: string }) {
   const [filter, setFilter] = useState<'all' | TourDate['type']>('all')
+  const booking = useBooking()
 
   const visible = dates.filter(d => filter === 'all' || d.type === filter)
   const hasTypes = new Set(dates.map(d => d.type))
@@ -139,14 +141,31 @@ export default function UpcomingDepartures({ dates, context }: { dates: TourDate
                     </span>
                     {spots.full ? (
                       <span className="font-sans text-xs text-gray-400 px-5 py-2.5 border border-gray-200">Full</span>
-                    ) : (
-                      <Link
-                        href={d.booking_href || `/checkout?tour=${d.id}`}
-                        className="font-sans text-sm bg-[#2d6a4f] text-white px-5 py-2.5 hover:bg-[#235a3f] transition-colors inline-flex items-center gap-1"
-                      >
-                        Book Spot <ChevronRight size={14} />
-                      </Link>
-                    )}
+                    ) : (() => {
+                      const isAdded = booking.addons.some(a => a.id === d.id)
+                      return (
+                        <button
+                          onClick={() => isAdded
+                            ? booking.removeAddon(d.id)
+                            : booking.addAddon({
+                                id: d.id,
+                                type: d.type === 'guide' ? 'hike' : d.type === 'package' ? 'activity' : 'tour',
+                                title: `${d.operator}${d.guide ? ` · ${d.guide}` : ''}`,
+                                date: d.date,
+                                price_per_person: d.price_per_person,
+                                guests: booking.guests || 1,
+                              })
+                          }
+                          className={`font-sans text-sm px-5 py-2.5 transition-colors inline-flex items-center gap-1.5 ${
+                            isAdded
+                              ? 'bg-[#2d6a4f] text-white hover:bg-red-600'
+                              : 'bg-[#2d6a4f] text-white hover:bg-[#235a3f]'
+                          }`}
+                        >
+                          {isAdded ? <><Check size={13} /> Added</> : <><Plus size={13} /> Add to Trip</>}
+                        </button>
+                      )
+                    })()}
                   </div>
                 </div>
               </div>

@@ -8,6 +8,8 @@ import Footer from '@/components/layout/Footer'
 import { ArrowLeft, Clock, Users, Star, CheckCircle, Calendar, MapPin } from 'lucide-react'
 import UpcomingDepartures from '@/components/tours/UpcomingDepartures'
 import { getTourDates } from '@/lib/tour-dates'
+import { useBooking } from '@/lib/booking-context'
+import { Check, Plus } from 'lucide-react'
 
 const ACTIVITIES: Record<string, any> = {
   a1: {
@@ -44,10 +46,29 @@ const REVIEWS = [
 export default function ActivityDetailPage() {
   const { id } = useParams() as { id: string }
   const activity = ACTIVITIES[id] || ACTIVITIES['a1']
+  const booking = useBooking()
 
-  const [date, setDate] = useState('')
-  const [groupSize, setGroupSize] = useState(2)
+  const [date, setDate] = useState(booking.checkIn || '')
+  const [groupSize, setGroupSize] = useState(booking.guests || 2)
   const total = activity.price_per_person * groupSize
+
+  const addonId = `activity-${id}-${date}`
+  const isAdded = booking.addons.some(a => a.id === addonId)
+
+  function toggleAddon() {
+    if (isAdded) {
+      booking.removeAddon(addonId)
+    } else {
+      booking.addAddon({
+        id: addonId,
+        type: 'activity',
+        title: activity.title,
+        date: date || undefined,
+        price_per_person: activity.price_per_person,
+        guests: groupSize,
+      })
+    }
+  }
 
   return (
     <div className="min-h-screen bg-[#F7F5F2]">
@@ -204,10 +225,22 @@ export default function ActivityDetailPage() {
                   <span className="text-[#2d6a4f]">R {total.toLocaleString()}</span>
                 </div>
               </div>
-              <button className="w-full bg-[#2d6a4f] text-white py-3.5 font-sans text-sm font-medium hover:bg-[#235a3f] transition-colors">
-                Book Now
+              <button
+                onClick={toggleAddon}
+                className={`w-full py-3.5 font-sans text-sm font-medium transition-colors flex items-center justify-center gap-2 ${
+                  isAdded
+                    ? 'bg-[#2d6a4f] text-white hover:bg-red-600'
+                    : 'bg-[#2d6a4f] text-white hover:bg-[#235a3f]'
+                }`}
+              >
+                {isAdded ? <><Check size={14} /> Added to Booking</> : <><Plus size={14} /> Add to Booking</>}
               </button>
-              <p className="font-sans text-xs text-center text-gray-400 mt-3">Free cancellation up to 48 hours before</p>
+              {booking.hasActiveSearch && (
+                <p className="font-sans text-xs text-center text-[#2d6a4f] mt-2">
+                  {isAdded ? 'Saved to your trip — continue exploring' : 'Add to your trip and keep browsing'}
+                </p>
+              )}
+              <p className="font-sans text-xs text-center text-gray-400 mt-2">Free cancellation up to 48 hours before</p>
             </div>
           </div>
         </div>

@@ -5,7 +5,8 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import Navbar from '@/components/layout/Navbar'
 import Footer from '@/components/layout/Footer'
-import { ArrowLeft, ShieldCheck, Lock, CreditCard, Calendar, Users } from 'lucide-react'
+import { ArrowLeft, ShieldCheck, Lock, CreditCard, Calendar, Users, MapPin, Bus } from 'lucide-react'
+import { useBooking } from '@/lib/booking-context'
 
 function formatCardNumber(val: string) {
   return val.replace(/\D/g, '').slice(0, 16).replace(/(.{4})/g, '$1 ').trim()
@@ -16,8 +17,14 @@ function formatExpiry(val: string) {
   return d.length >= 3 ? `${d.slice(0, 2)}/${d.slice(2)}` : d
 }
 
+function formatDate(iso: string) {
+  if (!iso) return ''
+  return new Date(iso).toLocaleDateString('en-ZA', { day: 'numeric', month: 'short', year: 'numeric' })
+}
+
 export default function CheckoutPage() {
   const router = useRouter()
+  const booking = useBooking()
   const [agreed, setAgreed] = useState(false)
   const [loading, setLoading] = useState(false)
   const [cardNumber, setCardNumber] = useState('')
@@ -30,18 +37,11 @@ export default function CheckoutPage() {
   const [phone, setPhone] = useState('')
   const [specialRequests, setSpecialRequests] = useState('')
 
-  const booking = {
-    listing: 'Cathedral Peak Mountain Lodge',
-    location: 'Cathedral Peak, Northern Berg',
-    checkIn: '15 Jul 2026',
-    checkOut: '18 Jul 2026',
-    nights: 3,
-    guests: 2,
-    room: 'Luxury Cottage',
-    pricePerNight: 1850,
-  }
-
-  const subtotal = booking.pricePerNight * booking.nights
+  const nights = booking.nights
+  const stayTotal = booking.stay ? booking.stay.price_per_night * nights : 0
+  const addonTotal = booking.addons.reduce((s, a) => s + a.price_per_person * a.guests, 0)
+  const shuttleTotal = booking.shuttle?.price ?? 0
+  const subtotal = stayTotal + addonTotal + shuttleTotal
   const serviceFee = Math.round(subtotal * 0.12)
   const tax = Math.round((subtotal + serviceFee) * 0.15)
   const total = subtotal + serviceFee + tax
@@ -51,6 +51,7 @@ export default function CheckoutPage() {
     if (!agreed) return
     setLoading(true)
     await new Promise(r => setTimeout(r, 1500))
+    booking.clearBooking()
     router.push('/checkout/success')
   }
 
@@ -60,9 +61,9 @@ export default function CheckoutPage() {
 
       <section className="bg-[#000000] text-white pt-32 pb-10 px-6 lg:px-12">
         <div className="max-w-[1440px] mx-auto">
-          <Link href="/stays" className="inline-flex items-center gap-2 font-sans text-xs text-white/40 hover:text-white transition-colors mb-6">
-            <ArrowLeft size={12} /> Back to listing
-          </Link>
+          <button onClick={() => router.back()} className="inline-flex items-center gap-2 font-sans text-xs text-white/40 hover:text-white transition-colors mb-6">
+            <ArrowLeft size={12} /> Back
+          </button>
           <div className="flex items-center justify-between">
             <div>
               <span className="font-sans text-[10px] tracking-[0.2em] uppercase text-[#C9A96E] block mb-2">Secure Checkout</span>
@@ -162,24 +163,51 @@ export default function CheckoutPage() {
             <div className="space-y-4">
               <div className="bg-[#000000] text-white p-6 sticky top-24">
                 <span className="font-sans text-[10px] tracking-[0.2em] uppercase text-[#C9A96E] block mb-4">Booking Summary</span>
-                <h3 className="font-display italic text-2xl mb-1">{booking.listing}</h3>
-                <p className="font-sans text-xs text-white/40 mb-5">{booking.location}</p>
-                <div className="space-y-3 mb-5 pb-5 border-b border-white/10">
-                  <div className="flex items-center gap-2 text-white/60">
-                    <Calendar size={12} />
-                    <span className="font-sans text-xs">{booking.checkIn} → {booking.checkOut}</span>
+
+                {booking.stay ? (
+                  <>
+                    <h3 className="font-display italic text-2xl mb-1">{booking.stay.title}</h3>
+                    <p className="font-sans text-xs text-white/40 mb-1 flex items-center gap-1">
+                      <MapPin size={10} />{booking.stay.region}
+                    </p>
+                    <div className="flex items-center gap-2 text-white/50 mb-5">
+                      <Calendar size={11} />
+                      <span className="font-sans text-xs">{formatDate(booking.checkIn)} → {formatDate(booking.checkOut)}</span>
+                    </div>
+                    <div className="space-y-2 mb-4 pb-4 border-b border-white/10">
+                      <div className="flex justify-between font-sans text-sm text-white/60">
+                        <span>R {booking.stay.price_per_night.toLocaleString()} × {nights} night{nights !== 1 ? 's' : ''}</span>
+                        <span>R {stayTotal.toLocaleString()}</span>
+                      </div>
+                    </div>
+                  </>
+                ) : (
+                  <p className="font-sans text-sm text-white/40 mb-4">No accommodation selected</p>
+                )}
+
+                {booking.addons.length > 0 && (
+                  <div className="mb-4 pb-4 border-b border-white/10">
+                    <p className="font-sans text-[10px] uppercase text-white/30 mb-2">Add-ons</p>
+                    {booking.addons.map(a => (
+                      <div key={a.id} className="flex justify-between font-sans text-xs text-white/60 mb-1.5">
+                        <span className="truncate mr-2">{a.title}</span>
+                        <span className="shrink-0">R {(a.price_per_person * a.guests).toLocaleString()}</span>
+                      </div>
+                    ))}
                   </div>
-                  <div className="flex items-center gap-2 text-white/60">
-                    <Users size={12} />
-                    <span className="font-sans text-xs">{booking.guests} guests · {booking.nights} nights</span>
+                )}
+
+                {booking.shuttle && (
+                  <div className="mb-4 pb-4 border-b border-white/10">
+                    <p className="font-sans text-[10px] uppercase text-white/30 mb-1">Shuttle</p>
+                    <div className="flex justify-between font-sans text-xs text-white/60">
+                      <span className="flex items-center gap-1 truncate mr-2"><Bus size={10} />{booking.shuttle.label}</span>
+                      <span className="shrink-0">R {booking.shuttle.price.toLocaleString()}</span>
+                    </div>
                   </div>
-                  <div className="font-sans text-xs text-white/60">Room: <span className="text-white">{booking.room}</span></div>
-                </div>
+                )}
+
                 <div className="space-y-2 mb-5 pb-5 border-b border-white/10">
-                  <div className="flex justify-between font-sans text-sm text-white/60">
-                    <span>R {booking.pricePerNight.toLocaleString()} × {booking.nights} nights</span>
-                    <span>R {subtotal.toLocaleString()}</span>
-                  </div>
                   <div className="flex justify-between font-sans text-sm text-white/60">
                     <span>Service fee</span>
                     <span>R {serviceFee.toLocaleString()}</span>
@@ -189,10 +217,17 @@ export default function CheckoutPage() {
                     <span>R {tax.toLocaleString()}</span>
                   </div>
                 </div>
+
                 <div className="flex justify-between items-baseline mb-6">
                   <span className="font-sans text-sm text-white">Total</span>
                   <span className="font-display italic text-3xl text-[#C9A96E]">R {total.toLocaleString()}</span>
                 </div>
+
+                <div className="flex items-center gap-2 text-white/40 mb-4">
+                  <Users size={11} />
+                  <span className="font-sans text-xs">{booking.guests} guest{booking.guests !== 1 ? 's' : ''}{nights > 0 ? ` · ${nights} night${nights !== 1 ? 's' : ''}` : ''}</span>
+                </div>
+
                 <button type="submit" disabled={!agreed || loading} className={`w-full py-4 font-sans text-sm font-medium transition-colors ${agreed && !loading ? 'bg-[#C9A96E] text-[#000000] hover:bg-[#b8945a]' : 'bg-white/10 text-white/30 cursor-not-allowed'}`}>
                   {loading ? 'Processing…' : `Pay R ${total.toLocaleString()}`}
                 </button>

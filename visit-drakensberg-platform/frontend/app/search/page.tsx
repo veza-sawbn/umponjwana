@@ -5,7 +5,8 @@ import { useSearchParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import Navbar from '@/components/layout/Navbar'
 import Footer from '@/components/layout/Footer'
-import { Calendar, Users, MapPin, ArrowRight, Search, SlidersHorizontal, X } from 'lucide-react'
+import { Calendar, Users, MapPin, ArrowRight, Search, SlidersHorizontal, X, Check, Bed } from 'lucide-react'
+import { useBooking } from '@/lib/booking-context'
 
 /* ── Mock data ─────────────────────────────────────────────────────────────── */
 
@@ -85,11 +86,12 @@ function SectionHeader({ label, heading, count, href }: { label: string; heading
 function SearchResults() {
   const params = useSearchParams()
   const router = useRouter()
+  const booking = useBooking()
 
-  const regionParam = params.get('region') || ''
-  const checkInParam = params.get('check_in') || ''
-  const checkOutParam = params.get('check_out') || ''
-  const guestsParam = parseInt(params.get('guests') || '2')
+  const regionParam = params.get('region') || booking.region || ''
+  const checkInParam = params.get('check_in') || booking.checkIn || ''
+  const checkOutParam = params.get('check_out') || booking.checkOut || ''
+  const guestsParam = parseInt(params.get('guests') || String(booking.guests) || '2')
 
   const [region, setRegion] = useState(regionParam)
   const [checkIn, setCheckIn] = useState(checkInParam)
@@ -102,6 +104,7 @@ function SearchResults() {
   const numNights = nights(checkIn, checkOut)
 
   function refine() {
+    booking.setSearch(region, checkIn, checkOut, guests)
     const p = new URLSearchParams()
     if (region) p.set('region', region)
     if (checkIn) p.set('check_in', checkIn)
@@ -220,34 +223,60 @@ function SearchResults() {
           <section>
             <SectionHeader label="Where to sleep" heading="Accommodation" count={stays.length} href="/stays" />
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-              {stays.map(stay => (
-                <Link key={stay.id} href={`/stays/${stay.id}${checkIn ? `?check_in=${checkIn}&check_out=${checkOut}&guests=${guests}` : ''}`}
-                  className={`group bg-white ${!stay.available ? 'opacity-60' : ''}`}>
-                  <div className="aspect-[4/3] overflow-hidden relative">
-                    <img src={stay.img} alt={stay.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" />
-                    {!stay.available && (
-                      <div className="absolute inset-0 bg-white/50 flex items-center justify-center">
-                        <span className="bg-white font-sans text-xs px-3 py-1.5 border border-gray-300 text-gray-500">Unavailable for these dates</span>
+              {stays.map(stay => {
+                const isSelected = booking.stay?.id === stay.id
+                return (
+                  <div key={stay.id} className={`group bg-white flex flex-col ${!stay.available ? 'opacity-60' : ''} border ${isSelected ? 'border-[#2d6a4f]' : 'border-transparent'}`}>
+                    <Link href={`/stays/${stay.id}?check_in=${checkIn}&check_out=${checkOut}&guests=${guests}`}>
+                      <div className="aspect-[4/3] overflow-hidden relative">
+                        <img src={stay.img} alt={stay.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" />
+                        {isSelected && (
+                          <div className="absolute top-3 left-3 bg-[#2d6a4f] text-white font-sans text-[10px] tracking-[0.1em] uppercase px-2.5 py-1 flex items-center gap-1">
+                            <Check size={10} /> Selected
+                          </div>
+                        )}
+                        {!stay.available && (
+                          <div className="absolute inset-0 bg-white/50 flex items-center justify-center">
+                            <span className="bg-white font-sans text-xs px-3 py-1.5 border border-gray-300 text-gray-500">Unavailable for these dates</span>
+                          </div>
+                        )}
+                      </div>
+                      <div className="p-4 flex-1">
+                        <div className="flex items-center justify-between mb-1">
+                          <span className="font-sans text-[10px] tracking-[0.12em] uppercase text-gray-400">{stay.region}</span>
+                          <span className="font-sans text-xs text-[#2d6a4f]">★ {stay.rating} <span className="text-gray-400">({stay.reviews})</span></span>
+                        </div>
+                        <h3 className="font-display italic text-lg mb-2">{stay.title}</h3>
+                        <div className="flex items-end justify-between">
+                          <span className="font-sans text-xs text-gray-400">
+                            {numNights ? `R ${(stay.price * numNights).toLocaleString()} total` : 'From'}
+                          </span>
+                          <p className="font-display italic text-xl text-[#2d6a4f]">
+                            R {stay.price.toLocaleString()}<span className="font-sans text-xs text-gray-400">/night</span>
+                          </p>
+                        </div>
+                      </div>
+                    </Link>
+                    {stay.available && (
+                      <div className="px-4 pb-4">
+                        <button
+                          onClick={() => isSelected
+                            ? booking.setStay(null)
+                            : booking.setStay({ id: stay.id, title: stay.title, region: stay.region, price_per_night: stay.price, img: stay.img })
+                          }
+                          className={`w-full py-2.5 font-sans text-sm transition-colors flex items-center justify-center gap-1.5 ${
+                            isSelected
+                              ? 'bg-[#2d6a4f] text-white hover:bg-red-600'
+                              : 'border border-[#2d6a4f] text-[#2d6a4f] hover:bg-[#2d6a4f] hover:text-white'
+                          }`}
+                        >
+                          {isSelected ? <><X size={13} /> Remove</> : <><Bed size={13} /> Select this Stay</>}
+                        </button>
                       </div>
                     )}
                   </div>
-                  <div className="p-4">
-                    <div className="flex items-center justify-between mb-1">
-                      <span className="font-sans text-[10px] tracking-[0.12em] uppercase text-gray-400">{stay.region}</span>
-                      <span className="font-sans text-xs text-[#2d6a4f]">★ {stay.rating} <span className="text-gray-400">({stay.reviews})</span></span>
-                    </div>
-                    <h3 className="font-display italic text-lg mb-2">{stay.title}</h3>
-                    <div className="flex items-end justify-between">
-                      <span className="font-sans text-xs text-gray-400">
-                        {numNights ? `R ${(stay.price * numNights).toLocaleString()} total` : 'From'}
-                      </span>
-                      <p className="font-display italic text-xl text-[#2d6a4f]">
-                        R {stay.price.toLocaleString()}<span className="font-sans text-xs text-gray-400">/night</span>
-                      </p>
-                    </div>
-                  </div>
-                </Link>
-              ))}
+                )
+              })}
             </div>
             <div className="mt-4 sm:hidden">
               <Link href="/stays" className="font-sans text-sm text-[#2d6a4f]">See all accommodation →</Link>

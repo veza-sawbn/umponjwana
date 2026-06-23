@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { MapPin, Calendar, Users, Search } from 'lucide-react'
+import { useBooking } from '@/lib/booking-context'
 
 const REGIONS = [
   'All Drakensberg',
@@ -17,14 +18,16 @@ const REGIONS = [
 
 export default function SearchBar() {
   const router = useRouter()
-  const [region, setRegion] = useState('')
-  const [checkIn, setCheckIn] = useState('')
-  const [checkOut, setCheckOut] = useState('')
-  const [guests, setGuests] = useState(2)
+  const { setSearch, region: savedRegion, checkIn: savedCheckIn, checkOut: savedCheckOut, guests: savedGuests } = useBooking()
+  const [region, setRegion] = useState(savedRegion || '')
+  const [checkIn, setCheckIn] = useState(savedCheckIn || '')
+  const [checkOut, setCheckOut] = useState(savedCheckOut || '')
+  const [guests, setGuests] = useState(savedGuests || 2)
 
   const today = new Date().toISOString().split('T')[0]
 
   function handleSearch() {
+    setSearch(region, checkIn, checkOut, guests)
     const params = new URLSearchParams()
     if (region) params.set('region', region)
     if (checkIn) params.set('check_in', checkIn)

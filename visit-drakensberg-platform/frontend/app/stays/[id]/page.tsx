@@ -7,6 +7,8 @@ import Navbar from '@/components/layout/Navbar'
 import Footer from '@/components/layout/Footer'
 import { MapPin, Star, Users, Wifi, Flame, Utensils, Car, ArrowLeft, Calendar, Coffee, Waves, TreePine, ShieldCheck } from 'lucide-react'
 import SmartRecommendations from '@/components/booking/SmartRecommendations'
+import { useBooking } from '@/lib/booking-context'
+import { Check } from 'lucide-react'
 
 const STAYS: Record<string, any> = {
   s1: {
@@ -124,12 +126,15 @@ const STAYS: Record<string, any> = {
 export default function StayDetailPage() {
   const { id } = useParams() as { id: string }
   const router = useRouter()
+  const booking = useBooking()
   const stay = STAYS[id] || STAYS['s1']
 
   const [selectedRoom, setSelectedRoom] = useState<any>(null)
-  const [checkIn, setCheckIn] = useState('')
-  const [checkOut, setCheckOut] = useState('')
-  const [guests, setGuests] = useState(2)
+  const [checkIn, setCheckIn] = useState(booking.checkIn || '')
+  const [checkOut, setCheckOut] = useState(booking.checkOut || '')
+  const [guests, setGuests] = useState(booking.guests || 2)
+
+  const isSelectedStay = booking.stay?.id === id
 
   const nights = checkIn && checkOut
     ? Math.max(1, Math.round((new Date(checkOut).getTime() - new Date(checkIn).getTime()) / 86400000))
@@ -394,11 +399,24 @@ export default function StayDetailPage() {
               )}
 
               <button
-                onClick={() => selectedRoom && router.push(`/checkout?listing=${id}&room=${selectedRoom.id}`)}
+                onClick={() => {
+                  if (!selectedRoom) return
+                  booking.setSearch(stay.region, checkIn, checkOut, guests)
+                  booking.setStay({ id, title: stay.title, region: stay.region, price_per_night: selectedRoom.price_per_night, img: stay.images?.[0] })
+                  router.push(`/search?region=${encodeURIComponent(stay.region)}&check_in=${checkIn}&check_out=${checkOut}&guests=${guests}`)
+                }}
                 className={`w-full py-3.5 font-sans text-sm font-medium transition-colors ${selectedRoom ? 'bg-[#2d6a4f] text-white hover:bg-[#235a3f]' : 'bg-gray-100 text-gray-400 cursor-not-allowed'}`}
               >
-                {selectedRoom ? 'Book Now' : 'Select a Room to Book'}
+                {selectedRoom ? (isSelectedStay ? <span className="flex items-center justify-center gap-2"><Check size={14} /> Stay Selected — View Trip</span> : 'Select & Browse Activities') : 'Select a Room First'}
               </button>
+              {isSelectedStay && (
+                <button
+                  onClick={() => router.push('/checkout/shuttle')}
+                  className="w-full mt-2 py-3 font-sans text-sm border border-[#2d6a4f] text-[#2d6a4f] hover:bg-[#2d6a4f] hover:text-white transition-colors"
+                >
+                  Proceed to Checkout →
+                </button>
+              )}
               <p className="font-sans text-xs text-center text-gray-400 mt-3">Free cancellation up to 48 hours before check-in</p>
 
               <div className="mt-6">
