@@ -181,7 +181,7 @@ export default function HomePage() {
 
         {/* Content */}
         <motion.div
-          className="relative flex-1 flex flex-col justify-end pb-32 lg:pb-20 px-6 lg:px-20 max-w-[1440px] mx-auto w-full"
+          className="relative flex-1 flex flex-col justify-end pb-20 pt-32 lg:pt-0 px-6 lg:px-20 max-w-[1440px] mx-auto w-full"
           variants={staggerContainer(0.12, 0.2)}
           initial="hidden"
           animate="show"
