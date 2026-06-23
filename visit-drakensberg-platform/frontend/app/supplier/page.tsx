@@ -1,7 +1,7 @@
 'use client'
 import { useState } from 'react'
 import Link from 'next/link'
-import { Plus, Trash2, Bell, MessageSquare, CalendarOff, Tag, LayoutDashboard, List, X, Check } from 'lucide-react'
+import { Plus, Trash2, Bell, MessageSquare, CalendarOff, Tag, LayoutDashboard, List, X, Check, User, Package, CalendarDays, Truck } from 'lucide-react'
 import Footer from '@/components/layout/Footer'
 
 /* ─── Types ─────────────────────────────────────────────────────────────────── */
@@ -192,6 +192,28 @@ export default function SupplierDashboardPage() {
                   <p className="font-display text-3xl text-forest">{s.value}</p>
                 </div>
               ))}
+            </div>
+
+            {/* Quick links to new sections */}
+            <div>
+              <h2 className="font-display text-2xl text-forest mb-4">Manage</h2>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                {[
+                  { href: '/supplier/guides', label: 'Guides', sub: 'Register & verify guides', icon: User, color: 'bg-[#2d6a4f]/5' },
+                  { href: '/supplier/packages', label: 'Packages', sub: 'Multi-day tour packages', icon: Package, color: 'bg-[#C9A96E]/5' },
+                  { href: '/supplier/events', label: 'Events & Specials', sub: 'Sell tickets to visitors', icon: CalendarDays, color: 'bg-[#2d6a4f]/5' },
+                  { href: '/supplier/shuttle', label: 'Shuttle Fleet', sub: 'Fleet & transfer management', icon: Truck, color: 'bg-[#C9A96E]/5' },
+                ].map(item => {
+                  const Icon = item.icon
+                  return (
+                    <Link key={item.href} href={item.href} className={`${item.color} border border-black/8 p-5 hover:border-forest transition-colors group`}>
+                      <Icon className="w-5 h-5 text-forest mb-3" />
+                      <p className="font-sans text-sm font-medium text-forest">{item.label}</p>
+                      <p className="font-sans text-xs text-forest/40 mt-0.5">{item.sub}</p>
+                    </Link>
+                  )
+                })}
+              </div>
             </div>
 
             {/* Recent bookings */}

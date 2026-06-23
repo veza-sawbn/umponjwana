@@ -18,6 +18,11 @@ from app.api.v1 import (
     admin,
     messages,
     discounts,
+    rooms,
+    guides,
+    packages,
+    events,
+    shuttle,
 )
 
 logger = logging.getLogger(__name__)
@@ -68,6 +73,11 @@ app.include_router(notifications.router, prefix=API_PREFIX)
 app.include_router(admin.router, prefix=API_PREFIX)
 app.include_router(messages.router, prefix=API_PREFIX)
 app.include_router(discounts.router, prefix=API_PREFIX)
+app.include_router(rooms.router, prefix=API_PREFIX)
+app.include_router(guides.router, prefix=API_PREFIX)
+app.include_router(packages.router, prefix=API_PREFIX)
+app.include_router(events.router, prefix=API_PREFIX)
+app.include_router(shuttle.router, prefix=API_PREFIX)
 
 
 # ---------------------------------------------------------------------------
