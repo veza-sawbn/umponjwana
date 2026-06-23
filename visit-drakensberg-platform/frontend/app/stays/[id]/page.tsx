@@ -6,6 +6,7 @@ import Link from 'next/link'
 import Navbar from '@/components/layout/Navbar'
 import Footer from '@/components/layout/Footer'
 import { MapPin, Star, Users, Wifi, Flame, Utensils, Car, ArrowLeft, Calendar, Coffee, Waves, TreePine, ShieldCheck } from 'lucide-react'
+import SmartRecommendations from '@/components/booking/SmartRecommendations'
 
 const STAYS: Record<string, any> = {
   s1: {
@@ -395,6 +396,10 @@ export default function StayDetailPage() {
                 {selectedRoom ? 'Book Now' : 'Select a Room to Book'}
               </button>
               <p className="font-sans text-xs text-center text-gray-400 mt-3">Free cancellation up to 48 hours before check-in</p>
+
+              <div className="mt-6">
+                <SmartRecommendations region={stay.region} excludeListingId={id} />
+              </div>
 
               <div className="mt-5 border-t border-gray-100 pt-5">
                 <p className="font-sans text-[10px] tracking-[0.1em] uppercase text-gray-400 mb-1">Location</p>

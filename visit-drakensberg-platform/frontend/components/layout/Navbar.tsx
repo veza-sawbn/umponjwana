@@ -12,7 +12,7 @@ const NAV_LINKS = [
   { label: 'Activities', href: '/activities' },
   { label: 'Reserves', href: '/nature-reserves' },
   { label: 'Regions', href: '/regions' },
-  { label: 'Stories', href: '/stories' },
+  { label: 'Stories', href: '/mydrakensberg' },
   { label: 'Plan', href: '/plan' },
 ]
 

@@ -2,7 +2,7 @@ import { createMiddlewareClient } from '@supabase/auth-helpers-nextjs'
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 
-const PROTECTED_ROUTES = ['/dashboard', '/checkout', '/supplier', '/admin']
+const PROTECTED_ROUTES = ['/dashboard', '/checkout', '/supplier', '/admin', '/account']
 const ADMIN_ROUTES = ['/admin']
 const SUPPLIER_ROUTES = ['/supplier']
 
@@ -34,5 +34,5 @@ export async function middleware(req: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/dashboard/:path*', '/checkout/:path*', '/supplier/:path*', '/admin/:path*'],
+  matcher: ['/dashboard/:path*', '/checkout/:path*', '/supplier/:path*', '/admin/:path*', '/account/:path*'],
 }
