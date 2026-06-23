@@ -1,17 +1,58 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Save, CheckCircle, AlertTriangle } from 'lucide-react'
+import { supabase } from '@/lib/auth'
 
 export default function AccountSettingsPage() {
   const [saved, setSaved] = useState(false)
-  const [profile, setProfile] = useState({ full_name: 'Sarah van der Merwe', email: 'sarah@example.com', phone: '+27 82 555 1234', bio: '' })
+  const [loading, setLoading] = useState(true)
+  const [profile, setProfile] = useState({ full_name: '', email: '', phone: '', bio: '' })
   const [notifs, setNotifs] = useState({ booking_updates: true, special_offers: true, new_events: false, loyalty_updates: true })
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+  const [deleteInput, setDeleteInput] = useState('')
 
-  function handleSave() {
-    setSaved(true)
-    setTimeout(() => setSaved(false), 2000)
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (!user) return
+      setProfile({
+        full_name: user.user_metadata?.full_name || '',
+        email: user.email || '',
+        phone: user.user_metadata?.phone || '',
+        bio: user.user_metadata?.bio || '',
+      })
+      setLoading(false)
+    })
+  }, [])
+
+  async function handleSave() {
+    const { error } = await supabase.auth.updateUser({
+      data: {
+        full_name: profile.full_name,
+        phone: profile.phone,
+        bio: profile.bio,
+      },
+    })
+    if (!error) {
+      setSaved(true)
+      setTimeout(() => setSaved(false), 2000)
+    }
+  }
+
+  if (loading) {
+    return (
+      <div className="space-y-4 max-w-2xl">
+        {[1, 2, 3].map(i => (
+          <div key={i} className="bg-white border border-gray-200 p-6 animate-pulse">
+            <div className="h-5 bg-gray-100 w-40 mb-5" />
+            <div className="space-y-3">
+              <div className="h-10 bg-gray-100" />
+              <div className="h-10 bg-gray-100" />
+            </div>
+          </div>
+        ))}
+      </div>
+    )
   }
 
   return (
@@ -47,6 +88,7 @@ export default function AccountSettingsPage() {
               <input
                 value={profile.phone}
                 onChange={e => setProfile(p => ({ ...p, phone: e.target.value }))}
+                placeholder="+27 82 000 0000"
                 className="w-full border border-gray-200 px-4 py-3 font-sans text-sm focus:outline-none focus:border-[#2d6a4f] bg-[#F7F5F2]"
               />
             </div>
@@ -127,11 +169,18 @@ export default function AccountSettingsPage() {
             <div className="bg-red-50 border border-red-200 p-4">
               <p className="font-sans text-sm text-red-600 font-medium mb-3">Are you absolutely sure? Type DELETE to confirm.</p>
               <input
+                value={deleteInput}
+                onChange={e => setDeleteInput(e.target.value)}
                 placeholder="Type DELETE"
                 className="w-full border border-red-200 px-3 py-2 font-sans text-sm mb-3 focus:outline-none"
               />
               <div className="flex gap-2">
-                <button className="bg-red-500 text-white px-4 py-2 font-sans text-sm hover:bg-red-600 transition-colors">Permanently Delete</button>
+                <button
+                  disabled={deleteInput !== 'DELETE'}
+                  className="bg-red-500 text-white px-4 py-2 font-sans text-sm hover:bg-red-600 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  Permanently Delete
+                </button>
                 <button onClick={() => setShowDeleteConfirm(false)} className="border border-gray-200 text-gray-600 px-4 py-2 font-sans text-sm hover:bg-gray-50 transition-colors">Cancel</button>
               </div>
             </div>

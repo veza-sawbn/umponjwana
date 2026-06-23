@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { useParams } from 'next/navigation'
+import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import Navbar from '@/components/layout/Navbar'
 import Footer from '@/components/layout/Footer'
@@ -123,6 +123,7 @@ const STAYS: Record<string, any> = {
 
 export default function StayDetailPage() {
   const { id } = useParams() as { id: string }
+  const router = useRouter()
   const stay = STAYS[id] || STAYS['s1']
 
   const [selectedRoom, setSelectedRoom] = useState<any>(null)
@@ -392,7 +393,10 @@ export default function StayDetailPage() {
                 </div>
               )}
 
-              <button className="w-full bg-[#2d6a4f] text-white py-3.5 font-sans text-sm font-medium hover:bg-[#235a3f] transition-colors">
+              <button
+                onClick={() => selectedRoom && router.push(`/checkout?listing=${id}&room=${selectedRoom.id}`)}
+                className={`w-full py-3.5 font-sans text-sm font-medium transition-colors ${selectedRoom ? 'bg-[#2d6a4f] text-white hover:bg-[#235a3f]' : 'bg-gray-100 text-gray-400 cursor-not-allowed'}`}
+              >
                 {selectedRoom ? 'Book Now' : 'Select a Room to Book'}
               </button>
               <p className="font-sans text-xs text-center text-gray-400 mt-3">Free cancellation up to 48 hours before check-in</p>

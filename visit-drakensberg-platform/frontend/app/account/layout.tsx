@@ -1,23 +1,40 @@
 'use client'
 
+import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
-import { CalendarDays, Heart, Star, Gift, Map, Settings, LogOut, User } from 'lucide-react'
+import { CalendarDays, Heart, Star, Gift, Map, Settings, LogOut } from 'lucide-react'
 import Navbar from '@/components/layout/Navbar'
 import Footer from '@/components/layout/Footer'
-import { signOut } from '@/lib/auth'
+import { supabase, signOut } from '@/lib/auth'
 
 const NAV = [
   { href: '/account', label: 'My Bookings', icon: CalendarDays, exact: true },
   { href: '/account/saved', label: 'Saved Listings', icon: Heart },
   { href: '/account/loyalty', label: 'Loyalty & Rewards', icon: Gift },
   { href: '/account/recommendations', label: 'Continue Planning', icon: Map },
+  { href: '/account/itinerary', label: 'My Itinerary', icon: Star },
   { href: '/account/settings', label: 'Settings', icon: Settings },
 ]
 
 export default function AccountLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
   const router = useRouter()
+  const [userName, setUserName] = useState<string>('')
+  const [userEmail, setUserEmail] = useState<string>('')
+  const [initials, setInitials] = useState<string>('?')
+
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (!user) return
+      const name = user.user_metadata?.full_name || user.email?.split('@')[0] || 'Visitor'
+      setUserName(name)
+      setUserEmail(user.email || '')
+      setInitials(
+        name.split(' ').map((n: string) => n[0]).join('').toUpperCase().slice(0, 2)
+      )
+    })
+  }, [])
 
   function isActive(item: typeof NAV[0]) {
     if (item.exact) return pathname === item.href
@@ -38,10 +55,10 @@ export default function AccountLayout({ children }: { children: React.ReactNode 
           <aside className="w-56 shrink-0 sticky top-24">
             <div className="bg-white border border-gray-200 p-5 mb-4">
               <div className="w-12 h-12 bg-[#2d6a4f]/10 flex items-center justify-center font-display italic text-[#2d6a4f] text-xl mb-3">
-                <User size={20} />
+                {initials}
               </div>
-              <p className="font-display italic text-lg leading-tight">My Account</p>
-              <p className="font-sans text-xs text-gray-400 mt-0.5">Visitor Portal</p>
+              <p className="font-display italic text-lg leading-tight truncate">{userName || 'My Account'}</p>
+              <p className="font-sans text-xs text-gray-400 mt-0.5 truncate">{userEmail || 'Visitor Portal'}</p>
             </div>
             <nav className="bg-white border border-gray-200 overflow-hidden">
               {NAV.map(item => {
