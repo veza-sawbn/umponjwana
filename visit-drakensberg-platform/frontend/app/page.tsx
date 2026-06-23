@@ -8,6 +8,8 @@ import PanoramaViewer from '@/components/panorama/PanoramaViewer'
 import Footer from '@/components/layout/Footer'
 import { getAllSiteContent, SITE_CONTENT_DEFAULTS } from '@/lib/site-content'
 import { staggerContainer, staggerChild, fadeUp } from '@/lib/motion'
+import { useEditMode, EditModeProvider } from '@/lib/edit-mode-context'
+import Editable from '@/components/editor/Editable'
 
 /* ─── Data ─────────────────────────────────────────────────────────────────── */
 
@@ -125,14 +127,80 @@ const SPECIALS = [
   { id: 'sp3', title: 'Kids Berg Explorer Camp', offer: '2-night adventure camp', location: 'Royal Natal', dates: '12–14 Jul 2026', price: 2200 },
 ]
 
+/* ─── Edit-mode helpers ──────────────────────────────────────────────────────── */
+
+function ConditionalEditMode({ active, children }: { active: boolean; children: React.ReactNode }) {
+  if (active) return <EditModeProvider>{children}</EditModeProvider>
+  return <>{children}</>
+}
+
+function HeroSection({ hero }: { hero: typeof SITE_CONTENT_DEFAULTS.hero }) {
+  const editMode = useEditMode()
+  const headline = editMode?.getValue('hero', 'headline', hero.headline) ?? hero.headline
+  const subheadline = editMode?.getValue('hero', 'subheadline', hero.subheadline) ?? hero.subheadline
+  const locationLabel = editMode?.getValue('hero', 'location_label', hero.location_label) ?? hero.location_label
+  const imageUrl = String(editMode?.getValue('hero', 'image_url', hero.image_url) ?? hero.image_url)
+  const overlayOpacity = Number(editMode?.getValue('hero', 'overlay_opacity', hero.overlay_opacity) ?? hero.overlay_opacity)
+
+  return (
+    <section className="relative h-screen min-h-[600px] flex flex-col">
+      <div className="absolute inset-0">
+        {hero.video_url ? (
+          <video src={hero.video_url} autoPlay muted loop playsInline className="w-full h-full object-cover" />
+        ) : (
+          <Editable section="hero" fieldKey="image_url" value={imageUrl} label="Background Image" type="image">
+            <img src={imageUrl} alt="Drakensberg mountains" className="w-full h-full object-cover" />
+          </Editable>
+        )}
+        <div
+          className="absolute inset-0 bg-gradient-to-b from-black/50 via-black/20 to-black/60"
+          style={{ opacity: overlayOpacity / 100 + 0.3 }}
+        />
+      </div>
+
+      <motion.div
+        className="relative flex-1 flex flex-col justify-end pb-20 pt-32 lg:pt-0 px-6 lg:px-20 max-w-[1440px] mx-auto w-full"
+        variants={staggerContainer(0.12, 0.2)}
+        initial="hidden"
+        animate="show"
+      >
+        <Editable section="hero" fieldKey="location_label" value={locationLabel} label="Location Label" type="text">
+          <motion.p variants={fadeUp} className="font-sans text-xs tracking-[0.2em] uppercase text-gold mb-4">
+            {locationLabel}
+          </motion.p>
+        </Editable>
+        <Editable section="hero" fieldKey="headline" value={headline} label="Headline" type="textarea">
+          <motion.h1 variants={fadeUp} className="font-display text-4xl sm:text-7xl lg:text-8xl text-white leading-[0.9] mb-6 max-w-3xl" style={{ whiteSpace: 'pre-line' }}>
+            {headline}
+          </motion.h1>
+        </Editable>
+        <Editable section="hero" fieldKey="subheadline" value={subheadline} label="Subheadline" type="textarea">
+          <motion.p variants={fadeUp} className="font-sans text-base text-white/70 max-w-md mb-10 font-light leading-relaxed">
+            {subheadline}
+          </motion.p>
+        </Editable>
+        <motion.div variants={fadeUp} className="max-w-2xl">
+          <SearchBar />
+        </motion.div>
+      </motion.div>
+
+      <div className="absolute bottom-6 left-1/2 -translate-x-1/2 flex flex-col items-center gap-1 text-white/40">
+        <ChevronDown className="w-5 h-5 animate-bounce-slow" />
+      </div>
+    </section>
+  )
+}
+
 /* ─── Component ─────────────────────────────────────────────────────────────── */
 
 export default function HomePage() {
   const [hero, setHero] = useState(SITE_CONTENT_DEFAULTS.hero)
   const [promos, setPromos] = useState(SITE_CONTENT_DEFAULTS.promotions)
   const [promoBannerDismissed, setPromoBannerDismissed] = useState(false)
+  const [isEditMode, setIsEditMode] = useState(false)
 
   useEffect(() => {
+    setIsEditMode(new URLSearchParams(window.location.search).get('edit') === '1')
     getAllSiteContent().then(content => {
       setHero(content.hero)
       setPromos(content.promotions)
@@ -140,6 +208,7 @@ export default function HomePage() {
   }, [])
 
   return (
+    <ConditionalEditMode active={isEditMode}>
     <main className="bg-mist min-h-screen">
 
       {/* ── 0. Promo Banner (admin-controlled) ── */}
@@ -154,59 +223,7 @@ export default function HomePage() {
       )}
 
       {/* ── 1. Hero ── */}
-      <section className="relative h-screen min-h-[600px] flex flex-col">
-        {/* Background */}
-        <div className="absolute inset-0">
-          {hero.video_url ? (
-            <video
-              src={hero.video_url}
-              autoPlay
-              muted
-              loop
-              playsInline
-              className="w-full h-full object-cover"
-            />
-          ) : (
-            <img
-              src={hero.image_url}
-              alt="Drakensberg mountains"
-              className="w-full h-full object-cover"
-            />
-          )}
-          <div
-            className="absolute inset-0 bg-gradient-to-b from-black/50 via-black/20 to-black/60"
-            style={{ opacity: hero.overlay_opacity / 100 + 0.3 }}
-          />
-        </div>
-
-        {/* Content */}
-        <motion.div
-          className="relative flex-1 flex flex-col justify-end pb-20 pt-32 lg:pt-0 px-6 lg:px-20 max-w-[1440px] mx-auto w-full"
-          variants={staggerContainer(0.12, 0.2)}
-          initial="hidden"
-          animate="show"
-        >
-          <motion.p variants={fadeUp} className="font-sans text-xs tracking-[0.2em] uppercase text-gold mb-4">
-            {hero.location_label}
-          </motion.p>
-          <motion.h1 variants={fadeUp} className="font-display text-4xl sm:text-7xl lg:text-8xl text-white leading-[0.9] mb-6 max-w-3xl" style={{ whiteSpace: 'pre-line' }}>
-            {hero.headline}
-          </motion.h1>
-          <motion.p variants={fadeUp} className="font-sans text-base text-white/70 max-w-md mb-10 font-light leading-relaxed">
-            {hero.subheadline}
-          </motion.p>
-
-          {/* Search */}
-          <motion.div variants={fadeUp} className="max-w-2xl">
-            <SearchBar />
-          </motion.div>
-        </motion.div>
-
-        {/* Scroll indicator */}
-        <div className="absolute bottom-6 left-1/2 -translate-x-1/2 flex flex-col items-center gap-1 text-white/40">
-          <ChevronDown className="w-5 h-5 animate-bounce-slow" />
-        </div>
-      </section>
+      <HeroSection hero={hero} />
 
       {/* ── 2. Stats strip ── */}
       <section className="bg-forest text-white">
@@ -554,5 +571,6 @@ export default function HomePage() {
       {/* ── Footer ── */}
       <Footer />
     </main>
+    </ConditionalEditMode>
   )
 }

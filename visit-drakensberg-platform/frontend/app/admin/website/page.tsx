@@ -1,7 +1,8 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Check, Loader2, Plus, Trash2, ExternalLink } from 'lucide-react'
+import { Check, Loader2, Plus, Trash2, ExternalLink, Paintbrush } from 'lucide-react'
+import Link from 'next/link'
 import { getAllSiteContent, setSiteContent, SITE_CONTENT_DEFAULTS } from '@/lib/site-content'
 
 type Section = 'hero' | 'featured' | 'promos' | 'footer' | 'nav' | 'about'
@@ -104,15 +105,24 @@ export default function AdminWebsitePage() {
           <h1 className="font-display italic text-3xl text-[#000000]">Website Editor</h1>
           <p className="font-sans text-sm text-gray-400 mt-1">Changes save to Supabase and reflect on the live site immediately.</p>
         </div>
-        <a
-          href="/"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="inline-flex items-center gap-2 border border-gray-200 text-gray-500 px-4 py-2.5 font-sans text-sm hover:border-[#2d6a4f] hover:text-[#2d6a4f] transition-colors"
-        >
-          <ExternalLink size={13} />
-          View Live Site
-        </a>
+        <div className="flex items-center gap-3">
+          <Link
+            href="/admin/editor"
+            className="inline-flex items-center gap-2 bg-[#2d6a4f] text-white px-4 py-2.5 font-sans text-sm hover:bg-[#235a3f] transition-colors"
+          >
+            <Paintbrush size={13} />
+            Visual Editor
+          </Link>
+          <a
+            href="/"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-2 border border-gray-200 text-gray-500 px-4 py-2.5 font-sans text-sm hover:border-[#2d6a4f] hover:text-[#2d6a4f] transition-colors"
+          >
+            <ExternalLink size={13} />
+            View Live Site
+          </a>
+        </div>
       </div>
 
       <div className="flex gap-6 items-start">
