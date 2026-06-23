@@ -14,7 +14,7 @@ const STAYS: Record<string, any> = {
     location: 'Cathedral Peak, Northern Berg',
     region: 'Northern Berg',
     rating: 4.9,
-    reviews: 142,
+    review_count: 142,
     member_since: '2019',
     response_rate: '97%',
     description: 'Perched beneath the towering Cathedral Peak massif, this classic mountain lodge offers an authentic Drakensberg experience. The lodge has been a beloved fixture in the Northern Berg since 1939, offering warm hospitality, fine dining and uninterrupted access to the surrounding wilderness.',
@@ -41,7 +41,7 @@ const STAYS: Record<string, any> = {
       { id: 'r3', name: 'Classic Double', description: 'Comfortable and cosy, with a private balcony overlooking the valley.', max_guests: 2, price_per_night: 1450, amenities: ['En-suite', 'Balcony', 'Double bed'] },
       { id: 'r4', name: 'Backpacker Dorm', description: 'Shared dormitory with 6 beds, lockers and access to communal kitchen.', max_guests: 6, price_per_night: 380, amenities: ['Shared bathroom', 'Lockers', 'Kitchen access', 'Bunk beds'] },
     ],
-    reviews: [
+    reviews_list: [
       { name: 'Sarah van der Merwe', rating: 5, date: 'June 2026', comment: 'The location is simply breathtaking. Woke up every morning to mist rolling off the peaks. The staff are exceptional.' },
       { name: 'James Fourie', rating: 5, date: 'May 2026', comment: 'We have stayed here three times and it never disappoints. The Mountain View Suite is worth every cent.' },
       { name: 'Priya Naidoo', rating: 4, date: 'April 2026', comment: 'Beautiful setting, great food. The only minor issue was the WiFi being slow in our room, but that is hardly what you come here for!' },
@@ -54,7 +54,7 @@ const STAYS: Record<string, any> = {
     location: 'Royal Natal National Park',
     region: 'Northern Berg',
     rating: 4.8,
-    reviews: 87,
+    review_count: 87,
     member_since: '2021',
     response_rate: '99%',
     description: 'An exclusive tented camp within the Royal Natal National Park, Tendele offers a genuine wilderness immersion steps from the Amphitheatre and Tugela Falls. Eight en-suite canvas tents are elevated on wooden platforms with unobstructed views across the escarpment. Sustainable solar-powered systems and responsible waste management are central to the operation.',
@@ -77,7 +77,7 @@ const STAYS: Record<string, any> = {
       { id: 'r1', name: 'Escarpment Tent', description: 'King-size bed, private en-suite with outdoor shower. Direct views of the Amphitheatre wall.', max_guests: 2, price_per_night: 3200, amenities: ['En-suite', 'Outdoor shower', 'Private deck', 'Escarpment view'] },
       { id: 'r2', name: 'Family Tent', description: 'Two rooms connected by a shared lounge area. Ideal for families or two couples travelling together.', max_guests: 4, price_per_night: 2800, amenities: ['Two rooms', 'Shared lounge', 'Family layout', 'En-suite'] },
     ],
-    reviews: [
+    reviews_list: [
       { name: 'Megan & Luke H.', rating: 5, date: 'June 2026', comment: 'Our honeymoon stay. Completely secluded, exceptional food, and waking up to the Amphitheatre every morning was surreal.' },
       { name: 'Brendan Coetzee', rating: 5, date: 'April 2026', comment: 'Best glamping experience in South Africa by a significant margin. The guides arranged our Tugela hike perfectly.' },
     ],
@@ -88,7 +88,7 @@ const STAYS: Record<string, any> = {
     location: "Giant's Castle, Central Berg",
     region: 'Central Berg',
     rating: 4.5,
-    reviews: 203,
+    review_count: 203,
     member_since: '2018',
     response_rate: '94%',
     description: "Ezemvelo KZN Wildlife's flagship restcamp in the Giant's Castle Game Reserve. The camp sits at 1,750m and is the gateway to over 5,000 San Bushman rock art paintings at the Main Caves — one of Africa's most significant heritage sites. All units are self-catering; a camp shop stocks basics and firewood.",
@@ -112,7 +112,7 @@ const STAYS: Record<string, any> = {
       { id: 'r2', name: 'Standard Chalet', description: 'En-suite chalet sleeping 2, with a kitchenette and covered stoep looking toward the escarpment.', max_guests: 2, price_per_night: 780, amenities: ['En-suite', 'Kitchenette', 'Stoep', 'Mountain view'] },
       { id: 'r3', name: 'Budget Rondavel', description: 'Circular rondavel with twin beds and shared bathroom facilities. Ideal for solo hikers.', max_guests: 2, price_per_night: 480, amenities: ['Twin beds', 'Shared bathroom', 'Camp shop access'] },
     ],
-    reviews: [
+    reviews_list: [
       { name: 'Nokukhanya Zulu', rating: 5, date: 'May 2026', comment: 'The rock art experience is like nothing else. A knowledgeable Ezemvelo guide made the history come alive. Highly recommend the Main Caves tour.' },
       { name: 'Riaan Botha', rating: 4, date: 'March 2026', comment: 'Excellent value. The luxury cottage was well-equipped. Bring your own firewood and supplies from town.' },
       { name: 'Ingrid Müller', rating: 5, date: 'February 2026', comment: 'We came for the Lammergeier (Bearded Vulture) hide. Arrived at sunrise and were rewarded with four birds. Incredible.' },
@@ -151,7 +151,7 @@ export default function StayDetailPage() {
             <span className="flex items-center gap-1.5">
               <Star size={14} className="text-[#C9A96E] fill-[#C9A96E]" />
               <span className="text-white">{stay.rating}</span>
-              <span>({stay.reviews} reviews)</span>
+              <span>({stay.review_count} reviews)</span>
             </span>
           </div>
         </div>
@@ -269,11 +269,11 @@ export default function StayDetailPage() {
                 <div className="flex items-center gap-1.5">
                   <Star size={16} className="text-[#C9A96E] fill-[#C9A96E]" />
                   <span className="font-display italic text-xl">{stay.rating}</span>
-                  <span className="font-sans text-sm text-gray-400">({stay.reviews})</span>
+                  <span className="font-sans text-sm text-gray-400">({stay.review_count})</span>
                 </div>
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {stay.reviews.map((r: any, i: number) => (
+                {stay.reviews_list.map((r: any, i: number) => (
                   <div key={i} className="bg-white border border-gray-200 p-5">
                     <div className="flex items-center justify-between mb-3">
                       <div className="flex items-center gap-2.5">
