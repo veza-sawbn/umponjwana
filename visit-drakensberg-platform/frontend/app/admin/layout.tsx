@@ -1,0 +1,94 @@
+'use client'
+
+import Link from 'next/link'
+import { usePathname } from 'next/navigation'
+import {
+  LayoutDashboard, ListChecks, Users, CalendarDays,
+  FileText, BarChart2, Search, Settings, LogOut, Mountain,
+} from 'lucide-react'
+import { signOut } from '@/lib/auth'
+import { useRouter } from 'next/navigation'
+
+const NAV = [
+  { href: '/admin', label: 'Overview', icon: LayoutDashboard, exact: true },
+  { href: '/admin/listings', label: 'Listings', icon: ListChecks },
+  { href: '/admin/suppliers', label: 'Suppliers', icon: Users },
+  { href: '/admin/bookings', label: 'Bookings', icon: CalendarDays },
+  { href: '/admin/blog', label: 'Blog & Content', icon: FileText },
+  { href: '/admin/analytics', label: 'Analytics', icon: BarChart2 },
+  { href: '/admin/seo', label: 'SEO', icon: Search },
+  { href: '/admin/settings', label: 'Settings', icon: Settings },
+]
+
+export default function AdminLayout({ children }: { children: React.ReactNode }) {
+  const pathname = usePathname()
+  const router = useRouter()
+
+  function isActive(item: typeof NAV[0]) {
+    if (item.exact) return pathname === item.href
+    return pathname.startsWith(item.href)
+  }
+
+  async function handleSignOut() {
+    await signOut()
+    router.push('/auth/login')
+  }
+
+  return (
+    <div className="min-h-screen bg-[#0a0a0a] flex">
+      {/* Sidebar */}
+      <aside className="w-60 shrink-0 bg-[#111111] border-r border-white/8 flex flex-col fixed inset-y-0 left-0 z-40">
+        {/* Brand */}
+        <div className="px-6 py-5 border-b border-white/8">
+          <Link href="/" className="flex items-center gap-2.5">
+            <Mountain size={18} className="text-[#C9A96E]" />
+            <div>
+              <p className="font-display italic text-white text-sm leading-tight">Visit Drakensberg</p>
+              <p className="font-sans text-[10px] tracking-[0.14em] uppercase text-white/30">Admin Console</p>
+            </div>
+          </Link>
+        </div>
+
+        {/* Nav */}
+        <nav className="flex-1 px-3 py-4 space-y-0.5 overflow-y-auto">
+          {NAV.map(item => {
+            const Icon = item.icon
+            const active = isActive(item)
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                className={`flex items-center gap-3 px-3 py-2.5 font-sans text-sm transition-colors ${
+                  active
+                    ? 'bg-[#C9A96E]/15 text-[#C9A96E]'
+                    : 'text-white/50 hover:text-white hover:bg-white/5'
+                }`}
+              >
+                <Icon size={16} className={active ? 'text-[#C9A96E]' : ''} />
+                {item.label}
+              </Link>
+            )
+          })}
+        </nav>
+
+        {/* Footer */}
+        <div className="px-3 py-4 border-t border-white/8">
+          <Link href="/" className="flex items-center gap-3 px-3 py-2.5 font-sans text-sm text-white/40 hover:text-white transition-colors">
+            <Mountain size={16} /> View Site
+          </Link>
+          <button
+            onClick={handleSignOut}
+            className="w-full flex items-center gap-3 px-3 py-2.5 font-sans text-sm text-white/40 hover:text-red-400 transition-colors"
+          >
+            <LogOut size={16} /> Sign Out
+          </button>
+        </div>
+      </aside>
+
+      {/* Main */}
+      <div className="ml-60 flex-1 min-h-screen bg-[#F7F5F2]">
+        {children}
+      </div>
+    </div>
+  )
+}
