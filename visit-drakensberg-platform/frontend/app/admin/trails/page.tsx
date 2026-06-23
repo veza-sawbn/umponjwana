@@ -341,7 +341,7 @@ export default function AdminTrailsPage() {
   }
 
   function toggleStatus(id: string) {
-    const updated = trails.map(t => t.id === id ? { ...t, status: t.status === 'published' ? 'draft' : 'published' } : t)
+    const updated = trails.map(t => t.id === id ? { ...t, status: (t.status === 'published' ? 'draft' : 'published') as Trail['status'] } : t)
     setTrails(updated)
     persistTrails(updated)
   }
