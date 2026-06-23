@@ -1,8 +1,16 @@
 import axios from 'axios'
 import { supabase } from './auth'
 
+// Route all API calls through the Next.js server-side proxy to avoid browser CORS blocks.
+// Paths in this file start with /api/v1/... which the proxy forwards verbatim to Render.
+// Server-side (SSR/RSC) we hit Render directly since there's no CORS constraint there.
+const baseURL =
+  typeof window !== 'undefined'
+    ? '/api/backend'
+    : (process.env.NEXT_PUBLIC_API_URL || 'https://visit-drakensberg.onrender.com').replace(/\/+$/, '')
+
 const api = axios.create({
-  baseURL: process.env.NEXT_PUBLIC_API_URL,
+  baseURL,
   headers: { 'Content-Type': 'application/json' },
 })
 

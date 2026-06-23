@@ -3,7 +3,9 @@ import { NextRequest, NextResponse } from 'next/server'
 // Proxy all /api/backend/* requests to the Render backend, bypassing browser CORS.
 // Usage: fetch('/api/backend/listings/1/availability') instead of fetching the Render URL directly.
 
-const RENDER_BASE = process.env.RENDER_API_URL || 'https://visit-drakensberg.onrender.com/api/v1'
+// RENDER_API_URL should be the bare origin, e.g. https://visit-drakensberg.onrender.com
+// The full path (including /api/v1/...) is forwarded from the incoming request.
+const RENDER_BASE = (process.env.RENDER_API_URL || 'https://visit-drakensberg.onrender.com').replace(/\/+$/, '')
 
 async function handler(req: NextRequest, { params }: { params: { path: string[] } }) {
   const path = params.path.join('/')
