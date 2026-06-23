@@ -380,3 +380,20 @@ create policy "Published posts are public" on blog_posts for select using (statu
 create policy "Admins manage all posts" on blog_posts for all using (
   exists (select 1 from profiles where id = auth.uid() and role = 'admin')
 );
+
+-- ─────────────────────────────────────────────
+-- SITE CONTENT (admin website editor)
+-- ─────────────────────────────────────────────
+create table if not exists site_content (
+  key text primary key,
+  value jsonb not null default '{}'::jsonb,
+  updated_at timestamptz default now()
+);
+
+-- Public read so the live site can fetch content without auth
+create policy "Site content is public" on site_content for select using (true);
+-- Only admins can write
+create policy "Admins manage site content" on site_content for all using (
+  exists (select 1 from profiles where id = auth.uid() and role = 'admin')
+);
+alter table site_content enable row level security;

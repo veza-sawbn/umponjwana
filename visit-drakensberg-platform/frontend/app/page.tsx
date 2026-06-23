@@ -1,9 +1,11 @@
 'use client'
+import { useState, useEffect } from 'react'
 import Link from 'next/link'
-import { ArrowRight, ChevronDown } from 'lucide-react'
+import { ArrowRight, ChevronDown, X } from 'lucide-react'
 import SearchBar from '@/components/search/SearchBar'
 import PanoramaViewer from '@/components/panorama/PanoramaViewer'
 import Footer from '@/components/layout/Footer'
+import { getAllSiteContent, SITE_CONTENT_DEFAULTS } from '@/lib/site-content'
 
 /* ─── Data ─────────────────────────────────────────────────────────────────── */
 
@@ -124,31 +126,67 @@ const SPECIALS = [
 /* ─── Component ─────────────────────────────────────────────────────────────── */
 
 export default function HomePage() {
+  const [hero, setHero] = useState(SITE_CONTENT_DEFAULTS.hero)
+  const [promos, setPromos] = useState(SITE_CONTENT_DEFAULTS.promotions)
+  const [promoBannerDismissed, setPromoBannerDismissed] = useState(false)
+
+  useEffect(() => {
+    getAllSiteContent().then(content => {
+      setHero(content.hero)
+      setPromos(content.promotions)
+    })
+  }, [])
+
   return (
     <main className="bg-mist min-h-screen">
 
+      {/* ── 0. Promo Banner (admin-controlled) ── */}
+      {promos.enabled && !promoBannerDismissed && (
+        <div className="fixed top-0 inset-x-0 z-50 flex items-center justify-between px-6 py-2.5 font-sans text-sm text-white" style={{ backgroundColor: promos.banner_color }}>
+          <span />
+          <Link href={promos.banner_link} className="hover:underline">{promos.banner_text}</Link>
+          <button onClick={() => setPromoBannerDismissed(true)} className="text-white/60 hover:text-white">
+            <X size={14} />
+          </button>
+        </div>
+      )}
+
       {/* ── 1. Hero ── */}
       <section className="relative h-screen min-h-[600px] flex flex-col">
-        {/* Background image */}
+        {/* Background */}
         <div className="absolute inset-0">
-          <img
-            src="https://images.unsplash.com/photo-1590098563548-8f14eed3a47f?w=1800&q=85"
-            alt="Drakensberg mountains"
-            className="w-full h-full object-cover"
+          {hero.video_url ? (
+            <video
+              src={hero.video_url}
+              autoPlay
+              muted
+              loop
+              playsInline
+              className="w-full h-full object-cover"
+            />
+          ) : (
+            <img
+              src={hero.image_url}
+              alt="Drakensberg mountains"
+              className="w-full h-full object-cover"
+            />
+          )}
+          <div
+            className="absolute inset-0 bg-gradient-to-b from-black/50 via-black/20 to-black/60"
+            style={{ opacity: hero.overlay_opacity / 100 + 0.3 }}
           />
-          <div className="absolute inset-0 bg-gradient-to-b from-black/50 via-black/20 to-black/60" />
         </div>
 
         {/* Content */}
         <div className="relative flex-1 flex flex-col justify-end pb-20 px-6 lg:px-20 max-w-[1440px] mx-auto w-full">
           <p className="font-sans text-xs tracking-[0.2em] uppercase text-gold mb-4">
-            KwaZulu-Natal · South Africa
+            {hero.location_label}
           </p>
-          <h1 className="font-display text-5xl sm:text-7xl lg:text-8xl text-white leading-[0.9] mb-6 max-w-3xl">
-            The Barrier<br />of Spears
+          <h1 className="font-display text-5xl sm:text-7xl lg:text-8xl text-white leading-[0.9] mb-6 max-w-3xl" style={{ whiteSpace: 'pre-line' }}>
+            {hero.headline}
           </h1>
           <p className="font-sans text-base text-white/70 max-w-md mb-10 font-light leading-relaxed">
-            Africa&apos;s highest mountain range. A UNESCO World Heritage Site. Two hundred kilometres of wild escarpment.
+            {hero.subheadline}
           </p>
 
           {/* Search */}

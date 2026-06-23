@@ -1,5 +1,9 @@
+'use client'
+
+import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { Instagram, Facebook, Youtube } from 'lucide-react'
+import { getSiteContent, SITE_CONTENT_DEFAULTS } from '@/lib/site-content'
 
 const COLUMNS = [
   {
@@ -24,7 +28,7 @@ const COLUMNS = [
   {
     heading: 'Discover',
     links: [
-      { label: 'Stories', href: '/stories' },
+      { label: 'Stories', href: '/mydrakensberg' },
       { label: 'Plan Your Trip', href: '/plan' },
       { label: 'Trail Map', href: '/hikes' },
       { label: 'Rock Art', href: '/activities' },
@@ -42,6 +46,12 @@ const COLUMNS = [
 ]
 
 export default function Footer() {
+  const [content, setContent] = useState(SITE_CONTENT_DEFAULTS.footer)
+
+  useEffect(() => {
+    getSiteContent('footer').then(setContent)
+  }, [])
+
   return (
     <footer className="bg-forest text-white">
       <div className="max-w-[1440px] mx-auto px-6 lg:px-12 py-16">
@@ -51,7 +61,7 @@ export default function Footer() {
             Visit Drakensberg
           </Link>
           <span className="font-sans text-sm text-white/30 sm:ml-4 mb-0.5">
-            Africa&apos;s alpine wilderness
+            {content.tagline}
           </span>
         </div>
 
@@ -86,23 +96,23 @@ export default function Footer() {
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
           <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-5">
             <p className="font-sans text-xs text-white/25">
-              &copy; {new Date().getFullYear()} visitdrakensberg.com
+              &copy; {new Date().getFullYear()} {content.copyright}
             </p>
             <span className="hidden sm:block text-white/15">·</span>
             <p className="font-sans text-xs text-white/25">
-              KwaZulu-Natal, South Africa
+              {content.address}
             </p>
           </div>
           <div className="flex items-center gap-5">
-            <a href="https://instagram.com" target="_blank" rel="noopener noreferrer" aria-label="Instagram"
+            <a href={content.instagram} target="_blank" rel="noopener noreferrer" aria-label="Instagram"
                className="text-white/25 hover:text-white transition-colors">
               <Instagram className="w-4 h-4" />
             </a>
-            <a href="https://facebook.com" target="_blank" rel="noopener noreferrer" aria-label="Facebook"
+            <a href={content.facebook} target="_blank" rel="noopener noreferrer" aria-label="Facebook"
                className="text-white/25 hover:text-white transition-colors">
               <Facebook className="w-4 h-4" />
             </a>
-            <a href="https://youtube.com" target="_blank" rel="noopener noreferrer" aria-label="YouTube"
+            <a href={content.youtube} target="_blank" rel="noopener noreferrer" aria-label="YouTube"
                className="text-white/25 hover:text-white transition-colors">
               <Youtube className="w-4 h-4" />
             </a>
