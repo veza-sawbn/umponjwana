@@ -31,7 +31,7 @@ const REGION_DATA: Record<string, SmartRecommendation[]> = {
   ],
   'Southern Berg': [
     { title: 'Sani Pass to Lesotho', type: 'Trail', location: 'Sani Pass', rating: 4.9, price: null, image: 'https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?w=400&q=80', href: '/hikes/sani-pass', distance: '~8km' },
-    { title: 'Bushman's Nek Loop', type: 'Trail', location: 'Southern Berg', rating: 4.5, price: null, image: 'https://images.unsplash.com/photo-1486870591958-9b9d0d1dda99?w=400&q=80', href: '/hikes/bushmans-nek', distance: '~10km' },
+    { title: "Bushman's Nek Loop", type: 'Trail', location: 'Southern Berg', rating: 4.5, price: null, image: 'https://images.unsplash.com/photo-1486870591958-9b9d0d1dda99?w=400&q=80', href: '/hikes/bushmans-nek', distance: '~10km' },
     { title: 'Sani Pass 4WD Tour', type: 'Activity', location: 'Sani Pass', rating: 4.8, price: 850, image: 'https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=400&q=80', href: '/activities/sani-4wd' },
     { title: 'Zulu Cultural Village', type: 'Experience', location: 'Southern Foothills', rating: 4.7, price: 350, image: 'https://images.unsplash.com/photo-1501854140801-50d01698950b?w=400&q=80', href: '/activities/zulu-village' },
   ],
