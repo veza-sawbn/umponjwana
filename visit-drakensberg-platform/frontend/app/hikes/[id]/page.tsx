@@ -7,6 +7,8 @@ import Navbar from '@/components/layout/Navbar'
 import Footer from '@/components/layout/Footer'
 import { ArrowLeft, Mountain, Clock, TrendingUp, Users, Star, CheckCircle, ChevronRight, X } from 'lucide-react'
 import { getTrails, Trail, DEFAULT_TRAILS } from '@/lib/trails'
+import UpcomingDepartures from '@/components/tours/UpcomingDepartures'
+import { getTourDates } from '@/lib/tour-dates'
 
 const DIFF_COLOR: Record<string, string> = { Easy: '#4A7251', Moderate: '#C9A96E', Hard: '#c0392b', Strenuous: '#c0392b' }
 const DIFF_BG: Record<string, string> = { Easy: '#4A725122', Moderate: '#C9A96E22', Hard: '#c0392b22', Strenuous: '#c0392b22' }
@@ -125,6 +127,12 @@ export default function HikeDetailPage() {
               <h2 className="font-display italic text-2xl text-[#000000] mb-4">About this Trail</h2>
               <p className="font-sans text-gray-700 leading-relaxed">{trail.description}</p>
             </div>
+
+            {/* Upcoming departures */}
+            <UpcomingDepartures
+              dates={getTourDates(id)}
+              context="Guided departures, packages and experiences on this trail"
+            />
 
             {/* Multi-day breakdown */}
             {trail.is_multi_day && trail.days.length > 0 && (

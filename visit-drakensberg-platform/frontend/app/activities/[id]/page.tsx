@@ -6,6 +6,8 @@ import Link from 'next/link'
 import Navbar from '@/components/layout/Navbar'
 import Footer from '@/components/layout/Footer'
 import { ArrowLeft, Clock, Users, Star, CheckCircle, Calendar, MapPin } from 'lucide-react'
+import UpcomingDepartures from '@/components/tours/UpcomingDepartures'
+import { getTourDates } from '@/lib/tour-dates'
 
 const ACTIVITIES: Record<string, any> = {
   a1: {
@@ -105,6 +107,12 @@ export default function ActivityDetailPage() {
                 </div>
               </div>
             </div>
+
+            {/* Upcoming departures */}
+            <UpcomingDepartures
+              dates={getTourDates(id)}
+              context="Scheduled departures, packages and experiences for this activity"
+            />
 
             {/* Guides */}
             <div>
