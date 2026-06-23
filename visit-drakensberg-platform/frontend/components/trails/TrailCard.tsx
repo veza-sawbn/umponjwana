@@ -2,6 +2,7 @@
 import { useState } from 'react'
 import { Mountain, ArrowUp, Clock, Star, Heart } from 'lucide-react'
 import Link from 'next/link'
+import { motion } from 'framer-motion'
 
 /* ─── Types ──────────────────────────────────────────────────────────────── */
 export interface Trail {
@@ -70,8 +71,11 @@ export default function TrailCard({ trail }: TrailCardProps) {
   const diff = DIFFICULTY[trail.difficulty]
 
   return (
-    <div
-      className="bg-white rounded-2xl overflow-hidden shadow-card transition-all duration-300 hover:shadow-card-hover hover:-translate-y-0.5 flex flex-col"
+    <motion.div
+      className="bg-white rounded-2xl overflow-hidden shadow-card flex flex-col"
+      whileHover={{ y: -3, boxShadow: '0 8px 30px rgba(0,0,0,0.14)' }}
+      whileTap={{ scale: 0.98 }}
+      transition={{ duration: 0.2, ease: [0, 0, 0.2, 1] }}
     >
       {/* Image */}
       <div className="relative aspect-[4/3] overflow-hidden">
@@ -98,15 +102,17 @@ export default function TrailCard({ trail }: TrailCardProps) {
         )}
 
         {/* Save / heart button */}
-        <button
+        <motion.button
           onClick={(e) => { e.preventDefault(); setSaved((s) => !s) }}
           className="absolute top-3 right-3 w-8 h-8 rounded-full bg-white/90 backdrop-blur-sm flex items-center justify-center hover:bg-white transition-all shadow-sm"
           aria-label={saved ? 'Remove from saved' : 'Save trail'}
+          whileTap={{ scale: 0.85 }}
+          transition={{ duration: 0.1 }}
         >
           <Heart
             className={`h-4 w-4 transition-colors ${saved ? 'fill-red-500 text-red-500' : 'text-gray-400'}`}
           />
-        </button>
+        </motion.button>
       </div>
 
       {/* Content */}
@@ -160,6 +166,6 @@ export default function TrailCard({ trail }: TrailCardProps) {
           </Link>
         </div>
       </div>
-    </div>
+    </motion.div>
   )
 }

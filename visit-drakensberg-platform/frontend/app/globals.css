@@ -11,6 +11,25 @@
   --color-sage: #4A7251;
   --primary: #4A7251;
   --primary-light: #f2f7f3;
+
+  /* Motion tokens */
+  --dur-micro:  150ms;
+  --dur-fast:   200ms;
+  --dur-base:   250ms;
+  --dur-medium: 300ms;
+  --dur-slow:   400ms;
+  --ease-out:   cubic-bezier(0.0, 0.0, 0.2, 1);
+  --ease-in:    cubic-bezier(0.4, 0.0, 1.0, 1);
+  --ease-inout: cubic-bezier(0.4, 0.0, 0.2, 1);
+}
+
+/* Honour system-level reduced-motion preference */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }
 
 html {

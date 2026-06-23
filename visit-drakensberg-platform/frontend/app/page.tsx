@@ -2,10 +2,12 @@
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { ArrowRight, ChevronDown, X } from 'lucide-react'
+import { motion } from 'framer-motion'
 import SearchBar from '@/components/search/SearchBar'
 import PanoramaViewer from '@/components/panorama/PanoramaViewer'
 import Footer from '@/components/layout/Footer'
 import { getAllSiteContent, SITE_CONTENT_DEFAULTS } from '@/lib/site-content'
+import { staggerContainer, staggerChild, fadeUp } from '@/lib/motion'
 
 /* ─── Data ─────────────────────────────────────────────────────────────────── */
 
@@ -178,22 +180,27 @@ export default function HomePage() {
         </div>
 
         {/* Content */}
-        <div className="relative flex-1 flex flex-col justify-end pb-20 px-6 lg:px-20 max-w-[1440px] mx-auto w-full">
-          <p className="font-sans text-xs tracking-[0.2em] uppercase text-gold mb-4">
+        <motion.div
+          className="relative flex-1 flex flex-col justify-end pb-20 px-6 lg:px-20 max-w-[1440px] mx-auto w-full"
+          variants={staggerContainer(0.12, 0.2)}
+          initial="hidden"
+          animate="show"
+        >
+          <motion.p variants={fadeUp} className="font-sans text-xs tracking-[0.2em] uppercase text-gold mb-4">
             {hero.location_label}
-          </p>
-          <h1 className="font-display text-5xl sm:text-7xl lg:text-8xl text-white leading-[0.9] mb-6 max-w-3xl" style={{ whiteSpace: 'pre-line' }}>
+          </motion.p>
+          <motion.h1 variants={fadeUp} className="font-display text-5xl sm:text-7xl lg:text-8xl text-white leading-[0.9] mb-6 max-w-3xl" style={{ whiteSpace: 'pre-line' }}>
             {hero.headline}
-          </h1>
-          <p className="font-sans text-base text-white/70 max-w-md mb-10 font-light leading-relaxed">
+          </motion.h1>
+          <motion.p variants={fadeUp} className="font-sans text-base text-white/70 max-w-md mb-10 font-light leading-relaxed">
             {hero.subheadline}
-          </p>
+          </motion.p>
 
           {/* Search */}
-          <div className="max-w-2xl">
+          <motion.div variants={fadeUp} className="max-w-2xl">
             <SearchBar />
-          </div>
-        </div>
+          </motion.div>
+        </motion.div>
 
         {/* Scroll indicator */}
         <div className="absolute bottom-6 left-1/2 -translate-x-1/2 flex flex-col items-center gap-1 text-white/40">
@@ -203,14 +210,20 @@ export default function HomePage() {
 
       {/* ── 2. Stats strip ── */}
       <section className="bg-forest text-white">
-        <div className="max-w-[1440px] mx-auto px-6 lg:px-12 py-10 grid grid-cols-2 md:grid-cols-4 gap-8">
+        <motion.div
+          className="max-w-[1440px] mx-auto px-6 lg:px-12 py-10 grid grid-cols-2 md:grid-cols-4 gap-8"
+          variants={staggerContainer(0.07)}
+          initial="hidden"
+          whileInView="show"
+          viewport={{ once: true, margin: '-60px' }}
+        >
           {STATS.map((s) => (
-            <div key={s.label}>
+            <motion.div key={s.label} variants={staggerChild}>
               <p className="font-display text-3xl text-gold">{s.value}</p>
               <p className="font-sans text-xs text-white/40 mt-1 tracking-wide uppercase">{s.label}</p>
-            </div>
+            </motion.div>
           ))}
-        </div>
+        </motion.div>
       </section>
 
       {/* ── 3. Categories ── */}
@@ -219,19 +232,28 @@ export default function HomePage() {
           <p className="font-sans text-xs tracking-[0.2em] uppercase text-forest/40 mb-2">What to do</p>
           <h2 className="font-display text-4xl text-forest">Explore the Berg</h2>
         </div>
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+        <motion.div
+          className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3"
+          variants={staggerContainer(0.06)}
+          initial="hidden"
+          whileInView="show"
+          viewport={{ once: true, margin: '-80px' }}
+        >
           {CATEGORIES.map((cat) => (
-            <Link key={cat.href} href={cat.href} className="group relative overflow-hidden aspect-[3/4]">
-              <img
-                src={cat.img}
-                alt={cat.label}
-                className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
-              />
-              <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/10 to-transparent" />
-              <span className="absolute bottom-4 left-4 font-display text-xl text-white">{cat.label}</span>
-            </Link>
+            <motion.div key={cat.href} variants={staggerChild} whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }} transition={{ duration: 0.2, ease: [0, 0, 0.2, 1] }}>
+              <Link href={cat.href} className="group relative overflow-hidden aspect-[3/4] block">
+                <img
+                  src={cat.img}
+                  alt={cat.label}
+                  className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                  style={{ willChange: 'transform' }}
+                />
+                <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/10 to-transparent" />
+                <span className="absolute bottom-4 left-4 font-display text-xl text-white">{cat.label}</span>
+              </Link>
+            </motion.div>
           ))}
-        </div>
+        </motion.div>
       </section>
 
       {/* ── 4. Regions ── */}
@@ -247,22 +269,31 @@ export default function HomePage() {
             </Link>
           </div>
 
-          <div className="grid md:grid-cols-3 gap-6">
+          <motion.div
+            className="grid md:grid-cols-3 gap-6"
+            variants={staggerContainer(0.08)}
+            initial="hidden"
+            whileInView="show"
+            viewport={{ once: true, margin: '-80px' }}
+          >
             {REGIONS.map((r) => (
-              <Link key={r.href} href={r.href} className="group block">
-                <div className="relative overflow-hidden aspect-[4/3] mb-4">
-                  <img
-                    src={r.img}
-                    alt={r.name}
-                    className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-104"
-                  />
-                </div>
-                <p className="font-sans text-[10px] tracking-[0.15em] uppercase text-gold mb-1">{r.subtitle}</p>
-                <h3 className="font-display text-2xl text-forest mb-2">{r.name}</h3>
-                <p className="font-sans text-sm text-forest/55 leading-relaxed">{r.desc}</p>
-              </Link>
+              <motion.div key={r.href} variants={staggerChild}>
+                <Link href={r.href} className="group block">
+                  <div className="relative overflow-hidden aspect-[4/3] mb-4">
+                    <img
+                      src={r.img}
+                      alt={r.name}
+                      className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                      style={{ willChange: 'transform' }}
+                    />
+                  </div>
+                  <p className="font-sans text-[10px] tracking-[0.15em] uppercase text-gold mb-1">{r.subtitle}</p>
+                  <h3 className="font-display text-2xl text-forest mb-2">{r.name}</h3>
+                  <p className="font-sans text-sm text-forest/55 leading-relaxed">{r.desc}</p>
+                </Link>
+              </motion.div>
             ))}
-          </div>
+          </motion.div>
         </div>
       </section>
 
@@ -302,17 +333,25 @@ export default function HomePage() {
             </Link>
           </div>
 
-          <div className="grid md:grid-cols-3 gap-8">
+          <motion.div
+            className="grid md:grid-cols-3 gap-8"
+            variants={staggerContainer(0.08)}
+            initial="hidden"
+            whileInView="show"
+            viewport={{ once: true, margin: '-80px' }}
+          >
             {STORIES.map((s) => (
-              <Link key={s.href} href={s.href} className="group block">
-                <div className="relative overflow-hidden aspect-[3/2] mb-4">
-                  <img src={s.img} alt={s.title} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" />
-                </div>
-                <p className="font-sans text-[10px] tracking-[0.15em] uppercase text-gold mb-2">{s.tag} · {s.date}</p>
-                <h3 className="font-display text-xl text-forest leading-snug group-hover:text-sage transition-colors">{s.title}</h3>
-              </Link>
+              <motion.div key={s.href} variants={staggerChild} whileHover={{ y: -3 }} transition={{ duration: 0.2, ease: [0, 0, 0.2, 1] }}>
+                <Link href={s.href} className="group block">
+                  <div className="relative overflow-hidden aspect-[3/2] mb-4">
+                    <img src={s.img} alt={s.title} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" style={{ willChange: 'transform' }} />
+                  </div>
+                  <p className="font-sans text-[10px] tracking-[0.15em] uppercase text-gold mb-2">{s.tag} · {s.date}</p>
+                  <h3 className="font-display text-xl text-forest leading-snug group-hover:text-sage transition-colors">{s.title}</h3>
+                </Link>
+              </motion.div>
             ))}
-          </div>
+          </motion.div>
         </div>
       </section>
 

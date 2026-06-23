@@ -3,6 +3,7 @@ import Link from 'next/link'
 import Image from 'next/image'
 import { MapPin, Heart } from 'lucide-react'
 import { useState } from 'react'
+import { motion } from 'framer-motion'
 import { Badge } from '@/components/ui/Badge'
 import { StarRating } from '@/components/ui/StarRating'
 import { formatCurrency } from '@/lib/utils'
@@ -30,12 +31,12 @@ const UNIT_LABELS: Record<string, string> = {
 
 export function ListingCardSkeleton() {
   return (
-    <div className="rounded-2xl overflow-hidden shadow-card animate-pulse">
-      <div className="bg-gray-200 h-52" />
+    <div className="rounded-2xl overflow-hidden shadow-card">
+      <div className="bg-gray-200 h-52 animate-skeleton" />
       <div className="p-4 space-y-2">
-        <div className="h-4 bg-gray-200 rounded w-3/4" />
-        <div className="h-3 bg-gray-200 rounded w-1/2" />
-        <div className="h-4 bg-gray-200 rounded w-1/3 mt-3" />
+        <div className="h-4 bg-gray-200 rounded w-3/4 animate-skeleton" />
+        <div className="h-3 bg-gray-200 rounded w-1/2 animate-skeleton" style={{ animationDelay: '0.1s' }} />
+        <div className="h-4 bg-gray-200 rounded w-1/3 mt-3 animate-skeleton" style={{ animationDelay: '0.2s' }} />
       </div>
     </div>
   )
@@ -46,7 +47,12 @@ export function ListingCard({ listing }: { listing: Listing }) {
   const image = listing.images?.[0] ?? 'https://images.unsplash.com/photo-1501854140801-50d01698950b?w=600'
 
   return (
-    <Link href={`/listings/${listing.id}`} className="group block rounded-2xl overflow-hidden shadow-card hover:shadow-card-hover transition-shadow bg-white">
+    <motion.div
+      whileHover={{ y: -2, boxShadow: '0 8px 30px rgba(0,0,0,0.14)' }}
+      whileTap={{ scale: 0.98 }}
+      transition={{ duration: 0.2, ease: [0, 0, 0.2, 1] }}
+    >
+    <Link href={`/listings/${listing.id}`} className="group block rounded-2xl overflow-hidden shadow-card bg-white">
       <div className="relative h-52 overflow-hidden">
         <Image
           src={image}
@@ -93,5 +99,6 @@ export function ListingCard({ listing }: { listing: Listing }) {
         </div>
       </div>
     </Link>
+    </motion.div>
   )
 }

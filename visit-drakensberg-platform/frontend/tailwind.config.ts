@@ -65,22 +65,42 @@ const config: Config = {
       },
       keyframes: {
         'fade-up': {
-          '0%': { opacity: '0', transform: 'translateY(20px)' },
+          '0%':   { opacity: '0', transform: 'translateY(16px)' },
+          '100%': { opacity: '1', transform: 'translateY(0)' },
+        },
+        'fade-in': {
+          '0%':   { opacity: '0' },
+          '100%': { opacity: '1' },
+        },
+        'scale-in': {
+          '0%':   { opacity: '0', transform: 'scale(0.95)' },
+          '100%': { opacity: '1', transform: 'scale(1)' },
+        },
+        'slide-up': {
+          '0%':   { opacity: '0', transform: 'translateY(12px)' },
           '100%': { opacity: '1', transform: 'translateY(0)' },
         },
         'bounce-slow': {
           '0%, 100%': { transform: 'translateY(0)' },
-          '50%': { transform: 'translateY(8px)' },
+          '50%':      { transform: 'translateY(8px)' },
         },
         'fade-out': {
-          '0%': { opacity: '1' },
-          '100%': { opacity: '0', pointerEvents: 'none' },
+          '0%':   { opacity: '1' },
+          '100%': { opacity: '0' },
+        },
+        'skeleton': {
+          '0%, 100%': { opacity: '1' },
+          '50%':      { opacity: '0.4' },
         },
       },
       animation: {
-        'fade-up': 'fade-up 0.6s ease-out forwards',
-        'bounce-slow': 'bounce-slow 1.8s ease-in-out infinite',
-        'fade-out': 'fade-out 0.5s ease-in 3s forwards',
+        'fade-up':    'fade-up 0.25s cubic-bezier(0,0,0.2,1) forwards',
+        'fade-in':    'fade-in 0.25s cubic-bezier(0,0,0.2,1) forwards',
+        'scale-in':   'scale-in 0.25s cubic-bezier(0,0,0.2,1) forwards',
+        'slide-up':   'slide-up 0.25s cubic-bezier(0,0,0.2,1) forwards',
+        'bounce-slow':'bounce-slow 1.8s ease-in-out infinite',
+        'fade-out':   'fade-out 0.16s cubic-bezier(0.4,0,1,1) forwards',
+        'skeleton':   'skeleton 1.5s ease-in-out infinite',
       },
     },
   },

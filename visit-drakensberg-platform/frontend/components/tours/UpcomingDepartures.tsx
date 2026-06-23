@@ -3,7 +3,9 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { Calendar, Users, Tag, ChevronRight, UserCircle, Package, Sparkles, Check, Plus } from 'lucide-react'
+import { motion } from 'framer-motion'
 import { useBooking } from '@/lib/booking-context'
+import { staggerContainer, staggerChild } from '@/lib/motion'
 
 export type TourDate = {
   id: string
@@ -72,14 +74,19 @@ export default function UpcomingDepartures({ dates, context }: { dates: TourDate
         )}
       </div>
 
-      <div className="space-y-3">
+      <motion.div
+        className="space-y-3"
+        variants={staggerContainer(0.04)}
+        initial="hidden"
+        animate="show"
+      >
         {visible.map(d => {
           const meta = TYPE_META[d.type]
           const Icon = meta.Icon
           const spots = spotsLabel(d.spots_remaining, d.spots_total)
 
           return (
-            <div key={d.id} className={`bg-white border ${spots.full ? 'border-gray-100 opacity-60' : 'border-gray-200'} p-5`}>
+            <motion.div key={d.id} variants={staggerChild} className={`bg-white border ${spots.full ? 'border-gray-100 opacity-60' : 'border-gray-200'} p-5`}>
               <div className="flex items-start justify-between gap-4 flex-wrap">
                 {/* Left: date + type + operator */}
                 <div className="flex items-start gap-4">
@@ -144,7 +151,9 @@ export default function UpcomingDepartures({ dates, context }: { dates: TourDate
                     ) : (() => {
                       const isAdded = booking.addons.some(a => a.id === d.id)
                       return (
-                        <button
+                        <motion.button
+                          whileTap={{ scale: 0.96 }}
+                          transition={{ duration: 0.1 }}
                           onClick={() => isAdded
                             ? booking.removeAddon(d.id)
                             : booking.addAddon({
@@ -163,16 +172,16 @@ export default function UpcomingDepartures({ dates, context }: { dates: TourDate
                           }`}
                         >
                           {isAdded ? <><Check size={13} /> Added</> : <><Plus size={13} /> Add to Trip</>}
-                        </button>
+                        </motion.button>
                       )
                     })()}
                   </div>
                 </div>
               </div>
-            </div>
+            </motion.div>
           )
         })}
-      </div>
+      </motion.div>
 
       <div className="mt-5 bg-[#F7F5F2] border border-gray-200 px-5 py-4 flex items-center justify-between flex-wrap gap-3">
         <div>

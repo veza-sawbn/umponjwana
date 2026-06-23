@@ -5,6 +5,8 @@ import { usePathname, useRouter } from 'next/navigation'
 import { X, Menu, ChevronDown, LogOut, LayoutDashboard, User, CalendarDays, Bell } from 'lucide-react'
 import { supabase, signOut } from '@/lib/auth'
 import type { User as SupabaseUser } from '@supabase/supabase-js'
+import { AnimatePresence, motion } from 'framer-motion'
+import { scaleFade, fade, staggerContainer, staggerChild } from '@/lib/motion'
 
 const NAV_LINKS = [
   { label: 'Stays', href: '/stays' },
@@ -119,8 +121,16 @@ export default function Navbar() {
                   <ChevronDown className={`w-3.5 h-3.5 transition-transform ${dropdownOpen ? 'rotate-180' : ''}`} />
                 </button>
 
+                <AnimatePresence>
                 {dropdownOpen && (
-                  <div className="absolute right-0 top-full mt-2 w-56 bg-white border border-black/8 shadow-card py-1 z-50">
+                  <motion.div
+                    className="absolute right-0 top-full mt-2 w-56 bg-white border border-black/8 shadow-card py-1 z-50"
+                    variants={scaleFade}
+                    initial="hidden"
+                    animate="show"
+                    exit="exit"
+                    style={{ originX: 1, originY: 0 }}
+                  >
                     <p className="px-4 py-2 font-sans text-xs text-forest/40 border-b border-black/6 truncate">
                       {user.user_metadata?.full_name ?? user.email}
                     </p>
@@ -160,8 +170,9 @@ export default function Navbar() {
                       className="flex items-center gap-2 w-full px-4 py-2.5 font-sans text-sm text-red-500 hover:bg-mist transition-colors border-t border-black/6">
                       <LogOut className="w-4 h-4" /> Sign Out
                     </button>
-                  </div>
+                  </motion.div>
                 )}
+                </AnimatePresence>
               </div>
             ) : (
               <Link
@@ -189,46 +200,68 @@ export default function Navbar() {
       </header>
 
       {/* Mobile overlay */}
-      <div
-        className={`fixed inset-0 z-40 bg-white flex flex-col transition-all duration-300 ${
-          mobileOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
-        }`}
-      >
-        <div className="h-16 flex items-center justify-between px-6 border-b border-black/8">
-          <Link href="/" className="font-display italic text-xl text-forest">
-            Visit Drakensberg
-          </Link>
-          <button onClick={() => setMobileOpen(false)} className="p-2 text-forest">
-            <X className="w-6 h-6" />
-          </button>
-        </div>
+      <AnimatePresence>
+        {mobileOpen && (
+          <motion.div
+            className="fixed inset-0 z-40 bg-white flex flex-col"
+            variants={fade}
+            initial="hidden"
+            animate="show"
+            exit="exit"
+          >
+            <div className="h-16 flex items-center justify-between px-6 border-b border-black/8">
+              <Link href="/" className="font-display italic text-xl text-forest">
+                Visit Drakensberg
+              </Link>
+              <motion.button
+                onClick={() => setMobileOpen(false)}
+                className="p-2 text-forest"
+                whileTap={{ scale: 0.9 }}
+              >
+                <X className="w-6 h-6" />
+              </motion.button>
+            </div>
 
-        <nav className="flex-1 flex flex-col items-center justify-center gap-6">
-          {NAV_LINKS.map((link) => (
-            <Link
-              key={link.href}
-              href={link.href}
-              className="font-display text-4xl text-forest hover:text-gold transition-colors"
+            <motion.nav
+              className="flex-1 flex flex-col items-center justify-center gap-6"
+              variants={staggerContainer(0.05, 0.05)}
+              initial="hidden"
+              animate="show"
             >
-              {link.label}
-            </Link>
-          ))}
-          <div className="h-px w-16 bg-black/10 my-2" />
-          <Link href="/supplier" className="font-sans text-sm tracking-widest uppercase text-forest/40 hover:text-gold transition-colors">
-            List Property
-          </Link>
-          {!user && (
-            <Link href="/auth/login" className="font-sans text-sm px-8 py-3 border border-forest text-forest hover:bg-forest hover:text-white transition-all">
-              Sign In
-            </Link>
-          )}
-          {user && (
-            <button onClick={handleSignOut} className="font-sans text-sm text-red-400 hover:text-red-600 transition-colors flex items-center gap-2">
-              <LogOut className="w-4 h-4" /> Sign Out
-            </button>
-          )}
-        </nav>
-      </div>
+              {NAV_LINKS.map((link) => (
+                <motion.div key={link.href} variants={staggerChild}>
+                  <Link
+                    href={link.href}
+                    className="font-display text-4xl text-forest hover:text-gold transition-colors"
+                  >
+                    {link.label}
+                  </Link>
+                </motion.div>
+              ))}
+              <motion.div variants={staggerChild} className="h-px w-16 bg-black/10 my-2" />
+              <motion.div variants={staggerChild}>
+                <Link href="/supplier" className="font-sans text-sm tracking-widest uppercase text-forest/40 hover:text-gold transition-colors">
+                  List Property
+                </Link>
+              </motion.div>
+              {!user && (
+                <motion.div variants={staggerChild}>
+                  <Link href="/auth/login" className="font-sans text-sm px-8 py-3 border border-forest text-forest hover:bg-forest hover:text-white transition-all">
+                    Sign In
+                  </Link>
+                </motion.div>
+              )}
+              {user && (
+                <motion.div variants={staggerChild}>
+                  <button onClick={handleSignOut} className="font-sans text-sm text-red-400 hover:text-red-600 transition-colors flex items-center gap-2">
+                    <LogOut className="w-4 h-4" /> Sign Out
+                  </button>
+                </motion.div>
+              )}
+            </motion.nav>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </>
   )
 }
