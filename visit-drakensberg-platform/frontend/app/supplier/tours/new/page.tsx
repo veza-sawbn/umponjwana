@@ -3,6 +3,8 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { ChevronLeft, Mountain, ChevronDown } from 'lucide-react'
 import { getTrails, type Trail } from '@/lib/trails'
+import { addTour } from '@/lib/tours'
+import { supabase } from '@/lib/auth'
 
 const DIFFICULTIES = ['Easy', 'Moderate', 'Challenging', 'Extreme']
 const INCLUDED_OPTIONS = ['Meals', 'Accommodation', 'Guides', 'Permits', 'Equipment', 'Transport']
@@ -21,6 +23,8 @@ export default function NewTourPage() {
   const [form, setForm] = useState(EMPTY)
   const [trails, setTrails] = useState<Trail[]>([])
   const [trailOpen, setTrailOpen] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState('')
   const set = (k: string, v: unknown) => setForm(f => ({ ...f, [k]: v }))
 
   useEffect(() => {
@@ -45,6 +49,23 @@ export default function NewTourPage() {
   }
 
   const selectedTrail = trails.find(t => t.id === form.trailId)
+
+  async function handleCreate() {
+    if (!form.name.trim()) { setError('Tour name is required.'); return }
+    if (!form.meetingPoint.trim()) { setError('Meeting point is required.'); return }
+    if (!form.pricePerPerson) { setError('Price per person is required.'); return }
+    setError('')
+    setSaving(true)
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      await addTour({ ...form, supplierId: user?.id ?? '' })
+      router.push('/supplier/tours')
+    } catch (e) {
+      setError('Failed to save tour. Please try again.')
+    } finally {
+      setSaving(false)
+    }
+  }
 
   return (
     <div className="p-8 max-w-2xl">
@@ -160,12 +181,15 @@ export default function NewTourPage() {
         </F>
       </div>
 
+      {error && <p className="font-sans text-sm text-red-500 mt-2">{error}</p>}
+
       <div className="flex gap-3 mt-6">
         <button
-          onClick={() => router.push('/supplier/tours')}
-          className="flex-1 bg-[#C9A96E] text-white font-sans text-sm py-2.5 rounded-lg hover:bg-[#b8965d] transition-colors"
+          onClick={handleCreate}
+          disabled={saving}
+          className="flex-1 bg-[#C9A96E] text-white font-sans text-sm py-2.5 rounded-lg hover:bg-[#b8965d] transition-colors disabled:opacity-50"
         >
-          Create Tour
+          {saving ? 'Saving…' : 'Create Tour'}
         </button>
         <button onClick={() => router.back()} className="font-sans text-sm px-5 py-2.5 border border-black/15 rounded-lg text-black/50">Cancel</button>
       </div>
