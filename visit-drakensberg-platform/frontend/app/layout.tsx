@@ -6,6 +6,7 @@ import { useState } from 'react'
 import Navbar from '@/components/layout/Navbar'
 import { BookingProvider } from '@/lib/booking-context'
 import BookingBar from '@/components/booking/BookingBar'
+import EditModeGate from '@/components/editor/EditModeGate'
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   const [queryClient] = useState(() => new QueryClient({
@@ -23,10 +24,12 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body>
         <QueryClientProvider client={queryClient}>
           <BookingProvider>
+            <EditModeGate>
             <Navbar />
             {children}
             <BookingBar />
             <Toaster position="top-right" toastOptions={{ duration: 4000 }} />
+            </EditModeGate>
           </BookingProvider>
         </QueryClientProvider>
       </body>

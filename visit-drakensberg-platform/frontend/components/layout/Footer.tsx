@@ -4,6 +4,8 @@ import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { Instagram, Facebook, Youtube } from 'lucide-react'
 import { getSiteContent, SITE_CONTENT_DEFAULTS } from '@/lib/site-content'
+import { useEditMode } from '@/lib/edit-mode-context'
+import Editable from '@/components/editor/Editable'
 
 const COLUMNS = [
   {
@@ -47,10 +49,16 @@ const COLUMNS = [
 
 export default function Footer() {
   const [content, setContent] = useState(SITE_CONTENT_DEFAULTS.footer)
+  const editMode = useEditMode()
 
   useEffect(() => {
     getSiteContent('footer').then(setContent)
   }, [])
+
+  const tagline = editMode?.getValue('footer', 'tagline', content.tagline) ?? content.tagline
+  const copyright = editMode?.getValue('footer', 'copyright', content.copyright) ?? content.copyright
+  const address = editMode?.getValue('footer', 'address', content.address) ?? content.address
+  const contactEmail = editMode?.getValue('footer', 'contact_email', content.contact_email) ?? content.contact_email
 
   return (
     <footer className="bg-forest text-white">
@@ -60,9 +68,11 @@ export default function Footer() {
           <Link href="/" className="font-display italic text-3xl text-gold leading-none">
             Visit Drakensberg
           </Link>
-          <span className="font-sans text-sm text-white/30 sm:ml-4 mb-0.5">
-            {content.tagline}
-          </span>
+          <Editable section="footer" fieldKey="tagline" value={tagline} label="Tagline" type="text" as="span">
+            <span className="font-sans text-sm text-white/30 sm:ml-4 mb-0.5">
+              {tagline}
+            </span>
+          </Editable>
         </div>
 
         <div className="h-px bg-white/10 mb-10" />
@@ -95,13 +105,17 @@ export default function Footer() {
         {/* Bottom bar */}
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
           <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-5">
-            <p className="font-sans text-xs text-white/25">
-              &copy; {new Date().getFullYear()} {content.copyright}
-            </p>
+            <Editable section="footer" fieldKey="copyright" value={copyright} label="Copyright" type="text">
+              <p className="font-sans text-xs text-white/25">
+                &copy; {new Date().getFullYear()} {copyright}
+              </p>
+            </Editable>
             <span className="hidden sm:block text-white/15">·</span>
-            <p className="font-sans text-xs text-white/25">
-              {content.address}
-            </p>
+            <Editable section="footer" fieldKey="address" value={address} label="Address" type="text">
+              <p className="font-sans text-xs text-white/25">
+                {address}
+              </p>
+            </Editable>
           </div>
           <div className="flex items-center gap-5">
             <a href={content.instagram} target="_blank" rel="noopener noreferrer" aria-label="Instagram"

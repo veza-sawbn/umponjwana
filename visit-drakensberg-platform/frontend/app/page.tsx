@@ -8,7 +8,7 @@ import PanoramaViewer from '@/components/panorama/PanoramaViewer'
 import Footer from '@/components/layout/Footer'
 import { getAllSiteContent, SITE_CONTENT_DEFAULTS } from '@/lib/site-content'
 import { staggerContainer, staggerChild, fadeUp } from '@/lib/motion'
-import { useEditMode, EditModeProvider } from '@/lib/edit-mode-context'
+import { useEditMode } from '@/lib/edit-mode-context'
 import Editable from '@/components/editor/Editable'
 
 /* ─── Data ─────────────────────────────────────────────────────────────────── */
@@ -127,12 +127,7 @@ const SPECIALS = [
   { id: 'sp3', title: 'Kids Berg Explorer Camp', offer: '2-night adventure camp', location: 'Royal Natal', dates: '12–14 Jul 2026', price: 2200 },
 ]
 
-/* ─── Edit-mode helpers ──────────────────────────────────────────────────────── */
-
-function ConditionalEditMode({ active, children }: { active: boolean; children: React.ReactNode }) {
-  if (active) return <EditModeProvider>{children}</EditModeProvider>
-  return <>{children}</>
-}
+/* ─── Edit-mode hero ─────────────────────────────────────────────────────────── */
 
 function HeroSection({ hero }: { hero: typeof SITE_CONTENT_DEFAULTS.hero }) {
   const editMode = useEditMode()
@@ -197,10 +192,8 @@ export default function HomePage() {
   const [hero, setHero] = useState(SITE_CONTENT_DEFAULTS.hero)
   const [promos, setPromos] = useState(SITE_CONTENT_DEFAULTS.promotions)
   const [promoBannerDismissed, setPromoBannerDismissed] = useState(false)
-  const [isEditMode, setIsEditMode] = useState(false)
 
   useEffect(() => {
-    setIsEditMode(new URLSearchParams(window.location.search).get('edit') === '1')
     getAllSiteContent().then(content => {
       setHero(content.hero)
       setPromos(content.promotions)
@@ -208,7 +201,6 @@ export default function HomePage() {
   }, [])
 
   return (
-    <ConditionalEditMode active={isEditMode}>
     <main className="bg-mist min-h-screen">
 
       {/* ── 0. Promo Banner (admin-controlled) ── */}
@@ -571,6 +563,5 @@ export default function HomePage() {
       {/* ── Footer ── */}
       <Footer />
     </main>
-    </ConditionalEditMode>
   )
 }

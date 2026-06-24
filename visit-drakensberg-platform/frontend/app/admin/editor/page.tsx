@@ -4,12 +4,25 @@ import { X, Save, Check, Loader2, Monitor, ExternalLink, MousePointer2 } from 'l
 import { setSiteContent } from '@/lib/site-content'
 import type { EditFieldConfig, FieldType } from '@/lib/edit-mode-context'
 
+const PAGES = [
+  { label: 'Home', path: '/' },
+  { label: 'Stays', path: '/stays' },
+  { label: 'Hikes', path: '/hikes' },
+  { label: 'Activities', path: '/activities' },
+  { label: 'Reserves', path: '/nature-reserves' },
+  { label: 'Regions', path: '/regions' },
+  { label: 'Stories', path: '/mydrakensberg' },
+  { label: 'Plan', path: '/plan' },
+  { label: 'About', path: '/about' },
+]
+
 interface PendingChanges {
   [section: string]: Record<string, any>
 }
 
 export default function AdminEditorPage() {
   const iframeRef = useRef<HTMLIFrameElement>(null)
+  const [activePage, setActivePage] = useState(PAGES[0])
   const [activeField, setActiveField] = useState<EditFieldConfig | null>(null)
   const [editValue, setEditValue] = useState<string | number>('')
   const [pending, setPending] = useState<PendingChanges>({})
@@ -33,6 +46,12 @@ export default function AdminEditorPage() {
     return () => window.removeEventListener('message', handler)
   }, [])
 
+  function switchPage(page: typeof PAGES[0]) {
+    setActivePage(page)
+    setActiveField(null)
+    setIframeReady(false)
+  }
+
   function handleChange(value: string | number) {
     setEditValue(value)
     if (!activeField) return
@@ -44,7 +63,7 @@ export default function AdminEditorPage() {
   }
 
   async function handleSaveAll() {
-    if (saving) return
+    if (saving || Object.keys(pending).length === 0) return
     setSaving(true)
     await Promise.all(
       Object.entries(pending).map(([section, fields]) =>
@@ -57,12 +76,12 @@ export default function AdminEditorPage() {
   }
 
   const unsavedCount = Object.values(pending).reduce((n, fields) => n + Object.keys(fields).length, 0)
+  const iframeSrc = `${activePage.path}?edit=1`
 
   return (
-    // Fixed overlay covers the admin sidebar
     <div className="fixed inset-0 z-[999] flex flex-col bg-[#0d0d0d]">
 
-      {/* ── Top bar ── */}
+      {/* ── Top toolbar ── */}
       <div className="h-12 bg-[#111] border-b border-white/10 flex items-center justify-between px-4 shrink-0 gap-4">
         <div className="flex items-center gap-3 min-w-0">
           <Monitor className="w-4 h-4 text-gold shrink-0" />
@@ -76,7 +95,7 @@ export default function AdminEditorPage() {
 
         <div className="flex items-center gap-4">
           <a
-            href="/"
+            href={activePage.path}
             target="_blank"
             rel="noopener noreferrer"
             className="hidden sm:flex items-center gap-1.5 font-sans text-xs text-white/40 hover:text-white transition-colors"
@@ -101,51 +120,58 @@ export default function AdminEditorPage() {
         </div>
       </div>
 
+      {/* ── Page tabs ── */}
+      <div className="bg-[#0d0d0d] border-b border-white/8 flex items-center px-4 gap-1 overflow-x-auto shrink-0">
+        {PAGES.map(page => (
+          <button
+            key={page.path}
+            onClick={() => switchPage(page)}
+            className={`px-4 py-2.5 font-sans text-xs font-medium whitespace-nowrap transition-colors border-b-2 ${
+              activePage.path === page.path
+                ? 'text-gold border-gold'
+                : 'text-white/40 border-transparent hover:text-white/70'
+            }`}
+          >
+            {page.label}
+          </button>
+        ))}
+      </div>
+
       {/* ── Editor body ── */}
       <div className="flex-1 flex overflow-hidden">
 
-        {/* iframe preview */}
+        {/* iframe */}
         <div className="flex-1 overflow-hidden relative bg-[#1a1a1a]">
+          {!iframeReady && (
+            <div className="absolute inset-0 flex items-center justify-center z-10 bg-[#1a1a1a]">
+              <Loader2 className="w-6 h-6 text-gold animate-spin" />
+            </div>
+          )}
           <iframe
+            key={iframeSrc}
             ref={iframeRef}
-            src="/?edit=1"
+            src={iframeSrc}
             className="w-full h-full border-none"
             title="Site Preview"
             onLoad={() => setIframeReady(true)}
           />
-          {!iframeReady && (
-            <div className="absolute inset-0 flex items-center justify-center">
-              <Loader2 className="w-6 h-6 text-gold animate-spin" />
-            </div>
-          )}
         </div>
 
         {/* ── Right panel ── */}
         {activeField ? (
           <div className="w-80 bg-white border-l border-gray-200 flex flex-col shrink-0 overflow-hidden">
-            {/* Panel header */}
             <div className="px-5 py-4 border-b border-gray-100 flex items-start justify-between gap-2">
               <div className="min-w-0">
                 <p className="font-sans text-[10px] tracking-[0.14em] uppercase text-gray-400">{activeField.section}</p>
                 <p className="font-sans text-sm font-semibold text-gray-900 mt-0.5 truncate">{activeField.label}</p>
               </div>
-              <button
-                onClick={() => setActiveField(null)}
-                className="text-gray-300 hover:text-gray-600 transition-colors shrink-0 mt-0.5"
-              >
+              <button onClick={() => setActiveField(null)} className="text-gray-300 hover:text-gray-600 transition-colors shrink-0 mt-0.5">
                 <X className="w-4 h-4" />
               </button>
             </div>
 
-            {/* Input */}
             <div className="flex-1 p-5 overflow-y-auto">
-              <EditInput
-                type={activeField.type}
-                value={editValue}
-                min={activeField.min}
-                max={activeField.max}
-                onChange={handleChange}
-              />
+              <EditInput type={activeField.type} value={editValue} min={activeField.min} max={activeField.max} onChange={handleChange} />
             </div>
 
             <div className="px-5 py-3 border-t border-gray-100 bg-gray-50">
@@ -155,8 +181,7 @@ export default function AdminEditorPage() {
             </div>
           </div>
         ) : (
-          /* Empty state */
-          <div className="w-72 bg-[#111] border-l border-white/8 flex flex-col items-center justify-center p-8 text-center shrink-0">
+          <div className="w-64 bg-[#111] border-l border-white/8 flex flex-col items-center justify-center p-8 text-center shrink-0">
             <div className="w-12 h-12 rounded-full bg-gold/10 flex items-center justify-center mb-4">
               <MousePointer2 className="w-5 h-5 text-gold" />
             </div>
@@ -171,113 +196,46 @@ export default function AdminEditorPage() {
   )
 }
 
-/* ── Inline input component ── */
-function EditInput({
-  type, value, min, max, onChange,
-}: {
-  type: FieldType
-  value: string | number
-  min?: number
-  max?: number
-  onChange: (v: string | number) => void
+/* ── Input component ── */
+function EditInput({ type, value, min, max, onChange }: {
+  type: FieldType; value: string | number; min?: number; max?: number; onChange: (v: string | number) => void
 }) {
   const inputCls = 'w-full border border-gray-200 px-3 py-2.5 font-sans text-sm focus:outline-none focus:border-forest bg-[#F7F5F2]'
 
-  if (type === 'textarea') {
-    return (
-      <textarea
-        // eslint-disable-next-line jsx-a11y/no-autofocus
-        autoFocus
-        value={String(value)}
-        onChange={e => onChange(e.target.value)}
-        rows={6}
-        className={`${inputCls} resize-none`}
-      />
-    )
-  }
+  if (type === 'textarea') return (
+    // eslint-disable-next-line jsx-a11y/no-autofocus
+    <textarea autoFocus value={String(value)} onChange={e => onChange(e.target.value)} rows={6} className={`${inputCls} resize-none`} />
+  )
 
-  if (type === 'image') {
-    return (
-      <div className="space-y-3">
-        <input
-          // eslint-disable-next-line jsx-a11y/no-autofocus
-          autoFocus
-          type="text"
-          value={String(value)}
-          onChange={e => onChange(e.target.value)}
-          placeholder="https://…"
-          className={inputCls}
-        />
-        {value && (
-          <img
-            src={String(value)}
-            alt="Preview"
-            className="w-full h-32 object-cover border border-gray-200"
-            onError={e => { (e.target as HTMLImageElement).style.display = 'none' }}
-          />
-        )}
-      </div>
-    )
-  }
+  if (type === 'image') return (
+    <div className="space-y-3">
+      {/* eslint-disable-next-line jsx-a11y/no-autofocus */}
+      <input autoFocus type="text" value={String(value)} onChange={e => onChange(e.target.value)} placeholder="https://…" className={inputCls} />
+      {value && <img src={String(value)} alt="Preview" className="w-full h-32 object-cover border border-gray-200" onError={e => { (e.target as HTMLImageElement).style.display = 'none' }} />}
+    </div>
+  )
 
-  if (type === 'range') {
-    return (
-      <div className="space-y-3">
-        <input
-          type="range"
-          min={min ?? 0}
-          max={max ?? 100}
-          value={Number(value)}
-          onChange={e => onChange(Number(e.target.value))}
-          className="w-full accent-forest"
-        />
-        <p className="font-sans text-sm text-center text-gray-500 font-semibold">{value}</p>
-      </div>
-    )
-  }
+  if (type === 'range') return (
+    <div className="space-y-3">
+      <input type="range" min={min ?? 0} max={max ?? 100} value={Number(value)} onChange={e => onChange(Number(e.target.value))} className="w-full accent-forest" />
+      <p className="font-sans text-sm text-center text-gray-500 font-semibold">{value}</p>
+    </div>
+  )
 
-  if (type === 'number') {
-    return (
-      <input
-        // eslint-disable-next-line jsx-a11y/no-autofocus
-        autoFocus
-        type="number"
-        min={min}
-        max={max}
-        value={Number(value)}
-        onChange={e => onChange(Number(e.target.value))}
-        className={inputCls}
-      />
-    )
-  }
+  if (type === 'number') return (
+    // eslint-disable-next-line jsx-a11y/no-autofocus
+    <input autoFocus type="number" min={min} max={max} value={Number(value)} onChange={e => onChange(Number(e.target.value))} className={inputCls} />
+  )
 
-  if (type === 'color') {
-    return (
-      <div className="flex items-center gap-3">
-        <input
-          type="color"
-          value={String(value)}
-          onChange={e => onChange(e.target.value)}
-          className="w-12 h-10 border border-gray-200 cursor-pointer bg-transparent p-0.5"
-        />
-        <input
-          type="text"
-          value={String(value)}
-          onChange={e => onChange(e.target.value)}
-          className={`flex-1 ${inputCls} font-mono`}
-        />
-      </div>
-    )
-  }
+  if (type === 'color') return (
+    <div className="flex items-center gap-3">
+      <input type="color" value={String(value)} onChange={e => onChange(e.target.value)} className="w-12 h-10 border border-gray-200 cursor-pointer bg-transparent p-0.5" />
+      <input type="text" value={String(value)} onChange={e => onChange(e.target.value)} className={`flex-1 ${inputCls} font-mono`} />
+    </div>
+  )
 
   return (
-    <input
-      // eslint-disable-next-line jsx-a11y/no-autofocus
-      autoFocus
-      type="text"
-      value={String(value)}
-      onChange={e => onChange(e.target.value)}
-      className={inputCls}
-    />
+    // eslint-disable-next-line jsx-a11y/no-autofocus
+    <input autoFocus type="text" value={String(value)} onChange={e => onChange(e.target.value)} className={inputCls} />
   )
 }

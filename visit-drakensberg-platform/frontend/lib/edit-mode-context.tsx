@@ -34,6 +34,7 @@ export function EditModeProvider({ children }: { children: ReactNode }) {
   }, [pending])
 
   useEffect(() => {
+    // Receive live-preview updates from parent admin panel
     const handler = (e: MessageEvent) => {
       if (e.data?.type === 'vd:field_update') {
         const { section, fieldKey, value } = e.data.payload
@@ -42,6 +43,16 @@ export function EditModeProvider({ children }: { children: ReactNode }) {
     }
     window.addEventListener('message', handler)
     return () => window.removeEventListener('message', handler)
+  }, [])
+
+  useEffect(() => {
+    // Intercept all link clicks so the iframe doesn't navigate away
+    const handler = (e: MouseEvent) => {
+      const anchor = (e.target as Element).closest('a')
+      if (anchor) e.preventDefault()
+    }
+    document.addEventListener('click', handler, true)
+    return () => document.removeEventListener('click', handler, true)
   }, [])
 
   return (
@@ -54,3 +65,4 @@ export function EditModeProvider({ children }: { children: ReactNode }) {
 export function useEditMode() {
   return useContext(EditModeContext)
 }
+
