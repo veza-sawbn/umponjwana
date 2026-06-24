@@ -1,6 +1,7 @@
 import {
   LayoutDashboard, List, Building2, BedDouble, Zap, Map, Users, Car, Truck,
   Sparkles, CalendarDays, Tag, BarChart2, Image, MessageSquare, Star, Clock,
+  type LucideIcon,
 } from 'lucide-react'
 
 export type SupplierType = 'Accommodation' | 'Activity' | 'Guided Tours' | 'Shuttle' | 'Experience'
@@ -8,7 +9,7 @@ export type SupplierType = 'Accommodation' | 'Activity' | 'Guided Tours' | 'Shut
 export interface NavItem {
   href: string
   label: string
-  icon: React.ComponentType<{ size?: number; className?: string }>
+  icon: LucideIcon
 }
 
 export interface SupplierTypeConfig {
