@@ -15,7 +15,7 @@ const EMPTY = {
   name: '', difficulty: 'Moderate', days: 1, minAge: 0, maxGroup: 10,
   meetingPoint: '', gpsLat: '', gpsLng: '', description: '',
   included: [] as string[], fitnessNotes: '', cancellation: '48h',
-  pricePerPerson: 0, groupDiscount: 0, status: 'draft',
+  pricePerPerson: 0, groupDiscount: 0, status: 'draft' as 'active' | 'draft',
 }
 
 export default function NewTourPage() {
@@ -55,10 +55,12 @@ export default function NewTourPage() {
     if (!form.meetingPoint.trim()) { setError('Meeting point is required.'); return }
     if (!form.pricePerPerson) { setError('Price per person is required.'); return }
     setError('')
+    // Snapshot form values before any async gap so stale closure can't affect them
+    const snapshot = { ...form }
     setSaving(true)
     try {
       const { data: { user } } = await supabase.auth.getUser()
-      await addTour({ ...form, status: form.status as 'active' | 'draft', supplierId: user?.id ?? '' })
+      await addTour({ ...snapshot, supplierId: user?.id ?? '' })
       router.push('/supplier/tours')
     } catch (e) {
       setError('Failed to save tour. Please try again.')
