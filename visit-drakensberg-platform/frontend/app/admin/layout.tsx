@@ -9,6 +9,7 @@ import {
 } from 'lucide-react'
 import { signOut } from '@/lib/auth'
 import { useRouter } from 'next/navigation'
+import Logo from '@/components/Logo'
 
 const NAV = [
   { href: '/admin', label: 'Overview', icon: LayoutDashboard, exact: true },
@@ -45,12 +46,9 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       <aside className="w-60 shrink-0 bg-[#111111] border-r border-white/8 flex flex-col fixed inset-y-0 left-0 z-40">
         {/* Brand */}
         <div className="px-6 py-5 border-b border-white/8">
-          <Link href="/" className="flex items-center gap-2.5">
-            <Mountain size={18} className="text-[#C9A96E]" />
-            <div>
-              <p className="font-display italic text-white text-sm leading-tight">Visit Drakensberg</p>
-              <p className="font-sans text-[10px] tracking-[0.14em] uppercase text-white/30">Admin Console</p>
-            </div>
+          <Link href="/" className="flex flex-col gap-2">
+            <Logo className="h-4 w-auto text-gold" />
+            <p className="font-sans text-[10px] tracking-[0.14em] uppercase text-white/30">Admin Console</p>
           </Link>
         </div>
 
