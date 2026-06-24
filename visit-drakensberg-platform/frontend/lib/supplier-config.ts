@@ -1,6 +1,7 @@
 import {
-  LayoutDashboard, List, Building2, BedDouble, Zap, Map, Users, Car, Truck,
+  LayoutDashboard, List, Building2, BedDouble, Zap, Map, Users, Truck,
   Sparkles, CalendarDays, Tag, BarChart2, Image, MessageSquare, Star, Clock,
+  Calculator,
   type LucideIcon,
 } from 'lucide-react'
 
@@ -48,7 +49,6 @@ export const SUPPLIER_CONFIG: Record<SupplierType, SupplierTypeConfig> = {
     nav: [
       { href: '/supplier',            label: 'Overview',      icon: LayoutDashboard },
       { href: '/supplier/activities', label: 'Activities',    icon: Zap },
-      { href: '/supplier/packages',   label: 'Packages',      icon: List },
       ...SHARED_NAV,
     ],
   },
@@ -61,6 +61,7 @@ export const SUPPLIER_CONFIG: Record<SupplierType, SupplierTypeConfig> = {
       { href: '/supplier/tours',      label: 'Tours',         icon: Map },
       { href: '/supplier/guides',     label: 'Guides',        icon: Users },
       { href: '/supplier/departures', label: 'Departures',    icon: CalendarDays },
+      { href: '/supplier/staff',      label: 'Staff',         icon: List },
       ...SHARED_NAV,
     ],
   },
@@ -69,10 +70,11 @@ export const SUPPLIER_CONFIG: Record<SupplierType, SupplierTypeConfig> = {
     description: 'Airport runs, trailhead drops and 4×4 transfers',
     primaryNoun: 'Vehicle',
     nav: [
-      { href: '/supplier',            label: 'Overview',      icon: LayoutDashboard },
-      { href: '/supplier/vehicles',   label: 'Vehicles',      icon: Truck },
-      { href: '/supplier/routes',     label: 'Routes',        icon: Map },
-      { href: '/supplier/drivers',    label: 'Drivers',       icon: Users },
+      { href: '/supplier',               label: 'Overview',   icon: LayoutDashboard },
+      { href: '/supplier/vehicles',      label: 'Vehicles',   icon: Truck },
+      { href: '/supplier/routes',        label: 'Routes',     icon: Map },
+      { href: '/supplier/drivers',       label: 'Drivers',    icon: Users },
+      { href: '/supplier/estimator',     label: 'Estimator',  icon: Calculator },
       ...SHARED_NAV,
     ],
   },
