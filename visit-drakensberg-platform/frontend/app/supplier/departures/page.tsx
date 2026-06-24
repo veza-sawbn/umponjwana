@@ -1,5 +1,5 @@
 'use client'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { CalendarDays, Plus, Users, Trash2, ChevronLeft, X } from 'lucide-react'
@@ -24,7 +24,7 @@ const STATUS: Record<string, string> = {
   full:      'bg-slate-100 text-slate-600',
 }
 
-export default function DeparturesPage() {
+function DeparturesInner() {
   const searchParams = useSearchParams()
   const tourFilter = searchParams.get('tour')
 
@@ -155,6 +155,14 @@ export default function DeparturesPage() {
         </table>
       </div>
     </div>
+  )
+}
+
+export default function DeparturesPage() {
+  return (
+    <Suspense fallback={<div className="p-8"><div className="w-6 h-6 border-2 border-[#C9A96E] border-t-transparent rounded-full animate-spin" /></div>}>
+      <DeparturesInner />
+    </Suspense>
   )
 }
 
