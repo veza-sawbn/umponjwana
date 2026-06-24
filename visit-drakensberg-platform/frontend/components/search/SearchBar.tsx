@@ -7,13 +7,13 @@ import { useBooking } from '@/lib/booking-context'
 
 const REGIONS = [
   'All Drakensberg',
-  'Northern Berg',
+  'North Berg',
   'Central Berg',
-  'Southern Berg',
-  'Royal Natal',
-  'Champagne Valley',
-  "Giant's Castle",
-  'Sani Pass',
+  'South Berg',
+  'Bergville & Surrounds',
+  'Winterton & Champagne Valley',
+  'Underberg & Himeville',
+  'Nottingham Road',
 ]
 
 export default function SearchBar() {

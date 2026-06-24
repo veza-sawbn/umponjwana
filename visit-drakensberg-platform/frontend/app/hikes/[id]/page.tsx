@@ -20,17 +20,6 @@ const TRAIL_COLOR: Record<string, string> = {
   Hard: 'bg-[#1a1a2e]',
 }
 
-const GUIDES = [
-  { id: 'g1', full_name: 'Sipho Dlamini', specialties: ['Multi-day hikes', 'San rock art'], languages: ['English', 'Zulu'], initials: 'SD' },
-  { id: 'g3', full_name: 'Thabo Ndlovu', specialties: ['Wilderness traverses', 'Wildlife tracking'], languages: ['English', 'Zulu', 'Afrikaans'], initials: 'TN' },
-  { id: 'g2', full_name: 'Anele Mokoena', specialties: ['Day hikes', 'Flora'], languages: ['English', 'Xhosa'], initials: 'AM' },
-]
-
-const REVIEWS = [
-  { name: 'James F.', rating: 5, date: 'May 2026', comment: 'The chain ladder section was exhilarating. Views from the top were worth every step. Go early to avoid afternoon clouds.' },
-  { name: 'Sarah T.', rating: 5, date: 'April 2026', comment: 'Did this with our guide Sipho. His knowledge of the geology and San history made the hike so much richer.' },
-  { name: 'Johan vdB', rating: 4, date: 'March 2026', comment: 'Challenging but achievable. Allow more time than the estimate if you want to stop for photos — and you will.' },
-]
 
 export default function HikeDetailPage() {
   const { id } = useParams() as { id: string }
@@ -233,46 +222,15 @@ export default function HikeDetailPage() {
               </div>
             )}
 
-            {/* Guides */}
-            <div>
-              <h2 className="font-display italic text-2xl text-[#000000] mb-6">Expert Guides for this Trail</h2>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                {GUIDES.map(guide => (
-                  <div key={guide.id} className="bg-white border border-gray-200 p-5">
-                    <div className="w-12 h-12 bg-[#2d6a4f]/10 flex items-center justify-center font-display italic text-[#2d6a4f] text-xl mb-3">{guide.initials}</div>
-                    <h3 className="font-display italic text-lg mb-1">{guide.full_name}</h3>
-                    <p className="font-sans text-xs text-gray-500 mb-3">{guide.specialties.join(' · ')}</p>
-                    <div className="flex flex-wrap gap-1 mb-4">
-                      {guide.languages.map((l: string) => <span key={l} className="bg-[#F7F5F2] px-2 py-0.5 font-sans text-xs">{l}</span>)}
-                    </div>
-                    <Link href={`/guides/${guide.id}`} className="block text-center border border-[#2d6a4f] text-[#2d6a4f] py-2 font-sans text-xs hover:bg-[#2d6a4f] hover:text-white transition-colors">
-                      Book Guided Hike
-                    </Link>
-                  </div>
-                ))}
+            {/* Guides CTA */}
+            <div className="bg-white border border-gray-200 p-6 flex items-center justify-between gap-4 flex-wrap">
+              <div>
+                <h2 className="font-display italic text-xl text-[#000000] mb-1">Looking for a guide?</h2>
+                <p className="font-sans text-sm text-gray-500">Browse certified local guides who lead experiences on this trail.</p>
               </div>
-            </div>
-
-            {/* Reviews */}
-            <div>
-              <h2 className="font-display italic text-2xl text-[#000000] mb-5">Hiker Reviews</h2>
-              <div className="space-y-4">
-                {REVIEWS.map((r, i) => (
-                  <div key={i} className="bg-white border border-gray-200 p-5">
-                    <div className="flex items-center justify-between mb-2">
-                      <div className="flex items-center gap-2">
-                        <div className="w-7 h-7 bg-[#2d6a4f]/10 flex items-center justify-center font-display italic text-[#2d6a4f] text-sm">{r.name[0]}</div>
-                        <div>
-                          <p className="font-sans text-sm font-medium">{r.name}</p>
-                          <p className="font-sans text-xs text-gray-400">{r.date}</p>
-                        </div>
-                      </div>
-                      <div className="flex gap-0.5">{Array.from({ length: r.rating }).map((_, j) => <Star key={j} size={11} className="text-[#C9A96E] fill-[#C9A96E]" />)}</div>
-                    </div>
-                    <p className="font-sans text-sm text-gray-700 leading-relaxed">{r.comment}</p>
-                  </div>
-                ))}
-              </div>
+              <Link href="/guides" className="shrink-0 border border-[#2d6a4f] text-[#2d6a4f] px-5 py-2.5 font-sans text-sm hover:bg-[#2d6a4f] hover:text-white transition-colors">
+                Find a Guide →
+              </Link>
             </div>
           </div>
 
