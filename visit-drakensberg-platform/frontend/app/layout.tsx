@@ -7,8 +7,11 @@ import Navbar from '@/components/layout/Navbar'
 import { BookingProvider } from '@/lib/booking-context'
 import BookingBar from '@/components/booking/BookingBar'
 import EditModeGate from '@/components/editor/EditModeGate'
+import { usePathname } from 'next/navigation'
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
+  const pathname = usePathname()
+  const isAdmin = pathname.startsWith('/admin')
   const [queryClient] = useState(() => new QueryClient({
     defaultOptions: { queries: { staleTime: 60 * 1000 } },
   }))
@@ -25,9 +28,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <QueryClientProvider client={queryClient}>
           <BookingProvider>
             <EditModeGate>
-            <Navbar />
+            {!isAdmin && <Navbar />}
             {children}
-            <BookingBar />
+            {!isAdmin && <BookingBar />}
             <Toaster position="top-right" toastOptions={{ duration: 4000 }} />
             </EditModeGate>
           </BookingProvider>
