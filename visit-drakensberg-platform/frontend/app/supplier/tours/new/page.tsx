@@ -58,7 +58,7 @@ export default function NewTourPage() {
     setSaving(true)
     try {
       const { data: { user } } = await supabase.auth.getUser()
-      await addTour({ ...form, supplierId: user?.id ?? '' })
+      await addTour({ ...form, status: form.status as 'active' | 'draft', supplierId: user?.id ?? '' })
       router.push('/supplier/tours')
     } catch (e) {
       setError('Failed to save tour. Please try again.')
