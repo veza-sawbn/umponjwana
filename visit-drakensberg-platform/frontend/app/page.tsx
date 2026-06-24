@@ -53,6 +53,30 @@ const REGIONS = [
   },
 ]
 
+const STORIES = [
+  {
+    tag: 'Wildlife',
+    title: 'The bearded vulture — rarest raptor in Southern Africa',
+    img: 'https://images.unsplash.com/photo-1508739773434-c26b3d09e071?w=800&q=80',
+    href: '/stories/bearded-vulture',
+    date: 'March 2025',
+  },
+  {
+    tag: 'Culture',
+    title: 'Reading the rock: San art and the spirit world',
+    img: 'https://images.unsplash.com/photo-1529946179074-1f3cf40c0a0e?w=800&q=80',
+    href: '/stories/san-rock-art',
+    date: 'January 2025',
+  },
+  {
+    tag: 'Adventure',
+    title: 'Five days on the Drakensberg Grand Traverse',
+    img: 'https://images.unsplash.com/photo-1551632811-561732d1e306?w=800&q=80',
+    href: '/stories/grand-traverse',
+    date: 'November 2024',
+  },
+]
+
 const DIFF_COLOR: Record<string, string> = {
   Easy: '#4A7251',
   Moderate: '#C9A96E',
