@@ -1,5 +1,5 @@
 'use client'
-import { useRef, useState, useCallback } from 'react'
+import { useState } from 'react'
 import { Image as ImageIcon, Upload, Trash2, X } from 'lucide-react'
 
 interface MediaFile {
@@ -7,7 +7,6 @@ interface MediaFile {
   name: string
   size: string
   url: string
-  type: string
 }
 
 function fmtSize(bytes: number) {
@@ -19,33 +18,29 @@ export default function MediaPage() {
   const [files, setFiles] = useState<MediaFile[]>([])
   const [dragging, setDragging] = useState(false)
   const [preview, setPreview] = useState<MediaFile | null>(null)
-  const inputRef = useRef<HTMLInputElement>(null)
 
   function addFiles(raw: FileList | null) {
-    if (!raw) return
+    if (!raw || raw.length === 0) return
     const next: MediaFile[] = []
     for (let i = 0; i < raw.length; i++) {
       const f = raw[i]
       if (!f.type.startsWith('image/')) continue
-      next.push({
-        id: `${Date.now()}-${i}`,
-        name: f.name,
-        size: fmtSize(f.size),
-        url: URL.createObjectURL(f),
-        type: f.type,
-      })
+      next.push({ id: `${Date.now()}-${i}`, name: f.name, size: fmtSize(f.size), url: URL.createObjectURL(f) })
     }
-    setFiles(prev => [...prev, ...next])
+    if (next.length) setFiles(prev => [...prev, ...next])
   }
 
-  const onDrop = useCallback((e: React.DragEvent) => {
+  function onDragOver(e: React.DragEvent) { e.preventDefault() }
+  function onDragEnter(e: React.DragEvent) { e.preventDefault(); setDragging(true) }
+  function onDragLeave(e: React.DragEvent) {
+    // Only clear when pointer leaves the zone entirely, not when entering a child element
+    if (!e.currentTarget.contains(e.relatedTarget as Node)) setDragging(false)
+  }
+  function onDrop(e: React.DragEvent) {
     e.preventDefault()
     setDragging(false)
     addFiles(e.dataTransfer.files)
-  }, [])
-
-  const onDragOver = (e: React.DragEvent) => { e.preventDefault(); setDragging(true) }
-  const onDragLeave = () => setDragging(false)
+  }
 
   function remove(id: string) {
     setFiles(prev => {
@@ -63,37 +58,40 @@ export default function MediaPage() {
           <ImageIcon size={20} className="text-[#C9A96E]" />
           <h1 className="font-display italic text-2xl text-black/90">Media Library</h1>
         </div>
-        <button
-          onClick={() => inputRef.current?.click()}
-          className="flex items-center gap-2 bg-[#C9A96E] text-white font-sans text-sm px-4 py-2 rounded-lg hover:bg-[#b8965d] transition-colors"
+        <label
+          htmlFor="media-upload"
+          className="flex items-center gap-2 bg-[#C9A96E] text-white font-sans text-sm px-4 py-2 rounded-lg hover:bg-[#b8965d] transition-colors cursor-pointer"
         >
           <Upload size={15} /> Upload Photos
-        </button>
+        </label>
       </div>
 
       <input
-        ref={inputRef}
+        id="media-upload"
         type="file"
         accept="image/*"
         multiple
         className="hidden"
-        onChange={e => addFiles(e.target.files)}
+        onChange={e => { addFiles(e.target.files); e.target.value = '' }}
       />
 
-      {/* Drop zone */}
-      <div
-        onClick={() => inputRef.current?.click()}
+      {/* Drop zone — wrapping label so the whole area is clickable */}
+      <label
+        htmlFor="media-upload"
         onDrop={onDrop}
         onDragOver={onDragOver}
+        onDragEnter={onDragEnter}
         onDragLeave={onDragLeave}
-        className={`border-2 border-dashed rounded-xl p-10 text-center cursor-pointer transition-colors select-none ${dragging ? 'border-[#C9A96E] bg-[#C9A96E]/5' : 'border-black/10 hover:border-[#C9A96E]/40'}`}
+        className={`flex flex-col items-center justify-center border-2 border-dashed rounded-xl p-10 text-center cursor-pointer transition-colors select-none block ${
+          dragging ? 'border-[#C9A96E] bg-[#C9A96E]/5' : 'border-black/10 hover:border-[#C9A96E]/40'
+        }`}
       >
-        <Upload size={24} className={`mx-auto mb-3 transition-colors ${dragging ? 'text-[#C9A96E]' : 'text-black/20'}`} />
+        <Upload size={24} className={`mb-3 transition-colors ${dragging ? 'text-[#C9A96E]' : 'text-black/20'}`} />
         <p className="font-sans text-sm text-black/40">
           {dragging ? 'Drop to upload' : 'Drag & drop photos here, or click to browse'}
         </p>
         <p className="font-sans text-xs text-black/25 mt-1">JPG, PNG, WebP · max 10 MB per file</p>
-      </div>
+      </label>
 
       {/* Grid */}
       {files.length === 0 ? (
@@ -126,10 +124,7 @@ export default function MediaPage() {
 
       {/* Lightbox */}
       {preview && (
-        <div
-          className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-6"
-          onClick={() => setPreview(null)}
-        >
+        <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-6" onClick={() => setPreview(null)}>
           <button className="absolute top-4 right-4 text-white/60 hover:text-white" onClick={() => setPreview(null)}>
             <X size={24} />
           </button>
