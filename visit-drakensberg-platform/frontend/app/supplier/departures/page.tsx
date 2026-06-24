@@ -3,20 +3,9 @@ import { useState, useEffect, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { CalendarDays, Plus, Users, Trash2, ChevronLeft, X } from 'lucide-react'
+import { getTours, type Tour } from '@/lib/tours'
 
 interface Departure { id: string; tour: string; tourId: string; date: string; guide: string; maxSeats: number; bookedSeats: number; status: string }
-
-const TOURS = [
-  { id: '1', name: 'Cathedral Peak Summit Hike' },
-  { id: '2', name: 'Amphitheatre Circular Trail' },
-  { id: '3', name: 'Giants Castle Cultural Tour' },
-]
-
-const INIT: Departure[] = [
-  { id: '1', tourId: '1', tour: 'Cathedral Peak Summit Hike',  date: '2025-07-12', guide: 'Bongani Ndlovu',   maxSeats: 10, bookedSeats: 7, status: 'confirmed' },
-  { id: '2', tourId: '2', tour: 'Amphitheatre Circular Trail',  date: '2025-07-19', guide: 'Zanele Mthembu',   maxSeats: 12, bookedSeats: 4, status: 'open' },
-  { id: '3', tourId: '3', tour: 'Giants Castle Cultural Tour',  date: '2025-08-02', guide: 'Marné du Plessis', maxSeats: 8,  bookedSeats: 8, status: 'full' },
-]
 
 const STATUS: Record<string, string> = {
   confirmed: 'bg-emerald-100 text-emerald-700',
@@ -28,19 +17,24 @@ function DeparturesInner() {
   const searchParams = useSearchParams()
   const tourFilter = searchParams.get('tour')
 
-  const [rows, setRows] = useState(INIT)
+  const [tours, setTours] = useState<Tour[]>([])
+  const [rows, setRows] = useState<Departure[]>([])
   const [adding, setAdding] = useState(false)
   const [form, setForm] = useState({ tour: '', tourId: '', date: '', guide: '', maxSeats: '10' })
 
-  // Pre-select tour when coming from tours page
   useEffect(() => {
-    if (tourFilter) {
-      const t = TOURS.find(x => x.id === tourFilter)
-      if (t) setForm(f => ({ ...f, tourId: t.id, tour: t.name }))
-    }
+    getTours().then(all => {
+      const active = all.filter(t => t.status === 'active')
+      setTours(active)
+      // Pre-select tour when coming from tours page
+      if (tourFilter) {
+        const t = active.find(x => x.id === tourFilter)
+        if (t) setForm(f => ({ ...f, tourId: t.id, tour: t.name }))
+      }
+    })
   }, [tourFilter])
 
-  const activeTour = tourFilter ? TOURS.find(t => t.id === tourFilter) : null
+  const activeTour = tourFilter ? tours.find(t => t.id === tourFilter) : null
   const filtered = activeTour ? rows.filter(r => r.tourId === activeTour.id) : rows
 
   return (
@@ -84,7 +78,8 @@ function DeparturesInner() {
                 className={inp}
               >
                 <option value="">Select tour…</option>
-                {TOURS.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+                {tours.length === 0 && <option disabled>No active tours — create one first</option>}
+                {tours.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
               </select>
             </div>
             <div className="space-y-1.5">
