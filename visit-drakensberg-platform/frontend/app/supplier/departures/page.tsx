@@ -72,7 +72,7 @@ function DeparturesInner() {
               <select
                 value={form.tourId}
                 onChange={e => {
-                  const t = TOURS.find(x => x.id === e.target.value)
+                  const t = tours.find(x => x.id === e.target.value)
                   setForm(f => ({ ...f, tourId: e.target.value, tour: t?.name ?? '' }))
                 }}
                 className={inp}
