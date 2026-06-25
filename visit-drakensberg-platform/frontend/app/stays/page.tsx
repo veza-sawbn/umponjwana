@@ -1,17 +1,49 @@
 'use client'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { SlidersHorizontal, X } from 'lucide-react'
 import Footer from '@/components/layout/Footer'
+import { getProperties, type Property } from '@/lib/properties'
 
-const STAYS = [
-  { id: '1', title: 'Cathedral Peak Mountain Lodge', location: 'Cathedral Peak, Northern Berg', price: 1850, rating: 4.9, reviews: 124, img: 'https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=800&q=80', category: 'Lodge', amenities: ['pool', 'wifi', 'braai', 'hiking'], guests: 4, discount: 15 },
-  { id: '2', title: 'Drakensberg Sun Resort', location: 'Central Berg, KZN', price: 2400, rating: 4.7, reviews: 89, img: 'https://images.unsplash.com/photo-1571003123894-1f0594d2b5d9?w=800&q=80', category: 'Resort', amenities: ['pool', 'wifi', 'braai'], guests: 6 },
-  { id: '3', title: 'Berg Valley Guesthouse', location: 'Champagne Valley', price: 980, rating: 4.5, reviews: 56, img: 'https://images.unsplash.com/photo-1520250497591-112f2f40a3f4?w=800&q=80', category: 'Guesthouse', amenities: ['wifi', 'braai', 'hiking'], guests: 2 },
-  { id: '4', title: 'Royal Natal Eco Cabin', location: 'Royal Natal Park', price: 650, rating: 4.6, reviews: 41, img: 'https://images.unsplash.com/photo-1470770841072-f978cf4d019e?w=800&q=80', category: 'Cabin', amenities: ['braai', 'hiking'], guests: 3 },
-  { id: '5', title: 'Sani Pass Adventure Camp', location: 'Sani Pass, Southern Berg', price: 420, rating: 4.3, reviews: 33, img: 'https://images.unsplash.com/photo-1504280390367-361c6d9f38f4?w=800&q=80', category: 'Camp', amenities: ['braai', 'hiking'], guests: 8 },
-  { id: '6', title: 'Giants Castle Boutique Hotel', location: 'Giants Castle', price: 3200, rating: 5.0, reviews: 17, img: 'https://images.unsplash.com/photo-1582719478250-c89cae4dc85b?w=800&q=80', category: 'Hotel', amenities: ['pool', 'wifi', 'braai', 'hiking'], guests: 2, featured: true },
+const HARDCODED_STAYS = [
+  { id: 's1', title: 'Cathedral Peak Mountain Lodge', location: 'Cathedral Peak, Northern Berg', price: 1850, rating: 4.9, reviews: 124, img: 'https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=800&q=80', category: 'Lodge', amenities: ['pool', 'wifi', 'braai', 'hiking'], guests: 4, discount: 15 },
+  { id: 's2', title: 'Drakensberg Sun Resort', location: 'Central Berg, KZN', price: 2400, rating: 4.7, reviews: 89, img: 'https://images.unsplash.com/photo-1571003123894-1f0594d2b5d9?w=800&q=80', category: 'Resort', amenities: ['pool', 'wifi', 'braai'], guests: 6 },
+  { id: 's3', title: 'Berg Valley Guesthouse', location: 'Champagne Valley', price: 980, rating: 4.5, reviews: 56, img: 'https://images.unsplash.com/photo-1520250497591-112f2f40a3f4?w=800&q=80', category: 'Guesthouse', amenities: ['wifi', 'braai', 'hiking'], guests: 2 },
+  { id: 's4', title: 'Royal Natal Eco Cabin', location: 'Royal Natal Park', price: 650, rating: 4.6, reviews: 41, img: 'https://images.unsplash.com/photo-1470770841072-f978cf4d019e?w=800&q=80', category: 'Cabin', amenities: ['braai', 'hiking'], guests: 3 },
+  { id: 's5', title: 'Sani Pass Adventure Camp', location: 'Sani Pass, Southern Berg', price: 420, rating: 4.3, reviews: 33, img: 'https://images.unsplash.com/photo-1504280390367-361c6d9f38f4?w=800&q=80', category: 'Camp', amenities: ['braai', 'hiking'], guests: 8 },
+  { id: 's6', title: 'Giants Castle Boutique Hotel', location: 'Giants Castle', price: 3200, rating: 5.0, reviews: 17, img: 'https://images.unsplash.com/photo-1582719478250-c89cae4dc85b?w=800&q=80', category: 'Hotel', amenities: ['pool', 'wifi', 'braai', 'hiking'], guests: 2, featured: true },
 ]
+
+type StayCard = {
+  id: string
+  title: string
+  location: string
+  price: number
+  rating?: number
+  reviews?: number
+  img?: string
+  category: string
+  amenities: string[]
+  guests?: number
+  discount?: number
+  featured?: boolean
+}
+
+function propToCard(p: Property): StayCard {
+  const amenityMap: Record<string, string> = {
+    'Swimming Pool': 'pool', 'Wi-Fi': 'wifi', 'Braai Facilities': 'braai',
+    'Hiking Trails Access': 'hiking', 'Restaurant': 'restaurant', 'Spa': 'spa',
+  }
+  return {
+    id: p.id,
+    title: p.name,
+    location: p.nearestTown ? `${p.nearestTown}` : p.address,
+    price: 0,
+    category: p.type,
+    amenities: p.amenities.map(a => amenityMap[a] ?? a.toLowerCase()),
+    img: p.photos[0] || undefined,
+  }
+}
 
 const AMENITY_OPTS = ['pool', 'wifi', 'braai', 'hiking']
 const SORT_OPTS = ['Recommended', 'Price: Low to High', 'Price: High to Low', 'Rating']
@@ -21,16 +53,26 @@ export default function StaysPage() {
   const [maxPrice, setMaxPrice] = useState(5000)
   const [amenities, setAmenities] = useState<string[]>([])
   const [showFilters, setShowFilters] = useState(false)
+  const [liveProperties, setLiveProperties] = useState<StayCard[]>([])
+
+  useEffect(() => {
+    getProperties().then(props => {
+      const active = props.filter(p => p.status === 'active')
+      setLiveProperties(active.map(propToCard))
+    })
+  }, [])
 
   const toggleAmenity = (a: string) =>
     setAmenities((prev) => prev.includes(a) ? prev.filter((x) => x !== a) : [...prev, a])
 
-  const filtered = STAYS
-    .filter((s) => s.price <= maxPrice && (!amenities.length || amenities.every((a) => s.amenities.includes(a))))
+  const allStays: StayCard[] = [...HARDCODED_STAYS, ...liveProperties]
+
+  const filtered = allStays
+    .filter((s) => (!s.price || s.price <= maxPrice) && (!amenities.length || amenities.every((a) => s.amenities.includes(a))))
     .sort((a, b) => {
       if (sortBy === 'Price: Low to High') return a.price - b.price
       if (sortBy === 'Price: High to Low') return b.price - a.price
-      if (sortBy === 'Rating') return b.rating - a.rating
+      if (sortBy === 'Rating') return (b.rating ?? 0) - (a.rating ?? 0)
       return 0
     })
 
@@ -105,11 +147,18 @@ export default function StaysPage() {
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-10">
           {filtered.map((stay) => {
             const discountedPrice = stay.discount ? Math.round(stay.price * (1 - stay.discount / 100)) : null
+            const href = stay.id.startsWith('s') ? `/stays/${stay.id}` : `/stays/${stay.id}`
             return (
-              <Link key={stay.id} href={`/listings/${stay.id}`} className="group block">
-                <div className="relative overflow-hidden aspect-[4/3] mb-4">
-                  <img src={stay.img} alt={stay.title}
-                    className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" />
+              <Link key={stay.id} href={href} className="group block">
+                <div className="relative overflow-hidden aspect-[4/3] mb-4 bg-[#2d6a4f]/10">
+                  {stay.img ? (
+                    <img src={stay.img} alt={stay.title}
+                      className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center bg-[#C9A96E]/10">
+                      <span className="font-display italic text-2xl text-[#C9A96E]/40">{stay.category}</span>
+                    </div>
+                  )}
                   {stay.featured && (
                     <span className="absolute top-3 left-3 font-sans text-[10px] tracking-[0.15em] uppercase bg-gold text-forest px-2.5 py-1">
                       Featured
@@ -125,22 +174,32 @@ export default function StaysPage() {
                 <h3 className="font-display text-xl text-forest leading-snug mb-2 group-hover:text-sage transition-colors">{stay.title}</h3>
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-1">
-                    <span className="text-gold text-sm">★</span>
-                    <span className="font-sans text-sm text-forest/70">{stay.rating}</span>
-                    <span className="font-sans text-xs text-forest/35">({stay.reviews})</span>
+                    {stay.rating ? (
+                      <>
+                        <span className="text-gold text-sm">★</span>
+                        <span className="font-sans text-sm text-forest/70">{stay.rating}</span>
+                        {stay.reviews && <span className="font-sans text-xs text-forest/35">({stay.reviews})</span>}
+                      </>
+                    ) : (
+                      <span className="font-sans text-xs text-forest/35">New listing</span>
+                    )}
                   </div>
                   <div className="text-right">
-                    {discountedPrice ? (
-                      <div>
-                        <span className="font-sans text-xs text-forest/35 line-through mr-1">R{stay.price.toLocaleString()}</span>
-                        <span className="font-display text-lg text-forest">R{discountedPrice.toLocaleString()}</span>
-                        <span className="font-sans text-xs text-forest/40"> /night</span>
-                      </div>
+                    {stay.price > 0 ? (
+                      discountedPrice ? (
+                        <div>
+                          <span className="font-sans text-xs text-forest/35 line-through mr-1">R{stay.price.toLocaleString()}</span>
+                          <span className="font-display text-lg text-forest">R{discountedPrice.toLocaleString()}</span>
+                          <span className="font-sans text-xs text-forest/40"> /night</span>
+                        </div>
+                      ) : (
+                        <span>
+                          <span className="font-display text-lg text-forest">R{stay.price.toLocaleString()}</span>
+                          <span className="font-sans text-xs text-forest/40"> /night</span>
+                        </span>
+                      )
                     ) : (
-                      <span>
-                        <span className="font-display text-lg text-forest">R{stay.price.toLocaleString()}</span>
-                        <span className="font-sans text-xs text-forest/40"> /night</span>
-                      </span>
+                      <span className="font-sans text-xs text-forest/40">Contact for rates</span>
                     )}
                   </div>
                 </div>

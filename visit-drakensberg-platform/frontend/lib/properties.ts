@@ -43,6 +43,15 @@ async function saveAll(items: Property[]): Promise<void> {
   )
 }
 
+export async function getProperties(): Promise<Property[]> {
+  return getAll()
+}
+
+export async function getPropertyById(id: string): Promise<Property | null> {
+  const all = await getAll()
+  return all.find(p => p.id === id) ?? null
+}
+
 export async function getPropertiesBySupplier(supplierId: string): Promise<Property[]> {
   const all = await getAll()
   return all.filter(p => p.supplierId === supplierId)

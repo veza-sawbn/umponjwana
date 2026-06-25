@@ -1,16 +1,19 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import Navbar from '@/components/layout/Navbar'
 import Footer from '@/components/layout/Footer'
-import { MapPin, Star, Users, Wifi, Flame, Utensils, Car, ArrowLeft, Calendar, Coffee, Waves, TreePine, ShieldCheck } from 'lucide-react'
+import { MapPin, Star, Users, Wifi, Flame, Utensils, Car, ArrowLeft, Calendar, Coffee, Waves, TreePine, ShieldCheck, BedDouble } from 'lucide-react'
 import SmartRecommendations from '@/components/booking/SmartRecommendations'
 import { useBooking } from '@/lib/booking-context'
 import { Check } from 'lucide-react'
+import { getPropertyById, type Property } from '@/lib/properties'
+import { getRoomsByProperty, type Room } from '@/lib/rooms'
 
-const STAYS: Record<string, any> = {
+// Hardcoded showcase stays (keep existing behaviour for demo IDs)
+const HARDCODED: Record<string, any> = {
   s1: {
     title: 'Cathedral Peak Mountain Lodge',
     category: 'Mountain Lodge',
@@ -60,29 +63,18 @@ const STAYS: Record<string, any> = {
     review_count: 87,
     member_since: '2021',
     response_rate: '99%',
-    description: 'An exclusive tented camp within the Royal Natal National Park, Tendele offers a genuine wilderness immersion steps from the Amphitheatre and Tugela Falls. Eight en-suite canvas tents are elevated on wooden platforms with unobstructed views across the escarpment. Sustainable solar-powered systems and responsible waste management are central to the operation.',
+    description: 'An exclusive tented camp within the Royal Natal National Park, Tendele offers a genuine wilderness immersion steps from the Amphitheatre and Tugela Falls.',
     highlights: ['Inside Royal Natal National Park', 'Solar-powered off-grid camp', 'Private deck per tent', 'Fully catered'],
     price_from: 2400,
     hero: 'bg-[#2d6a4f]',
-    amenities: [
-      { label: 'Full Board', icon: Utensils },
-      { label: 'Firepit', icon: Flame },
-      { label: 'Nature Walks', icon: TreePine },
-      { label: 'Parking', icon: Car },
-    ],
-    images: [
-      'https://images.unsplash.com/photo-1533873984035-25970ab07461?w=1400&q=80',
-      'https://images.unsplash.com/photo-1504280390367-361c6d9f38f4?w=800&q=80',
-      'https://images.unsplash.com/photo-1510798831971-661eb04b3739?w=800&q=80',
-      'https://images.unsplash.com/photo-1478131143081-80f7f84ca84d?w=800&q=80',
-    ],
+    amenities: [{ label: 'Full Board', icon: Utensils }, { label: 'Firepit', icon: Flame }, { label: 'Nature Walks', icon: TreePine }, { label: 'Parking', icon: Car }],
+    images: ['https://images.unsplash.com/photo-1533873984035-25970ab07461?w=1400&q=80', 'https://images.unsplash.com/photo-1504280390367-361c6d9f38f4?w=800&q=80', 'https://images.unsplash.com/photo-1510798831971-661eb04b3739?w=800&q=80', 'https://images.unsplash.com/photo-1478131143081-80f7f84ca84d?w=800&q=80'],
     rooms: [
       { id: 'r1', name: 'Escarpment Tent', description: 'King-size bed, private en-suite with outdoor shower. Direct views of the Amphitheatre wall.', max_guests: 2, price_per_night: 3200, amenities: ['En-suite', 'Outdoor shower', 'Private deck', 'Escarpment view'] },
-      { id: 'r2', name: 'Family Tent', description: 'Two rooms connected by a shared lounge area. Ideal for families or two couples travelling together.', max_guests: 4, price_per_night: 2800, amenities: ['Two rooms', 'Shared lounge', 'Family layout', 'En-suite'] },
+      { id: 'r2', name: 'Family Tent', description: 'Two rooms connected by a shared lounge area. Ideal for families.', max_guests: 4, price_per_night: 2800, amenities: ['Two rooms', 'Shared lounge', 'Family layout', 'En-suite'] },
     ],
     reviews_list: [
       { name: 'Megan & Luke H.', rating: 5, date: 'June 2026', comment: 'Our honeymoon stay. Completely secluded, exceptional food, and waking up to the Amphitheatre every morning was surreal.' },
-      { name: 'Brendan Coetzee', rating: 5, date: 'April 2026', comment: 'Best glamping experience in South Africa by a significant margin. The guides arranged our Tugela hike perfectly.' },
     ],
   },
   s3: {
@@ -94,52 +86,106 @@ const STAYS: Record<string, any> = {
     review_count: 203,
     member_since: '2018',
     response_rate: '94%',
-    description: "Ezemvelo KZN Wildlife's flagship restcamp in the Giant's Castle Game Reserve. The camp sits at 1,750m and is the gateway to over 5,000 San Bushman rock art paintings at the Main Caves — one of Africa's most significant heritage sites. All units are self-catering; a camp shop stocks basics and firewood.",
+    description: "Ezemvelo KZN Wildlife's flagship restcamp in the Giant's Castle Game Reserve. The camp sits at 1,750m and is the gateway to over 5,000 San Bushman rock art paintings.",
     highlights: ['San rock art access on doorstep', 'Eland and vulture hide nearby', 'Lammergeier hide bookings', 'National Heritage Site'],
     price_from: 680,
     hero: 'bg-[#8B4513]',
-    amenities: [
-      { label: 'Self-Catering', icon: Utensils },
-      { label: 'Fireplace', icon: Flame },
-      { label: 'Parking', icon: Car },
-      { label: 'Nature Walks', icon: TreePine },
-    ],
-    images: [
-      'https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?w=1400&q=80',
-      'https://images.unsplash.com/photo-1486870591958-9b9d0d1dda99?w=800&q=80',
-      'https://images.unsplash.com/photo-1501854140801-50d01698950b?w=800&q=80',
-      'https://images.unsplash.com/photo-1441974231531-c6227db76b6e?w=800&q=80',
-    ],
+    amenities: [{ label: 'Self-Catering', icon: Utensils }, { label: 'Fireplace', icon: Flame }, { label: 'Parking', icon: Car }, { label: 'Nature Walks', icon: TreePine }],
+    images: ['https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?w=1400&q=80', 'https://images.unsplash.com/photo-1486870591958-9b9d0d1dda99?w=800&q=80', 'https://images.unsplash.com/photo-1501854140801-50d01698950b?w=800&q=80', 'https://images.unsplash.com/photo-1441974231531-c6227db76b6e?w=800&q=80'],
     rooms: [
       { id: 'r1', name: 'Luxury Cottage', description: 'Two-bedroom self-catering cottage with a fully equipped kitchen, fireplace and braai area.', max_guests: 4, price_per_night: 1250, amenities: ['2 bedrooms', 'Kitchen', 'Braai', 'Fireplace'] },
-      { id: 'r2', name: 'Standard Chalet', description: 'En-suite chalet sleeping 2, with a kitchenette and covered stoep looking toward the escarpment.', max_guests: 2, price_per_night: 780, amenities: ['En-suite', 'Kitchenette', 'Stoep', 'Mountain view'] },
-      { id: 'r3', name: 'Budget Rondavel', description: 'Circular rondavel with twin beds and shared bathroom facilities. Ideal for solo hikers.', max_guests: 2, price_per_night: 480, amenities: ['Twin beds', 'Shared bathroom', 'Camp shop access'] },
+      { id: 'r2', name: 'Standard Chalet', description: 'En-suite chalet sleeping 2, with a kitchenette and covered stoep.', max_guests: 2, price_per_night: 780, amenities: ['En-suite', 'Kitchenette', 'Stoep', 'Mountain view'] },
+      { id: 'r3', name: 'Budget Rondavel', description: 'Circular rondavel with twin beds and shared bathroom facilities.', max_guests: 2, price_per_night: 480, amenities: ['Twin beds', 'Shared bathroom', 'Camp shop access'] },
     ],
     reviews_list: [
-      { name: 'Nokukhanya Zulu', rating: 5, date: 'May 2026', comment: 'The rock art experience is like nothing else. A knowledgeable Ezemvelo guide made the history come alive. Highly recommend the Main Caves tour.' },
+      { name: 'Nokukhanya Zulu', rating: 5, date: 'May 2026', comment: 'The rock art experience is like nothing else. A knowledgeable Ezemvelo guide made the history come alive.' },
       { name: 'Riaan Botha', rating: 4, date: 'March 2026', comment: 'Excellent value. The luxury cottage was well-equipped. Bring your own firewood and supplies from town.' },
-      { name: 'Ingrid Müller', rating: 5, date: 'February 2026', comment: 'We came for the Lammergeier (Bearded Vulture) hide. Arrived at sunrise and were rewarded with four birds. Incredible.' },
     ],
   },
+}
+
+const AMENITY_ICONS: Record<string, React.ComponentType<any>> = {
+  'Wi-Fi': Wifi, 'Swimming Pool': Waves, 'Braai Facilities': Flame, 'Restaurant': Utensils,
+  'Bar': Utensils, 'Spa': ShieldCheck, 'Gym': ShieldCheck, 'Laundry': ShieldCheck,
+  'Airport Transfers': Car, 'Hiking Trails Access': TreePine, 'Pet-Friendly': TreePine,
+  'Wheelchair Access': ShieldCheck,
+}
+
+function propToStay(prop: Property, rooms: Room[]) {
+  const minPrice = rooms.length > 0 ? Math.min(...rooms.map(r => r.basePrice)) : 0
+  return {
+    title: prop.name,
+    category: prop.type,
+    location: prop.nearestTown || prop.address,
+    region: prop.nearestTown || '',
+    rating: null as null | number,
+    review_count: 0,
+    member_since: new Date(prop.createdAt).getFullYear().toString(),
+    response_rate: '—',
+    description: prop.description,
+    highlights: prop.amenities.slice(0, 4),
+    price_from: minPrice,
+    hero: 'bg-[#2d6a4f]',
+    amenities: prop.amenities.map(a => ({ label: a, icon: AMENITY_ICONS[a] ?? ShieldCheck })),
+    images: prop.photos.length > 0 ? prop.photos : ['https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=1400&q=80'],
+    checkIn: prop.checkIn,
+    checkOut: prop.checkOut,
+    rooms: rooms.map(r => ({
+      id: r.id,
+      name: r.name,
+      description: [r.bedConfig, r.enSuite ? 'En-suite' : '', r.sizeSqm ? `${r.sizeSqm}m²` : ''].filter(Boolean).join(' · '),
+      max_guests: r.maxOccupancy,
+      price_per_night: r.basePrice,
+      amenities: [...(r.features ?? []), ...(r.inclusions ?? [])],
+    })),
+    reviews_list: [] as any[],
+  }
 }
 
 export default function StayDetailPage() {
   const { id } = useParams() as { id: string }
   const router = useRouter()
   const booking = useBooking()
-  const stay = STAYS[id] || STAYS['s1']
+
+  const [stay, setStay] = useState<any>(HARDCODED[id] || null)
+  const [loading, setLoading] = useState(!HARDCODED[id])
 
   const [selectedRoom, setSelectedRoom] = useState<any>(null)
   const [checkIn, setCheckIn] = useState(booking.checkIn || '')
   const [checkOut, setCheckOut] = useState(booking.checkOut || '')
   const [guests, setGuests] = useState(booking.guests || 2)
 
-  const isSelectedStay = booking.stay?.id === id
+  useEffect(() => {
+    if (HARDCODED[id]) return
+    Promise.all([getPropertyById(id), getRoomsByProperty(id)]).then(([prop, rooms]) => {
+      if (prop) setStay(propToStay(prop, rooms))
+      setLoading(false)
+    })
+  }, [id])
 
+  const isSelectedStay = booking.stay?.id === id
   const nights = checkIn && checkOut
     ? Math.max(1, Math.round((new Date(checkOut).getTime() - new Date(checkIn).getTime()) / 86400000))
     : 1
   const total = selectedRoom ? selectedRoom.price_per_night * nights : null
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-[#F7F5F2] flex items-center justify-center">
+        <div className="w-8 h-8 border-2 border-[#C9A96E] border-t-transparent rounded-full animate-spin" />
+      </div>
+    )
+  }
+
+  if (!stay) {
+    return (
+      <div className="min-h-screen bg-[#F7F5F2] flex flex-col items-center justify-center gap-4">
+        <Navbar />
+        <p className="font-sans text-black/40">Property not found.</p>
+        <Link href="/stays" className="font-sans text-sm text-[#C9A96E] hover:underline">← Back to Stays</Link>
+      </div>
+    )
+  }
 
   return (
     <div className="min-h-screen bg-[#F7F5F2]">
@@ -155,11 +201,13 @@ export default function StayDetailPage() {
           <h1 className="font-display italic text-5xl lg:text-6xl mb-4">{stay.title}</h1>
           <div className="flex flex-wrap items-center gap-5 font-sans text-sm text-white/60">
             <span className="flex items-center gap-1.5"><MapPin size={14} />{stay.location}</span>
-            <span className="flex items-center gap-1.5">
-              <Star size={14} className="text-[#C9A96E] fill-[#C9A96E]" />
-              <span className="text-white">{stay.rating}</span>
-              <span>({stay.review_count} reviews)</span>
-            </span>
+            {stay.rating && (
+              <span className="flex items-center gap-1.5">
+                <Star size={14} className="text-[#C9A96E] fill-[#C9A96E]" />
+                <span className="text-white">{stay.rating}</span>
+                <span>({stay.review_count} reviews)</span>
+              </span>
+            )}
           </div>
         </div>
       </section>
@@ -169,31 +217,32 @@ export default function StayDetailPage() {
         <div className="col-span-2 row-span-2 overflow-hidden">
           <img src={stay.images[0]} alt={stay.title} className="w-full h-full object-cover" />
         </div>
-        <div className="overflow-hidden">
-          <img src={stay.images[1] || stay.images[0]} alt="" className="w-full h-full object-cover" />
-        </div>
-        <div className="overflow-hidden">
-          <img src={stay.images[2] || stay.images[0]} alt="" className="w-full h-full object-cover" />
-        </div>
-        <div className="overflow-hidden">
-          <img src={stay.images[3] || stay.images[0]} alt="" className="w-full h-full object-cover" />
-        </div>
-        <div className="overflow-hidden bg-[#2d6a4f]/10 flex items-center justify-center">
-          <span className="font-sans text-xs text-gray-400">+ more photos</span>
-        </div>
+        {[1, 2, 3].map(i => (
+          <div key={i} className="overflow-hidden bg-[#2d6a4f]/10">
+            {stay.images[i] ? (
+              <img src={stay.images[i]} alt="" className="w-full h-full object-cover" />
+            ) : (
+              <div className="w-full h-full flex items-center justify-center">
+                <span className="font-sans text-xs text-gray-400">Photo {i + 1}</span>
+              </div>
+            )}
+          </div>
+        ))}
       </div>
 
       {/* Highlights strip */}
-      <div className="bg-white border-b border-gray-200">
-        <div className="max-w-[1440px] mx-auto px-6 lg:px-12 py-5 flex flex-wrap gap-6">
-          {stay.highlights.map((h: string) => (
-            <div key={h} className="flex items-center gap-2">
-              <ShieldCheck size={14} className="text-[#C9A96E] shrink-0" />
-              <span className="font-sans text-sm text-gray-700">{h}</span>
-            </div>
-          ))}
+      {stay.highlights?.length > 0 && (
+        <div className="bg-white border-b border-gray-200">
+          <div className="max-w-[1440px] mx-auto px-6 lg:px-12 py-5 flex flex-wrap gap-6">
+            {stay.highlights.map((h: string) => (
+              <div key={h} className="flex items-center gap-2">
+                <ShieldCheck size={14} className="text-[#C9A96E] shrink-0" />
+                <span className="font-sans text-sm text-gray-700">{h}</span>
+              </div>
+            ))}
+          </div>
         </div>
-      </div>
+      )}
 
       <main className="max-w-[1440px] mx-auto px-6 lg:px-12 py-16">
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-12">
@@ -205,104 +254,125 @@ export default function StayDetailPage() {
             <div>
               <h2 className="font-display italic text-2xl text-[#000000] mb-4">About this Stay</h2>
               <p className="font-sans text-gray-700 leading-relaxed">{stay.description}</p>
+              {stay.checkIn && (
+                <div className="mt-4 flex gap-6 font-sans text-sm text-gray-500">
+                  <span>Check-in: <strong>{stay.checkIn}</strong></span>
+                  <span>Check-out: <strong>{stay.checkOut}</strong></span>
+                </div>
+              )}
             </div>
 
             {/* Amenities */}
-            <div>
-              <h2 className="font-display italic text-2xl text-[#000000] mb-5">Amenities</h2>
-              <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-                {stay.amenities.map((a: any) => {
-                  const Icon = a.icon
-                  return (
-                    <div key={a.label} className="flex items-center gap-3 bg-white border border-gray-200 px-4 py-3.5">
-                      <Icon size={16} className="text-[#2d6a4f]" />
-                      <span className="font-sans text-sm text-gray-700">{a.label}</span>
-                    </div>
-                  )
-                })}
+            {stay.amenities?.length > 0 && (
+              <div>
+                <h2 className="font-display italic text-2xl text-[#000000] mb-5">Amenities</h2>
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                  {stay.amenities.map((a: any) => {
+                    const Icon = a.icon
+                    return (
+                      <div key={a.label} className="flex items-center gap-3 bg-white border border-gray-200 px-4 py-3.5">
+                        <Icon size={16} className="text-[#2d6a4f]" />
+                        <span className="font-sans text-sm text-gray-700">{a.label}</span>
+                      </div>
+                    )
+                  })}
+                </div>
               </div>
-            </div>
+            )}
 
             {/* Rooms */}
             <div>
               <h2 className="font-display italic text-2xl text-[#000000] mb-5">Choose Your Room</h2>
-              <div className="space-y-4">
-                {stay.rooms.map((room: any) => (
-                  <div
-                    key={room.id}
-                    onClick={() => setSelectedRoom(room)}
-                    className={`bg-white border cursor-pointer transition-all ${selectedRoom?.id === room.id ? 'border-[#2d6a4f] shadow-sm' : 'border-gray-200 hover:border-gray-400'}`}
-                  >
-                    {selectedRoom?.id === room.id && (
-                      <div className="bg-[#2d6a4f] px-5 py-1.5">
-                        <span className="font-sans text-[10px] tracking-[0.12em] uppercase text-white">Selected</span>
-                      </div>
-                    )}
-                    <div className="p-5 flex items-start justify-between gap-4">
-                      <div className="flex-1">
-                        <div className="flex items-center gap-3 mb-1.5">
-                          <h3 className="font-display italic text-xl">{room.name}</h3>
-                          <span className="flex items-center gap-1 font-sans text-xs text-gray-400">
-                            <Users size={11} /> up to {room.max_guests}
-                          </span>
+              {stay.rooms.length === 0 ? (
+                <div className="bg-white border border-gray-200 p-8 text-center">
+                  <BedDouble size={24} className="text-gray-300 mx-auto mb-2" />
+                  <p className="font-sans text-sm text-gray-400">No rooms listed yet — contact the property directly.</p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {stay.rooms.map((room: any) => (
+                    <div
+                      key={room.id}
+                      onClick={() => setSelectedRoom(room)}
+                      className={`bg-white border cursor-pointer transition-all ${selectedRoom?.id === room.id ? 'border-[#2d6a4f] shadow-sm' : 'border-gray-200 hover:border-gray-400'}`}
+                    >
+                      {selectedRoom?.id === room.id && (
+                        <div className="bg-[#2d6a4f] px-5 py-1.5">
+                          <span className="font-sans text-[10px] tracking-[0.12em] uppercase text-white">Selected</span>
                         </div>
-                        <p className="font-sans text-sm text-gray-600 leading-relaxed mb-3">{room.description}</p>
-                        <div className="flex flex-wrap gap-1.5">
-                          {room.amenities.map((a: string) => (
-                            <span key={a} className="bg-[#F7F5F2] px-2.5 py-1 font-sans text-xs text-gray-600">{a}</span>
-                          ))}
+                      )}
+                      <div className="p-5 flex items-start justify-between gap-4">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-3 mb-1.5">
+                            <h3 className="font-display italic text-xl">{room.name}</h3>
+                            <span className="flex items-center gap-1 font-sans text-xs text-gray-400">
+                              <Users size={11} /> up to {room.max_guests}
+                            </span>
+                          </div>
+                          <p className="font-sans text-sm text-gray-600 leading-relaxed mb-3">{room.description}</p>
+                          {room.amenities?.length > 0 && (
+                            <div className="flex flex-wrap gap-1.5">
+                              {room.amenities.map((a: string) => (
+                                <span key={a} className="bg-[#F7F5F2] px-2.5 py-1 font-sans text-xs text-gray-600">{a}</span>
+                              ))}
+                            </div>
+                          )}
                         </div>
-                      </div>
-                      <div className="text-right shrink-0 pl-4">
-                        <p className="font-display italic text-2xl text-[#2d6a4f]">R {room.price_per_night.toLocaleString()}</p>
-                        <p className="font-sans text-xs text-gray-400">/night</p>
-                        <button
-                          onClick={e => { e.stopPropagation(); setSelectedRoom(room) }}
-                          className={`mt-3 px-4 py-2 font-sans text-xs transition-colors ${selectedRoom?.id === room.id ? 'bg-[#2d6a4f] text-white' : 'border border-[#2d6a4f] text-[#2d6a4f] hover:bg-[#2d6a4f] hover:text-white'}`}
-                        >
-                          {selectedRoom?.id === room.id ? '✓ Selected' : 'Select'}
-                        </button>
+                        <div className="text-right shrink-0 pl-4">
+                          <p className="font-display italic text-2xl text-[#2d6a4f]">R {room.price_per_night.toLocaleString()}</p>
+                          <p className="font-sans text-xs text-gray-400">/night</p>
+                          <button
+                            onClick={e => { e.stopPropagation(); setSelectedRoom(room) }}
+                            className={`mt-3 px-4 py-2 font-sans text-xs transition-colors ${selectedRoom?.id === room.id ? 'bg-[#2d6a4f] text-white' : 'border border-[#2d6a4f] text-[#2d6a4f] hover:bg-[#2d6a4f] hover:text-white'}`}
+                          >
+                            {selectedRoom?.id === room.id ? '✓ Selected' : 'Select'}
+                          </button>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                ))}
-              </div>
+                  ))}
+                </div>
+              )}
             </div>
 
             {/* Reviews */}
-            <div>
-              <div className="flex items-center gap-4 mb-6">
-                <h2 className="font-display italic text-2xl text-[#000000]">Guest Reviews</h2>
-                <div className="flex items-center gap-1.5">
-                  <Star size={16} className="text-[#C9A96E] fill-[#C9A96E]" />
-                  <span className="font-display italic text-xl">{stay.rating}</span>
-                  <span className="font-sans text-sm text-gray-400">({stay.review_count})</span>
+            {stay.reviews_list?.length > 0 && (
+              <div>
+                <div className="flex items-center gap-4 mb-6">
+                  <h2 className="font-display italic text-2xl text-[#000000]">Guest Reviews</h2>
+                  {stay.rating && (
+                    <div className="flex items-center gap-1.5">
+                      <Star size={16} className="text-[#C9A96E] fill-[#C9A96E]" />
+                      <span className="font-display italic text-xl">{stay.rating}</span>
+                      <span className="font-sans text-sm text-gray-400">({stay.review_count})</span>
+                    </div>
+                  )}
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {stay.reviews_list.map((r: any, i: number) => (
+                    <div key={i} className="bg-white border border-gray-200 p-5">
+                      <div className="flex items-center justify-between mb-3">
+                        <div className="flex items-center gap-2.5">
+                          <div className="w-8 h-8 bg-[#2d6a4f]/10 flex items-center justify-center font-display italic text-[#2d6a4f] text-sm shrink-0">
+                            {r.name[0]}
+                          </div>
+                          <div>
+                            <p className="font-sans text-sm font-medium leading-tight">{r.name}</p>
+                            <p className="font-sans text-xs text-gray-400">{r.date}</p>
+                          </div>
+                        </div>
+                        <div className="flex gap-0.5 shrink-0">
+                          {Array.from({ length: r.rating }).map((_, j) => (
+                            <Star key={j} size={11} className="text-[#C9A96E] fill-[#C9A96E]" />
+                          ))}
+                        </div>
+                      </div>
+                      <p className="font-sans text-sm text-gray-700 leading-relaxed">{r.comment}</p>
+                    </div>
+                  ))}
                 </div>
               </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {stay.reviews_list.map((r: any, i: number) => (
-                  <div key={i} className="bg-white border border-gray-200 p-5">
-                    <div className="flex items-center justify-between mb-3">
-                      <div className="flex items-center gap-2.5">
-                        <div className="w-8 h-8 bg-[#2d6a4f]/10 flex items-center justify-center font-display italic text-[#2d6a4f] text-sm shrink-0">
-                          {r.name[0]}
-                        </div>
-                        <div>
-                          <p className="font-sans text-sm font-medium leading-tight">{r.name}</p>
-                          <p className="font-sans text-xs text-gray-400">{r.date}</p>
-                        </div>
-                      </div>
-                      <div className="flex gap-0.5 shrink-0">
-                        {Array.from({ length: r.rating }).map((_, j) => (
-                          <Star key={j} size={11} className="text-[#C9A96E] fill-[#C9A96E]" />
-                        ))}
-                      </div>
-                    </div>
-                    <p className="font-sans text-sm text-gray-700 leading-relaxed">{r.comment}</p>
-                  </div>
-                ))}
-              </div>
-            </div>
+            )}
 
             {/* Provider */}
             <div className="bg-white border border-gray-200 p-6">
@@ -311,8 +381,8 @@ export default function StayDetailPage() {
                 <div>
                   <p className="font-display italic text-2xl mb-1">{stay.title}</p>
                   <div className="flex gap-5 font-sans text-sm text-gray-500">
-                    <span>Member since {stay.member_since}</span>
-                    <span>Response rate: {stay.response_rate}</span>
+                    {stay.member_since && <span>Member since {stay.member_since}</span>}
+                    {stay.response_rate && stay.response_rate !== '—' && <span>Response rate: {stay.response_rate}</span>}
                   </div>
                 </div>
                 <button className="shrink-0 border border-[#2d6a4f] text-[#2d6a4f] px-5 py-2.5 font-sans text-sm hover:bg-[#2d6a4f] hover:text-white transition-colors">
@@ -328,8 +398,8 @@ export default function StayDetailPage() {
               <div className="mb-5">
                 <p className="font-sans text-[10px] tracking-[0.12em] uppercase text-gray-400">From</p>
                 <p className="font-display italic text-3xl text-[#2d6a4f]">
-                  R {stay.price_from.toLocaleString()}
-                  <span className="font-sans text-sm text-gray-400">/night</span>
+                  {stay.price_from > 0 ? `R ${stay.price_from.toLocaleString()}` : 'Contact for rates'}
+                  {stay.price_from > 0 && <span className="font-sans text-sm text-gray-400">/night</span>}
                 </p>
               </div>
 
@@ -338,51 +408,31 @@ export default function StayDetailPage() {
                   <label className="block font-sans text-[10px] tracking-[0.1em] uppercase text-gray-400 mb-1.5">Check-in</label>
                   <div className="flex items-center gap-2 border border-gray-300 px-3 py-2.5">
                     <Calendar size={14} className="text-gray-400 shrink-0" />
-                    <input
-                      type="date"
-                      value={checkIn}
-                      onChange={e => setCheckIn(e.target.value)}
-                      className="flex-1 font-sans text-sm focus:outline-none bg-transparent"
-                    />
+                    <input type="date" value={checkIn} onChange={e => setCheckIn(e.target.value)} className="flex-1 font-sans text-sm focus:outline-none bg-transparent" />
                   </div>
                 </div>
                 <div>
                   <label className="block font-sans text-[10px] tracking-[0.1em] uppercase text-gray-400 mb-1.5">Check-out</label>
                   <div className="flex items-center gap-2 border border-gray-300 px-3 py-2.5">
                     <Calendar size={14} className="text-gray-400 shrink-0" />
-                    <input
-                      type="date"
-                      value={checkOut}
-                      onChange={e => setCheckOut(e.target.value)}
-                      className="flex-1 font-sans text-sm focus:outline-none bg-transparent"
-                    />
+                    <input type="date" value={checkOut} onChange={e => setCheckOut(e.target.value)} className="flex-1 font-sans text-sm focus:outline-none bg-transparent" />
                   </div>
                 </div>
                 <div>
                   <label className="block font-sans text-[10px] tracking-[0.1em] uppercase text-gray-400 mb-1.5">Guests</label>
-                  <select
-                    value={guests}
-                    onChange={e => setGuests(parseInt(e.target.value))}
-                    className="w-full border border-gray-300 px-3 py-2.5 font-sans text-sm focus:outline-none bg-white"
-                  >
-                    {[1, 2, 3, 4, 5, 6].map(n => (
-                      <option key={n} value={n}>{n} guest{n !== 1 ? 's' : ''}</option>
-                    ))}
+                  <select value={guests} onChange={e => setGuests(parseInt(e.target.value))} className="w-full border border-gray-300 px-3 py-2.5 font-sans text-sm focus:outline-none bg-white">
+                    {[1, 2, 3, 4, 5, 6].map(n => <option key={n} value={n}>{n} guest{n !== 1 ? 's' : ''}</option>)}
                   </select>
                 </div>
-                <div>
-                  <label className="block font-sans text-[10px] tracking-[0.1em] uppercase text-gray-400 mb-1.5">Room</label>
-                  <select
-                    value={selectedRoom?.id || ''}
-                    onChange={e => setSelectedRoom(stay.rooms.find((r: any) => r.id === e.target.value) || null)}
-                    className="w-full border border-gray-300 px-3 py-2.5 font-sans text-sm focus:outline-none bg-white"
-                  >
-                    <option value="">Select a room…</option>
-                    {stay.rooms.map((r: any) => (
-                      <option key={r.id} value={r.id}>{r.name} — R {r.price_per_night.toLocaleString()}/night</option>
-                    ))}
-                  </select>
-                </div>
+                {stay.rooms.length > 0 && (
+                  <div>
+                    <label className="block font-sans text-[10px] tracking-[0.1em] uppercase text-gray-400 mb-1.5">Room</label>
+                    <select value={selectedRoom?.id || ''} onChange={e => setSelectedRoom(stay.rooms.find((r: any) => r.id === e.target.value) || null)} className="w-full border border-gray-300 px-3 py-2.5 font-sans text-sm focus:outline-none bg-white">
+                      <option value="">Select a room…</option>
+                      {stay.rooms.map((r: any) => <option key={r.id} value={r.id}>{r.name} — R {r.price_per_night.toLocaleString()}/night</option>)}
+                    </select>
+                  </div>
+                )}
               </div>
 
               {total && (
@@ -410,10 +460,7 @@ export default function StayDetailPage() {
                 {selectedRoom ? (isSelectedStay ? <span className="flex items-center justify-center gap-2"><Check size={14} /> Stay Selected — View Trip</span> : 'Select & Browse Activities') : 'Select a Room First'}
               </button>
               {isSelectedStay && (
-                <button
-                  onClick={() => router.push('/checkout/shuttle')}
-                  className="w-full mt-2 py-3 font-sans text-sm border border-[#2d6a4f] text-[#2d6a4f] hover:bg-[#2d6a4f] hover:text-white transition-colors"
-                >
+                <button onClick={() => router.push('/checkout/shuttle')} className="w-full mt-2 py-3 font-sans text-sm border border-[#2d6a4f] text-[#2d6a4f] hover:bg-[#2d6a4f] hover:text-white transition-colors">
                   Proceed to Checkout →
                 </button>
               )}
