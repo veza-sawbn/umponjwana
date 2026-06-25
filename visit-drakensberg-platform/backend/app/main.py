@@ -23,6 +23,7 @@ from app.api.v1 import (
     packages,
     events,
     shuttle,
+    admin_content,
 )
 
 logger = logging.getLogger(__name__)
@@ -78,6 +79,7 @@ app.include_router(guides.router, prefix=API_PREFIX)
 app.include_router(packages.router, prefix=API_PREFIX)
 app.include_router(events.router, prefix=API_PREFIX)
 app.include_router(shuttle.router, prefix=API_PREFIX)
+app.include_router(admin_content.router, prefix=API_PREFIX)
 
 
 # ---------------------------------------------------------------------------
