@@ -36,9 +36,10 @@ export default function HikeDetailPage() {
       setTrail(found || trails[0])
     })
     getDepartures().then(all => {
+      console.log('[departures] all:', all, 'trail id:', id)
       const today = new Date().toISOString().slice(0, 10)
       const tourDates: TourDate[] = all
-        .filter(d => d.trailId === id && d.date >= today && d.status !== 'full')
+        .filter(d => { const match = d.trailId === id && d.date >= today && d.status !== 'full'; console.log('[departures] dep trailId:', d.trailId, 'match:', match); return match })
         .sort((a, b) => a.date.localeCompare(b.date))
         .map(d => ({
           id: d.id,
