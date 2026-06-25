@@ -1,15 +1,16 @@
 'use client'
 
 import { useState } from 'react'
+import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { Calendar, Users, Tag, ChevronRight, UserCircle, Package, Sparkles, Check, Plus } from 'lucide-react'
+import { Calendar, Users, Tag, UserCircle, Package, Sparkles, Check, Plus, Minus } from 'lucide-react'
 import { motion } from 'framer-motion'
 import { useBooking } from '@/lib/booking-context'
 import { staggerContainer, staggerChild } from '@/lib/motion'
 
 export type TourDate = {
   id: string
-  date: string           // ISO date string
+  date: string
   type: 'guide' | 'package' | 'experience'
   operator: string
   guide?: string
@@ -38,9 +39,56 @@ function formatDate(iso: string) {
   return d.toLocaleDateString('en-ZA', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' })
 }
 
-export default function UpcomingDepartures({ dates, context }: { dates: TourDate[]; context?: string }) {
+function addDays(iso: string, days: number) {
+  const d = new Date(iso)
+  d.setDate(d.getDate() + days)
+  return d.toISOString().slice(0, 10)
+}
+
+export default function UpcomingDepartures({
+  dates,
+  context,
+  trailRegion,
+}: {
+  dates: TourDate[]
+  context?: string
+  trailRegion?: string
+}) {
   const [filter, setFilter] = useState<'all' | TourDate['type']>('all')
+  const [guestCounts, setGuestCounts] = useState<Record<string, number>>({})
   const booking = useBooking()
+  const router = useRouter()
+
+  function getGuests(id: string, maxSpots: number) {
+    return Math.min(guestCounts[id] ?? 1, maxSpots)
+  }
+
+  function changeGuests(id: string, delta: number, maxSpots: number) {
+    setGuestCounts(prev => ({
+      ...prev,
+      [id]: Math.max(1, Math.min(maxSpots, (prev[id] ?? 1) + delta)),
+    }))
+  }
+
+  function handleAdd(d: TourDate) {
+    const guests = getGuests(d.id, d.spots_remaining)
+    // Set booking search dates: check-in night before, check-out night after the hike
+    booking.setSearch(
+      trailRegion ?? booking.region,
+      addDays(d.date, -1),
+      addDays(d.date, 1),
+      guests,
+    )
+    booking.addAddon({
+      id: d.id,
+      type: d.type === 'guide' ? 'hike' : d.type === 'package' ? 'activity' : 'tour',
+      title: `${d.operator}${d.guide ? ` · ${d.guide}` : ''}`,
+      date: d.date,
+      price_per_person: d.price_per_person,
+      guests,
+    })
+    router.push('/trip')
+  }
 
   const visible = dates.filter(d => filter === 'all' || d.type === filter)
   const hasTypes = new Set(dates.map(d => d.type))
@@ -54,7 +102,6 @@ export default function UpcomingDepartures({ dates, context }: { dates: TourDate
           <h2 className="font-display italic text-2xl text-[#000000]">Upcoming Departures</h2>
           {context && <p className="font-sans text-xs text-gray-400 mt-0.5">{context}</p>}
         </div>
-        {/* Type filter pills — only show when multiple types present */}
         {hasTypes.size > 1 && (
           <div className="flex gap-1.5">
             {(['all', ...Array.from(hasTypes)] as const).map(t => (
@@ -84,13 +131,14 @@ export default function UpcomingDepartures({ dates, context }: { dates: TourDate
           const meta = TYPE_META[d.type]
           const Icon = meta.Icon
           const spots = spotsLabel(d.spots_remaining, d.spots_total)
+          const isAdded = booking.addons.some(a => a.id === d.id)
+          const guests = getGuests(d.id, d.spots_remaining)
 
           return (
             <motion.div key={d.id} variants={staggerChild} className={`bg-white border ${spots.full ? 'border-gray-100 opacity-60' : 'border-gray-200'} p-5`}>
               <div className="flex items-start justify-between gap-4 flex-wrap">
                 {/* Left: date + type + operator */}
                 <div className="flex items-start gap-4">
-                  {/* Date block */}
                   <div className="text-center shrink-0 bg-[#F7F5F2] px-3 py-2 min-w-[56px]">
                     <p className="font-sans text-[10px] text-gray-400 uppercase tracking-wide">
                       {new Date(d.date).toLocaleDateString('en-ZA', { month: 'short' })}
@@ -127,12 +175,36 @@ export default function UpcomingDepartures({ dates, context }: { dates: TourDate
                   </div>
                 </div>
 
-                {/* Right: price + spots + CTA */}
+                {/* Right: price + guest picker + CTA */}
                 <div className="flex flex-col items-end gap-3 shrink-0">
                   <div className="text-right">
                     <p className="font-display italic text-xl text-[#2d6a4f]">R {d.price_per_person.toLocaleString()}</p>
                     <p className="font-sans text-[10px] text-gray-400">per person</p>
                   </div>
+
+                  {!spots.full && !isAdded && (
+                    <div className="flex items-center gap-2">
+                      <span className="font-sans text-xs text-gray-400">Spots:</span>
+                      <div className="flex items-center border border-gray-200 rounded">
+                        <button
+                          onClick={() => changeGuests(d.id, -1, d.spots_remaining)}
+                          className="px-2 py-1 text-gray-500 hover:text-black disabled:opacity-30"
+                          disabled={guests <= 1}
+                        >
+                          <Minus size={11} />
+                        </button>
+                        <span className="font-sans text-sm px-2 min-w-[24px] text-center">{guests}</span>
+                        <button
+                          onClick={() => changeGuests(d.id, 1, d.spots_remaining)}
+                          className="px-2 py-1 text-gray-500 hover:text-black disabled:opacity-30"
+                          disabled={guests >= d.spots_remaining}
+                        >
+                          <Plus size={11} />
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
                   <div className="flex items-center gap-3">
                     <span
                       className={`font-sans text-[10px] px-2.5 py-1 ${
@@ -148,34 +220,32 @@ export default function UpcomingDepartures({ dates, context }: { dates: TourDate
                     </span>
                     {spots.full ? (
                       <span className="font-sans text-xs text-gray-400 px-5 py-2.5 border border-gray-200">Full</span>
-                    ) : (() => {
-                      const isAdded = booking.addons.some(a => a.id === d.id)
-                      return (
-                        <motion.button
-                          whileTap={{ scale: 0.96 }}
-                          transition={{ duration: 0.1 }}
-                          onClick={() => isAdded
-                            ? booking.removeAddon(d.id)
-                            : booking.addAddon({
-                                id: d.id,
-                                type: d.type === 'guide' ? 'hike' : d.type === 'package' ? 'activity' : 'tour',
-                                title: `${d.operator}${d.guide ? ` · ${d.guide}` : ''}`,
-                                date: d.date,
-                                price_per_person: d.price_per_person,
-                                guests: booking.guests || 1,
-                              })
-                          }
-                          className={`font-sans text-sm px-5 py-2.5 transition-colors inline-flex items-center gap-1.5 ${
-                            isAdded
-                              ? 'bg-[#2d6a4f] text-white hover:bg-red-600'
-                              : 'bg-[#2d6a4f] text-white hover:bg-[#235a3f]'
-                          }`}
-                        >
-                          {isAdded ? <><Check size={13} /> Added</> : <><Plus size={13} /> Add to Trip</>}
-                        </motion.button>
-                      )
-                    })()}
+                    ) : isAdded ? (
+                      <motion.button
+                        whileTap={{ scale: 0.96 }}
+                        transition={{ duration: 0.1 }}
+                        onClick={() => booking.removeAddon(d.id)}
+                        className="font-sans text-sm px-5 py-2.5 bg-[#2d6a4f] text-white hover:bg-red-600 transition-colors inline-flex items-center gap-1.5"
+                      >
+                        <Check size={13} /> Added
+                      </motion.button>
+                    ) : (
+                      <motion.button
+                        whileTap={{ scale: 0.96 }}
+                        transition={{ duration: 0.1 }}
+                        onClick={() => handleAdd(d)}
+                        className="font-sans text-sm px-5 py-2.5 bg-[#2d6a4f] text-white hover:bg-[#235a3f] transition-colors inline-flex items-center gap-1.5"
+                      >
+                        <Plus size={13} /> Add to Trip
+                      </motion.button>
+                    )}
                   </div>
+
+                  {!spots.full && !isAdded && guests > 1 && (
+                    <p className="font-sans text-[10px] text-gray-400">
+                      Total: R {(d.price_per_person * guests).toLocaleString()}
+                    </p>
+                  )}
                 </div>
               </div>
             </motion.div>

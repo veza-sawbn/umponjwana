@@ -141,6 +141,7 @@ export default function HikeDetailPage() {
             <UpcomingDepartures
               dates={departures}
               context="Guided departures and experiences on this trail"
+              trailRegion={trail.region}
             />
 
             {/* Multi-day breakdown */}
