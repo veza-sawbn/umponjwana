@@ -197,8 +197,13 @@ function ExperienceSection({
   const [thread, setThread] = useState<MessageThread | null>(null)
   const [threadLoading, setThreadLoading] = useState(false)
 
+  // Resolve supplier identity: departure.supplierId is most reliable,
+  // tour.supplierId is fallback, then empty string (matched by name on supplier side)
+  const resolvedSupplierId = departure?.supplierId || tour?.supplierId || ''
+  const resolvedSupplierName = tour?.supplierName || departure?.supplierName || addon.operator || ''
+
   async function openMessages() {
-    if (!currentUser || !tour) return
+    if (!currentUser) return
     setShowMsg(true)
     if (thread) return
     setThreadLoading(true)
@@ -208,8 +213,8 @@ function ExperienceSection({
       currentUser.id,
       currentUser.name,
       currentUser.email,
-      tour.supplierId,
-      tour.supplierName,
+      resolvedSupplierId,
+      resolvedSupplierName,
       addon.title,
     )
     setThread(t)
@@ -430,7 +435,7 @@ function ExperienceSection({
                   </p>
                 )}
               </div>
-              {currentUser && tour && (
+              {currentUser && resolvedSupplierName && (
                 <button
                   onClick={openMessages}
                   className="shrink-0 inline-flex items-center gap-2 bg-[#C9A96E] text-[#1a1a1a] px-4 py-2 font-sans text-sm font-medium hover:bg-[#b8935e] transition-colors"

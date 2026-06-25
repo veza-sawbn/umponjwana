@@ -21,8 +21,10 @@ export default function MessagesPage() {
     supabase.auth.getUser().then(({ data: { user } }) => {
       if (!user) { setLoading(false); return }
       setSupplierId(user.id)
-      setSupplierName(fullName || user.user_metadata?.full_name || user.email || '')
-      getThreadsBySupplier(user.id).then(t => {
+      const displayName = fullName || user.user_metadata?.full_name || ''
+      const email = user.email || ''
+      setSupplierName(displayName || email)
+      getThreadsBySupplier(user.id, [displayName, email].filter(Boolean)).then(t => {
         setThreads(t.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)))
         setLoading(false)
       })

@@ -48,6 +48,7 @@ function DeparturesInner() {
         trailId: tour.trailId,
         tour: tour.name,
         supplierName: tour.supplierName || tour.name,
+        supplierId: tour.supplierId || '',
         tourDays: tour.days,
         date: form.date,
         guide: form.guide,

@@ -6,6 +6,7 @@ export type Departure = {
   trailId: string
   tour: string
   supplierName: string
+  supplierId: string
   tourDays: number
   date: string
   guide: string

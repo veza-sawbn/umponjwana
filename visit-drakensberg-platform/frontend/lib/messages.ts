@@ -49,9 +49,13 @@ export async function getThreadsByBooking(bookingId: string): Promise<MessageThr
   return all.filter(t => t.bookingId === bookingId)
 }
 
-export async function getThreadsBySupplier(supplierId: string): Promise<MessageThread[]> {
+export async function getThreadsBySupplier(supplierId: string, fallbackNames?: string[]): Promise<MessageThread[]> {
   const all = await getThreads()
-  return all.filter(t => t.supplierId === supplierId)
+  return all.filter(t => {
+    if (supplierId && t.supplierId === supplierId) return true
+    if (fallbackNames?.length) return fallbackNames.some(n => n && t.supplierName === n)
+    return false
+  })
 }
 
 export async function getOrCreateThread(
