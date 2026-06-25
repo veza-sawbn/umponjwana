@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { Plus, Trash2, Check } from 'lucide-react'
-import { supabase } from '@/lib/auth'
+import { admin } from '@/lib/api'
 
 type KeyAttraction = { id: string; name: string; description: string }
 type RegionData = { id?: string; name: string; tagline: string; heroImage: string; heroVideo: string; overview: string; highlights: string[]; gettingThere: string; bestTime: string; keyAttractions: KeyAttraction[]; seoTitle: string; seoDescription: string }
@@ -16,60 +16,23 @@ export default function AdminRegionsPage() {
   const [error, setError] = useState('')
   const data = regions.find(r => r.id === selectedId) || regions[0]
 
-  async function persistRegions(nextRegions: RegionData[]) {
-    const { error } = await supabase.from('site_content').upsert(
-      { key: 'admin_regions', value: { items: nextRegions }, updated_at: new Date().toISOString() },
-      { onConflict: 'key' }
-    )
-    if (error) throw error
-  }
-
   async function loadRegions() {
-    try {
-      const { data, error } = await supabase.from('site_content').select('value').eq('key', 'admin_regions').maybeSingle()
-      if (error) throw error
-      const items = ((data?.value as { items?: RegionData[] } | null)?.items) || []
-      setRegions(items)
-      setSelectedId(items[0]?.id ?? null)
-    } catch {
-      setError('Could not load regions from Supabase.')
-    }
+    try { const items = await admin.getRegions(); setRegions(items); setSelectedId(items[0]?.id ?? null) } catch { setError('Could not load regions from the admin API.') }
   }
   useEffect(() => { loadRegions() }, [])
 
   function replaceCurrent(next: RegionData) { setRegions(rs => rs.map(r => r.id === data.id ? next : r)) }
   function update(field: keyof RegionData, value: unknown) { if (data) replaceCurrent({ ...data, [field]: value }) }
-  async function save() {
-    if (!data) return
-    const region = { ...data, id: data.id || `region-${Date.now()}` }
-    const next = data.id ? regions.map(r => r.id === data.id ? region : r) : [...regions, region]
-    await persistRegions(next)
-    setRegions(next)
-    setSelectedId(region.id!)
-    setSaved(true)
-    setTimeout(() => setSaved(false), 2000)
-  }
-  async function addRegion() {
-    const created = { ...blankRegion(), id: `region-${Date.now()}` }
-    const next = [...regions, created]
-    await persistRegions(next)
-    setRegions(next)
-    setSelectedId(created.id)
-  }
-  async function deleteRegion() {
-    if (!data?.id) return
-    const next = regions.filter(r => r.id !== data.id)
-    await persistRegions(next)
-    setRegions(next)
-    setSelectedId(next[0]?.id ?? null)
-  }
+  async function save() { if (!data) return; const result = data.id ? await admin.updateRegion(data.id, data) : await admin.createRegion(data); replaceCurrent(result); setSelectedId(result.id); setSaved(true); setTimeout(() => setSaved(false), 2000) }
+  async function addRegion() { const created = await admin.createRegion(blankRegion()); setRegions(rs => [...rs, created]); setSelectedId(created.id) }
+  async function deleteRegion() { if (!data?.id) return; await admin.deleteRegion(data.id); const next = regions.filter(r => r.id !== data.id); setRegions(next); setSelectedId(next[0]?.id ?? null) }
 
   const inputCls = 'w-full border border-gray-200 px-3 py-2.5 font-sans text-sm focus:outline-none focus:border-[#2d6a4f] bg-[#F7F5F2]'
   const labelCls = 'block font-sans text-[10px] tracking-[0.12em] uppercase text-gray-400 mb-1.5'
 
   if (!data) return <div className="p-8"><div className="mb-8"><p className="font-sans text-[10px] tracking-[0.14em] uppercase text-gray-400 mb-1">Admin Console</p><h1 className="font-display italic text-3xl text-[#000000]">Regions</h1></div>{error && <p className="text-sm text-red-500 mb-4">{error}</p>}<button onClick={addRegion} className="bg-[#2d6a4f] text-white px-5 py-2.5 font-sans text-sm">Create first region</button></div>
 
-  return <div className="p-8"><div className="mb-8 flex items-center justify-between"><div><p className="font-sans text-[10px] tracking-[0.14em] uppercase text-gray-400 mb-1">Admin Console</p><h1 className="font-display italic text-3xl text-[#000000]">Regions</h1><p className="font-sans text-xs text-gray-400 mt-1">Create, edit, and remove region content stored in Supabase.</p></div><button onClick={addRegion} className="inline-flex items-center gap-2 bg-[#2d6a4f] text-white px-5 py-2.5 font-sans text-sm"><Plus size={15}/> Add Region</button></div>{error && <p className="text-sm text-red-500 mb-4">{error}</p>}
+  return <div className="p-8"><div className="mb-8 flex items-center justify-between"><div><p className="font-sans text-[10px] tracking-[0.14em] uppercase text-gray-400 mb-1">Admin Console</p><h1 className="font-display italic text-3xl text-[#000000]">Regions</h1><p className="font-sans text-xs text-gray-400 mt-1">Create, edit, and remove live region content.</p></div><button onClick={addRegion} className="inline-flex items-center gap-2 bg-[#2d6a4f] text-white px-5 py-2.5 font-sans text-sm"><Plus size={15}/> Add Region</button></div>{error && <p className="text-sm text-red-500 mb-4">{error}</p>}
     <div className="flex gap-6 items-start"><div className="w-52 shrink-0 bg-white border border-gray-200">{regions.map(r => <button key={r.id} onClick={() => setSelectedId(r.id!)} className={`w-full text-left px-4 py-3 font-sans text-sm border-b border-gray-100 last:border-b-0 ${data.id === r.id ? 'bg-[#2d6a4f] text-white' : 'text-gray-700 hover:bg-[#F7F5F2]'}`}>{r.name}</button>)}</div>
       <div className="flex-1 bg-white border border-gray-200 p-6"><div className="flex items-center justify-between mb-6"><h2 className="font-display italic text-xl">{data.name}</h2><button onClick={deleteRegion} className="inline-flex items-center gap-1 text-red-400 font-sans text-xs"><Trash2 size={13}/> Delete region</button></div>
         <div className="space-y-5"><div className="grid grid-cols-2 gap-4"><div><label className={labelCls}>Region Name</label><input value={data.name} onChange={e => update('name', e.target.value)} className={inputCls}/></div><div><label className={labelCls}>Tagline</label><input value={data.tagline} onChange={e => update('tagline', e.target.value)} className={inputCls}/></div></div>
