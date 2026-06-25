@@ -57,6 +57,9 @@ function DeparturesInner() {
       setRows(r => [...r, dep])
       setAdding(false)
       setForm({ tourId: tourFilter ? form.tourId : '', date: '', guide: '', maxSeats: '10' })
+    } catch (e) {
+      console.error('[departures] save failed:', e)
+      alert('Failed to save departure. Check the console for details.')
     } finally {
       setSaving(false)
     }
