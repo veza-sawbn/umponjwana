@@ -14,28 +14,6 @@ async function handler(req: NextRequest, { params }: { params: { path: string[] 
   const search = req.nextUrl.search
   const upstreamUrl = `${BACKEND_BASE}/${path}${search}`
 
-  // Old admin console bundles may still call deprecated FastAPI admin endpoints.
-  // The admin console now uses Supabase directly, so return safe empty payloads
-  // instead of proxying those requests and surfacing backend 401s in the UI.
-  if (req.method === 'GET') {
-    if (path === 'api/v1/admin/dashboard/stats') {
-      return NextResponse.json({
-        total_users: 0,
-        total_suppliers: 0,
-        total_listings: 0,
-        total_bookings: 0,
-        total_revenue: 0,
-        pending_bookings: 0,
-      })
-    }
-    if (path === 'api/v1/admin/suppliers' || path === 'api/v1/admin/bookings') {
-      return NextResponse.json({ items: [], total: 0 })
-    }
-    if (path === 'api/v1/guides/admin') {
-      return NextResponse.json([])
-    }
-  }
-
   const headers = new Headers()
   const contentType = req.headers.get('content-type')
   if (contentType) headers.set('content-type', contentType)

@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { Copy, Trash2, Upload, X, Check } from 'lucide-react'
-import { supabase } from '@/lib/auth'
+import { admin } from '@/lib/api'
 
 type MediaItem = { id: string; type: 'image' | 'video'; name: string; url: string; size: string; dimensions: string; used_in: string[]; uploaded: string }
 
@@ -17,23 +17,7 @@ export default function AdminMediaPage() {
   const [error, setError] = useState('')
   const fileInputRef = useRef<HTMLInputElement>(null)
 
-  async function persistMedia(nextMedia: MediaItem[]) {
-    const { error } = await supabase.from('site_content').upsert(
-      { key: 'admin_media', value: { items: nextMedia }, updated_at: new Date().toISOString() },
-      { onConflict: 'key' }
-    )
-    if (error) throw error
-  }
-
-  async function loadMedia() {
-    try {
-      const { data, error } = await supabase.from('site_content').select('value').eq('key', 'admin_media').maybeSingle()
-      if (error) throw error
-      setMedia(((data?.value as { items?: MediaItem[] } | null)?.items) || [])
-    } catch {
-      setError('Could not load media library from Supabase.')
-    }
-  }
+  async function loadMedia() { try { setMedia(await admin.getMedia()) } catch { setError('Could not load media library.') } }
   useEffect(() => { loadMedia() }, [])
 
   const filtered = media.filter(item => item.name.toLowerCase().includes(search.toLowerCase()) || item.used_in.some(u => u.toLowerCase().includes(search.toLowerCase())))
@@ -42,39 +26,20 @@ export default function AdminMediaPage() {
 
   function copyUrl(item: MediaItem) { navigator.clipboard.writeText(item.url).catch(() => {}); setCopiedId(item.id); setTimeout(() => setCopiedId(null), 2000) }
 
-  async function remove(id: string) {
-    const next = media.filter(item => item.id !== id)
-    await persistMedia(next)
-    setMedia(next)
-  }
+  async function remove(id: string) { await admin.deleteMedia(id); setMedia(m => m.filter(item => item.id !== id)) }
   async function addFromUrl() {
     if (!uploadUrl || !uploadName) return
-    const created: MediaItem = { id: `media-${Date.now()}`, type: uploadUrl.match(/\.mp4|\.mov|\.webm/i) ? 'video' : 'image', name: uploadName, url: uploadUrl, size: 'External URL', dimensions: 'Unknown', used_in: [], uploaded: new Date().toLocaleDateString() }
-    const next = [...media, created]
-    await persistMedia(next)
-    setMedia(next); setUploadUrl(''); setUploadName(''); setShowUpload(false)
+    const created = await admin.createMedia({ type: uploadUrl.match(/\.mp4|\.mov|\.webm/i) ? 'video' : 'image', name: uploadName, url: uploadUrl, size: 'External URL', dimensions: 'Unknown', used_in: [] })
+    setMedia(m => [...m, created]); setUploadUrl(''); setUploadName(''); setShowUpload(false)
   }
   async function uploadFile(file?: File) {
     if (!file) return
     setBusy(true); setError('')
-    try {
-      const path = `admin/${Date.now()}-${file.name}`
-      const { error } = await supabase.storage.from('media').upload(path, file, { upsert: false })
-      if (error) throw error
-      const { data } = supabase.storage.from('media').getPublicUrl(path)
-      const created: MediaItem = { id: `media-${Date.now()}`, type: file.type.startsWith('video/') ? 'video' : 'image', name: file.name, url: data.publicUrl, size: file.size > 1024 * 1024 ? `${(file.size / 1024 / 1024).toFixed(1)} MB` : `${Math.round(file.size / 1024)} KB`, dimensions: 'Unknown', used_in: [], uploaded: new Date().toLocaleDateString() }
-      const next = [...media, created]
-      await persistMedia(next)
-      setMedia(next); setShowUpload(false)
-    } catch {
-      setError('Upload failed. Check Supabase storage bucket and policies.')
-    } finally {
-      setBusy(false)
-    }
+    try { const created = await admin.uploadMedia(file); setMedia(m => [...m, created]); setShowUpload(false) } catch { setError('Upload failed. Check Supabase storage configuration and API logs.') } finally { setBusy(false) }
   }
 
   return <div className="p-8">
-    <div className="flex items-center justify-between mb-4"><div><p className="font-sans text-[10px] tracking-[0.14em] uppercase text-gray-400 mb-1">Admin Console</p><h1 className="font-display italic text-3xl text-[#000000]">Media Library</h1><p className="font-sans text-xs text-gray-400 mt-1">Live media managed in Supabase.</p></div><button onClick={() => setShowUpload(v => !v)} className="inline-flex items-center gap-2 bg-[#2d6a4f] text-white px-5 py-2.5 font-sans text-sm">{showUpload ? <X size={15}/> : <Upload size={15}/>} {showUpload ? 'Cancel' : 'Upload'}</button></div>
+    <div className="flex items-center justify-between mb-4"><div><p className="font-sans text-[10px] tracking-[0.14em] uppercase text-gray-400 mb-1">Admin Console</p><h1 className="font-display italic text-3xl text-[#000000]">Media Library</h1><p className="font-sans text-xs text-gray-400 mt-1">Live media managed through the admin API.</p></div><button onClick={() => setShowUpload(v => !v)} className="inline-flex items-center gap-2 bg-[#2d6a4f] text-white px-5 py-2.5 font-sans text-sm">{showUpload ? <X size={15}/> : <Upload size={15}/>} {showUpload ? 'Cancel' : 'Upload'}</button></div>
     {error && <p className="mb-4 text-sm text-red-500">{error}</p>}
     <div className="flex gap-6 mb-6">{[{label:'Total Items',value:media.length},{label:'Images',value:imageCount},{label:'Videos',value:videoCount}].map(s => <div key={s.label} className="bg-white border border-gray-200 px-4 py-3"><p className="font-sans text-[9px] tracking-[0.12em] uppercase text-gray-400">{s.label}</p><p className="font-sans text-xl font-medium">{s.value}</p></div>)}</div>
     {showUpload && <div className="bg-white border border-gray-200 p-6 mb-6"><h2 className="font-display italic text-xl mb-4">Upload Media</h2><input ref={fileInputRef} type="file" accept="image/*,video/*" className="hidden" onChange={e => uploadFile(e.target.files?.[0])}/><button disabled={busy} onClick={() => fileInputRef.current?.click()} className="w-full border-2 border-dashed border-gray-200 bg-[#F7F5F2] p-10 text-center mb-5 font-sans text-sm text-gray-500 disabled:opacity-50"><Upload size={28} className="mx-auto mb-2 text-gray-300"/>{busy ? 'Uploading…' : 'Choose JPG, PNG, WebP, or MP4 file'}</button><p className="font-sans text-xs text-gray-400 uppercase tracking-[0.1em] mb-3">Or add by URL</p><div className="flex gap-3"><input value={uploadName} onChange={e => setUploadName(e.target.value)} className="border border-gray-200 px-3 py-2.5 font-sans text-sm bg-[#F7F5F2] w-48" placeholder="filename.jpg"/><input value={uploadUrl} onChange={e => setUploadUrl(e.target.value)} className="flex-1 border border-gray-200 px-3 py-2.5 font-sans text-sm bg-[#F7F5F2]" placeholder="https://…"/><button onClick={addFromUrl} className="bg-[#2d6a4f] text-white px-5 py-2.5 font-sans text-sm">Add</button></div></div>}
