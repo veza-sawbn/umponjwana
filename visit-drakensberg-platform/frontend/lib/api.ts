@@ -7,7 +7,7 @@ import { supabase } from './auth'
 const baseURL =
   typeof window !== 'undefined'
     ? '/api/backend'
-    : (process.env.NEXT_PUBLIC_API_URL || 'https://visit-drakensberg.onrender.com').replace(/\/+$/, '')
+    : (process.env.NEXT_PUBLIC_API_URL || process.env.BACKEND_URL || 'https://drakensberg-backend.onrender.com').replace(/\/+$/, '')
 
 const api = axios.create({
   baseURL,
