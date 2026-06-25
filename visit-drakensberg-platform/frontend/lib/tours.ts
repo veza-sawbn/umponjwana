@@ -1,4 +1,5 @@
 import { supabase } from './auth'
+import { getDepartures, saveDepartures } from './departures'
 
 export type Tour = {
   id: string
@@ -64,6 +65,9 @@ export async function updateTour(id: string, patch: Partial<Tour>): Promise<void
 }
 
 export async function deleteTour(id: string): Promise<void> {
-  const all = await getTours()
-  await saveTours(all.filter(t => t.id !== id))
+  const [all, departures] = await Promise.all([getTours(), getDepartures()])
+  await Promise.all([
+    saveTours(all.filter(t => t.id !== id)),
+    saveDepartures(departures.filter(d => d.tourId !== id)),
+  ])
 }

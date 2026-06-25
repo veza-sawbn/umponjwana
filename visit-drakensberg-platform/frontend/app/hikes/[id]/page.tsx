@@ -8,7 +8,8 @@ import Footer from '@/components/layout/Footer'
 import { ArrowLeft, Mountain, Clock, TrendingUp, Users, Star, CheckCircle, ChevronRight, X } from 'lucide-react'
 import { getTrails, Trail, DEFAULT_TRAILS } from '@/lib/trails'
 import UpcomingDepartures from '@/components/tours/UpcomingDepartures'
-import { getDepartures, type Departure } from '@/lib/departures'
+import { getDepartures } from '@/lib/departures'
+import { getTours } from '@/lib/tours'
 import type { TourDate } from '@/components/tours/UpcomingDepartures'
 
 const DIFF_COLOR: Record<string, string> = { Easy: '#4A7251', Moderate: '#C9A96E', Hard: '#c0392b', Strenuous: '#c0392b' }
@@ -35,10 +36,11 @@ export default function HikeDetailPage() {
       const found = trails.find(t => t.id === id)
       setTrail(found || trails[0])
     })
-    getDepartures().then(all => {
+    Promise.all([getDepartures(), getTours()]).then(([all, tours]) => {
+      const activeTourIds = new Set(tours.filter(t => t.status === 'active').map(t => t.id))
       const today = new Date().toISOString().slice(0, 10)
       const tourDates: TourDate[] = all
-        .filter(d => d.trailId === id && d.date >= today && d.status !== 'full')
+        .filter(d => d.trailId === id && d.date >= today && d.status !== 'full' && activeTourIds.has(d.tourId))
         .sort((a, b) => a.date.localeCompare(b.date))
         .map(d => ({
           id: d.id,
