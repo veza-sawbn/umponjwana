@@ -2,6 +2,8 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { ChevronRight, ChevronLeft } from 'lucide-react'
+import { supabase } from '@/lib/auth'
+import { addProperty } from '@/lib/properties'
 
 const PROPERTY_TYPES = ['Lodge', 'Guesthouse', 'Hotel', 'Self-catering Cottage', 'Campsite', 'Backpackers', 'Boutique Hotel']
 const AMENITIES = ['Swimming Pool', 'Braai Facilities', 'Wi-Fi', 'Restaurant', 'Bar', 'Spa', 'Gym', 'Laundry', 'Pet-Friendly', 'Wheelchair Access', 'Airport Transfers', 'Hiking Trails Access']
@@ -11,6 +13,7 @@ const STEPS = ['Property Details', 'Location & Access', 'Amenities & Policies', 
 export default function NewPropertyPage() {
   const router = useRouter()
   const [step, setStep] = useState(0)
+  const [saving, setSaving] = useState(false)
   const [form, setForm] = useState({
     name: '', type: '', description: '', starRating: '',
     address: '', gpsLat: '', gpsLng: '', nearestTown: '', accessNotes: '',
@@ -27,6 +30,39 @@ export default function NewPropertyPage() {
       ...f,
       amenities: f.amenities.includes(a) ? f.amenities.filter(x => x !== a) : [...f.amenities, a],
     }))
+  }
+
+  async function handleSubmit() {
+    setSaving(true)
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) { alert('Not signed in'); return }
+      await addProperty({
+        supplierId: user.id,
+        name: form.name,
+        type: form.type,
+        starRating: form.starRating,
+        description: form.description,
+        address: form.address,
+        gpsLat: form.gpsLat,
+        gpsLng: form.gpsLng,
+        nearestTown: form.nearestTown,
+        accessNotes: form.accessNotes,
+        amenities: form.amenities,
+        checkIn: form.checkIn,
+        checkOut: form.checkOut,
+        petPolicy: form.petPolicy,
+        cancellationPolicy: form.cancellationPolicy,
+        photos: form.photos,
+        status: 'active',
+      })
+      router.push('/supplier/properties')
+    } catch (e) {
+      console.error('[properties] save failed:', e)
+      alert('Failed to save property.')
+    } finally {
+      setSaving(false)
+    }
   }
 
   return (
@@ -145,7 +181,7 @@ export default function NewPropertyPage() {
 
         {step === 4 && (
           <div className="space-y-3">
-            <p className="font-sans text-sm text-black/60">Review your property details before submitting for approval.</p>
+            <p className="font-sans text-sm text-black/60">Review your property details before submitting.</p>
             <div className="rounded-lg bg-black/3 p-4 space-y-2">
               {[['Name', form.name], ['Type', form.type], ['Star Rating', form.starRating || 'Unrated'], ['Address', form.address], ['Nearest Town', form.nearestTown], ['Check-in', form.checkIn], ['Check-out', form.checkOut]].map(([k, v]) => v ? (
                 <div key={k} className="flex gap-3 font-sans text-sm">
@@ -176,16 +212,18 @@ export default function NewPropertyPage() {
         {step < STEPS.length - 1 ? (
           <button
             onClick={() => setStep(s => s + 1)}
-            className="flex items-center gap-2 font-sans text-sm px-5 py-2 bg-[#C9A96E] text-white rounded-lg hover:bg-[#b8965d] transition-colors"
+            disabled={step === 0 && (!form.name || !form.type)}
+            className="flex items-center gap-2 font-sans text-sm px-5 py-2 bg-[#C9A96E] text-white rounded-lg hover:bg-[#b8965d] transition-colors disabled:opacity-40"
           >
             Next <ChevronRight size={14} />
           </button>
         ) : (
           <button
-            onClick={() => router.push('/supplier/properties')}
-            className="font-sans text-sm px-5 py-2 bg-black text-white rounded-lg hover:bg-black/80 transition-colors"
+            onClick={handleSubmit}
+            disabled={saving || !form.name || !form.type}
+            className="font-sans text-sm px-5 py-2 bg-black text-white rounded-lg hover:bg-black/80 transition-colors disabled:opacity-50"
           >
-            Submit Property
+            {saving ? 'Saving…' : 'Submit Property'}
           </button>
         )}
       </div>

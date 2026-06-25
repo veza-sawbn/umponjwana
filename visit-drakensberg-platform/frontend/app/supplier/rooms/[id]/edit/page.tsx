@@ -1,110 +1,18 @@
 'use client'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter, useParams } from 'next/navigation'
-import { ChevronRight, ChevronLeft, Plus, Trash2, X } from 'lucide-react'
+import { ChevronRight, ChevronLeft, Plus, Trash2 } from 'lucide-react'
+import { supabase } from '@/lib/auth'
+import { getPropertiesBySupplier, type Property } from '@/lib/properties'
+import { getRoomById, updateRoom, type Room } from '@/lib/rooms'
 
-const PROPERTIES = ['Cathedral Peak Mountain Lodge', 'Berg Valley Guesthouse']
 const BED_CONFIGS = ['Single', 'Twin', 'Double', 'Queen', 'King', '2×Queen', '2×King', 'Bunk Beds']
-const ROOM_AMENITIES = ['Air Con', 'Heater', 'TV', 'Mini-fridge', 'Safe', 'Balcony', 'Mountain View', 'Private Entrance', 'Wheelchair Accessible']
+const ROOM_FEATURES = ['Air Con', 'Heater', 'TV', 'Mini-fridge', 'Safe', 'Balcony', 'Mountain View', 'Private Entrance', 'Wheelchair Accessible', 'Fireplace', 'Kitchenette', 'Bathtub']
+const INCLUSIONS_OPTIONS = ['Breakfast', 'Dinner', 'All Meals', 'Towels & Linen', 'Toiletries', 'Wi-Fi', 'Parking', 'Tea & Coffee', 'Welcome Drink', 'Turndown Service']
 
-const STEPS = ['Room Details', 'Pricing & Seasons', 'Photos', 'Review']
+const STEPS = ['Room Details', 'Features & Inclusions', 'Pricing & Seasons', 'Photos', 'Review']
 
 type Season = { name: string; from: string; to: string; price: string }
-
-interface RoomData {
-  property: string
-  name: string
-  bedConfig: string
-  maxOccupancy: string
-  units: string
-  sizeSqm: string
-  enSuite: boolean
-  amenities: string[]
-  basePrice: string
-  weekendSurcharge: string
-  seasons: Season[]
-  minNights: string
-  cleaningFee: string
-  photos: string[]
-}
-
-const MOCK: Record<string, RoomData> = {
-  '1': {
-    property: 'Cathedral Peak Mountain Lodge',
-    name: 'Mountain Suite',
-    bedConfig: 'King',
-    maxOccupancy: '2',
-    units: '4',
-    sizeSqm: '32',
-    enSuite: true,
-    amenities: ['Heater', 'TV', 'Mountain View', 'Balcony'],
-    basePrice: '2850',
-    weekendSurcharge: '15',
-    seasons: [
-      { name: 'Peak Season', from: '2025-07-01', to: '2025-08-31', price: '3200' },
-      { name: 'Festive Season', from: '2025-12-15', to: '2026-01-10', price: '3800' },
-    ],
-    minNights: '2',
-    cleaningFee: '250',
-    photos: ['Suite View 1', 'Suite View 2', 'Bathroom'],
-  },
-  '2': {
-    property: 'Cathedral Peak Mountain Lodge',
-    name: 'Family Chalet',
-    bedConfig: '2×Queen',
-    maxOccupancy: '4',
-    units: '3',
-    sizeSqm: '58',
-    enSuite: true,
-    amenities: ['Air Con', 'Heater', 'TV', 'Mini-fridge', 'Safe', 'Balcony', 'Mountain View'],
-    basePrice: '4200',
-    weekendSurcharge: '10',
-    seasons: [
-      { name: 'Peak Season', from: '2025-07-01', to: '2025-08-31', price: '5100' },
-      { name: 'Festive Season', from: '2025-12-15', to: '2026-01-10', price: '5800' },
-    ],
-    minNights: '2',
-    cleaningFee: '400',
-    photos: ['Chalet Exterior', 'Living Area', 'Main Bedroom', 'Kids Room'],
-  },
-  '3': {
-    property: 'Cathedral Peak Mountain Lodge',
-    name: 'Backpacker Dorm',
-    bedConfig: 'Bunk Beds',
-    maxOccupancy: '1',
-    units: '12',
-    sizeSqm: '8',
-    enSuite: false,
-    amenities: ['Heater'],
-    basePrice: '480',
-    weekendSurcharge: '0',
-    seasons: [
-      { name: 'Peak Season', from: '2025-07-01', to: '2025-08-31', price: '550' },
-    ],
-    minNights: '1',
-    cleaningFee: '',
-    photos: ['Dorm Room', 'Shared Bathroom'],
-  },
-  '4': {
-    property: 'Berg Valley Guesthouse',
-    name: 'Garden Room',
-    bedConfig: 'Queen',
-    maxOccupancy: '2',
-    units: '4',
-    sizeSqm: '22',
-    enSuite: true,
-    amenities: ['Air Con', 'TV'],
-    basePrice: '1450',
-    weekendSurcharge: '10',
-    seasons: [
-      { name: 'Peak Season', from: '2025-07-01', to: '2025-08-31', price: '1750' },
-      { name: 'Festive Season', from: '2025-12-15', to: '2026-01-10', price: '2100' },
-    ],
-    minNights: '1',
-    cleaningFee: '150',
-    photos: ['Garden View', 'Room Interior', 'Bathroom'],
-  },
-}
 
 const inp = 'w-full font-sans text-sm border border-black/10 rounded-lg px-3 py-2 outline-none focus:border-[#C9A96E]/50 bg-white'
 
@@ -119,30 +27,137 @@ function Field({ label, required, children }: { label: string; required?: boolea
   )
 }
 
+function ChipPicker({ label, options, selected, onChange }: { label: string; options: string[]; selected: string[]; onChange: (v: string[]) => void }) {
+  function toggle(a: string) {
+    onChange(selected.includes(a) ? selected.filter(x => x !== a) : [...selected, a])
+  }
+  return (
+    <div>
+      <p className="font-sans text-sm font-medium text-black/70 mb-3">{label}</p>
+      <div className="flex flex-wrap gap-2">
+        {options.map(a => (
+          <button
+            key={a}
+            type="button"
+            onClick={() => toggle(a)}
+            className={`font-sans text-xs px-3 py-1.5 rounded-full border transition-colors ${
+              selected.includes(a) ? 'bg-[#C9A96E] text-white border-[#C9A96E]' : 'border-black/15 text-black/60 hover:border-[#C9A96E]/40'
+            }`}
+          >
+            {a}
+          </button>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+function ImageList({ images, onChange }: { images: string[]; onChange: (v: string[]) => void }) {
+  const [draft, setDraft] = useState('')
+  function add() {
+    const url = draft.trim()
+    if (!url) return
+    onChange([...images, url])
+    setDraft('')
+  }
+  return (
+    <div className="space-y-2">
+      <p className="font-sans text-sm font-medium text-black/70">Image URLs</p>
+      {images.map((url, i) => (
+        <div key={i} className="flex gap-2 items-center">
+          <input value={url} onChange={e => { const next = [...images]; next[i] = e.target.value; onChange(next) }} className={`${inp} flex-1 text-xs`} />
+          <button type="button" onClick={() => onChange(images.filter((_, j) => j !== i))} className="text-red-400 hover:text-red-600 shrink-0">
+            <Trash2 size={14} />
+          </button>
+        </div>
+      ))}
+      <div className="flex gap-2">
+        <input value={draft} onChange={e => setDraft(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); add() } }} placeholder="https://… paste image URL and press Enter" className={`${inp} flex-1 text-xs`} />
+        <button type="button" onClick={add} className="shrink-0 flex items-center gap-1 font-sans text-xs text-[#C9A96E] border border-[#C9A96E]/30 rounded-lg px-2.5 py-1.5 hover:border-[#C9A96E]/60">
+          <Plus size={12} /> Add
+        </button>
+      </div>
+      {images.length > 0 && (
+        <div className="grid grid-cols-3 gap-2 mt-2">
+          {images.map((url, i) => (
+            <div key={i} className="aspect-video rounded-lg overflow-hidden bg-black/5 border border-black/8">
+              <img src={url} alt="" className="w-full h-full object-cover" onError={e => { (e.target as HTMLImageElement).style.display = 'none' }} />
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+type FormState = {
+  propertyId: string
+  name: string
+  bedConfig: string
+  maxOccupancy: string
+  units: string
+  sizeSqm: string
+  enSuite: boolean
+  features: string[]
+  inclusions: string[]
+  images: string[]
+  basePrice: string
+  weekendSurcharge: string
+  seasons: Season[]
+  minNights: string
+  cleaningFee: string
+}
+
 export default function EditRoomPage() {
   const router = useRouter()
   const params = useParams()
   const id = Array.isArray(params.id) ? params.id[0] : params.id as string
 
-  const defaults = MOCK[id] ?? {
-    property: '', name: '', bedConfig: '', maxOccupancy: '', units: '', sizeSqm: '',
-    enSuite: false, amenities: [], basePrice: '', weekendSurcharge: '0',
-    seasons: [{ name: '', from: '', to: '', price: '' }],
-    minNights: '1', cleaningFee: '', photos: [],
-  }
-
   const [step, setStep] = useState(0)
-  const [form, setForm] = useState<RoomData>({ ...defaults, seasons: [...defaults.seasons] })
+  const [saving, setSaving] = useState(false)
+  const [loading, setLoading] = useState(true)
+  const [properties, setProperties] = useState<Property[]>([])
+  const [form, setForm] = useState<FormState>({
+    propertyId: '', name: '', bedConfig: '', maxOccupancy: '', units: '', sizeSqm: '',
+    enSuite: false, features: [], inclusions: [], images: [],
+    basePrice: '', weekendSurcharge: '0',
+    seasons: [{ name: '', from: '', to: '', price: '' }],
+    minNights: '1', cleaningFee: '',
+  })
+
+  useEffect(() => {
+    supabase.auth.getUser().then(async ({ data: { user } }) => {
+      if (!user) { setLoading(false); return }
+      const [room, props] = await Promise.all([
+        getRoomById(id),
+        getPropertiesBySupplier(user.id),
+      ])
+      setProperties(props)
+      if (room) {
+        setForm({
+          propertyId: room.propertyId,
+          name: room.name,
+          bedConfig: room.bedConfig,
+          maxOccupancy: String(room.maxOccupancy),
+          units: String(room.units),
+          sizeSqm: String(room.sizeSqm),
+          enSuite: room.enSuite,
+          features: room.features ?? [],
+          inclusions: room.inclusions ?? [],
+          images: room.images ?? [],
+          basePrice: String(room.basePrice),
+          weekendSurcharge: String(room.weekendSurcharge),
+          seasons: room.seasons.length > 0 ? room.seasons : [{ name: '', from: '', to: '', price: '' }],
+          minNights: String(room.minNights),
+          cleaningFee: room.cleaningFee ? String(room.cleaningFee) : '',
+        })
+      }
+      setLoading(false)
+    })
+  }, [id])
 
   function setField(key: string, val: unknown) {
     setForm(f => ({ ...f, [key]: val }))
-  }
-
-  function toggleAmenity(a: string) {
-    setForm(f => ({
-      ...f,
-      amenities: f.amenities.includes(a) ? f.amenities.filter(x => x !== a) : [...f.amenities, a],
-    }))
   }
 
   function updateSeason(i: number, key: keyof Season, val: string) {
@@ -161,8 +176,43 @@ export default function EditRoomPage() {
     setForm(f => ({ ...f, seasons: f.seasons.filter((_, idx) => idx !== i) }))
   }
 
-  function removePhoto(i: number) {
-    setForm(f => ({ ...f, photos: f.photos.filter((_, idx) => idx !== i) }))
+  async function handleSave() {
+    setSaving(true)
+    try {
+      const prop = properties.find(p => p.id === form.propertyId)
+      await updateRoom(id, {
+        propertyId: form.propertyId,
+        propertyName: prop?.name ?? '',
+        name: form.name,
+        bedConfig: form.bedConfig,
+        maxOccupancy: +form.maxOccupancy || 1,
+        units: +form.units || 1,
+        sizeSqm: +form.sizeSqm || 0,
+        enSuite: form.enSuite,
+        features: form.features,
+        inclusions: form.inclusions,
+        images: form.images,
+        basePrice: +form.basePrice || 0,
+        weekendSurcharge: +form.weekendSurcharge || 0,
+        seasons: form.seasons.filter(s => s.name),
+        minNights: +form.minNights || 1,
+        cleaningFee: +form.cleaningFee || 0,
+      })
+      router.push('/supplier/rooms')
+    } catch (e) {
+      console.error('[rooms] update failed:', e)
+      alert('Failed to save changes.')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  if (loading) {
+    return (
+      <div className="p-8 flex items-center justify-center">
+        <div className="w-6 h-6 border-2 border-[#C9A96E] border-t-transparent rounded-full animate-spin" />
+      </div>
+    )
   }
 
   return (
@@ -192,9 +242,9 @@ export default function EditRoomPage() {
         {step === 0 && (
           <>
             <Field label="Property" required>
-              <select value={form.property} onChange={e => setField('property', e.target.value)} className={inp}>
+              <select value={form.propertyId} onChange={e => setField('propertyId', e.target.value)} className={inp}>
                 <option value="">Select property…</option>
-                {PROPERTIES.map(p => <option key={p}>{p}</option>)}
+                {properties.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
               </select>
             </Field>
             <Field label="Room Type Name" required>
@@ -227,26 +277,17 @@ export default function EditRoomPage() {
               />
               <label htmlFor="enSuite" className="font-sans text-sm text-black/70">En-suite bathroom</label>
             </div>
-            <div>
-              <p className="font-sans text-sm font-medium text-black/70 mb-3">Room Amenities</p>
-              <div className="flex flex-wrap gap-2">
-                {ROOM_AMENITIES.map(a => (
-                  <button
-                    key={a}
-                    onClick={() => toggleAmenity(a)}
-                    className={`font-sans text-xs px-3 py-1.5 rounded-full border transition-colors ${
-                      form.amenities.includes(a) ? 'bg-[#C9A96E] text-white border-[#C9A96E]' : 'border-black/15 text-black/60 hover:border-[#C9A96E]/40'
-                    }`}
-                  >
-                    {a}
-                  </button>
-                ))}
-              </div>
-            </div>
           </>
         )}
 
         {step === 1 && (
+          <>
+            <ChipPicker label="Room Features (in-room amenities)" options={ROOM_FEATURES} selected={form.features} onChange={v => setField('features', v)} />
+            <ChipPicker label="What's Included" options={INCLUSIONS_OPTIONS} selected={form.inclusions} onChange={v => setField('inclusions', v)} />
+          </>
+        )}
+
+        {step === 2 && (
           <>
             <div className="grid grid-cols-2 gap-4">
               <Field label="Base Price per Night (ZAR)" required>
@@ -260,45 +301,18 @@ export default function EditRoomPage() {
             <div>
               <div className="flex items-center justify-between mb-3">
                 <p className="font-sans text-sm font-medium text-black/70">Seasonal Pricing</p>
-                <button
-                  onClick={addSeason}
-                  className="flex items-center gap-1 font-sans text-xs text-[#C9A96E] hover:text-[#b8965d] border border-[#C9A96E]/30 rounded-lg px-2.5 py-1 hover:border-[#C9A96E]/60 transition-colors"
-                >
+                <button type="button" onClick={addSeason} className="flex items-center gap-1 font-sans text-xs text-[#C9A96E] border border-[#C9A96E]/30 rounded-lg px-2.5 py-1 hover:border-[#C9A96E]/60">
                   <Plus size={12} /> Add Season
                 </button>
               </div>
               <div className="space-y-2">
                 {form.seasons.map((s, i) => (
                   <div key={i} className="grid grid-cols-[1fr_1fr_1fr_80px_32px] gap-2 items-start">
-                    <input
-                      value={s.name}
-                      onChange={e => updateSeason(i, 'name', e.target.value)}
-                      placeholder="Season name"
-                      className={inp}
-                    />
-                    <input
-                      type="date"
-                      value={s.from}
-                      onChange={e => updateSeason(i, 'from', e.target.value)}
-                      className={inp}
-                    />
-                    <input
-                      type="date"
-                      value={s.to}
-                      onChange={e => updateSeason(i, 'to', e.target.value)}
-                      className={inp}
-                    />
-                    <input
-                      type="number"
-                      value={s.price}
-                      onChange={e => updateSeason(i, 'price', e.target.value)}
-                      placeholder="R/night"
-                      className={inp}
-                    />
-                    <button
-                      onClick={() => removeSeason(i)}
-                      className="h-[34px] flex items-center justify-center text-black/30 hover:text-red-400 transition-colors"
-                    >
+                    <input value={s.name} onChange={e => updateSeason(i, 'name', e.target.value)} placeholder="Season name" className={inp} />
+                    <input type="date" value={s.from} onChange={e => updateSeason(i, 'from', e.target.value)} className={inp} />
+                    <input type="date" value={s.to} onChange={e => updateSeason(i, 'to', e.target.value)} className={inp} />
+                    <input type="number" value={s.price} onChange={e => updateSeason(i, 'price', e.target.value)} placeholder="R/night" className={inp} />
+                    <button type="button" onClick={() => removeSeason(i)} className="h-[34px] flex items-center justify-center text-black/30 hover:text-red-400">
                       <Trash2 size={14} />
                     </button>
                   </div>
@@ -320,42 +334,16 @@ export default function EditRoomPage() {
           </>
         )}
 
-        {step === 2 && (
-          <div>
-            {form.photos.length > 0 && (
-              <div className="mb-4">
-                <p className="font-sans text-sm font-medium text-black/70 mb-3">Current Photos</p>
-                <div className="grid grid-cols-3 gap-3">
-                  {form.photos.map((photo, i) => (
-                    <div key={i} className="relative aspect-video rounded-lg bg-black/5 border border-black/8 flex items-center justify-center group">
-                      <span className="font-sans text-xs text-black/40">{photo}</span>
-                      <button
-                        onClick={() => removePhoto(i)}
-                        className="absolute top-1.5 right-1.5 w-5 h-5 rounded-full bg-black/60 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-500"
-                      >
-                        <X size={10} />
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-            <div className="border-2 border-dashed border-black/10 rounded-lg p-8 text-center">
-              <p className="font-sans text-sm text-black/40 mb-1">Drag & drop to add more photos, or click to browse</p>
-              <p className="font-sans text-xs text-black/30 mb-3">JPG, PNG, WebP · max 10 MB</p>
-              <button className="font-sans text-xs px-3 py-1.5 border border-[#C9A96E]/40 text-[#C9A96E] rounded-lg hover:border-[#C9A96E] hover:bg-[#C9A96E]/5 transition-colors">
-                Add More
-              </button>
-            </div>
-          </div>
+        {step === 3 && (
+          <ImageList images={form.images} onChange={v => setField('images', v)} />
         )}
 
-        {step === 3 && (
+        {step === 4 && (
           <div className="space-y-3">
             <p className="font-sans text-sm text-black/60">Review your changes before saving.</p>
             <div className="rounded-lg bg-black/3 p-4 space-y-2">
               {([
-                ['Property', form.property],
+                ['Property', properties.find(p => p.id === form.propertyId)?.name ?? ''],
                 ['Room Type', form.name],
                 ['Bed Config', form.bedConfig],
                 ['Max Occupancy', form.maxOccupancy ? `${form.maxOccupancy} guests` : ''],
@@ -363,7 +351,6 @@ export default function EditRoomPage() {
                 ['Room Size', form.sizeSqm ? `${form.sizeSqm} m²` : ''],
                 ['En-suite', form.enSuite ? 'Yes' : 'No'],
                 ['Base Price', form.basePrice ? `R${form.basePrice}/night` : ''],
-                ['Weekend Surcharge', form.weekendSurcharge && form.weekendSurcharge !== '0' ? `${form.weekendSurcharge}%` : 'None'],
                 ['Min Nights', form.minNights],
                 ['Cleaning Fee', form.cleaningFee ? `R${form.cleaningFee}` : 'None'],
               ] as [string, string][]).map(([k, v]) => v ? (
@@ -372,16 +359,22 @@ export default function EditRoomPage() {
                   <span className="text-black/80">{v}</span>
                 </div>
               ) : null)}
-              {form.amenities.length > 0 && (
+              {form.features.length > 0 && (
                 <div className="flex gap-3 font-sans text-sm">
-                  <span className="text-black/40 w-36 shrink-0">Amenities</span>
-                  <span className="text-black/80">{form.amenities.join(', ')}</span>
+                  <span className="text-black/40 w-36 shrink-0">Features</span>
+                  <span className="text-black/80">{form.features.join(', ')}</span>
                 </div>
               )}
-              {form.seasons.filter(s => s.name).length > 0 && (
+              {form.inclusions.length > 0 && (
                 <div className="flex gap-3 font-sans text-sm">
-                  <span className="text-black/40 w-36 shrink-0">Seasonal Pricing</span>
-                  <span className="text-black/80">{form.seasons.filter(s => s.name).map(s => `${s.name} (R${s.price})`).join(', ')}</span>
+                  <span className="text-black/40 w-36 shrink-0">Inclusions</span>
+                  <span className="text-black/80">{form.inclusions.join(', ')}</span>
+                </div>
+              )}
+              {form.images.length > 0 && (
+                <div className="flex gap-3 font-sans text-sm">
+                  <span className="text-black/40 w-36 shrink-0">Images</span>
+                  <span className="text-black/80">{form.images.length} photo{form.images.length !== 1 ? 's' : ''}</span>
                 </div>
               )}
             </div>
@@ -407,10 +400,11 @@ export default function EditRoomPage() {
           </button>
         ) : (
           <button
-            onClick={() => router.push('/supplier/rooms')}
-            className="font-sans text-sm px-5 py-2 bg-black text-white rounded-lg hover:bg-black/80 transition-colors"
+            onClick={handleSave}
+            disabled={saving || !form.name}
+            className="font-sans text-sm px-5 py-2 bg-black text-white rounded-lg hover:bg-black/80 transition-colors disabled:opacity-50"
           >
-            Save Changes
+            {saving ? 'Saving…' : 'Save Changes'}
           </button>
         )}
       </div>
