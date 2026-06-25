@@ -6,7 +6,7 @@ import { useSupplier } from '@/lib/supplier-context'
 import { getThreadsBySupplier, sendMessage, type MessageThread } from '@/lib/messages'
 
 export default function MessagesPage() {
-  const { supplier } = useSupplier()
+  const { fullName } = useSupplier()
   const [threads, setThreads] = useState<MessageThread[]>([])
   const [selected, setSelected] = useState<MessageThread | null>(null)
   const [reply, setReply] = useState('')
@@ -14,7 +14,7 @@ export default function MessagesPage() {
   const [loading, setLoading] = useState(true)
   const bottomRef = useRef<HTMLDivElement>(null)
 
-  const supplierName = supplier?.businessName || supplier?.name || ''
+  const supplierName = fullName
 
   useEffect(() => {
     if (!supplierName) return
