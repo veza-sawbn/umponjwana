@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { MessageSquare, Send } from 'lucide-react'
 import { useSupplier } from '@/lib/supplier-context'
+import { supabase } from '@/lib/auth'
 import { getThreadsBySupplier, sendMessage, type MessageThread } from '@/lib/messages'
 
 export default function MessagesPage() {
@@ -12,24 +13,28 @@ export default function MessagesPage() {
   const [reply, setReply] = useState('')
   const [sending, setSending] = useState(false)
   const [loading, setLoading] = useState(true)
+  const [supplierId, setSupplierId] = useState('')
+  const [supplierName, setSupplierName] = useState('')
   const bottomRef = useRef<HTMLDivElement>(null)
 
-  const supplierName = fullName
-
   useEffect(() => {
-    if (!supplierName) return
-    getThreadsBySupplier(supplierName).then(t => {
-      setThreads(t.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)))
-      setLoading(false)
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (!user) { setLoading(false); return }
+      setSupplierId(user.id)
+      setSupplierName(fullName || user.user_metadata?.full_name || user.email || '')
+      getThreadsBySupplier(user.id).then(t => {
+        setThreads(t.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)))
+        setLoading(false)
+      })
     })
-  }, [supplierName])
+  }, [fullName])
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [selected?.messages.length])
 
   async function handleReply() {
-    if (!selected || !reply.trim() || !supplierName) return
+    if (!selected || !reply.trim() || !supplierId) return
     setSending(true)
     const updated = await sendMessage(selected.id, 'supplier', supplierName, reply.trim())
     if (updated) {

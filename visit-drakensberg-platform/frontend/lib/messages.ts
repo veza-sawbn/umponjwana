@@ -15,6 +15,7 @@ export type MessageThread = {
   customerUserId: string
   customerName: string
   customerEmail: string
+  supplierId: string
   supplierName: string
   addonTitle: string
   messages: ThreadMessage[]
@@ -48,9 +49,9 @@ export async function getThreadsByBooking(bookingId: string): Promise<MessageThr
   return all.filter(t => t.bookingId === bookingId)
 }
 
-export async function getThreadsBySupplier(supplierName: string): Promise<MessageThread[]> {
+export async function getThreadsBySupplier(supplierId: string): Promise<MessageThread[]> {
   const all = await getThreads()
-  return all.filter(t => t.supplierName === supplierName)
+  return all.filter(t => t.supplierId === supplierId)
 }
 
 export async function getOrCreateThread(
@@ -59,12 +60,13 @@ export async function getOrCreateThread(
   customerUserId: string,
   customerName: string,
   customerEmail: string,
+  supplierId: string,
   supplierName: string,
   addonTitle: string,
 ): Promise<MessageThread> {
   const all = await getThreads()
   const existing = all.find(
-    t => t.bookingId === bookingId && t.supplierName === supplierName && t.addonTitle === addonTitle
+    t => t.bookingId === bookingId && t.supplierId === supplierId && t.addonTitle === addonTitle
   )
   if (existing) return existing
   const now = new Date().toISOString()
@@ -75,6 +77,7 @@ export async function getOrCreateThread(
     customerUserId,
     customerName,
     customerEmail,
+    supplierId,
     supplierName,
     addonTitle,
     messages: [],

@@ -208,6 +208,7 @@ function ExperienceSection({
       currentUser.id,
       currentUser.name,
       currentUser.email,
+      tour.supplierId,
       tour.supplierName,
       addon.title,
     )
