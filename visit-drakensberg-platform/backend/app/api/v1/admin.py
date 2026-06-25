@@ -116,6 +116,7 @@ async def admin_list_bookings(
 @router.put("/suppliers/{supplier_id}/verify")
 async def verify_supplier(
     supplier_id: UUID,
+    verified: bool = True,
     current_user: User = Depends(get_current_admin),
     db: AsyncSession = Depends(get_db),
 ):
@@ -124,7 +125,7 @@ async def verify_supplier(
     if not supplier:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Supplier not found")
 
-    supplier.is_verified = True
+    supplier.is_verified = verified
     await db.flush()
     await db.refresh(supplier)
     return SupplierResponse.model_validate(supplier)
