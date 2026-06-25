@@ -8,7 +8,8 @@ import Footer from '@/components/layout/Footer'
 import { ArrowLeft, Mountain, Clock, TrendingUp, Users, Star, CheckCircle, ChevronRight, X } from 'lucide-react'
 import { getTrails, Trail, DEFAULT_TRAILS } from '@/lib/trails'
 import UpcomingDepartures from '@/components/tours/UpcomingDepartures'
-import { getTourDates } from '@/lib/tour-dates'
+import { getDepartures, type Departure } from '@/lib/departures'
+import type { TourDate } from '@/components/tours/UpcomingDepartures'
 
 const DIFF_COLOR: Record<string, string> = { Easy: '#4A7251', Moderate: '#C9A96E', Hard: '#c0392b', Strenuous: '#c0392b' }
 const DIFF_BG: Record<string, string> = { Easy: '#4A725122', Moderate: '#C9A96E22', Hard: '#c0392b22', Strenuous: '#c0392b22' }
@@ -26,12 +27,31 @@ export default function HikeDetailPage() {
   const [trail, setTrail] = useState<Trail | null>(null)
   const [allTrails, setAllTrails] = useState<Trail[]>([])
   const [lightboxImg, setLightboxImg] = useState<string | null>(null)
+  const [departures, setDepartures] = useState<TourDate[]>([])
 
   useEffect(() => {
     getTrails().then(trails => {
       setAllTrails(trails)
       const found = trails.find(t => t.id === id)
       setTrail(found || trails[0])
+    })
+    getDepartures().then(all => {
+      const today = new Date().toISOString().slice(0, 10)
+      const tourDates: TourDate[] = all
+        .filter(d => d.trailId === id && d.date >= today && d.status !== 'full')
+        .sort((a, b) => a.date.localeCompare(b.date))
+        .map(d => ({
+          id: d.id,
+          date: d.date,
+          type: 'guide' as const,
+          operator: d.tour,
+          guide: d.guide || undefined,
+          spots_total: d.maxSeats,
+          spots_remaining: d.maxSeats - d.bookedSeats,
+          price_per_person: d.pricePerPerson,
+          duration: `${d.maxSeats} max group`,
+        }))
+      setDepartures(tourDates)
     })
   }, [id])
 
@@ -119,8 +139,8 @@ export default function HikeDetailPage() {
 
             {/* Upcoming departures */}
             <UpcomingDepartures
-              dates={getTourDates(id)}
-              context="Guided departures, packages and experiences on this trail"
+              dates={departures}
+              context="Guided departures and experiences on this trail"
             />
 
             {/* Multi-day breakdown */}

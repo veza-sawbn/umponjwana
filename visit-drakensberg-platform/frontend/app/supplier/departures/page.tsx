@@ -4,8 +4,7 @@ import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { CalendarDays, Plus, Users, Trash2, ChevronLeft, X } from 'lucide-react'
 import { getTours, type Tour } from '@/lib/tours'
-
-interface Departure { id: string; tour: string; tourId: string; date: string; guide: string; maxSeats: number; bookedSeats: number; status: string }
+import { getDepartures, addDeparture, deleteDeparture, type Departure } from '@/lib/departures'
 
 const STATUS: Record<string, string> = {
   confirmed: 'bg-emerald-100 text-emerald-700',
@@ -20,22 +19,53 @@ function DeparturesInner() {
   const [tours, setTours] = useState<Tour[]>([])
   const [rows, setRows] = useState<Departure[]>([])
   const [adding, setAdding] = useState(false)
-  const [form, setForm] = useState({ tour: '', tourId: '', date: '', guide: '', maxSeats: '10' })
+  const [saving, setSaving] = useState(false)
+  const [form, setForm] = useState({ tourId: '', date: '', guide: '', maxSeats: '10' })
 
   useEffect(() => {
     getTours().then(all => {
       const active = all.filter(t => t.status === 'active')
       setTours(active)
-      // Pre-select tour when coming from tours page
       if (tourFilter) {
         const t = active.find(x => x.id === tourFilter)
-        if (t) setForm(f => ({ ...f, tourId: t.id, tour: t.name }))
+        if (t) setForm(f => ({ ...f, tourId: t.id }))
       }
     })
+    getDepartures().then(setRows)
   }, [tourFilter])
 
   const activeTour = tourFilter ? tours.find(t => t.id === tourFilter) : null
   const filtered = activeTour ? rows.filter(r => r.tourId === activeTour.id) : rows
+
+  async function handleAdd() {
+    if (!form.tourId || !form.date) return
+    const tour = tours.find(t => t.id === form.tourId)
+    if (!tour) return
+    setSaving(true)
+    try {
+      const dep = await addDeparture({
+        tourId: tour.id,
+        trailId: tour.trailId,
+        tour: tour.name,
+        date: form.date,
+        guide: form.guide,
+        maxSeats: +form.maxSeats,
+        bookedSeats: 0,
+        status: 'open',
+        pricePerPerson: tour.pricePerPerson,
+      })
+      setRows(r => [...r, dep])
+      setAdding(false)
+      setForm({ tourId: tourFilter ? form.tourId : '', date: '', guide: '', maxSeats: '10' })
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  async function handleDelete(id: string) {
+    await deleteDeparture(id)
+    setRows(rs => rs.filter(x => x.id !== id))
+  }
 
   return (
     <div className="p-8 space-y-6">
@@ -71,10 +101,7 @@ function DeparturesInner() {
               <label className="font-sans text-sm font-medium text-black/70">Tour</label>
               <select
                 value={form.tourId}
-                onChange={e => {
-                  const t = tours.find(x => x.id === e.target.value)
-                  setForm(f => ({ ...f, tourId: e.target.value, tour: t?.name ?? '' }))
-                }}
+                onChange={e => setForm(f => ({ ...f, tourId: e.target.value }))}
                 className={inp}
               >
                 <option value="">Select tour…</option>
@@ -100,15 +127,11 @@ function DeparturesInner() {
           </div>
           <div className="flex gap-3">
             <button
-              onClick={() => {
-                if (form.tour && form.date) {
-                  setRows(r => [...r, { id: Date.now().toString(), tourId: form.tourId, tour: form.tour, date: form.date, guide: form.guide, maxSeats: +form.maxSeats, bookedSeats: 0, status: 'open' }])
-                  setAdding(false)
-                }
-              }}
-              className="bg-[#C9A96E] text-white font-sans text-sm px-4 py-2 rounded-lg"
+              onClick={handleAdd}
+              disabled={saving || !form.tourId || !form.date}
+              className="bg-[#C9A96E] text-white font-sans text-sm px-4 py-2 rounded-lg disabled:opacity-50"
             >
-              Add Departure
+              {saving ? 'Saving…' : 'Add Departure'}
             </button>
             <button onClick={() => setAdding(false)} className="font-sans text-sm px-4 py-2 border border-black/10 rounded-lg text-black/50">Cancel</button>
           </div>
@@ -140,7 +163,7 @@ function DeparturesInner() {
                   <span className={`font-sans text-xs px-2 py-0.5 rounded-full capitalize ${STATUS[r.status]}`}>{r.status}</span>
                 </td>
                 <td className="px-4 py-3">
-                  <button onClick={() => setRows(rs => rs.filter(x => x.id !== r.id))} className="text-red-400 hover:text-red-600">
+                  <button onClick={() => handleDelete(r.id)} className="text-red-400 hover:text-red-600">
                     <Trash2 size={14} />
                   </button>
                 </td>
