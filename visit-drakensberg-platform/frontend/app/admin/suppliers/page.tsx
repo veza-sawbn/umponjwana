@@ -2,15 +2,14 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { Search, CheckCircle, XCircle, RefreshCw } from 'lucide-react'
-import { supabase } from '@/lib/auth'
+import { admin } from '@/lib/api'
 
 type Supplier = {
   id: string
-  full_name?: string | null
-  email?: string | null
-  bio?: string | null
+  business_name: string
+  description: string
   website?: string | null
-  is_approved: boolean
+  is_verified: boolean
   created_at: string
 }
 
@@ -20,7 +19,7 @@ const STATUS_STYLE: Record<string, string> = {
 }
 
 function supplierStatus(supplier: Supplier) {
-  return supplier.is_approved ? 'approved' : 'pending'
+  return supplier.is_verified ? 'approved' : 'pending'
 }
 
 export default function AdminSuppliersPage() {
@@ -34,16 +33,10 @@ export default function AdminSuppliersPage() {
     setLoading(true)
     setError('')
     try {
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('id, full_name, email, bio, is_approved, created_at')
-        .eq('role', 'supplier')
-        .order('created_at', { ascending: false })
-        .limit(200)
-      if (error) throw error
-      setSuppliers(data || [])
+      const data = await admin.getSuppliers({ limit: 200 })
+      setSuppliers(data.items || [])
     } catch {
-      setError('Could not load suppliers from Supabase.')
+      setError('Could not load suppliers from the admin API.')
     } finally {
       setLoading(false)
     }
@@ -53,7 +46,7 @@ export default function AdminSuppliersPage() {
 
   const filtered = useMemo(() => suppliers.filter(supplier => {
     const status = supplierStatus(supplier)
-    const searchable = `${supplier.full_name || ''} ${supplier.email || ''} ${supplier.bio || ''}`.toLowerCase()
+    const searchable = `${supplier.business_name} ${supplier.description} ${supplier.website || ''}`.toLowerCase()
     const matchSearch = searchable.includes(search.toLowerCase())
     const matchFilter = filter === 'all' || status === filter
     return matchSearch && matchFilter
@@ -61,13 +54,12 @@ export default function AdminSuppliersPage() {
 
   const counts = {
     all: suppliers.length,
-    pending: suppliers.filter(s => !s.is_approved).length,
-    approved: suppliers.filter(s => s.is_approved).length,
+    pending: suppliers.filter(s => !s.is_verified).length,
+    approved: suppliers.filter(s => s.is_verified).length,
   }
 
   async function setVerified(id: string, verified: boolean) {
-    const { error } = await supabase.from('profiles').update({ is_approved: verified }).eq('id', id)
-    if (error) setError(error.message)
+    await admin.verifySupplier(id, verified)
     await loadSuppliers()
   }
 
@@ -77,7 +69,7 @@ export default function AdminSuppliersPage() {
         <div>
           <p className="font-sans text-[10px] tracking-[0.14em] uppercase text-gray-400 mb-1">Admin Console</p>
           <h1 className="font-display italic text-3xl text-[#000000]">Suppliers</h1>
-          <p className="font-sans text-sm text-gray-500 mt-1">Live supplier profiles from Supabase.</p>
+          <p className="font-sans text-sm text-gray-500 mt-1">Live supplier records from the platform API.</p>
         </div>
         <button
           onClick={loadSuppliers}
@@ -108,7 +100,7 @@ export default function AdminSuppliersPage() {
         <input
           value={search}
           onChange={e => setSearch(e.target.value)}
-          placeholder="Search by name, email, or bio…"
+          placeholder="Search by business, description, or website…"
           className="flex-1 font-sans text-sm focus:outline-none"
         />
       </div>
@@ -117,7 +109,7 @@ export default function AdminSuppliersPage() {
         <table className="w-full">
           <thead>
             <tr className="border-b border-gray-100">
-              {['Supplier', 'Email', 'Bio', 'Status', 'Joined', 'Actions'].map(h => (
+              {['Business', 'Description', 'Website', 'Status', 'Joined', 'Actions'].map(h => (
                 <th key={h} className="text-left px-5 py-3 font-sans text-[10px] tracking-[0.12em] uppercase text-gray-400">{h}</th>
               ))}
             </tr>
@@ -130,16 +122,20 @@ export default function AdminSuppliersPage() {
                   <td className="px-5 py-4">
                     <div className="flex items-center gap-3">
                       <div className="w-8 h-8 bg-[#2d6a4f]/10 flex items-center justify-center font-display italic text-[#2d6a4f] text-sm shrink-0">
-                        {(supplier.full_name || supplier.email || 'S')[0]}
+                        {supplier.business_name[0]}
                       </div>
-                      <p className="font-sans text-sm font-medium">{supplier.full_name || 'Supplier'}</p>
+                      <p className="font-sans text-sm font-medium">{supplier.business_name}</p>
                     </div>
                   </td>
                   <td className="px-5 py-4 max-w-sm">
-                    <p className="font-sans text-sm text-gray-600 line-clamp-2">{supplier.email || 'No email'}</p>
+                    <p className="font-sans text-sm text-gray-600 line-clamp-2">{supplier.description}</p>
                   </td>
                   <td className="px-5 py-4">
-                    <p className="font-sans text-sm text-gray-600 line-clamp-2">{supplier.bio || 'No bio provided'}</p>
+                    {supplier.website ? (
+                      <a href={supplier.website} className="font-sans text-xs text-[#2d6a4f] hover:underline" target="_blank" rel="noreferrer">
+                        {supplier.website}
+                      </a>
+                    ) : <span className="font-sans text-xs text-gray-300">Not provided</span>}
                   </td>
                   <td className="px-5 py-4">
                     <span className={`font-sans text-[10px] tracking-[0.1em] uppercase px-2.5 py-1 ${STATUS_STYLE[status]}`}>{status}</span>
@@ -147,7 +143,7 @@ export default function AdminSuppliersPage() {
                   <td className="px-5 py-4 font-sans text-sm text-gray-400">{new Date(supplier.created_at).toLocaleDateString()}</td>
                   <td className="px-5 py-4">
                     <div className="flex items-center gap-1">
-                      {!supplier.is_approved ? (
+                      {!supplier.is_verified ? (
                         <>
                           <button
                             onClick={() => setVerified(supplier.id, true)}
