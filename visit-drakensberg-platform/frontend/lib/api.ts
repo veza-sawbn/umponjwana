@@ -7,7 +7,7 @@ import { supabase } from './auth'
 const baseURL =
   typeof window !== 'undefined'
     ? '/api/backend'
-    : (process.env.NEXT_PUBLIC_API_URL || 'https://visit-drakensberg.onrender.com').replace(/\/+$/, '')
+    : (process.env.NEXT_PUBLIC_API_URL || process.env.BACKEND_URL || 'https://drakensberg-backend.onrender.com').replace(/\/+$/, '')
 
 const api = axios.create({
   baseURL,
@@ -24,12 +24,7 @@ api.interceptors.request.use(async (config) => {
 
 api.interceptors.response.use(
   (res) => res,
-  (error) => {
-    if (error.response?.status === 401 && typeof window !== 'undefined') {
-      window.location.href = '/auth/login'
-    }
-    return Promise.reject(error)
-  }
+  (error) => Promise.reject(error)
 )
 
 export const listings = {
@@ -86,9 +81,23 @@ export const admin = {
   getSuppliers: (params?: Record<string, unknown>) => api.get('/api/v1/admin/suppliers', { params }).then(r => r.data),
   getListings: (params?: Record<string, unknown>) => api.get('/api/v1/admin/listings', { params }).then(r => r.data),
   getBookings: (params?: Record<string, unknown>) => api.get('/api/v1/admin/bookings', { params }).then(r => r.data),
-  verifySupplier: (id: string) => api.put(`/api/v1/admin/suppliers/${id}/verify`).then(r => r.data),
+  verifySupplier: (id: string, verified = true) => api.put(`/api/v1/admin/suppliers/${id}/verify`, null, { params: { verified } }).then(r => r.data),
   featureListing: (id: string) => api.put(`/api/v1/admin/listings/${id}/feature`).then(r => r.data),
   deleteListing: (id: string) => api.delete(`/api/v1/admin/listings/${id}`).then(r => r.data),
+  getRegions: () => api.get('/api/v1/admin/content/regions').then(r => r.data),
+  createRegion: (data: unknown) => api.post('/api/v1/admin/content/regions', data).then(r => r.data),
+  updateRegion: (id: string, data: unknown) => api.put(`/api/v1/admin/content/regions/${id}`, data).then(r => r.data),
+  deleteRegion: (id: string) => api.delete(`/api/v1/admin/content/regions/${id}`).then(r => r.data),
+  getMedia: () => api.get('/api/v1/admin/content/media').then(r => r.data),
+  createMedia: (data: unknown) => api.post('/api/v1/admin/content/media', data).then(r => r.data),
+  uploadMedia: (file: File) => {
+    const formData = new FormData()
+    formData.append('file', file)
+    return api.post('/api/v1/admin/content/media/upload', formData, { headers: { 'Content-Type': 'multipart/form-data' } }).then(r => r.data)
+  },
+  deleteMedia: (id: string) => api.delete(`/api/v1/admin/content/media/${id}`).then(r => r.data),
+  getGuides: (params?: Record<string, unknown>) => api.get('/api/v1/guides/admin', { params }).then(r => r.data),
+  verifyGuide: (id: string, verified: boolean) => api.put(`/api/v1/guides/${id}/verify`, null, { params: { verified } }).then(r => r.data),
 }
 
 export default api

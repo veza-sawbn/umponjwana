@@ -1,19 +1,20 @@
 import { NextRequest, NextResponse } from 'next/server'
 
-// Proxy all /api/backend/* requests to the Render backend, bypassing browser CORS.
-// Usage: fetch('/api/backend/listings/1/availability') instead of fetching the Render URL directly.
-
-// RENDER_API_URL should be the bare origin, e.g. https://visit-drakensberg.onrender.com
-// The full path (including /api/v1/...) is forwarded from the incoming request.
-const RENDER_BASE = (process.env.RENDER_API_URL || 'https://visit-drakensberg.onrender.com').replace(/\/+$/, '')
+// Proxy all /api/backend/* requests to the backend, bypassing browser CORS.
+// Usage: fetch('/api/backend/api/v1/listings') and the full path is forwarded.
+const BACKEND_BASE = (
+  process.env.RENDER_API_URL ||
+  process.env.NEXT_PUBLIC_API_URL ||
+  process.env.BACKEND_URL ||
+  'https://drakensberg-backend.onrender.com'
+).replace(/\/+$/, '')
 
 async function handler(req: NextRequest, { params }: { params: { path: string[] } }) {
   const path = params.path.join('/')
   const search = req.nextUrl.search
-  const upstreamUrl = `${RENDER_BASE}/${path}${search}`
+  const upstreamUrl = `${BACKEND_BASE}/${path}${search}`
 
   const headers = new Headers()
-  // Forward content-type and auth headers if present.
   const contentType = req.headers.get('content-type')
   if (contentType) headers.set('content-type', contentType)
   const auth = req.headers.get('authorization')
@@ -29,8 +30,9 @@ async function handler(req: NextRequest, { params }: { params: { path: string[] 
       method: req.method,
       headers,
       body,
-      // Render's free tier can be slow to cold-start; allow up to 10 s.
-      signal: AbortSignal.timeout(10_000),
+      // Render's free tier can cold-start slowly; admin pages make several
+      // concurrent requests, so keep the proxy patient instead of surfacing 502s.
+      signal: AbortSignal.timeout(45_000),
     })
 
     const responseHeaders = new Headers()
@@ -43,7 +45,11 @@ async function handler(req: NextRequest, { params }: { params: { path: string[] 
     })
   } catch (err) {
     return NextResponse.json(
-      { error: 'Upstream request failed', detail: String(err) },
+      {
+        error: 'Upstream request failed',
+        upstream: upstreamUrl,
+        detail: err instanceof Error ? err.message : String(err),
+      },
       { status: 502 }
     )
   }
