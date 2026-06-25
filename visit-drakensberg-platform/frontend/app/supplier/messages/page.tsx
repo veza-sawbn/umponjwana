@@ -1,80 +1,179 @@
 'use client'
-import { useState } from 'react'
-import { MessageSquare } from 'lucide-react'
 
-interface Message { id: string; guest: string; listing: string; preview: string; date: string; read: boolean }
-
-const INIT: Message[] = [
-  { id: 'm1', guest: 'Sarah van der Merwe', listing: 'Cathedral Peak Mountain Lodge', preview: 'Hi, do you have braai facilities for our group of 6?',             date: '2025-06-18', read: false },
-  { id: 'm2', guest: 'Tom Kruger',           listing: 'Berg Valley Guesthouse',        preview: 'Is the guesthouse dog-friendly? We have a small labrador.',        date: '2025-06-17', read: false },
-  { id: 'm3', guest: 'Amira Hassan',         listing: 'Cathedral Peak Mountain Lodge', preview: 'Can we arrange early check-in at 10am? Our trail starts at noon.', date: '2025-06-16', read: true  },
-]
+import { useState, useEffect, useRef } from 'react'
+import { MessageSquare, Send } from 'lucide-react'
+import { useSupplier } from '@/lib/supplier-context'
+import { getThreadsBySupplier, sendMessage, type MessageThread } from '@/lib/messages'
 
 export default function MessagesPage() {
-  const [messages, setMessages] = useState(INIT)
-  const [selected, setSelected] = useState<Message | null>(null)
+  const { supplier } = useSupplier()
+  const [threads, setThreads] = useState<MessageThread[]>([])
+  const [selected, setSelected] = useState<MessageThread | null>(null)
+  const [reply, setReply] = useState('')
+  const [sending, setSending] = useState(false)
+  const [loading, setLoading] = useState(true)
+  const bottomRef = useRef<HTMLDivElement>(null)
 
-  function open(m: Message) {
-    setSelected(m)
-    setMessages(ms => ms.map(x => x.id === m.id ? { ...x, read: true } : x))
+  const supplierName = supplier?.businessName || supplier?.name || ''
+
+  useEffect(() => {
+    if (!supplierName) return
+    getThreadsBySupplier(supplierName).then(t => {
+      setThreads(t.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)))
+      setLoading(false)
+    })
+  }, [supplierName])
+
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
+  }, [selected?.messages.length])
+
+  async function handleReply() {
+    if (!selected || !reply.trim() || !supplierName) return
+    setSending(true)
+    const updated = await sendMessage(selected.id, 'supplier', supplierName, reply.trim())
+    if (updated) {
+      setSelected(updated)
+      setThreads(prev => prev.map(t => t.id === updated.id ? updated : t))
+    }
+    setReply('')
+    setSending(false)
+  }
+
+  function unread(thread: MessageThread) {
+    // threads with last message from visitor = unread for supplier
+    const last = thread.messages[thread.messages.length - 1]
+    return last?.from === 'visitor'
   }
 
   return (
-    <div className="p-8 space-y-6">
+    <div className="p-4 sm:p-8 space-y-4 sm:space-y-6 h-full">
       <div className="flex items-center gap-3">
         <MessageSquare size={20} className="text-[#C9A96E]" />
         <h1 className="font-display italic text-2xl text-black/90">Messages</h1>
-        {messages.filter(m => !m.read).length > 0 && (
-          <span className="font-sans text-xs bg-[#C9A96E] text-white px-2 py-0.5 rounded-full">{messages.filter(m => !m.read).length} new</span>
+        {threads.filter(unread).length > 0 && (
+          <span className="font-sans text-xs bg-[#C9A96E] text-white px-2 py-0.5">
+            {threads.filter(unread).length} new
+          </span>
         )}
       </div>
 
-      <div className="grid grid-cols-5 gap-4 h-[calc(100vh-200px)]">
-        {/* List */}
-        <div className="col-span-2 bg-white rounded-xl border border-black/8 overflow-y-auto">
-          {messages.map((m, i) => (
-            <button
-              key={m.id}
-              onClick={() => open(m)}
-              className={`w-full text-left px-4 py-4 transition-colors ${selected?.id === m.id ? 'bg-[#C9A96E]/8' : 'hover:bg-black/3'} ${i < messages.length - 1 ? 'border-b border-black/6' : ''}`}
-            >
-              <div className="flex items-center justify-between mb-1">
-                <p className={`font-sans text-sm ${m.read ? 'text-black/60' : 'font-semibold text-black/90'}`}>{m.guest}</p>
-                <p className="font-sans text-[10px] text-black/30">{m.date}</p>
-              </div>
-              <p className="font-sans text-xs text-black/40 truncate">{m.preview}</p>
-              {!m.read && <div className="w-1.5 h-1.5 rounded-full bg-[#C9A96E] mt-1" />}
-            </button>
-          ))}
+      {loading ? (
+        <div className="flex items-center justify-center py-20">
+          <div className="w-6 h-6 border-2 border-[#C9A96E] border-t-transparent rounded-full animate-spin" />
         </div>
+      ) : threads.length === 0 ? (
+        <div className="bg-white border border-black/8 p-12 text-center">
+          <MessageSquare size={32} className="text-gray-200 mx-auto mb-3" />
+          <p className="font-display italic text-xl text-black/20 mb-2">No messages yet</p>
+          <p className="font-sans text-sm text-black/30">Customer messages will appear here once visitors contact you from their itinerary.</p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 lg:grid-cols-5 gap-4 lg:h-[calc(100vh-200px)]">
+          {/* Thread list */}
+          <div className="lg:col-span-2 bg-white border border-black/8 overflow-y-auto">
+            {threads.map((t, i) => {
+              const lastMsg = t.messages[t.messages.length - 1]
+              const isUnread = unread(t)
+              return (
+                <button
+                  key={t.id}
+                  onClick={() => setSelected(t)}
+                  className={`w-full text-left px-4 py-4 transition-colors ${selected?.id === t.id ? 'bg-[#C9A96E]/8 border-l-2 border-[#C9A96E]' : 'hover:bg-black/3'} ${i < threads.length - 1 ? 'border-b border-black/6' : ''}`}
+                >
+                  <div className="flex items-start justify-between gap-2 mb-1">
+                    <div className="flex items-center gap-2 min-w-0">
+                      {isUnread && <div className="w-2 h-2 rounded-full bg-[#C9A96E] shrink-0" />}
+                      <p className={`font-sans text-sm truncate ${isUnread ? 'font-semibold text-black/90' : 'text-black/60'}`}>
+                        {t.customerName}
+                      </p>
+                    </div>
+                    <p className="font-sans text-[10px] text-black/30 shrink-0">
+                      {new Date(t.updatedAt).toLocaleDateString('en-ZA', { day: 'numeric', month: 'short' })}
+                    </p>
+                  </div>
+                  <p className="font-sans text-xs text-[#C9A96E] truncate mb-1">{t.addonTitle}</p>
+                  {lastMsg && (
+                    <p className="font-sans text-xs text-black/40 truncate">
+                      {lastMsg.from === 'supplier' ? 'You: ' : ''}{lastMsg.body}
+                    </p>
+                  )}
+                  <p className="font-sans text-[10px] text-black/30 mt-1">Ref: {t.bookingRef}</p>
+                </button>
+              )
+            })}
+          </div>
 
-        {/* Detail */}
-        <div className="col-span-3 bg-white rounded-xl border border-black/8 flex flex-col">
-          {selected ? (
-            <>
-              <div className="px-6 py-4 border-b border-black/6">
-                <p className="font-sans font-semibold text-black/90">{selected.guest}</p>
-                <p className="font-sans text-xs text-black/40">{selected.listing} · {selected.date}</p>
-              </div>
-              <div className="flex-1 p-6">
-                <div className="bg-black/4 rounded-xl px-4 py-3 inline-block max-w-md">
-                  <p className="font-sans text-sm text-black/80">{selected.preview}</p>
+          {/* Thread detail */}
+          <div className="lg:col-span-3 bg-white border border-black/8 flex flex-col min-h-[400px] lg:min-h-0">
+            {selected ? (
+              <>
+                {/* Thread header */}
+                <div className="px-5 py-4 border-b border-black/6 shrink-0">
+                  <div className="flex items-start justify-between gap-2">
+                    <div>
+                      <p className="font-sans font-semibold text-black/90">{selected.customerName}</p>
+                      <p className="font-sans text-xs text-black/40">{selected.addonTitle} · Ref: {selected.bookingRef}</p>
+                    </div>
+                    <div className="text-right">
+                      <p className="font-sans text-xs text-black/40">{selected.customerEmail}</p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Messages */}
+                <div className="flex-1 overflow-y-auto p-5 space-y-3 bg-[#FAFAF9]">
+                  {selected.messages.length === 0 && (
+                    <p className="font-sans text-xs text-black/30 text-center pt-8">
+                      No messages yet — wait for the customer to start the conversation.
+                    </p>
+                  )}
+                  {selected.messages.map(m => (
+                    <div key={m.id} className={`flex ${m.from === 'supplier' ? 'justify-end' : 'justify-start'}`}>
+                      <div className={`max-w-[75%] px-4 py-2.5 ${m.from === 'supplier' ? 'bg-[#2d6a4f] text-white' : 'bg-white border border-black/8 text-black/80'}`}>
+                        <p className={`font-sans text-[10px] mb-1 ${m.from === 'supplier' ? 'text-white/60' : 'text-black/40'}`}>{m.senderName}</p>
+                        <p className="font-sans text-sm leading-relaxed">{m.body}</p>
+                        <p className={`font-sans text-[10px] mt-1 ${m.from === 'supplier' ? 'text-white/40' : 'text-black/30'}`}>
+                          {new Date(m.createdAt).toLocaleTimeString('en-ZA', { hour: '2-digit', minute: '2-digit' })}
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+                  <div ref={bottomRef} />
+                </div>
+
+                {/* Reply */}
+                <div className="px-5 py-4 border-t border-black/6 shrink-0">
+                  <div className="flex gap-3">
+                    <textarea
+                      value={reply}
+                      onChange={e => setReply(e.target.value)}
+                      onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleReply() } }}
+                      placeholder="Reply to customer… (Enter to send)"
+                      rows={2}
+                      className="flex-1 font-sans text-sm border border-black/10 px-3 py-2 outline-none focus:border-[#C9A96E]/50 resize-none"
+                    />
+                    <button
+                      onClick={handleReply}
+                      disabled={sending || !reply.trim()}
+                      className="shrink-0 flex items-center gap-1.5 bg-[#C9A96E] text-white px-4 font-sans text-sm hover:bg-[#b8935e] transition-colors disabled:opacity-40"
+                    >
+                      <Send size={14} />{sending ? '…' : 'Send'}
+                    </button>
+                  </div>
+                </div>
+              </>
+            ) : (
+              <div className="flex-1 flex items-center justify-center">
+                <div className="text-center">
+                  <MessageSquare size={24} className="text-black/15 mx-auto mb-2" />
+                  <p className="font-sans text-sm text-black/30">Select a conversation</p>
                 </div>
               </div>
-              <div className="px-6 py-4 border-t border-black/6">
-                <div className="flex gap-3">
-                  <input placeholder="Type a reply…" className="flex-1 font-sans text-sm border border-black/10 rounded-lg px-3 py-2 outline-none focus:border-[#C9A96E]/50" />
-                  <button className="bg-[#C9A96E] text-white font-sans text-sm px-4 py-2 rounded-lg hover:bg-[#b8965d]">Send</button>
-                </div>
-              </div>
-            </>
-          ) : (
-            <div className="flex-1 flex items-center justify-center">
-              <p className="font-sans text-sm text-black/30">Select a message to view</p>
-            </div>
-          )}
+            )}
+          </div>
         </div>
-      </div>
+      )}
     </div>
   )
 }
