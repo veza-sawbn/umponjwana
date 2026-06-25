@@ -7,6 +7,9 @@ import Navbar from '@/components/layout/Navbar'
 import Footer from '@/components/layout/Footer'
 import { ArrowLeft, ShieldCheck, Lock, CreditCard, Calendar, Users, MapPin, Bus } from 'lucide-react'
 import { useBooking } from '@/lib/booking-context'
+import { addBooking } from '@/lib/bookings'
+import { getDepartures, updateDepartureSeats } from '@/lib/departures'
+import { supabase } from '@/lib/auth'
 
 function formatCardNumber(val: string) {
   return val.replace(/\D/g, '').slice(0, 16).replace(/(.{4})/g, '$1 ').trim()
@@ -50,9 +53,52 @@ export default function CheckoutPage() {
     e.preventDefault()
     if (!agreed) return
     setLoading(true)
-    await new Promise(r => setTimeout(r, 1500))
-    booking.clearBooking()
-    router.push('/checkout/success')
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+
+      // Snapshot booking state before clearing
+      const snap = {
+        region: booking.region,
+        checkIn: booking.checkIn,
+        checkOut: booking.checkOut,
+        nights,
+        guests: booking.guests,
+        stay: booking.stay,
+        addons: [...booking.addons],
+        shuttle: booking.shuttle,
+      }
+
+      // Persist booking
+      const saved = await addBooking({
+        userId: user?.id ?? 'guest',
+        customerName: `${firstName} ${lastName}`.trim(),
+        customerEmail: email,
+        customerPhone: phone,
+        specialRequests,
+        ...snap,
+        subtotal,
+        serviceFee,
+        vat: tax,
+        total,
+        status: 'confirmed',
+      })
+
+      // Update departure seat counts in parallel
+      const allDeps = await getDepartures()
+      await Promise.all(
+        snap.addons.map(addon => {
+          const dep = allDeps.find(d => d.id === addon.id)
+          if (dep) return updateDepartureSeats(dep.id, dep.bookedSeats + addon.guests)
+          return Promise.resolve()
+        })
+      )
+
+      booking.clearBooking()
+      router.push(`/checkout/success?id=${saved.id}`)
+    } catch (err) {
+      console.error('Booking save failed:', err)
+      setLoading(false)
+    }
   }
 
   return (

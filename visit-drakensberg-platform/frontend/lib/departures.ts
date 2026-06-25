@@ -50,6 +50,14 @@ export async function addDeparture(dep: Omit<Departure, 'id' | 'createdAt'>): Pr
   return newDep
 }
 
+export async function updateDepartureSeats(id: string, bookedSeats: number): Promise<void> {
+  const all = await getDepartures()
+  const dep = all.find(d => d.id === id)
+  if (!dep) return
+  const status: Departure['status'] = bookedSeats >= dep.maxSeats ? 'full' : dep.status
+  await saveDepartures(all.map(d => d.id === id ? { ...d, bookedSeats, status } : d))
+}
+
 export async function deleteDeparture(id: string): Promise<void> {
   const all = await getDepartures()
   await saveDepartures(all.filter(d => d.id !== id))

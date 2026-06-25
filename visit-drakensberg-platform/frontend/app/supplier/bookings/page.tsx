@@ -1,32 +1,49 @@
 'use client'
-import { useState } from 'react'
-import { CalendarDays, Search } from 'lucide-react'
-import { useSupplier } from '@/lib/supplier-context'
 
-type Status = 'all' | 'confirmed' | 'pending' | 'completed' | 'cancelled'
+import { useState, useEffect } from 'react'
+import { CalendarDays, Search, Phone, Mail, Users, MessageSquare } from 'lucide-react'
+import { getBookings, type SavedBooking } from '@/lib/bookings'
+import { getDepartures } from '@/lib/departures'
 
-const MOCK = [
-  { id: 'BK001', guest: 'Sarah van der Merwe', item: 'Cathedral Peak Mountain Lodge', checkIn: '2025-07-15', checkOut: '2025-07-18', guests: 2, total: 8214, status: 'confirmed' },
-  { id: 'BK002', guest: 'James Fourie',         item: 'Berg Valley Guesthouse',        checkIn: '2025-06-22', checkOut: '2025-06-25', guests: 4, total: 12320, status: 'completed' },
-  { id: 'BK003', guest: 'Priya Naidoo',         item: 'Cathedral Peak Mountain Lodge', checkIn: '2025-07-10', checkOut: '2025-07-12', guests: 2, total: 2940,  status: 'pending' },
-  { id: 'BK004', guest: 'Lindiwe Dlamini',      item: 'Cathedral Peak Mountain Lodge', checkIn: '2025-08-01', checkOut: '2025-08-04', guests: 6, total: 18500, status: 'confirmed' },
-]
+type Status = 'all' | 'confirmed' | 'cancelled'
 
 const STATUS_CHIP: Record<string, string> = {
   confirmed: 'bg-emerald-100 text-emerald-700',
-  completed: 'bg-slate-100 text-slate-600',
-  pending:   'bg-amber-100 text-amber-700',
   cancelled: 'bg-red-100 text-red-600',
+}
+
+function fmt(d: string) {
+  if (!d) return '—'
+  return new Date(d).toLocaleDateString('en-ZA', { day: 'numeric', month: 'short', year: 'numeric' })
 }
 
 export default function BookingsPage() {
   const [filter, setFilter] = useState<Status>('all')
   const [search, setSearch] = useState('')
-  const { loading } = useSupplier()
+  const [bookings, setBookings] = useState<SavedBooking[]>([])
+  const [loading, setLoading] = useState(true)
+  const [expanded, setExpanded] = useState<string | null>(null)
 
-  const rows = MOCK.filter(b =>
+  useEffect(() => {
+    Promise.all([getBookings(), getDepartures()]).then(([allBookings, departures]) => {
+      // Show all bookings that include at least one addon (guided departure)
+      // In a multi-supplier setup this would be filtered by supplier's departure IDs
+      // For now show all bookings with addons or stays so supplier can see customer details
+      const relevant = allBookings.filter(b => b.addons.length > 0 || b.stay)
+      setBookings(relevant.sort((a, b) => b.createdAt.localeCompare(a.createdAt)))
+      setLoading(false)
+    })
+  }, [])
+
+  const filtered = bookings.filter(b =>
     (filter === 'all' || b.status === filter) &&
-    (b.guest.toLowerCase().includes(search.toLowerCase()) || b.item.toLowerCase().includes(search.toLowerCase()))
+    (
+      b.customerName.toLowerCase().includes(search.toLowerCase()) ||
+      b.customerEmail.toLowerCase().includes(search.toLowerCase()) ||
+      b.reference.toLowerCase().includes(search.toLowerCase()) ||
+      b.addons.some(a => a.title.toLowerCase().includes(search.toLowerCase())) ||
+      (b.stay?.title || '').toLowerCase().includes(search.toLowerCase())
+    )
   )
 
   return (
@@ -36,23 +53,22 @@ export default function BookingsPage() {
         <h1 className="font-display italic text-2xl text-black/90">Bookings</h1>
       </div>
 
-      {/* Filters */}
       <div className="flex flex-wrap gap-3">
         <div className="relative">
           <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-black/30" />
           <input
             value={search}
             onChange={e => setSearch(e.target.value)}
-            placeholder="Search guest or listing…"
-            className="pl-8 pr-4 py-2 font-sans text-sm border border-black/10 rounded-lg bg-white outline-none focus:border-[#C9A96E]/50 w-64"
+            placeholder="Search guest, ref, or experience…"
+            className="pl-8 pr-4 py-2 font-sans text-sm border border-black/10 bg-white outline-none focus:border-[#C9A96E]/50 w-72"
           />
         </div>
         <div className="flex gap-1.5">
-          {(['all', 'confirmed', 'pending', 'completed', 'cancelled'] as Status[]).map(s => (
+          {(['all', 'confirmed', 'cancelled'] as Status[]).map(s => (
             <button
               key={s}
               onClick={() => setFilter(s)}
-              className={`font-sans text-xs px-3 py-1.5 rounded-full capitalize transition-colors ${
+              className={`font-sans text-xs px-3 py-1.5 capitalize transition-colors ${
                 filter === s ? 'bg-[#C9A96E] text-white' : 'bg-white border border-black/10 text-black/60 hover:border-[#C9A96E]/40'
               }`}
             >
@@ -62,36 +78,125 @@ export default function BookingsPage() {
         </div>
       </div>
 
-      <div className="bg-white rounded-xl border border-black/8 overflow-hidden">
-        <table className="w-full">
-          <thead>
-            <tr className="border-b border-black/6">
-              {['ID', 'Guest', 'Listing', 'Check-in', 'Check-out', 'Guests', 'Total', 'Status'].map(h => (
-                <th key={h} className="px-4 py-3 text-left font-sans text-xs font-semibold text-black/40 uppercase tracking-wider">{h}</th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {rows.length === 0 && (
-              <tr><td colSpan={8} className="px-4 py-10 text-center font-sans text-sm text-black/30">No bookings found</td></tr>
-            )}
-            {rows.map((b, i) => (
-              <tr key={b.id} className={i < rows.length - 1 ? 'border-b border-black/5' : ''}>
-                <td className="px-4 py-3 font-sans text-xs text-black/40">{b.id}</td>
-                <td className="px-4 py-3 font-sans text-sm text-black/80">{b.guest}</td>
-                <td className="px-4 py-3 font-sans text-sm text-black/60 max-w-[160px] truncate">{b.item}</td>
-                <td className="px-4 py-3 font-sans text-sm text-black/60">{b.checkIn}</td>
-                <td className="px-4 py-3 font-sans text-sm text-black/60">{b.checkOut}</td>
-                <td className="px-4 py-3 font-sans text-sm text-black/60">{b.guests}</td>
-                <td className="px-4 py-3 font-sans text-sm text-black/80">R {b.total.toLocaleString()}</td>
-                <td className="px-4 py-3">
-                  <span className={`font-sans text-xs px-2 py-0.5 rounded-full capitalize ${STATUS_CHIP[b.status]}`}>{b.status}</span>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+      {loading ? (
+        <div className="flex items-center justify-center py-16">
+          <div className="w-6 h-6 border-2 border-[#C9A96E] border-t-transparent rounded-full animate-spin" />
+        </div>
+      ) : filtered.length === 0 ? (
+        <div className="bg-white border border-black/8 p-12 text-center">
+          <p className="font-display italic text-xl text-black/20 mb-2">No bookings found</p>
+          <p className="font-sans text-sm text-black/30">Bookings from customers will appear here once confirmed.</p>
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {filtered.map(b => (
+            <div key={b.id} className="bg-white border border-black/8 overflow-hidden">
+              {/* Summary row */}
+              <button
+                className="w-full text-left px-5 py-4 flex flex-wrap gap-4 items-center hover:bg-black/[0.02] transition-colors"
+                onClick={() => setExpanded(expanded === b.id ? null : b.id)}
+              >
+                <div className="min-w-[120px]">
+                  <p className="font-sans text-[10px] uppercase tracking-wider text-black/30 mb-0.5">Reference</p>
+                  <p className="font-display italic text-base text-[#2d6a4f]">{b.reference}</p>
+                </div>
+                <div className="flex-1 min-w-[160px]">
+                  <p className="font-sans text-[10px] uppercase tracking-wider text-black/30 mb-0.5">Customer</p>
+                  <p className="font-sans text-sm text-black/80 font-medium">{b.customerName}</p>
+                </div>
+                <div className="min-w-[140px]">
+                  <p className="font-sans text-[10px] uppercase tracking-wider text-black/30 mb-0.5">Experience</p>
+                  <p className="font-sans text-sm text-black/60 truncate max-w-[180px]">
+                    {b.addons.length > 0 ? b.addons[0].title : b.stay?.title || '—'}
+                    {b.addons.length > 1 ? ` +${b.addons.length - 1}` : ''}
+                  </p>
+                </div>
+                <div className="min-w-[100px]">
+                  <p className="font-sans text-[10px] uppercase tracking-wider text-black/30 mb-0.5">Date</p>
+                  <p className="font-sans text-sm text-black/60">{b.addons[0]?.date ? fmt(b.addons[0].date) : fmt(b.checkIn)}</p>
+                </div>
+                <div className="min-w-[60px] text-center">
+                  <p className="font-sans text-[10px] uppercase tracking-wider text-black/30 mb-0.5">Guests</p>
+                  <p className="font-sans text-sm text-black/60">{b.guests}</p>
+                </div>
+                <div className="min-w-[80px]">
+                  <p className="font-sans text-[10px] uppercase tracking-wider text-black/30 mb-0.5">Total</p>
+                  <p className="font-sans text-sm text-black/80 font-medium">R {b.total.toLocaleString()}</p>
+                </div>
+                <div>
+                  <span className={`font-sans text-xs px-2.5 py-1 capitalize ${STATUS_CHIP[b.status] || 'bg-gray-100 text-gray-500'}`}>{b.status}</span>
+                </div>
+              </button>
+
+              {/* Expanded customer details */}
+              {expanded === b.id && (
+                <div className="border-t border-black/6 px-5 py-5 bg-[#FAFAF9] grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div>
+                    <p className="font-sans text-[10px] uppercase tracking-wider text-black/30 mb-3">Customer Contact</p>
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-2 font-sans text-sm text-black/70">
+                        <Mail size={13} className="text-[#C9A96E] shrink-0" />
+                        <a href={`mailto:${b.customerEmail}`} className="hover:underline">{b.customerEmail}</a>
+                      </div>
+                      {b.customerPhone && (
+                        <div className="flex items-center gap-2 font-sans text-sm text-black/70">
+                          <Phone size={13} className="text-[#C9A96E] shrink-0" />
+                          <a href={`tel:${b.customerPhone}`} className="hover:underline">{b.customerPhone}</a>
+                        </div>
+                      )}
+                      <div className="flex items-center gap-2 font-sans text-sm text-black/70">
+                        <Users size={13} className="text-[#C9A96E] shrink-0" />
+                        {b.guests} guest{b.guests !== 1 ? 's' : ''}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div>
+                    <p className="font-sans text-[10px] uppercase tracking-wider text-black/30 mb-3">Booking Details</p>
+                    <div className="space-y-1.5 font-sans text-sm text-black/60">
+                      {b.addons.map(a => (
+                        <div key={a.id} className="flex justify-between">
+                          <span>{a.title} {a.date ? `— ${fmt(a.date)}` : ''} × {a.guests}</span>
+                          <span className="font-medium text-black/70">R {(a.price_per_person * a.guests).toLocaleString()}</span>
+                        </div>
+                      ))}
+                      {b.stay && (
+                        <div className="flex justify-between">
+                          <span>{b.stay.title} ({b.nights}n)</span>
+                          <span className="font-medium text-black/70">R {b.stay.price_per_night ? (b.stay.price_per_night * b.nights).toLocaleString() : '—'}</span>
+                        </div>
+                      )}
+                      {b.shuttle && (
+                        <div className="flex justify-between">
+                          <span>{b.shuttle.label}</span>
+                          <span className="font-medium text-black/70">R {b.shuttle.price.toLocaleString()}</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {b.specialRequests && (
+                    <div className="md:col-span-2">
+                      <div className="flex items-start gap-2 bg-[#C9A96E]/10 border border-[#C9A96E]/20 p-3">
+                        <MessageSquare size={13} className="text-[#C9A96E] shrink-0 mt-0.5" />
+                        <div>
+                          <p className="font-sans text-[10px] uppercase tracking-wider text-[#8B6914] mb-1">Special Requests</p>
+                          <p className="font-sans text-sm text-black/70">{b.specialRequests}</p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="md:col-span-2 pt-2 border-t border-black/6 flex justify-between items-center">
+                    <p className="font-sans text-xs text-black/30">Booked {new Date(b.createdAt).toLocaleDateString('en-ZA', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</p>
+                    <p className="font-display italic text-lg text-[#2d6a4f]">Total: R {b.total.toLocaleString()}</p>
+                  </div>
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   )
 }
