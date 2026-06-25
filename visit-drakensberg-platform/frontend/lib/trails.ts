@@ -168,7 +168,7 @@ export async function getTrails(): Promise<Trail[]> {
       .from('site_content')
       .select('value')
       .eq('key', 'trails')
-      .single()
+      .maybeSingle()
     if (data?.value?.items && Array.isArray(data.value.items)) {
       return data.value.items as Trail[]
     }

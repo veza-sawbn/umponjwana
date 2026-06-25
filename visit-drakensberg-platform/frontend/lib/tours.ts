@@ -29,7 +29,7 @@ export async function getTours(): Promise<Tour[]> {
       .from('site_content')
       .select('value')
       .eq('key', 'tours')
-      .single()
+      .maybeSingle()
     if (data?.value?.items && Array.isArray(data.value.items)) {
       return data.value.items as Tour[]
     }

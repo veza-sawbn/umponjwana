@@ -53,7 +53,7 @@ async function fetchKey<K extends SiteContentKey>(key: K): Promise<SiteContent[K
       .from('site_content')
       .select('value')
       .eq('key', key)
-      .single()
+      .maybeSingle()
     if (data?.value) {
       return { ...SITE_CONTENT_DEFAULTS[key], ...data.value } as SiteContent[K]
     }
