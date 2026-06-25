@@ -7,7 +7,7 @@ import { supabase } from './auth'
 const baseURL =
   typeof window !== 'undefined'
     ? '/api/backend'
-    : (process.env.NEXT_PUBLIC_API_URL || 'https://visit-drakensberg.onrender.com').replace(/\/+$/, '')
+    : (process.env.NEXT_PUBLIC_API_URL || process.env.BACKEND_URL || 'https://drakensberg-backend.onrender.com').replace(/\/+$/, '')
 
 const api = axios.create({
   baseURL,
@@ -24,12 +24,7 @@ api.interceptors.request.use(async (config) => {
 
 api.interceptors.response.use(
   (res) => res,
-  (error) => {
-    if (error.response?.status === 401 && typeof window !== 'undefined') {
-      window.location.href = '/auth/login'
-    }
-    return Promise.reject(error)
-  }
+  (error) => Promise.reject(error)
 )
 
 export const listings = {
@@ -80,15 +75,6 @@ export const notifications = {
   delete: (id: string) => api.delete(`/api/v1/notifications/${id}`).then(r => r.data),
 }
 
-export const admin = {
-  getStats: () => api.get('/api/v1/admin/dashboard/stats').then(r => r.data),
-  getUsers: (params?: Record<string, unknown>) => api.get('/api/v1/admin/users', { params }).then(r => r.data),
-  getSuppliers: (params?: Record<string, unknown>) => api.get('/api/v1/admin/suppliers', { params }).then(r => r.data),
-  getListings: (params?: Record<string, unknown>) => api.get('/api/v1/admin/listings', { params }).then(r => r.data),
-  getBookings: (params?: Record<string, unknown>) => api.get('/api/v1/admin/bookings', { params }).then(r => r.data),
-  verifySupplier: (id: string) => api.put(`/api/v1/admin/suppliers/${id}/verify`).then(r => r.data),
-  featureListing: (id: string) => api.put(`/api/v1/admin/listings/${id}/feature`).then(r => r.data),
-  deleteListing: (id: string) => api.delete(`/api/v1/admin/listings/${id}`).then(r => r.data),
-}
+// Admin console pages use the Supabase client directly; do not route them through FastAPI.
 
 export default api
