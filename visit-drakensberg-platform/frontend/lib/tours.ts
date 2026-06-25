@@ -19,6 +19,7 @@ export type Tour = {
   pricePerPerson: number
   groupDiscount: number
   status: 'active' | 'draft'
+  supplierName: string
   supplierId: string
   createdAt: string
 }

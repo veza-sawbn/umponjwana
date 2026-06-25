@@ -4,8 +4,9 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import Navbar from '@/components/layout/Navbar'
 import Footer from '@/components/layout/Footer'
-import { Mountain, Bed, Car, Compass, ChevronRight, Trash2, Users, Calendar, ArrowLeft } from 'lucide-react'
+import { Mountain, Bed, Car, Compass, ChevronRight, Trash2, Users, Calendar, ArrowLeft, Pencil } from 'lucide-react'
 import { useBooking } from '@/lib/booking-context'
+import { useState } from 'react'
 
 const ACTIVITY_SUGGESTIONS = [
   {
@@ -41,16 +42,31 @@ function formatDate(iso: string) {
 export default function TripPage() {
   const booking = useBooking()
   const router = useRouter()
+  const [editingDates, setEditingDates] = useState(false)
+  const [draftIn, setDraftIn] = useState('')
+  const [draftOut, setDraftOut] = useState('')
 
   const hikeAddons = booking.addons.filter(a => a.type === 'hike' || a.type === 'tour' || a.type === 'activity')
   const hasStay = !!booking.stay
   const hasShuttle = !!booking.shuttle
   const isEmpty = booking.addons.length === 0 && !booking.stay
 
-  // Dates for accommodation suggestion — already set by UpcomingDepartures via setSearch
   const checkIn = booking.checkIn
   const checkOut = booking.checkOut
   const guests = booking.guests || 1
+
+  function startEditDates() {
+    setDraftIn(checkIn)
+    setDraftOut(checkOut)
+    setEditingDates(true)
+  }
+
+  function applyDates() {
+    if (draftIn && draftOut && draftIn < draftOut) {
+      booking.setSearch(booking.region, draftIn, draftOut, guests)
+    }
+    setEditingDates(false)
+  }
 
   const subtotal = booking.totalPrice
 
@@ -144,13 +160,57 @@ export default function TripPage() {
             {/* Accommodation suggestion */}
             {!hasStay && hikeAddons.length > 0 && (
               <section>
-                <div className="flex items-center gap-2 mb-1">
-                  <Bed size={16} className="text-[#C9A96E]" />
-                  <h2 className="font-display italic text-2xl">Where to stay</h2>
+                <div className="flex items-center justify-between mb-1 flex-wrap gap-2">
+                  <div className="flex items-center gap-2">
+                    <Bed size={16} className="text-[#C9A96E]" />
+                    <h2 className="font-display italic text-2xl">Where to stay</h2>
+                  </div>
+                  {checkIn && !editingDates && (
+                    <button
+                      onClick={startEditDates}
+                      className="flex items-center gap-1.5 font-sans text-xs text-black/40 hover:text-black/70 transition-colors"
+                    >
+                      <Pencil size={11} /> Adjust dates
+                    </button>
+                  )}
                 </div>
                 <p className="font-sans text-xs text-black/40 mb-4">
-                  Stay the night before your hike so you're rested and close to the trailhead
+                  Accommodation for the night before your departure and the night after your tour ends
                 </p>
+
+                {editingDates && (
+                  <div className="bg-white border border-black/8 rounded-xl p-5 mb-3 space-y-4">
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-1.5">
+                        <label className="font-sans text-xs font-medium text-black/60">Check-in</label>
+                        <input
+                          type="date"
+                          value={draftIn}
+                          onChange={e => setDraftIn(e.target.value)}
+                          className="w-full font-sans text-sm border border-black/10 rounded-lg px-3 py-2 outline-none focus:border-[#C9A96E]/50"
+                        />
+                      </div>
+                      <div className="space-y-1.5">
+                        <label className="font-sans text-xs font-medium text-black/60">Check-out</label>
+                        <input
+                          type="date"
+                          value={draftOut}
+                          onChange={e => setDraftOut(e.target.value)}
+                          className="w-full font-sans text-sm border border-black/10 rounded-lg px-3 py-2 outline-none focus:border-[#C9A96E]/50"
+                        />
+                      </div>
+                    </div>
+                    <div className="flex gap-3">
+                      <button onClick={applyDates} className="bg-[#C9A96E] text-white font-sans text-sm px-4 py-2 rounded-lg hover:bg-[#b8965d] transition-colors">
+                        Apply
+                      </button>
+                      <button onClick={() => setEditingDates(false)} className="font-sans text-sm px-4 py-2 border border-black/10 rounded-lg text-black/50">
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                )}
+
                 <Link
                   href={`/stays${checkIn ? `?check_in=${checkIn}&check_out=${checkOut}&guests=${guests}` : ''}`}
                   className="flex items-center justify-between bg-white border border-black/8 rounded-xl p-6 hover:border-[#C9A96E]/50 transition-colors group"

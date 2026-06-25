@@ -44,12 +44,14 @@ export default function HikeDetailPage() {
           id: d.id,
           date: d.date,
           type: 'guide' as const,
-          operator: d.tour,
+          operator: d.supplierName || d.tour,
+          tourName: d.tour,
           guide: d.guide || undefined,
           spots_total: d.maxSeats,
           spots_remaining: d.maxSeats - d.bookedSeats,
           price_per_person: d.pricePerPerson,
-          duration: `${d.maxSeats} max group`,
+          duration: `${d.tourDays ?? 1} day${(d.tourDays ?? 1) > 1 ? 's' : ''}`,
+          tourDays: d.tourDays ?? 1,
         }))
       setDepartures(tourDates)
     })

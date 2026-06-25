@@ -12,12 +12,14 @@ export type TourDate = {
   id: string
   date: string
   type: 'guide' | 'package' | 'experience'
-  operator: string
+  operator: string      // supplier / company name
+  tourName?: string     // tour product name (shown beneath operator)
   guide?: string
   spots_total: number
   spots_remaining: number
   price_per_person: number
   duration: string
+  tourDays?: number     // used to calculate checkout date for accommodation
   notes?: string
   booking_href?: string
 }
@@ -72,11 +74,12 @@ export default function UpcomingDepartures({
 
   function handleAdd(d: TourDate) {
     const guests = getGuests(d.id, d.spots_remaining)
-    // Set booking search dates: check-in night before, check-out night after the hike
+    const days = d.tourDays ?? 1
+    // Night before departure → night after last day of tour
     booking.setSearch(
       trailRegion ?? booking.region,
       addDays(d.date, -1),
-      addDays(d.date, 1),
+      addDays(d.date, days),
       guests,
     )
     booking.addAddon({
@@ -165,8 +168,13 @@ export default function UpcomingDepartures({
                       )}
                     </div>
                     <p className="font-display italic text-lg leading-snug">{d.operator}</p>
+                    {d.tourName && d.tourName !== d.operator && (
+                      <p className="font-sans text-xs text-black/50 mt-0.5">{d.tourName}</p>
+                    )}
                     {d.guide && (
-                      <p className="font-sans text-xs text-gray-500 mt-0.5">Guide: {d.guide}</p>
+                      <p className="font-sans text-xs text-[#2d6a4f] mt-0.5 flex items-center gap-1">
+                        <UserCircle size={11} /> {d.guide}
+                      </p>
                     )}
                     <div className="flex items-center gap-4 mt-2 font-sans text-xs text-gray-400">
                       <span className="flex items-center gap-1"><Calendar size={11} />{formatDate(d.date)}</span>

@@ -12,7 +12,7 @@ const CANCELLATIONS = ['48h', '72h', '7 days', '14 days']
 
 const EMPTY = {
   trailId: '', trailName: '',
-  name: '', difficulty: 'Moderate', days: 1, minAge: 0, maxGroup: 10,
+  name: '', supplierName: '', difficulty: 'Moderate', days: 1, minAge: 0, maxGroup: 10,
   meetingPoint: '', gpsLat: '', gpsLng: '', description: '',
   included: [] as string[], fitnessNotes: '', cancellation: '48h',
   pricePerPerson: 0, groupDiscount: 0, status: 'draft' as 'active' | 'draft',
@@ -125,6 +125,10 @@ export default function NewTourPage() {
 
         <F label="Tour Name" required>
           <input value={form.name} onChange={e => set('name', e.target.value)} placeholder="e.g. Cathedral Peak Summit Hike" className={inp} />
+        </F>
+
+        <F label="Company / Operator Name" required>
+          <input value={form.supplierName} onChange={e => set('supplierName', e.target.value)} placeholder="e.g. Berg Adventures" className={inp} />
         </F>
 
         <F label="Difficulty">
