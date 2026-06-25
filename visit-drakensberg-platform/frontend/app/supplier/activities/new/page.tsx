@@ -2,18 +2,22 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
+import { supabase } from '@/lib/auth'
+import { addActivity } from '@/lib/activities'
 
 const CATEGORIES = ['Adventure', 'Nature', 'Water', 'Cultural', 'Wellness', 'Family']
 const DIFFICULTY = ['Easy', 'Moderate', 'Challenging', 'Extreme']
-const INCLUDED = ['Helmet & Harness', 'Guide', 'Safety Briefing', 'Refreshments', 'Transport to Site', 'Photos/Video']
+const INCLUDED = ['Helmet & Harness', 'Guide', 'Safety Briefing', 'Refreshments', 'Transport to Site', 'Photos/Video', 'Equipment']
 const STEPS = ['Activity Details', 'Logistics', 'Inclusions & Safety', 'Pricing', 'Review']
 
 export default function NewActivityPage() {
   const router = useRouter()
   const [step, setStep] = useState(0)
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState('')
   const [form, setForm] = useState({
     name: '', category: '', description: '', difficulty: '',
-    durationHours: '', durationMinutes: '0', minAge: '', maxGroupSize: '',
+    durationH: '', minAge: '', maxGroupSize: '',
     meetingPoint: '', gpsLat: '', gpsLng: '', whatToWear: '',
     included: [] as string[], safetyNotes: '',
     pricePerPerson: '', priceGroup: '', depositRequired: false, depositPercent: '30',
@@ -23,6 +27,46 @@ export default function NewActivityPage() {
 
   const toggleIncluded = (item: string) =>
     setForm(f => ({ ...f, included: f.included.includes(item) ? f.included.filter(x => x !== item) : [...f.included, item] }))
+
+  async function handleSubmit() {
+    if (!form.name.trim()) { setError('Activity name is required.'); return }
+    if (!form.pricePerPerson) { setError('Price per person is required.'); return }
+    setError('')
+    setSaving(true)
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) { setError('Not signed in'); return }
+      await addActivity({
+        supplierId: user.id,
+        supplierName: user.user_metadata?.full_name || user.email || '',
+        name: form.name,
+        category: form.category,
+        difficulty: form.difficulty,
+        description: form.description,
+        durationH: +form.durationH || 0,
+        durationM: 0,
+        minAge: +form.minAge || 0,
+        maxGroup: +form.maxGroupSize || 1,
+        meetingPoint: form.meetingPoint,
+        gpsLat: form.gpsLat,
+        gpsLng: form.gpsLng,
+        whatToWear: form.whatToWear,
+        included: form.included,
+        safetyNotes: form.safetyNotes,
+        pricePerPerson: +form.pricePerPerson || 0,
+        priceGroup: +form.priceGroup || 0,
+        depositRequired: form.depositRequired,
+        depositPercent: form.depositPercent,
+        status: 'active',
+      })
+      router.push('/supplier/activities')
+    } catch (e) {
+      console.error('[activities] save failed:', e)
+      setError('Failed to save activity. Please try again.')
+    } finally {
+      setSaving(false)
+    }
+  }
 
   return (
     <div className="p-8 max-w-2xl">
@@ -68,7 +112,7 @@ export default function NewActivityPage() {
         {step === 1 && (
           <>
             <div className="grid grid-cols-2 gap-4">
-              <F label="Duration (hours)"><input type="number" value={form.durationHours} onChange={e => set('durationHours', e.target.value)} min="0" className={inp} /></F>
+              <F label="Duration (hours)"><input type="number" value={form.durationH} onChange={e => set('durationH', e.target.value)} min="0" className={inp} /></F>
               <F label="Min. Age"><input type="number" value={form.minAge} onChange={e => set('minAge', e.target.value)} min="0" placeholder="e.g. 10" className={inp} /></F>
             </div>
             <F label="Max Group Size" required><input type="number" value={form.maxGroupSize} onChange={e => set('maxGroupSize', e.target.value)} className={inp} /></F>
@@ -119,7 +163,7 @@ export default function NewActivityPage() {
           <div className="space-y-3">
             <p className="font-sans text-sm text-black/60">Review your activity before submitting.</p>
             <div className="rounded-lg bg-black/3 p-4 space-y-2">
-              {[['Name', form.name], ['Category', form.category], ['Difficulty', form.difficulty], ['Duration', form.durationHours ? `${form.durationHours}h` : ''], ['Max Group', form.maxGroupSize], ['Meeting Point', form.meetingPoint], ['Price/Person', form.pricePerPerson ? `R ${form.pricePerPerson}` : '']].map(([k, v]) => v ? (
+              {[['Name', form.name], ['Category', form.category], ['Difficulty', form.difficulty], ['Duration', form.durationH ? `${form.durationH}h` : ''], ['Max Group', form.maxGroupSize], ['Meeting Point', form.meetingPoint], ['Price/Person', form.pricePerPerson ? `R ${form.pricePerPerson}` : '']].map(([k, v]) => v ? (
                 <div key={k} className="flex gap-3 font-sans text-sm">
                   <span className="text-black/40 w-32 shrink-0">{k}</span>
                   <span className="text-black/80">{v}</span>
@@ -130,11 +174,13 @@ export default function NewActivityPage() {
         )}
       </div>
 
+      {error && <p className="font-sans text-sm text-red-500 mt-2">{error}</p>}
+
       <div className="flex justify-between mt-6">
         <button onClick={() => setStep(s => s - 1)} disabled={step === 0} className="font-sans text-sm px-4 py-2 border border-black/15 rounded-lg text-black/60 disabled:opacity-30">Back</button>
         {step < STEPS.length - 1
           ? <button onClick={() => setStep(s => s + 1)} className="flex items-center gap-2 font-sans text-sm px-5 py-2 bg-[#C9A96E] text-white rounded-lg">Next <ChevronRight size={14} /></button>
-          : <button onClick={() => router.push('/supplier/activities')} className="font-sans text-sm px-5 py-2 bg-black text-white rounded-lg">Submit Activity</button>
+          : <button onClick={handleSubmit} disabled={saving} className="font-sans text-sm px-5 py-2 bg-black text-white rounded-lg disabled:opacity-50">{saving ? 'Saving…' : 'Submit Activity'}</button>
         }
       </div>
     </div>
