@@ -14,9 +14,10 @@ import { getBookingById, type SavedBooking } from '@/lib/bookings'
 import { getTours, type Tour } from '@/lib/tours'
 import { getDepartures, type Departure } from '@/lib/departures'
 import { getTrails, type Trail } from '@/lib/trails'
+import { getPropertyById, type Property } from '@/lib/properties'
 import { supabase } from '@/lib/auth'
 import {
-  getOrCreateThread, sendMessage, getThreadsByBooking,
+  getOrCreateThread, sendMessage, getThreadsByBooking, getThreadById,
   type MessageThread,
 } from '@/lib/messages'
 
@@ -182,9 +183,100 @@ function MessagePanel({
   )
 }
 
+/* ── stay contact + message panel ──────────────────────── */
+function StayContactPanel({
+  stay, booking, property, currentUser, initialThread,
+}: {
+  stay: NonNullable<SavedBooking['stay']>
+  booking: SavedBooking
+  property: Property | null
+  currentUser: { id: string; name: string; email: string } | null
+  initialThread: MessageThread | null
+}) {
+  const [showMsg, setShowMsg] = useState(false)
+  const [thread, setThread] = useState<MessageThread | null>(initialThread)
+  const [threadLoading, setThreadLoading] = useState(false)
+
+  const supplierId = property?.supplierId || ''
+  const supplierName = property?.name || stay.title
+
+  useEffect(() => {
+    if (!showMsg || !thread) return
+    const timer = setInterval(async () => {
+      const fresh = await getThreadById(thread.id)
+      if (fresh && fresh.updatedAt !== thread.updatedAt) setThread(fresh)
+    }, 5000)
+    return () => clearInterval(timer)
+  }, [showMsg, thread?.id, thread?.updatedAt])
+
+  async function openMessages() {
+    if (!currentUser) return
+    setShowMsg(true)
+    if (thread) return
+    setThreadLoading(true)
+    const t = await getOrCreateThread(
+      booking.id,
+      booking.reference,
+      currentUser.id,
+      currentUser.name,
+      currentUser.email,
+      supplierId,
+      supplierName,
+      stay.title,
+    )
+    setThread(t)
+    setThreadLoading(false)
+  }
+
+  async function handleSend(body: string) {
+    if (!thread || !currentUser) return
+    const updated = await sendMessage(thread.id, 'visitor', currentUser.name, body)
+    if (updated) setThread(updated)
+  }
+
+  return (
+    <div className="border border-gray-200">
+      <div className="bg-[#000000] text-white p-5">
+        <p className="font-sans text-[10px] uppercase tracking-wider text-[#C9A96E] mb-3">Property Contact</p>
+        <div className="flex items-start justify-between gap-4 flex-wrap">
+          <div>
+            <p className="font-display italic text-xl mb-1">{stay.title}</p>
+            <p className="font-sans text-xs text-white/40 leading-relaxed">
+              Contact the property directly with any special requests or questions about your stay.
+            </p>
+          </div>
+          {currentUser && (
+            <button
+              onClick={openMessages}
+              className="shrink-0 inline-flex items-center gap-2 bg-[#C9A96E] text-[#1a1a1a] px-4 py-2 font-sans text-sm font-medium hover:bg-[#b8935e] transition-colors"
+            >
+              <MessageCircle size={14} />Message Property
+            </button>
+          )}
+        </div>
+      </div>
+      {showMsg && (
+        <div>
+          <div className="px-5 py-3 border-b border-gray-200 bg-[#F7F5F2] flex items-center justify-between">
+            <p className="font-sans text-xs font-medium text-gray-700">Message thread with {stay.title}</p>
+            <button onClick={() => setShowMsg(false)} className="font-sans text-xs text-gray-400 hover:text-gray-600">Close</button>
+          </div>
+          {threadLoading ? (
+            <div className="flex items-center justify-center h-32">
+              <div className="w-5 h-5 border-2 border-[#2d6a4f] border-t-transparent rounded-full animate-spin" />
+            </div>
+          ) : (
+            <MessagePanel thread={thread} currentUserName={currentUser?.name ?? ''} onSend={handleSend} />
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
 /* ── experience section ─────────────────────────────────── */
 function ExperienceSection({
-  addon, departure, tour, trail, booking, currentUser,
+  addon, departure, tour, trail, booking, currentUser, initialThread,
 }: {
   addon: SavedBooking['addons'][0]
   departure: Departure | null
@@ -192,15 +284,26 @@ function ExperienceSection({
   trail: Trail | null
   booking: SavedBooking
   currentUser: { id: string; name: string; email: string } | null
+  initialThread: MessageThread | null
 }) {
   const [showMsg, setShowMsg] = useState(false)
-  const [thread, setThread] = useState<MessageThread | null>(null)
+  const [thread, setThread] = useState<MessageThread | null>(initialThread)
   const [threadLoading, setThreadLoading] = useState(false)
 
-  // Resolve supplier identity: departure.supplierId is most reliable,
-  // tour.supplierId is fallback, then empty string (matched by name on supplier side)
-  const resolvedSupplierId = departure?.supplierId || tour?.supplierId || ''
+  // Resolve supplier: addon.supplierId (set by booking-context for real suppliers) is most
+  // reliable; fall through departure and tour as fallbacks
+  const resolvedSupplierId = addon.supplierId || departure?.supplierId || tour?.supplierId || ''
   const resolvedSupplierName = tour?.supplierName || departure?.supplierName || addon.operator || ''
+
+  // Poll for new messages when the panel is open
+  useEffect(() => {
+    if (!showMsg || !thread) return
+    const timer = setInterval(async () => {
+      const fresh = await getThreadById(thread.id)
+      if (fresh && fresh.updatedAt !== thread.updatedAt) setThread(fresh)
+    }, 5000)
+    return () => clearInterval(timer)
+  }, [showMsg, thread?.id, thread?.updatedAt])
 
   async function openMessages() {
     if (!currentUser) return
@@ -481,6 +584,8 @@ function ItineraryInner() {
   const [tours, setTours] = useState<Tour[]>([])
   const [departures, setDepartures] = useState<Departure[]>([])
   const [trails, setTrails] = useState<Trail[]>([])
+  const [threads, setThreads] = useState<MessageThread[]>([])
+  const [stayProperty, setStayProperty] = useState<Property | null>(null)
   const [currentUser, setCurrentUser] = useState<{ id: string; name: string; email: string } | null>(null)
   const [loading, setLoading] = useState(true)
 
@@ -492,17 +597,24 @@ function ItineraryInner() {
       getDepartures(),
       getTrails(),
       supabase.auth.getUser(),
-    ]).then(([b, t, d, tr, { data: { user } }]) => {
+      getThreadsByBooking(id),
+    ]).then(async ([b, t, d, tr, { data: { user } }, existingThreads]) => {
       setBooking(b)
       setTours(t)
       setDepartures(d)
       setTrails(tr)
+      setThreads(existingThreads)
       if (user) {
         setCurrentUser({
           id: user.id,
           name: user.user_metadata?.full_name || user.email?.split('@')[0] || 'Visitor',
           email: user.email || '',
         })
+      }
+      // Load property for stay messaging
+      if (b?.stay?.id) {
+        const prop = await getPropertyById(b.stay.id)
+        setStayProperty(prop)
       }
       setLoading(false)
     })
@@ -541,6 +653,10 @@ function ItineraryInner() {
   // Fallback: match tour by name/operator if no departure
   function tourFallback(a: SavedBooking['addons'][0]) {
     return tours.find(t => t.name === a.title || (a.operator && t.supplierName === a.operator)) ?? null
+  }
+  // Find pre-loaded thread for an addon by title
+  function threadForAddon(addonTitle: string) {
+    return threads.find(t => t.addonTitle === addonTitle) ?? null
   }
 
   const pageUrl = typeof window !== 'undefined' ? window.location.href : ''
@@ -613,11 +729,13 @@ function ItineraryInner() {
                 )}
               </div>
               <div className="space-y-4">
-                <div className="bg-[#000000] text-white p-5">
-                  <p className="font-sans text-[10px] uppercase tracking-wider text-[#C9A96E] mb-3">Property Contact</p>
-                  <p className="font-display italic text-xl mb-3">{booking.stay.title}</p>
-                  <p className="font-sans text-xs text-white/40 leading-relaxed">Contact the property directly with any special requests or questions about your stay.</p>
-                </div>
+                <StayContactPanel
+                  stay={booking.stay}
+                  booking={booking}
+                  property={stayProperty}
+                  currentUser={currentUser}
+                  initialThread={threadForAddon(booking.stay.title)}
+                />
                 <div className="border border-amber-200 bg-amber-50 p-4">
                   <p className="font-sans text-[10px] uppercase tracking-wider text-amber-700 mb-2 flex items-center gap-1.5">
                     <Shield size={11} />Property Policies
@@ -649,6 +767,7 @@ function ItineraryInner() {
               trail={trail}
               booking={booking}
               currentUser={currentUser}
+              initialThread={threadForAddon(a.title)}
             />
           )
         })}

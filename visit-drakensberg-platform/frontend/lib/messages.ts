@@ -49,6 +49,11 @@ export async function getThreadsByBooking(bookingId: string): Promise<MessageThr
   return all.filter(t => t.bookingId === bookingId)
 }
 
+export async function getThreadById(threadId: string): Promise<MessageThread | null> {
+  const all = await getThreads()
+  return all.find(t => t.id === threadId) ?? null
+}
+
 export async function getThreadsBySupplier(supplierId: string, fallbackNames?: string[]): Promise<MessageThread[]> {
   const all = await getThreads()
   return all.filter(t => {
@@ -69,10 +74,20 @@ export async function getOrCreateThread(
   addonTitle: string,
 ): Promise<MessageThread> {
   const all = await getThreads()
+  // Match loosely: same booking + same addon title, regardless of whether supplierId
+  // was stored correctly on a previous visit. Prevents duplicate threads.
   const existing = all.find(
-    t => t.bookingId === bookingId && t.supplierId === supplierId && t.addonTitle === addonTitle
+    t => t.bookingId === bookingId && t.addonTitle === addonTitle
   )
-  if (existing) return existing
+  if (existing) {
+    // Backfill supplierId if it was missing when thread was first created
+    if (!existing.supplierId && supplierId) {
+      const patched = { ...existing, supplierId, supplierName }
+      await saveThreads(all.map(t => t.id === existing.id ? patched : t))
+      return patched
+    }
+    return existing
+  }
   const now = new Date().toISOString()
   const thread: MessageThread = {
     id: `thr-${Date.now()}`,

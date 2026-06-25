@@ -1,10 +1,10 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { MessageSquare, Send } from 'lucide-react'
 import { useSupplier } from '@/lib/supplier-context'
 import { supabase } from '@/lib/auth'
-import { getThreadsBySupplier, sendMessage, type MessageThread } from '@/lib/messages'
+import { getThreadsBySupplier, getThreadById, sendMessage, type MessageThread } from '@/lib/messages'
 
 export default function MessagesPage() {
   const { fullName } = useSupplier()
@@ -16,20 +16,43 @@ export default function MessagesPage() {
   const [supplierId, setSupplierId] = useState('')
   const [supplierName, setSupplierName] = useState('')
   const bottomRef = useRef<HTMLDivElement>(null)
+  const supplierIdRef = useRef('')
+  const supplierNamesRef = useRef<string[]>([])
+
+  const refreshThreads = useCallback(async () => {
+    if (!supplierIdRef.current) return
+    const t = await getThreadsBySupplier(supplierIdRef.current, supplierNamesRef.current)
+    const sorted = t.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
+    setThreads(sorted)
+    // Refresh selected thread messages too
+    setSelected(prev => {
+      if (!prev) return prev
+      const fresh = sorted.find(x => x.id === prev.id)
+      return fresh ?? prev
+    })
+  }, [])
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data: { user } }) => {
       if (!user) { setLoading(false); return }
       setSupplierId(user.id)
+      supplierIdRef.current = user.id
       const displayName = fullName || user.user_metadata?.full_name || ''
       const email = user.email || ''
       setSupplierName(displayName || email)
-      getThreadsBySupplier(user.id, [displayName, email].filter(Boolean)).then(t => {
+      supplierNamesRef.current = [displayName, email].filter(Boolean)
+      getThreadsBySupplier(user.id, supplierNamesRef.current).then(t => {
         setThreads(t.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)))
         setLoading(false)
       })
     })
   }, [fullName])
+
+  // Poll for new messages every 5 seconds
+  useEffect(() => {
+    const timer = setInterval(refreshThreads, 5000)
+    return () => clearInterval(timer)
+  }, [refreshThreads])
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
