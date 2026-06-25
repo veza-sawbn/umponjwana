@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { SlidersHorizontal, X } from 'lucide-react'
 import Footer from '@/components/layout/Footer'
 import { getProperties, type Property } from '@/lib/properties'
+import { getRoomsByProperty } from '@/lib/rooms'
 
 const HARDCODED_STAYS = [
   { id: 's1', title: 'Cathedral Peak Mountain Lodge', location: 'Cathedral Peak, Northern Berg', price: 1850, rating: 4.9, reviews: 124, img: 'https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=800&q=80', category: 'Lodge', amenities: ['pool', 'wifi', 'braai', 'hiking'], guests: 4, discount: 15 },
@@ -29,7 +30,7 @@ type StayCard = {
   featured?: boolean
 }
 
-function propToCard(p: Property): StayCard {
+function propToCard(p: Property, minPrice = 0): StayCard {
   const amenityMap: Record<string, string> = {
     'Swimming Pool': 'pool', 'Wi-Fi': 'wifi', 'Braai Facilities': 'braai',
     'Hiking Trails Access': 'hiking', 'Restaurant': 'restaurant', 'Spa': 'spa',
@@ -37,8 +38,8 @@ function propToCard(p: Property): StayCard {
   return {
     id: p.id,
     title: p.name,
-    location: p.nearestTown ? `${p.nearestTown}` : p.address,
-    price: 0,
+    location: p.region || p.address,
+    price: minPrice,
     category: p.type,
     amenities: p.amenities.map(a => amenityMap[a] ?? a.toLowerCase()),
     img: p.photos[0] || undefined,
@@ -56,9 +57,14 @@ export default function StaysPage() {
   const [liveProperties, setLiveProperties] = useState<StayCard[]>([])
 
   useEffect(() => {
-    getProperties().then(props => {
+    getProperties().then(async props => {
       const active = props.filter(p => p.status === 'active')
-      setLiveProperties(active.map(propToCard))
+      const cards = await Promise.all(active.map(async p => {
+        const rooms = await getRoomsByProperty(p.id)
+        const minPrice = rooms.length > 0 ? Math.min(...rooms.map(r => r.basePrice)) : 0
+        return propToCard(p, minPrice)
+      }))
+      setLiveProperties(cards)
     })
   }, [])
 

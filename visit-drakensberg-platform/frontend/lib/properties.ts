@@ -1,5 +1,20 @@
 import { supabase } from './auth'
 
+export const PROPERTY_REGIONS = [
+  'North Berg',
+  'Central Berg',
+  'South Berg',
+  'Royal Natal National Park',
+  'Champagne Valley',
+  'Bergville & Surrounds',
+  'Winterton & Champagne Valley',
+  'Underberg & Himeville',
+  'Nottingham Road',
+  'Giants Castle',
+  'Cathedral Peak',
+  'Sani Pass',
+]
+
 export type Property = {
   id: string
   supplierId: string
@@ -7,10 +22,10 @@ export type Property = {
   type: string
   starRating: string
   description: string
+  region: string
   address: string
   gpsLat: string
   gpsLng: string
-  nearestTown: string
   accessNotes: string
   amenities: string[]
   checkIn: string

@@ -3,7 +3,7 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { ChevronRight, ChevronLeft } from 'lucide-react'
 import { supabase } from '@/lib/auth'
-import { addProperty } from '@/lib/properties'
+import { addProperty, PROPERTY_REGIONS } from '@/lib/properties'
 
 const PROPERTY_TYPES = ['Lodge', 'Guesthouse', 'Hotel', 'Self-catering Cottage', 'Campsite', 'Backpackers', 'Boutique Hotel']
 const AMENITIES = ['Swimming Pool', 'Braai Facilities', 'Wi-Fi', 'Restaurant', 'Bar', 'Spa', 'Gym', 'Laundry', 'Pet-Friendly', 'Wheelchair Access', 'Airport Transfers', 'Hiking Trails Access']
@@ -16,7 +16,7 @@ export default function NewPropertyPage() {
   const [saving, setSaving] = useState(false)
   const [form, setForm] = useState({
     name: '', type: '', description: '', starRating: '',
-    address: '', gpsLat: '', gpsLng: '', nearestTown: '', accessNotes: '',
+    region: '', address: '', gpsLat: '', gpsLng: '', accessNotes: '',
     amenities: [] as string[], checkIn: '14:00', checkOut: '10:00', petPolicy: '', cancellationPolicy: '48',
     photos: [] as string[],
   })
@@ -43,10 +43,10 @@ export default function NewPropertyPage() {
         type: form.type,
         starRating: form.starRating,
         description: form.description,
+        region: form.region,
         address: form.address,
         gpsLat: form.gpsLat,
         gpsLng: form.gpsLng,
-        nearestTown: form.nearestTown,
         accessNotes: form.accessNotes,
         amenities: form.amenities,
         checkIn: form.checkIn,
@@ -74,13 +74,10 @@ export default function NewPropertyPage() {
         <h1 className="font-display italic text-2xl text-black/90">Add Property</h1>
       </div>
 
-      {/* Step indicator */}
       <div className="flex gap-2 mb-8">
         {STEPS.map((s, i) => (
           <div key={s} className="flex items-center gap-2">
-            <div className={`w-6 h-6 rounded-full flex items-center justify-center font-sans text-xs font-semibold transition-colors ${
-              i < step ? 'bg-[#C9A96E] text-white' : i === step ? 'bg-[#C9A96E]/20 text-[#C9A96E] border border-[#C9A96E]' : 'bg-black/5 text-black/30'
-            }`}>{i + 1}</div>
+            <div className={`w-6 h-6 rounded-full flex items-center justify-center font-sans text-xs font-semibold transition-colors ${i < step ? 'bg-[#C9A96E] text-white' : i === step ? 'bg-[#C9A96E]/20 text-[#C9A96E] border border-[#C9A96E]' : 'bg-black/5 text-black/30'}`}>{i + 1}</div>
             {i < STEPS.length - 1 && <div className={`w-6 h-px ${i < step ? 'bg-[#C9A96E]' : 'bg-black/10'}`} />}
           </div>
         ))}
@@ -113,7 +110,13 @@ export default function NewPropertyPage() {
 
         {step === 1 && (
           <>
-            <Field label="Street Address" required>
+            <Field label="Region" required>
+              <select value={form.region} onChange={e => setField('region', e.target.value)} className={input}>
+                <option value="">Select region…</option>
+                {PROPERTY_REGIONS.map(r => <option key={r}>{r}</option>)}
+              </select>
+            </Field>
+            <Field label="Street Address">
               <input value={form.address} onChange={e => setField('address', e.target.value)} className={input} />
             </Field>
             <div className="grid grid-cols-2 gap-4">
@@ -124,9 +127,6 @@ export default function NewPropertyPage() {
                 <input value={form.gpsLng} onChange={e => setField('gpsLng', e.target.value)} placeholder="29.123456" className={input} />
               </Field>
             </div>
-            <Field label="Nearest Town / Village">
-              <input value={form.nearestTown} onChange={e => setField('nearestTown', e.target.value)} className={input} />
-            </Field>
             <Field label="Access Notes">
               <textarea value={form.accessNotes} onChange={e => setField('accessNotes', e.target.value)} rows={3} placeholder="4×4 recommended in wet season, last 8 km gravel road…" className={`${input} resize-none`} />
             </Field>
@@ -139,15 +139,7 @@ export default function NewPropertyPage() {
               <p className="font-sans text-sm font-medium text-black/70 mb-3">Amenities</p>
               <div className="flex flex-wrap gap-2">
                 {AMENITIES.map(a => (
-                  <button
-                    key={a}
-                    onClick={() => toggleAmenity(a)}
-                    className={`font-sans text-xs px-3 py-1.5 rounded-full border transition-colors ${
-                      form.amenities.includes(a) ? 'bg-[#C9A96E] text-white border-[#C9A96E]' : 'border-black/15 text-black/60 hover:border-[#C9A96E]/40'
-                    }`}
-                  >
-                    {a}
-                  </button>
+                  <button key={a} onClick={() => toggleAmenity(a)} className={`font-sans text-xs px-3 py-1.5 rounded-full border transition-colors ${form.amenities.includes(a) ? 'bg-[#C9A96E] text-white border-[#C9A96E]' : 'border-black/15 text-black/60 hover:border-[#C9A96E]/40'}`}>{a}</button>
                 ))}
               </div>
             </div>
@@ -183,7 +175,7 @@ export default function NewPropertyPage() {
           <div className="space-y-3">
             <p className="font-sans text-sm text-black/60">Review your property details before submitting.</p>
             <div className="rounded-lg bg-black/3 p-4 space-y-2">
-              {[['Name', form.name], ['Type', form.type], ['Star Rating', form.starRating || 'Unrated'], ['Address', form.address], ['Nearest Town', form.nearestTown], ['Check-in', form.checkIn], ['Check-out', form.checkOut]].map(([k, v]) => v ? (
+              {[['Name', form.name], ['Type', form.type], ['Star Rating', form.starRating || 'Unrated'], ['Region', form.region], ['Address', form.address], ['Check-in', form.checkIn], ['Check-out', form.checkOut]].map(([k, v]) => v ? (
                 <div key={k} className="flex gap-3 font-sans text-sm">
                   <span className="text-black/40 w-32 shrink-0">{k}</span>
                   <span className="text-black/80">{v}</span>
@@ -200,29 +192,14 @@ export default function NewPropertyPage() {
         )}
       </div>
 
-      {/* Navigation */}
       <div className="flex justify-between mt-6">
-        <button
-          onClick={() => setStep(s => s - 1)}
-          disabled={step === 0}
-          className="font-sans text-sm px-4 py-2 border border-black/15 rounded-lg text-black/60 hover:border-black/30 disabled:opacity-30 disabled:cursor-not-allowed"
-        >
-          Back
-        </button>
+        <button onClick={() => setStep(s => s - 1)} disabled={step === 0} className="font-sans text-sm px-4 py-2 border border-black/15 rounded-lg text-black/60 hover:border-black/30 disabled:opacity-30 disabled:cursor-not-allowed">Back</button>
         {step < STEPS.length - 1 ? (
-          <button
-            onClick={() => setStep(s => s + 1)}
-            disabled={step === 0 && (!form.name || !form.type)}
-            className="flex items-center gap-2 font-sans text-sm px-5 py-2 bg-[#C9A96E] text-white rounded-lg hover:bg-[#b8965d] transition-colors disabled:opacity-40"
-          >
+          <button onClick={() => setStep(s => s + 1)} disabled={step === 0 && (!form.name || !form.type)} className="flex items-center gap-2 font-sans text-sm px-5 py-2 bg-[#C9A96E] text-white rounded-lg hover:bg-[#b8965d] transition-colors disabled:opacity-40">
             Next <ChevronRight size={14} />
           </button>
         ) : (
-          <button
-            onClick={handleSubmit}
-            disabled={saving || !form.name || !form.type}
-            className="font-sans text-sm px-5 py-2 bg-black text-white rounded-lg hover:bg-black/80 transition-colors disabled:opacity-50"
-          >
+          <button onClick={handleSubmit} disabled={saving || !form.name || !form.type} className="font-sans text-sm px-5 py-2 bg-black text-white rounded-lg hover:bg-black/80 transition-colors disabled:opacity-50">
             {saving ? 'Saving…' : 'Submit Property'}
           </button>
         )}
@@ -236,9 +213,7 @@ const input = 'w-full font-sans text-sm border border-black/10 rounded-lg px-3 p
 function Field({ label, required, children }: { label: string; required?: boolean; children: React.ReactNode }) {
   return (
     <div className="space-y-1.5">
-      <label className="font-sans text-sm font-medium text-black/70">
-        {label}{required && <span className="text-[#C9A96E] ml-0.5">*</span>}
-      </label>
+      <label className="font-sans text-sm font-medium text-black/70">{label}{required && <span className="text-[#C9A96E] ml-0.5">*</span>}</label>
       {children}
     </div>
   )

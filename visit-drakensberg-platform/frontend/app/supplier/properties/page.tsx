@@ -63,8 +63,8 @@ export default function PropertiesPage() {
                       <Star size={12} /> {p.starRating} Star
                     </span>
                   )}
-                  {p.nearestTown && (
-                    <span className="font-sans text-xs text-black/40">{p.nearestTown}</span>
+                  {p.region && (
+                    <span className="font-sans text-xs text-black/40">{p.region}</span>
                   )}
                 </div>
               </div>

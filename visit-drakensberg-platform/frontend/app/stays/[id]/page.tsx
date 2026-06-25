@@ -116,8 +116,8 @@ function propToStay(prop: Property, rooms: Room[]) {
   return {
     title: prop.name,
     category: prop.type,
-    location: prop.nearestTown || prop.address,
-    region: prop.nearestTown || '',
+    location: prop.region || prop.address,
+    region: prop.region || '',
     rating: null as null | number,
     review_count: 0,
     member_since: new Date(prop.createdAt).getFullYear().toString(),
@@ -151,6 +151,7 @@ export default function StayDetailPage() {
   const [loading, setLoading] = useState(!HARDCODED[id])
 
   const [selectedRoom, setSelectedRoom] = useState<any>(null)
+  const [showRooms, setShowRooms] = useState(false)
   const [checkIn, setCheckIn] = useState(booking.checkIn || '')
   const [checkOut, setCheckOut] = useState(booking.checkOut || '')
   const [guests, setGuests] = useState(booking.guests || 2)
@@ -282,14 +283,24 @@ export default function StayDetailPage() {
 
             {/* Rooms */}
             <div>
-              <h2 className="font-display italic text-2xl text-[#000000] mb-5">Choose Your Room</h2>
+              <div className="flex items-center justify-between mb-5">
+                <h2 className="font-display italic text-2xl text-[#000000]">Choose Your Room</h2>
+                {stay.rooms.length > 0 && (
+                  <button
+                    onClick={() => setShowRooms(v => !v)}
+                    className="lg:hidden font-sans text-sm border border-[#2d6a4f] text-[#2d6a4f] px-4 py-2 hover:bg-[#2d6a4f] hover:text-white transition-colors"
+                  >
+                    {showRooms ? 'Hide Rooms' : `View Rooms (${stay.rooms.length})`}
+                  </button>
+                )}
+              </div>
               {stay.rooms.length === 0 ? (
                 <div className="bg-white border border-gray-200 p-8 text-center">
                   <BedDouble size={24} className="text-gray-300 mx-auto mb-2" />
                   <p className="font-sans text-sm text-gray-400">No rooms listed yet — contact the property directly.</p>
                 </div>
               ) : (
-                <div className="space-y-4">
+                <div className={`space-y-4 ${!showRooms ? 'hidden lg:block' : ''}`}>
                   {stay.rooms.map((room: any) => (
                     <div
                       key={room.id}
@@ -425,13 +436,23 @@ export default function StayDetailPage() {
                   </select>
                 </div>
                 {stay.rooms.length > 0 && (
-                  <div>
-                    <label className="block font-sans text-[10px] tracking-[0.1em] uppercase text-gray-400 mb-1.5">Room</label>
-                    <select value={selectedRoom?.id || ''} onChange={e => setSelectedRoom(stay.rooms.find((r: any) => r.id === e.target.value) || null)} className="w-full border border-gray-300 px-3 py-2.5 font-sans text-sm focus:outline-none bg-white">
-                      <option value="">Select a room…</option>
-                      {stay.rooms.map((r: any) => <option key={r.id} value={r.id}>{r.name} — R {r.price_per_night.toLocaleString()}/night</option>)}
-                    </select>
-                  </div>
+                  <>
+                    <div className={showRooms ? '' : 'hidden lg:block'}>
+                      <label className="block font-sans text-[10px] tracking-[0.1em] uppercase text-gray-400 mb-1.5">Room</label>
+                      <select value={selectedRoom?.id || ''} onChange={e => setSelectedRoom(stay.rooms.find((r: any) => r.id === e.target.value) || null)} className="w-full border border-gray-300 px-3 py-2.5 font-sans text-sm focus:outline-none bg-white">
+                        <option value="">Select a room…</option>
+                        {stay.rooms.map((r: any) => <option key={r.id} value={r.id}>{r.name} — R {r.price_per_night.toLocaleString()}/night</option>)}
+                      </select>
+                    </div>
+                    {!showRooms && (
+                      <button
+                        onClick={() => setShowRooms(true)}
+                        className="lg:hidden w-full border border-[#2d6a4f] text-[#2d6a4f] py-2.5 font-sans text-sm hover:bg-[#2d6a4f] hover:text-white transition-colors"
+                      >
+                        View Rooms ({stay.rooms.length})
+                      </button>
+                    )}
+                  </>
                 )}
               </div>
 
