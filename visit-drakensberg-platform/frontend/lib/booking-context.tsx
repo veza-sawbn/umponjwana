@@ -7,6 +7,7 @@ export type BookingAddon = {
   type: 'activity' | 'hike' | 'tour' | 'event'
   title: string
   operator?: string
+  supplierId?: string
   date?: string
   price_per_person: number
   guests: number

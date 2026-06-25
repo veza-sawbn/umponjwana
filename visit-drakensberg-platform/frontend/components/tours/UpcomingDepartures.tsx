@@ -15,6 +15,7 @@ export type TourDate = {
   operator: string      // supplier / company name
   tourName?: string     // tour product name (shown beneath operator)
   guide?: string
+  supplierId?: string
   spots_total: number
   spots_remaining: number
   price_per_person: number
@@ -86,6 +87,7 @@ export default function UpcomingDepartures({
       id: d.id,
       type: d.type === 'guide' ? 'hike' : d.type === 'package' ? 'activity' : 'tour',
       title: `${d.operator}${d.guide ? ` · ${d.guide}` : ''}`,
+      supplierId: d.supplierId,
       date: d.date,
       price_per_person: d.price_per_person,
       guests,

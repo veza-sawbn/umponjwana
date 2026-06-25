@@ -3,7 +3,8 @@
 import { useState, useEffect } from 'react'
 import { CalendarDays, Search, Phone, Mail, Users, MessageSquare } from 'lucide-react'
 import { getBookings, type SavedBooking } from '@/lib/bookings'
-import { getDepartures } from '@/lib/departures'
+import { getPropertiesBySupplier } from '@/lib/properties'
+import { supabase } from '@/lib/auth'
 
 type Status = 'all' | 'confirmed' | 'cancelled'
 
@@ -25,11 +26,17 @@ export default function BookingsPage() {
   const [expanded, setExpanded] = useState<string | null>(null)
 
   useEffect(() => {
-    Promise.all([getBookings(), getDepartures()]).then(([allBookings, departures]) => {
-      // Show all bookings that include at least one addon (guided departure)
-      // In a multi-supplier setup this would be filtered by supplier's departure IDs
-      // For now show all bookings with addons or stays so supplier can see customer details
-      const relevant = allBookings.filter(b => b.addons.length > 0 || b.stay)
+    supabase.auth.getUser().then(async ({ data: { user } }) => {
+      if (!user) { setLoading(false); return }
+      const [allBookings, myProperties] = await Promise.all([
+        getBookings(),
+        getPropertiesBySupplier(user.id),
+      ])
+      const myPropertyIds = new Set(myProperties.map(p => p.id))
+      const relevant = allBookings.filter(b =>
+        b.addons.some(a => a.supplierId === user.id) ||
+        (b.stay && myPropertyIds.has(b.stay.id))
+      )
       setBookings(relevant.sort((a, b) => b.createdAt.localeCompare(a.createdAt)))
       setLoading(false)
     })

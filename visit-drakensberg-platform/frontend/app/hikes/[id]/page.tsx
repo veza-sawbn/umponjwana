@@ -49,6 +49,7 @@ export default function HikeDetailPage() {
           operator: d.supplierName || d.tour,
           tourName: d.tour,
           guide: d.guide || undefined,
+          supplierId: d.supplierId,
           spots_total: d.maxSeats,
           spots_remaining: d.maxSeats - d.bookedSeats,
           price_per_person: d.pricePerPerson,
