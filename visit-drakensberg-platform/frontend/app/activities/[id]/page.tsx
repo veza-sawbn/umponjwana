@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useParams } from 'next/navigation'
 import Link from 'next/link'
 import Navbar from '@/components/layout/Navbar'
@@ -10,8 +10,9 @@ import UpcomingDepartures from '@/components/tours/UpcomingDepartures'
 import { getTourDates } from '@/lib/tour-dates'
 import { useBooking } from '@/lib/booking-context'
 import { Check, Plus } from 'lucide-react'
+import { getActivityById } from '@/lib/activities'
 
-const ACTIVITIES: Record<string, any> = {
+const MOCK_ACTIVITIES: Record<string, any> = {
   a1: {
     title: 'Guided Rock Climbing Experience', category: 'Adventure', location: 'Amphitheatre, Royal Natal', duration: 'Full day (6–8 hrs)', group_size: '2–8 people', price_per_person: 750,
     description: 'Experience the dramatic basalt cliffs of the Drakensberg under the expert supervision of FGASA-certified climbing guides. Routes range from introductory single-pitch climbs to challenging multi-pitch ascents on classic Drakensberg routes. All equipment is provided; no prior experience is necessary for beginner routes.',
@@ -43,13 +44,72 @@ const REVIEWS = [
   { name: 'Tom B.', rating: 4, date: 'April 2026', comment: 'Great day out. The views from the top of the climb were incredible. Recommend bringing your own snacks in addition to the provided lunch.' },
 ]
 
+function mapActivityToView(a: any) {
+  const durationParts = []
+  if (a.durationH) durationParts.push(`${a.durationH}h`)
+  if (a.durationM) durationParts.push(`${a.durationM}min`)
+  const duration = durationParts.length ? durationParts.join(' ') : 'See details'
+  const whatToWear = a.whatToWear
+    ? a.whatToWear.split(/[,\n]+/).map((s: string) => s.trim()).filter(Boolean)
+    : []
+  return {
+    title: a.name,
+    category: a.category,
+    location: a.meetingPoint || '',
+    duration,
+    group_size: a.maxGroup ? `Up to ${a.maxGroup} people` : '',
+    price_per_person: a.pricePerPerson || 0,
+    description: a.description,
+    includes: Array.isArray(a.included) ? a.included : [],
+    what_to_bring: whatToWear,
+    images: ['bg-[#1a1a2e]', 'bg-[#2d6a4f]', 'bg-[#8B4513]'],
+    guides: [],
+    supplier: { name: a.supplierName || '', member_since: '', response_rate: '' },
+  }
+}
+
 export default function ActivityDetailPage() {
   const { id } = useParams() as { id: string }
-  const activity = ACTIVITIES[id] || ACTIVITIES['a1']
+  const [activity, setActivity] = useState<any>(MOCK_ACTIVITIES[id] || null)
+  const [loading, setLoading] = useState(!MOCK_ACTIVITIES[id])
   const booking = useBooking()
+
+  useEffect(() => {
+    if (MOCK_ACTIVITIES[id]) return
+    getActivityById(id).then(data => {
+      if (data) setActivity(mapActivityToView(data))
+      setLoading(false)
+    })
+  }, [id])
 
   const [date, setDate] = useState(booking.checkIn || '')
   const [groupSize, setGroupSize] = useState(booking.guests || 2)
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-[#F7F5F2]">
+        <Navbar />
+        <div className="flex items-center justify-center min-h-[60vh]">
+          <p className="font-sans text-gray-500">Loading activity…</p>
+        </div>
+        <Footer />
+      </div>
+    )
+  }
+
+  if (!activity) {
+    return (
+      <div className="min-h-screen bg-[#F7F5F2]">
+        <Navbar />
+        <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4">
+          <p className="font-display italic text-2xl text-gray-700">Activity not found</p>
+          <Link href="/activities" className="font-sans text-sm text-[#2d6a4f] hover:underline">← Back to Activities</Link>
+        </div>
+        <Footer />
+      </div>
+    )
+  }
+
   const total = activity.price_per_person * groupSize
 
   const addonId = `activity-${id}-${date}`
