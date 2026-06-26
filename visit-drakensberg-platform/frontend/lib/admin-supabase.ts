@@ -1,8 +1,22 @@
 import { supabase } from './auth'
 import { getBookings, updateBookingStatus, type SavedBooking } from './bookings'
-import { createRegion, deleteRegion, getRegions, updateRegion, type Region } from './regions'
 
-export type AdminRegion = Region
+export type AdminRegion = {
+  id: string
+  name: string
+  tagline: string
+  heroImage: string
+  heroVideo: string
+  overview: string
+  highlights: string[]
+  gettingThere: string
+  bestTime: string
+  keyAttractions: { id: string; name: string; description: string }[]
+  seoTitle: string
+  seoDescription: string
+  createdAt?: string
+  updatedAt?: string
+}
 
 export type AdminMedia = {
   id: string
@@ -43,19 +57,34 @@ async function saveCollection<T>(key: string, items: T[]): Promise<void> {
 }
 
 export async function getAdminRegions(): Promise<AdminRegion[]> {
-  return getRegions()
+  return getCollection<AdminRegion>('admin_regions')
 }
 
-export async function createAdminRegion(data: Omit<AdminRegion, 'id' | 'slug' | 'createdAt' | 'updatedAt'>): Promise<AdminRegion> {
-  return createRegion(data)
+export async function createAdminRegion(data: Omit<AdminRegion, 'id' | 'createdAt' | 'updatedAt'>): Promise<AdminRegion> {
+  const all = await getAdminRegions()
+  const now = new Date().toISOString()
+  const item: AdminRegion = {
+    ...data,
+    id: `region-${Date.now()}`,
+    seoTitle: data.seoTitle || `${data.name} | Visit Drakensberg`,
+    createdAt: now,
+    updatedAt: now,
+  }
+  await saveCollection('admin_regions', [...all, item])
+  return item
 }
 
-export async function updateAdminRegion(id: string, data: Omit<AdminRegion, 'id' | 'slug' | 'createdAt' | 'updatedAt'>): Promise<AdminRegion> {
-  return updateRegion(id, data)
+export async function updateAdminRegion(id: string, data: Omit<AdminRegion, 'id' | 'createdAt' | 'updatedAt'>): Promise<AdminRegion> {
+  const all = await getAdminRegions()
+  const previous = all.find(item => item.id === id)
+  const updated: AdminRegion = { ...data, id, createdAt: previous?.createdAt, updatedAt: new Date().toISOString() }
+  await saveCollection('admin_regions', all.map(item => item.id === id ? updated : item))
+  return updated
 }
 
 export async function deleteAdminRegion(id: string): Promise<void> {
-  return deleteRegion(id)
+  const all = await getAdminRegions()
+  await saveCollection('admin_regions', all.filter(item => item.id !== id))
 }
 
 export async function getAdminMedia(): Promise<AdminMedia[]> {
