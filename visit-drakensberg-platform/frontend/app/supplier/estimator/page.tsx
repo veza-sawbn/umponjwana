@@ -50,6 +50,23 @@ const VEHICLE_MULTIPLIER: Record<string, number> = {
   'Sedan': 0.9,
 }
 
+type Fee = {
+  id: number
+  label: string
+  amount: number
+}
+
+type VehicleRateKey = '4×4' | 'Minibus' | 'Sedan'
+
+const VEHICLE_TYPES: VehicleRateKey[] = ['4×4', 'Minibus', 'Sedan']
+
+const DEFAULT_VEHICLE_RATES: Record<VehicleRateKey, number> = {
+  '4×4': 14,
+  Minibus: 18,
+  Sedan: 11,
+}
+
+
 function generateRef() {
   return 'VD-' + String(Math.floor(1000 + Math.random() * 9000))
 }
@@ -84,7 +101,7 @@ export default function EstimatorPage() {
   const [pickupDate, setPickupDate] = useState('')
   const [pickupTime, setPickupTime] = useState('')
   const [passengers, setPassengers] = useState(1)
-  const [vehicleType, setVehicleType] = useState('4×4')
+  const [vehicleType, setVehicleType] = useState<VehicleRateKey>('4×4')
   const [luggage, setLuggage] = useState('Standard')
   const [ratePerKm, setRatePerKm] = useState(12)
   const [minimumFare, setMinimumFare] = useState(350)
