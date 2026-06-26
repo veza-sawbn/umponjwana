@@ -25,7 +25,10 @@ export default function LoginPage() {
     try {
       const result = await signIn(data.email, data.password)
       const role = result?.user?.user_metadata?.role
-      router.push(role === 'supplier' ? '/supplier' : role === 'admin' ? '/admin' : '/dashboard')
+      const redirect = new URLSearchParams(window.location.search).get('redirect')
+      const defaultPath = role === 'supplier' ? '/supplier' : role === 'admin' ? '/admin' : '/dashboard'
+      const targetPath = redirect?.startsWith('/') && !redirect.startsWith('//') ? redirect : defaultPath
+      router.push(targetPath)
     } catch (err: unknown) {
       setAuthError(err instanceof Error ? err.message : 'Sign in failed')
     }
