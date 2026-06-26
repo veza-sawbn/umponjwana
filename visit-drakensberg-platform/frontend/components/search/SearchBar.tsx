@@ -1,30 +1,27 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { MapPin, Calendar, Users, Search } from 'lucide-react'
 import { useBooking } from '@/lib/booking-context'
+import { getRegionNames } from '@/lib/regions'
 
-const REGIONS = [
-  'All Drakensberg',
-  'North Berg',
-  'Central Berg',
-  'South Berg',
-  'Bergville & Surrounds',
-  'Winterton & Champagne Valley',
-  'Underberg & Himeville',
-  'Nottingham Road',
-]
+const DEFAULT_REGION_LABELS = ['All Drakensberg']
 
 export default function SearchBar() {
   const router = useRouter()
   const { setSearch, region: savedRegion, checkIn: savedCheckIn, checkOut: savedCheckOut, guests: savedGuests } = useBooking()
   const [region, setRegion] = useState(savedRegion || '')
+  const [regions, setRegions] = useState(DEFAULT_REGION_LABELS)
   const [checkIn, setCheckIn] = useState(savedCheckIn || '')
   const [checkOut, setCheckOut] = useState(savedCheckOut || '')
   const [guests, setGuests] = useState(savedGuests || 2)
 
   const today = new Date().toISOString().split('T')[0]
+
+  useEffect(() => {
+    getRegionNames().then(names => setRegions(['All Drakensberg', ...names]))
+  }, [])
 
   function handleSearch() {
     setSearch(region, checkIn, checkOut, guests)
@@ -51,7 +48,7 @@ export default function SearchBar() {
             onChange={e => setRegion(e.target.value)}
             className="w-full font-sans text-sm text-[#111] bg-transparent focus:outline-none appearance-none cursor-pointer"
           >
-            {REGIONS.map(r => (
+            {regions.map(r => (
               <option key={r} value={r === 'All Drakensberg' ? '' : r}>{r}</option>
             ))}
           </select>

@@ -1,19 +1,8 @@
 import { supabase } from './auth'
 
-export const PROPERTY_REGIONS = [
-  'North Berg',
-  'Central Berg',
-  'South Berg',
-  'Royal Natal National Park',
-  'Champagne Valley',
-  'Bergville & Surrounds',
-  'Winterton & Champagne Valley',
-  'Underberg & Himeville',
-  'Nottingham Road',
-  'Giants Castle',
-  'Cathedral Peak',
-  'Sani Pass',
-]
+import { DEFAULT_REGIONS } from './regions'
+
+export const PROPERTY_REGIONS = DEFAULT_REGIONS.map(region => region.name)
 
 export type Property = {
   id: string
