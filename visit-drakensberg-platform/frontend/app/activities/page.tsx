@@ -1,6 +1,8 @@
 'use client'
+import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import Footer from '@/components/layout/Footer'
+import { getActivities, type Activity } from '@/lib/activities'
 
 const CATEGORIES = [
   { label: 'Adventure', slug: 'adventure' },
@@ -22,6 +24,27 @@ const ACTIVITIES = [
 ]
 
 export default function ActivitiesPage() {
+  const [live, setLive] = useState<Activity[]>([])
+
+  useEffect(() => {
+    getActivities().then(items => setLive(items.filter(item => item.status === 'active')))
+  }, [])
+
+  const activities = useMemo(() => [
+    ...ACTIVITIES,
+    ...live.map(a => ({
+      id: a.id,
+      title: a.name,
+      location: a.meetingPoint || 'Drakensberg',
+      category: a.category,
+      price: a.pricePerPerson,
+      duration: `${a.durationH} h${a.durationM ? ` ${a.durationM} m` : ''}`,
+      img: 'https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?w=800&q=80',
+      rating: 0,
+      reviews: 0,
+    })),
+  ], [live])
+
   return (
     <main className="bg-mist min-h-screen pt-16">
       <section className="bg-forest text-white py-16 px-6 lg:px-12">
@@ -45,10 +68,10 @@ export default function ActivitiesPage() {
 
       <div className="max-w-[1440px] mx-auto px-6 lg:px-12 py-12">
         <p className="font-sans text-sm text-forest/50 mb-8">
-          <span className="text-forest font-medium">{ACTIVITIES.length}</span> experiences
+          <span className="text-forest font-medium">{activities.length}</span> experiences
         </p>
         <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-x-6 gap-y-10">
-          {ACTIVITIES.map((a) => (
+          {activities.map((a) => (
             <Link key={a.id} href={`/activities/${a.id}`} className="group block">
               <div className="relative overflow-hidden aspect-square mb-4">
                 <img src={a.img} alt={a.title}
