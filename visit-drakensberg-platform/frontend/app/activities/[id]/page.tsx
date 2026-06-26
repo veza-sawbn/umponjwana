@@ -1,59 +1,86 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useParams } from 'next/navigation'
 import Link from 'next/link'
 import Navbar from '@/components/layout/Navbar'
 import Footer from '@/components/layout/Footer'
-import { ArrowLeft, Clock, Users, Star, CheckCircle, Calendar, MapPin } from 'lucide-react'
+import { ArrowLeft, Clock, Users, CheckCircle, Calendar, MapPin } from 'lucide-react'
 import UpcomingDepartures from '@/components/tours/UpcomingDepartures'
 import { getTourDates } from '@/lib/tour-dates'
 import { useBooking } from '@/lib/booking-context'
 import { Check, Plus } from 'lucide-react'
+import { getActivityById } from '@/lib/activities'
 
-const ACTIVITIES: Record<string, any> = {
-  a1: {
-    title: 'Guided Rock Climbing Experience', category: 'Adventure', location: 'Amphitheatre, Royal Natal', duration: 'Full day (6–8 hrs)', group_size: '2–8 people', price_per_person: 750,
-    description: 'Experience the dramatic basalt cliffs of the Drakensberg under the expert supervision of FGASA-certified climbing guides. Routes range from introductory single-pitch climbs to challenging multi-pitch ascents on classic Drakensberg routes. All equipment is provided; no prior experience is necessary for beginner routes.',
-    includes: ['All climbing equipment', 'Harness and helmet', 'Instruction and safety briefing', 'Packed lunch', 'Transport from meeting point', 'FGASA-certified guide'],
-    what_to_bring: ['Comfortable athletic clothing', 'Closed-toe shoes', '1.5L water', 'Sunscreen and hat', 'Camera'],
-    images: ['bg-[#1a1a2e]', 'bg-[#2d6a4f]', 'bg-[#8B4513]'],
-    guides: [
-      { id: 'g1', full_name: 'Sipho Dlamini', specialties: ['Rock climbing', 'Abseiling'], languages: ['English', 'Zulu'], initials: 'SD' },
-      { id: 'g5', full_name: 'Bongani Khumalo', specialties: ['Rock climbing', 'Mountain biking'], languages: ['English', 'Zulu'], initials: 'BK' },
-    ],
-    supplier: { name: 'Drakensberg Adventures', member_since: '2020', response_rate: '98%' },
-  },
-  a2: {
-    title: 'San Rock Art Full-Day Tour', category: 'Culture & Heritage', location: "Giant's Castle", duration: 'Full day', group_size: '2–15 people', price_per_person: 620,
-    description: 'Explore the finest San Bushman rock art sites in the Drakensberg with a qualified heritage guide. Over 5,000 individual images have been documented at the Giant\'s Castle Main Caves alone, making this one of the most significant rock art sites in southern Africa.',
-    includes: ['Heritage guide fee', 'Park entry permit', 'Light lunch', 'Information booklet'],
-    what_to_bring: ['Comfortable walking shoes', '2L water', 'Hat and sunscreen', 'Notebook'],
-    images: ['bg-[#8B4513]', 'bg-[#C9A96E]/60', 'bg-[#1a1a2e]'],
-    guides: [
-      { id: 'g4', full_name: 'Lerato Sithole', specialties: ['San rock art', 'Heritage tours'], languages: ['English', 'Sotho', 'Zulu'], initials: 'LS' },
-    ],
-    supplier: { name: 'Berg Cultural Tours', member_since: '2021', response_rate: '95%' },
-  },
+function mapActivityToView(a: any) {
+  const durationParts = []
+  if (a.durationH) durationParts.push(`${a.durationH}h`)
+  if (a.durationM) durationParts.push(`${a.durationM}min`)
+  const duration = durationParts.length ? durationParts.join(' ') : 'See details'
+  const whatToWear = a.whatToWear
+    ? a.whatToWear.split(/[,\n]+/).map((s: string) => s.trim()).filter(Boolean)
+    : []
+  return {
+    title: a.name,
+    category: a.category,
+    location: a.meetingPoint || '',
+    duration,
+    group_size: a.maxGroup ? `Up to ${a.maxGroup} people` : '',
+    price_per_person: a.pricePerPerson || 0,
+    description: a.description,
+    includes: Array.isArray(a.included) ? a.included : [],
+    what_to_bring: whatToWear,
+    supplier: { name: a.supplierName || '' },
+  }
 }
-
-const REVIEWS = [
-  { name: 'Mark D.', rating: 5, date: 'June 2026', comment: 'Absolutely world-class experience. Our guide was safety-focused, encouraging and deeply knowledgeable. Reached the top of our first multi-pitch climb!' },
-  { name: 'Lindiwe K.', rating: 5, date: 'May 2026', comment: 'Booked for my partner\'s birthday. Neither of us had climbed before — our guide was patient and made us feel completely safe throughout.' },
-  { name: 'Tom B.', rating: 4, date: 'April 2026', comment: 'Great day out. The views from the top of the climb were incredible. Recommend bringing your own snacks in addition to the provided lunch.' },
-]
 
 export default function ActivityDetailPage() {
   const { id } = useParams() as { id: string }
-  const activity = ACTIVITIES[id] || ACTIVITIES['a1']
+  const [activity, setActivity] = useState<any>(null)
+  const [loading, setLoading] = useState(true)
   const booking = useBooking()
 
   const [date, setDate] = useState(booking.checkIn || '')
   const [groupSize, setGroupSize] = useState(booking.guests || 2)
-  const total = activity.price_per_person * groupSize
 
+  useEffect(() => {
+    setLoading(true)
+    getActivityById(id)
+      .then(data => {
+        if (data) setActivity(mapActivityToView(data))
+        setLoading(false)
+      })
+      .catch(() => setLoading(false))
+  }, [id])
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-[#F7F5F2]">
+        <Navbar />
+        <div className="flex items-center justify-center min-h-[60vh]">
+          <p className="font-sans text-gray-500">Loading activity…</p>
+        </div>
+        <Footer />
+      </div>
+    )
+  }
+
+  if (!activity) {
+    return (
+      <div className="min-h-screen bg-[#F7F5F2]">
+        <Navbar />
+        <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4">
+          <p className="font-display italic text-2xl text-gray-700">Activity not found</p>
+          <Link href="/activities" className="font-sans text-sm text-[#2d6a4f] hover:underline">← Back to Activities</Link>
+        </div>
+        <Footer />
+      </div>
+    )
+  }
+
+  const total = activity.price_per_person * groupSize
   const addonId = `activity-${id}-${date}`
-  const isAdded = booking.addons.some(a => a.id === addonId)
+  const isAdded = booking.addons.some((a: any) => a.id === addonId)
 
   function toggleAddon() {
     if (isAdded) {
@@ -82,19 +109,12 @@ export default function ActivityDetailPage() {
           <span className="inline-block font-sans text-[10px] tracking-[0.14em] uppercase bg-[#C9A96E]/20 text-[#C9A96E] px-3 py-1.5 mb-4">{activity.category}</span>
           <h1 className="font-display italic text-5xl lg:text-6xl mb-4">{activity.title}</h1>
           <div className="flex flex-wrap gap-5 font-sans text-sm text-white/60">
-            <span className="flex items-center gap-1.5"><MapPin size={14} />{activity.location}</span>
-            <span className="flex items-center gap-1.5"><Clock size={14} />{activity.duration}</span>
-            <span className="flex items-center gap-1.5"><Users size={14} />{activity.group_size}</span>
+            {activity.location && <span className="flex items-center gap-1.5"><MapPin size={14} />{activity.location}</span>}
+            {activity.duration && <span className="flex items-center gap-1.5"><Clock size={14} />{activity.duration}</span>}
+            {activity.group_size && <span className="flex items-center gap-1.5"><Users size={14} />{activity.group_size}</span>}
           </div>
         </div>
       </section>
-
-      {/* Image gallery */}
-      <div className="grid grid-cols-3 gap-1 h-64">
-        <div className={`col-span-1 ${activity.images[0]}`} />
-        <div className={`col-span-1 ${activity.images[1]}`} />
-        <div className={`col-span-1 ${activity.images[2]}`} />
-      </div>
 
       <main className="max-w-[1440px] mx-auto px-6 lg:px-12 py-16">
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-12">
@@ -105,95 +125,52 @@ export default function ActivityDetailPage() {
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-              <div>
-                <h3 className="font-display italic text-xl text-[#000000] mb-4">What's Included</h3>
-                <div className="space-y-2">
-                  {activity.includes.map((item: string) => (
-                    <div key={item} className="flex items-start gap-2.5">
-                      <CheckCircle size={14} className="text-[#2d6a4f] mt-0.5 shrink-0" />
-                      <span className="font-sans text-sm text-gray-700">{item}</span>
-                    </div>
-                  ))}
+              {activity.includes.length > 0 && (
+                <div>
+                  <h3 className="font-display italic text-xl text-[#000000] mb-4">What's Included</h3>
+                  <div className="space-y-2">
+                    {activity.includes.map((item: string) => (
+                      <div key={item} className="flex items-start gap-2.5">
+                        <CheckCircle size={14} className="text-[#2d6a4f] mt-0.5 shrink-0" />
+                        <span className="font-sans text-sm text-gray-700">{item}</span>
+                      </div>
+                    ))}
+                  </div>
                 </div>
-              </div>
-              <div>
-                <h3 className="font-display italic text-xl text-[#000000] mb-4">What to Bring</h3>
-                <div className="space-y-2">
-                  {activity.what_to_bring.map((item: string) => (
-                    <div key={item} className="flex items-start gap-2.5">
-                      <span className="text-[#C9A96E] mt-0.5 shrink-0 text-sm">→</span>
-                      <span className="font-sans text-sm text-gray-700">{item}</span>
-                    </div>
-                  ))}
+              )}
+              {activity.what_to_bring.length > 0 && (
+                <div>
+                  <h3 className="font-display italic text-xl text-[#000000] mb-4">What to Bring</h3>
+                  <div className="space-y-2">
+                    {activity.what_to_bring.map((item: string) => (
+                      <div key={item} className="flex items-start gap-2.5">
+                        <span className="text-[#C9A96E] mt-0.5 shrink-0 text-sm">→</span>
+                        <span className="font-sans text-sm text-gray-700">{item}</span>
+                      </div>
+                    ))}
+                  </div>
                 </div>
-              </div>
+              )}
             </div>
 
-            {/* Upcoming departures */}
             <UpcomingDepartures
               dates={getTourDates(id)}
               context="Scheduled departures, packages and experiences for this activity"
             />
 
-            {/* Guides */}
-            <div>
-              <h2 className="font-display italic text-2xl text-[#000000] mb-6">Your Instructors & Guides</h2>
-              <div className="flex gap-4 overflow-x-auto pb-2">
-                {activity.guides.map((guide: any) => (
-                  <div key={guide.id} className="bg-white border border-gray-200 p-5 min-w-[220px]">
-                    <div className="w-12 h-12 bg-[#2d6a4f]/10 flex items-center justify-center font-display italic text-[#2d6a4f] text-xl mb-3">{guide.initials}</div>
-                    <h3 className="font-display italic text-lg mb-1">{guide.full_name}</h3>
-                    <p className="font-sans text-xs text-gray-500 mb-2">{guide.specialties.join(' · ')}</p>
-                    <div className="flex flex-wrap gap-1 mb-3">
-                      {guide.languages.map((l: string) => <span key={l} className="bg-[#F7F5F2] px-2 py-0.5 font-sans text-xs">{l}</span>)}
-                    </div>
-                    <Link href={`/guides/${guide.id}`} className="font-sans text-xs text-[#2d6a4f] hover:underline">View profile →</Link>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* Reviews */}
-            <div>
-              <h2 className="font-display italic text-2xl text-[#000000] mb-5">Guest Reviews</h2>
-              <div className="space-y-4">
-                {REVIEWS.map((r, i) => (
-                  <div key={i} className="bg-white border border-gray-200 p-5">
-                    <div className="flex items-center justify-between mb-2">
-                      <div className="flex items-center gap-2">
-                        <div className="w-7 h-7 bg-[#2d6a4f]/10 flex items-center justify-center font-display italic text-[#2d6a4f] text-sm">{r.name[0]}</div>
-                        <div>
-                          <p className="font-sans text-sm font-medium">{r.name}</p>
-                          <p className="font-sans text-xs text-gray-400">{r.date}</p>
-                        </div>
-                      </div>
-                      <div className="flex gap-0.5">{Array.from({ length: r.rating }).map((_, j) => <Star key={j} size={11} className="text-[#C9A96E] fill-[#C9A96E]" />)}</div>
-                    </div>
-                    <p className="font-sans text-sm text-gray-700 leading-relaxed">{r.comment}</p>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* Provider */}
-            <div className="bg-white border border-gray-200 p-6">
-              <h3 className="font-display italic text-xl mb-4">About the Provider</h3>
-              <div className="flex items-start justify-between">
-                <div>
-                  <p className="font-display italic text-2xl mb-1">{activity.supplier.name}</p>
-                  <div className="flex gap-4 font-sans text-sm text-gray-500">
-                    <span>Member since {activity.supplier.member_since}</span>
-                    <span>Response rate: {activity.supplier.response_rate}</span>
-                  </div>
+            {activity.supplier.name && (
+              <div className="bg-white border border-gray-200 p-6">
+                <h3 className="font-display italic text-xl mb-4">About the Provider</h3>
+                <div className="flex items-start justify-between">
+                  <p className="font-display italic text-2xl">{activity.supplier.name}</p>
+                  <button className="border border-[#2d6a4f] text-[#2d6a4f] px-5 py-2.5 font-sans text-sm hover:bg-[#2d6a4f] hover:text-white transition-colors">
+                    Contact Supplier
+                  </button>
                 </div>
-                <button className="border border-[#2d6a4f] text-[#2d6a4f] px-5 py-2.5 font-sans text-sm hover:bg-[#2d6a4f] hover:text-white transition-colors">
-                  Contact Supplier
-                </button>
               </div>
-            </div>
+            )}
           </div>
 
-          {/* Booking sidebar */}
           <div>
             <div className="bg-white border border-gray-200 p-6 sticky top-24">
               <div className="mb-5">
@@ -235,9 +212,9 @@ export default function ActivityDetailPage() {
               >
                 {isAdded ? <><Check size={14} /> Added to Booking</> : <><Plus size={14} /> Add to Booking</>}
               </button>
-              {booking.hasActiveSearch && (
+              {isAdded && (
                 <p className="font-sans text-xs text-center text-[#2d6a4f] mt-2">
-                  {isAdded ? 'Saved to your trip — continue exploring' : 'Add to your trip and keep browsing'}
+                  Saved to your trip — continue exploring
                 </p>
               )}
               <p className="font-sans text-xs text-center text-gray-400 mt-2">Free cancellation up to 48 hours before</p>

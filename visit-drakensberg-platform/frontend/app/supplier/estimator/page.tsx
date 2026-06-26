@@ -2,7 +2,7 @@
 
 import { useRouter } from 'next/navigation'
 import { useState, useMemo } from 'react'
-import { ChevronLeft, Copy, Send, CheckCircle, MapPin, Plus, Trash2, Calculator } from 'lucide-react'
+import { ChevronLeft, Copy, Send, CheckCircle, MapPin, Plus, Trash2 } from 'lucide-react'
 
 function F({ label, required, children }: { label: string; required?: boolean; children: React.ReactNode }) {
   return (
@@ -17,12 +17,40 @@ function F({ label, required, children }: { label: string; required?: boolean; c
 
 const INPUT = 'w-full font-sans text-sm border border-black/10 rounded-lg px-3 py-2 outline-none focus:border-[#C9A96E]/50 bg-white'
 
-type GeoPoint = {
+type LocationOption = {
+  label: string
   lat: number
   lng: number
 }
 
-type CustomFee = {
+type Fee = {
+  id: number
+  label: string
+  amount: number
+}
+
+const LOCATION_OPTIONS: LocationOption[] = [
+  { label: 'King Shaka International Airport', lat: -29.6144, lng: 31.1197 },
+  { label: 'Durban CBD', lat: -29.8587, lng: 31.0218 },
+  { label: 'Pietermaritzburg', lat: -29.6006, lng: 30.3794 },
+  { label: 'Johannesburg OR Tambo Airport', lat: -26.1337, lng: 28.2420 },
+  { label: 'Central Drakensberg / Champagne Valley', lat: -29.0046, lng: 29.4317 },
+  { label: 'Drakensberg Sun Resort', lat: -29.0217, lng: 29.4381 },
+  { label: "Monk's Cowl Trailhead", lat: -29.0394, lng: 29.3954 },
+  { label: 'Royal Natal National Park', lat: -28.6852, lng: 28.9445 },
+  { label: 'Cathedral Peak Hotel', lat: -28.9466, lng: 29.2044 },
+  { label: 'Underberg', lat: -29.7904, lng: 29.4948 },
+  { label: 'Himeville', lat: -29.7468, lng: 29.5136 },
+  { label: 'Sani Pass Border Post', lat: -29.5848, lng: 29.2871 },
+]
+
+const VEHICLE_MULTIPLIER: Record<string, number> = {
+  '4×4': 1.0,
+  'Minibus': 1.4,
+  'Sedan': 0.9,
+}
+
+type Fee = {
   id: number
   label: string
   amount: number
@@ -51,7 +79,7 @@ function toRad(value: number) {
   return (value * Math.PI) / 180
 }
 
-function calculateDistanceKm(from: GeoPoint, to: GeoPoint) {
+function calculateDistanceKm(from: LocationOption, to: LocationOption) {
   const earthRadiusKm = 6371
   const dLat = toRad(to.lat - from.lat)
   const dLng = toRad(to.lng - from.lng)
@@ -68,19 +96,16 @@ export default function EstimatorPage() {
 
   const [guestName, setGuestName] = useState('')
   const [guestEmail, setGuestEmail] = useState('')
-  const [pickupAddress, setPickupAddress] = useState('King Shaka International Airport, Durban')
-  const [dropoffAddress, setDropoffAddress] = useState('Champagne Valley, Central Drakensberg')
-  const [distanceKm, setDistanceKm] = useState(0)
-  const [distanceStatus, setDistanceStatus] = useState('Enter pickup and drop-off addresses, then calculate distance.')
-  const [calculatingDistance, setCalculatingDistance] = useState(false)
+  const [pickupLocation, setPickupLocation] = useState(LOCATION_OPTIONS[0].label)
+  const [dropoffLocation, setDropoffLocation] = useState(LOCATION_OPTIONS[4].label)
   const [pickupDate, setPickupDate] = useState('')
   const [pickupTime, setPickupTime] = useState('')
   const [passengers, setPassengers] = useState(1)
   const [vehicleType, setVehicleType] = useState<VehicleRateKey>('4×4')
   const [luggage, setLuggage] = useState('Standard')
-  const [vehicleRates, setVehicleRates] = useState<Record<VehicleRateKey, number>>(DEFAULT_VEHICLE_RATES)
+  const [ratePerKm, setRatePerKm] = useState(12)
   const [minimumFare, setMinimumFare] = useState(350)
-  const [fees, setFees] = useState<CustomFee[]>([{ id: 1, label: 'Booking/admin fee', amount: 150 }])
+  const [fees, setFees] = useState<Fee[]>([{ id: 1, label: 'Booking/admin fee', amount: 150 }])
   const [returnTrip, setReturnTrip] = useState(false)
   const [notes, setNotes] = useState('')
 
@@ -88,11 +113,14 @@ export default function EstimatorPage() {
   const [sendMsg, setSendMsg] = useState('')
   const [paid, setPaid] = useState(false)
 
-  const routeLabel = `${pickupAddress || 'Pickup address'} → ${dropoffAddress || 'Drop-off address'}`
-  const selectedRatePerKm = vehicleRates[vehicleType] ?? 0
+  const pickup = LOCATION_OPTIONS.find(location => location.label === pickupLocation) ?? LOCATION_OPTIONS[0]
+  const dropoff = LOCATION_OPTIONS.find(location => location.label === dropoffLocation) ?? LOCATION_OPTIONS[4]
+  const routeLabel = `${pickup.label} → ${dropoff.label}`
+  const distanceKm = useMemo(() => calculateDistanceKm(pickup, dropoff), [pickup, dropoff])
 
   const { total, lineItems } = useMemo(() => {
-    const oneWayDistanceFare = Math.round(distanceKm * Math.max(selectedRatePerKm, 0))
+    const multiplier = VEHICLE_MULTIPLIER[vehicleType] ?? 1.0
+    const oneWayDistanceFare = Math.round(distanceKm * Math.max(ratePerKm, 0) * multiplier)
     const minimumAdjustedFare = Math.max(oneWayDistanceFare, Math.max(minimumFare, 0))
     const minimumAdjustment = minimumAdjustedFare - oneWayDistanceFare
     const rawTripFare = returnTrip ? oneWayDistanceFare * 2 : oneWayDistanceFare
@@ -102,57 +130,16 @@ export default function EstimatorPage() {
     const total = tripFare + luggageSurcharge + customFeesTotal
 
     const lineItems = [
-      { label: 'Distance fare', sublabel: `${distanceKm} km × ${fmt(selectedRatePerKm)} / km · ${vehicleType}${returnTrip ? ' · Return' : ''}`, amount: rawTripFare },
+      { label: 'Distance fare', sublabel: `${distanceKm} km × ${fmt(ratePerKm)} / km · ${vehicleType}${returnTrip ? ' · Return' : ''}`, amount: rawTripFare },
       ...(minimumAdjustment > 0 ? [{ label: 'Minimum fare adjustment', sublabel: `Minimum one-way fare ${fmt(minimumFare)}`, amount: returnTrip ? minimumAdjustment * 2 : minimumAdjustment }] : []),
       ...(luggageSurcharge > 0 ? [{ label: 'Heavy luggage surcharge', sublabel: '', amount: luggageSurcharge }] : []),
       ...fees.filter(fee => fee.label || fee.amount).map(fee => ({ label: fee.label || 'Custom fee', sublabel: 'Supplier-added fee', amount: fee.amount || 0 })),
     ]
 
     return { total, lineItems }
-  }, [distanceKm, selectedRatePerKm, vehicleType, returnTrip, luggage, fees, minimumFare])
+  }, [distanceKm, ratePerKm, vehicleType, returnTrip, luggage, fees, minimumFare])
 
-
-  function updateVehicleRate(type: VehicleRateKey, value: string) {
-    setVehicleRates(current => ({ ...current, [type]: Number(value) }))
-  }
-
-  async function geocodeAddress(address: string): Promise<GeoPoint | null> {
-    const response = await fetch(`https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${encodeURIComponent(address)}`)
-    const results = await response.json()
-    if (!Array.isArray(results) || !results[0]) return null
-    return { lat: Number(results[0].lat), lng: Number(results[0].lon) }
-  }
-
-  async function calculateAddressDistance() {
-    if (!pickupAddress.trim() || !dropoffAddress.trim()) {
-      setDistanceStatus('Add both a pickup and drop-off address before calculating distance.')
-      return
-    }
-
-    setCalculatingDistance(true)
-    setDistanceStatus('Finding addresses and calculating route distance…')
-    try {
-      const [from, to] = await Promise.all([geocodeAddress(pickupAddress), geocodeAddress(dropoffAddress)])
-      if (!from || !to) {
-        setDistanceStatus('Could not find one of those addresses. Add more detail and try again.')
-        return
-      }
-
-      const routeResponse = await fetch(`https://router.project-osrm.org/route/v1/driving/${from.lng},${from.lat};${to.lng},${to.lat}?overview=false`)
-      const routeData = await routeResponse.json()
-      const routeDistance = routeData?.routes?.[0]?.distance
-      const nextDistanceKm = routeDistance ? Math.round(routeDistance / 1000) : calculateDistanceKm(from, to)
-      setDistanceKm(nextDistanceKm)
-      setDistanceStatus(routeDistance ? 'Distance calculated from the entered addresses.' : 'Road route unavailable; using an adjusted straight-line estimate.')
-    } catch (error) {
-      console.error('[estimator] distance calculation failed:', error)
-      setDistanceStatus('Distance service is unavailable right now. Please try again or enter a manual estimate later.')
-    } finally {
-      setCalculatingDistance(false)
-    }
-  }
-
-  function updateFee(id: number, field: keyof Omit<CustomFee, 'id'>, value: string) {
+  function updateFee(id: number, field: keyof Omit<Fee, 'id'>, value: string) {
     setFees(current => current.map(fee => fee.id === id ? { ...fee, [field]: field === 'amount' ? Number(value) : value } : fee))
   }
 
@@ -197,17 +184,24 @@ export default function EstimatorPage() {
             </div>
 
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-              <F label="Pickup Address" required><input className={INPUT} value={pickupAddress} onChange={e => setPickupAddress(e.target.value)} placeholder="Full pickup address" /></F>
-              <F label="Drop-off Address" required><input className={INPUT} value={dropoffAddress} onChange={e => setDropoffAddress(e.target.value)} placeholder="Full drop-off address" /></F>
+              <F label="Pickup Location" required>
+                <select className={INPUT} value={pickupLocation} onChange={e => setPickupLocation(e.target.value)}>
+                  {LOCATION_OPTIONS.map(location => <option key={location.label}>{location.label}</option>)}
+                </select>
+              </F>
+              <F label="Drop-off Location" required>
+                <select className={INPUT} value={dropoffLocation} onChange={e => setDropoffLocation(e.target.value)}>
+                  {LOCATION_OPTIONS.map(location => <option key={location.label}>{location.label}</option>)}
+                </select>
+              </F>
             </div>
 
             <div className="rounded-xl border border-[#C9A96E]/20 bg-[#C9A96E]/5 p-4 flex items-start gap-3">
               <MapPin size={18} className="text-[#C9A96E] mt-0.5" />
-              <div className="flex-1">
-                <p className="font-sans text-sm font-semibold text-black">Estimated route distance: {distanceKm > 0 ? `${distanceKm} km` : 'Not calculated yet'}</p>
-                <p className="font-sans text-xs text-black/50 mt-1">{distanceStatus}</p>
+              <div>
+                <p className="font-sans text-sm font-semibold text-black">Estimated route distance: {distanceKm} km</p>
+                <p className="font-sans text-xs text-black/50 mt-1">Calculated from pickup and drop-off coordinates with a road-distance adjustment for quote planning.</p>
               </div>
-              <button type="button" onClick={calculateAddressDistance} disabled={calculatingDistance} className="flex items-center gap-1.5 rounded-lg bg-[#C9A96E] px-3 py-2 font-sans text-xs text-white hover:bg-[#b8935a] disabled:opacity-60"><Calculator size={13} /> {calculatingDistance ? 'Calculating…' : 'Calculate'}</button>
             </div>
 
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -218,13 +212,13 @@ export default function EstimatorPage() {
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
               <F label="Passengers" required><input className={INPUT} type="number" min={1} max={50} value={passengers} onChange={e => setPassengers(Number(e.target.value))} /></F>
               <F label="Vehicle Type" required>
-                <select className={INPUT} value={vehicleType} onChange={e => setVehicleType(e.target.value as VehicleRateKey)}>{VEHICLE_TYPES.map(type => <option key={type}>{type}</option>)}</select>
+                <select className={INPUT} value={vehicleType} onChange={e => setVehicleType(e.target.value)}><option>4×4</option><option>Minibus</option><option>Sedan</option></select>
               </F>
               <F label="Luggage"><select className={INPUT} value={luggage} onChange={e => setLuggage(e.target.value)}><option>Light</option><option>Standard</option><option>Heavy</option></select></F>
             </div>
 
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-              {VEHICLE_TYPES.map(type => <F key={type} label={`${type} rate per km`} required><input className={INPUT} type="number" min={0} step="0.5" value={vehicleRates[type]} onChange={e => updateVehicleRate(type, e.target.value)} /></F>)}
+              <F label="Your Rate per km" required><input className={INPUT} type="number" min={0} step="0.5" value={ratePerKm} onChange={e => setRatePerKm(Number(e.target.value))} /></F>
               <F label="Minimum One-way Fare"><input className={INPUT} type="number" min={0} step="50" value={minimumFare} onChange={e => setMinimumFare(Number(e.target.value))} /></F>
             </div>
 
