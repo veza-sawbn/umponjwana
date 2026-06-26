@@ -7,6 +7,7 @@ import Navbar from '@/components/layout/Navbar'
 import Footer from '@/components/layout/Footer'
 import { Calendar, Users, MapPin, ArrowRight, Search, SlidersHorizontal, X, Check, Bed } from 'lucide-react'
 import { useBooking } from '@/lib/booking-context'
+import { getRegionNames, DEFAULT_REGIONS } from '@/lib/regions'
 
 /* ── Mock data ─────────────────────────────────────────────────────────────── */
 
@@ -98,9 +99,14 @@ function SearchResults() {
   const [checkOut, setCheckOut] = useState(checkOutParam)
   const [guests, setGuests] = useState(guestsParam)
   const [showFilters, setShowFilters] = useState(false)
+  const [regionOptions, setRegionOptions] = useState(DEFAULT_REGIONS.map(r => r.name))
   const [availableOnly, setAvailableOnly] = useState(false)
 
   const today = new Date().toISOString().split('T')[0]
+
+  useEffect(() => {
+    getRegionNames().then(setRegionOptions)
+  }, [])
   const numNights = nights(checkIn, checkOut)
 
   function refine() {
@@ -143,7 +149,7 @@ function SearchResults() {
                 className="font-sans text-sm bg-transparent focus:outline-none"
               >
                 <option value="">All Drakensberg</option>
-                {['Northern Berg','Central Berg','Southern Berg','Royal Natal','Champagne Valley',"Giant's Castle",'Sani Pass'].map(r => (
+                {regionOptions.map(r => (
                   <option key={r} value={r}>{r}</option>
                 ))}
               </select>

@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { ChevronRight, ChevronLeft } from 'lucide-react'
 import { getPropertyById, updateProperty, PROPERTY_REGIONS } from '@/lib/properties'
+import { getRegionNames } from '@/lib/regions'
 
 const PROPERTY_TYPES = ['Lodge', 'Guesthouse', 'Hotel', 'Self-catering Cottage', 'Campsite', 'Backpackers', 'Boutique Hotel']
 const AMENITIES = ['Swimming Pool', 'Braai Facilities', 'Wi-Fi', 'Restaurant', 'Bar', 'Spa', 'Gym', 'Laundry', 'Pet-Friendly', 'Wheelchair Access', 'Airport Transfers', 'Hiking Trails Access']
@@ -13,6 +14,7 @@ export default function EditPropertyPage() {
   const router = useRouter()
   const [step, setStep] = useState(0)
   const [saving, setSaving] = useState(false)
+  const [regions, setRegions] = useState<string[]>(PROPERTY_REGIONS)
   const [loading, setLoading] = useState(true)
   const [form, setForm] = useState({
     name: '', type: '', description: '', starRating: '',
@@ -47,6 +49,10 @@ export default function EditPropertyPage() {
       setLoading(false)
     })
   }, [id])
+
+  useEffect(() => {
+    getRegionNames().then(setRegions)
+  }, [])
 
   function setField(key: string, val: unknown) {
     setForm(f => ({ ...f, [key]: val }))
@@ -151,7 +157,7 @@ export default function EditPropertyPage() {
             <Field label="Region" required>
               <select value={form.region} onChange={e => setField('region', e.target.value)} className={input}>
                 <option value="">Select region…</option>
-                {PROPERTY_REGIONS.map(r => <option key={r}>{r}</option>)}
+                {regions.map(r => <option key={r} value={r}>{r}</option>)}
               </select>
             </Field>
             <Field label="Street Address">
