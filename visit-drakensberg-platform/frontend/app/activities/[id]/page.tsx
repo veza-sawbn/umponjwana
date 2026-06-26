@@ -202,10 +202,16 @@ export default function ActivityDetailPage() {
                   <span className="text-[#2d6a4f]">R {total.toLocaleString()}</span>
                 </div>
               </div>
+              {!date && (
+                <p className="font-sans text-xs text-amber-600 mb-2">Please select a date to add this activity.</p>
+              )}
               <button
                 onClick={toggleAddon}
+                disabled={!date && !isAdded}
                 className={`w-full py-3.5 font-sans text-sm font-medium transition-colors flex items-center justify-center gap-2 ${
-                  isAdded
+                  !date && !isAdded
+                    ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                    : isAdded
                     ? 'bg-[#2d6a4f] text-white hover:bg-red-600'
                     : 'bg-[#2d6a4f] text-white hover:bg-[#235a3f]'
                 }`}
