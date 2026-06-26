@@ -212,9 +212,9 @@ export default function ActivityDetailPage() {
               >
                 {isAdded ? <><Check size={14} /> Added to Booking</> : <><Plus size={14} /> Add to Booking</>}
               </button>
-              {booking.hasActiveSearch && (
+              {isAdded && (
                 <p className="font-sans text-xs text-center text-[#2d6a4f] mt-2">
-                  {isAdded ? 'Saved to your trip — continue exploring' : 'Add to your trip and keep browsing'}
+                  Saved to your trip — continue exploring
                 </p>
               )}
               <p className="font-sans text-xs text-center text-gray-400 mt-2">Free cancellation up to 48 hours before</p>

@@ -20,9 +20,8 @@ export default function BookingBar() {
   const [open, setOpen] = useState(false)
 
   const hidden = ['/admin', '/checkout', '/auth'].some(p => pathname.startsWith(p))
-  if (hidden || !booking.hasActiveSearch) return null
-
   const itemCount = (booking.stay ? 1 : 0) + booking.addons.length + (booking.shuttle ? 1 : 0)
+  if (hidden || (!booking.hasActiveSearch && itemCount === 0)) return null
 
   function handleCheckout() {
     if (!booking.shuttle) {
