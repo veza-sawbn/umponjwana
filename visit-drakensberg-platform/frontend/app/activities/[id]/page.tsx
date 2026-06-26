@@ -14,19 +14,7 @@ import { getActivityById } from '@/lib/activities'
 
 const MOCK_ACTIVITIES: Record<string, any> = {
   a1: {
-    title: 'Guided Rock Climbing Experience', category: 'Adventure', location: 'Amphitheatre, Royal Natal', duration: 'Full day (6–8 hrs)', group_size: '2–8 people', price_per_person: 750,
-    description: 'Experience the dramatic basalt cliffs of the Drakensberg under the expert supervision of FGASA-certified climbing guides. Routes range from introductory single-pitch climbs to challenging multi-pitch ascents on classic Drakensberg routes. All equipment is provided; no prior experience is necessary for beginner routes.',
-    includes: ['All climbing equipment', 'Harness and helmet', 'Instruction and safety briefing', 'Packed lunch', 'Transport from meeting point', 'FGASA-certified guide'],
-    what_to_bring: ['Comfortable athletic clothing', 'Closed-toe shoes', '1.5L water', 'Sunscreen and hat', 'Camera'],
-    images: ['bg-[#1a1a2e]', 'bg-[#2d6a4f]', 'bg-[#8B4513]'],
-    guides: [
-      { id: 'g1', full_name: 'Sipho Dlamini', specialties: ['Rock climbing', 'Abseiling'], languages: ['English', 'Zulu'], initials: 'SD' },
-      { id: 'g5', full_name: 'Bongani Khumalo', specialties: ['Rock climbing', 'Mountain biking'], languages: ['English', 'Zulu'], initials: 'BK' },
-    ],
-    supplier: { name: 'Drakensberg Adventures', member_since: '2020', response_rate: '98%' },
-  },
-  a2: {
-    title: 'San Rock Art Full-Day Tour', category: 'Culture & Heritage', location: "Giant's Castle", duration: 'Full day', group_size: '2–15 people', price_per_person: 620,
+    title: 'San Rock Art Tour', category: 'Cultural', location: "Giants Castle", duration: '3 h', group_size: '2–15 people', price_per_person: 380,
     description: 'Explore the finest San Bushman rock art sites in the Drakensberg with a qualified heritage guide. Over 5,000 individual images have been documented at the Giant\'s Castle Main Caves alone, making this one of the most significant rock art sites in southern Africa.',
     includes: ['Heritage guide fee', 'Park entry permit', 'Light lunch', 'Information booklet'],
     what_to_bring: ['Comfortable walking shoes', '2L water', 'Hat and sunscreen', 'Notebook'],
@@ -35,6 +23,18 @@ const MOCK_ACTIVITIES: Record<string, any> = {
       { id: 'g4', full_name: 'Lerato Sithole', specialties: ['San rock art', 'Heritage tours'], languages: ['English', 'Sotho', 'Zulu'], initials: 'LS' },
     ],
     supplier: { name: 'Berg Cultural Tours', member_since: '2021', response_rate: '95%' },
+  },
+  a2: {
+    title: 'Abseiling at the Amphitheatre', category: 'Adventure', location: 'Royal Natal', duration: '4 h', group_size: '2–8 people', price_per_person: 650,
+    description: 'Experience the dramatic basalt cliffs of the Drakensberg under the expert supervision of FGASA-certified guides. Routes range from introductory abseils to challenging multi-pitch descents on classic Drakensberg routes. All equipment is provided; no prior experience is necessary for beginner routes.',
+    includes: ['All abseiling equipment', 'Harness and helmet', 'Instruction and safety briefing', 'Packed lunch', 'Transport from meeting point', 'FGASA-certified guide'],
+    what_to_bring: ['Comfortable athletic clothing', 'Closed-toe shoes', '1.5L water', 'Sunscreen and hat', 'Camera'],
+    images: ['bg-[#1a1a2e]', 'bg-[#2d6a4f]', 'bg-[#8B4513]'],
+    guides: [
+      { id: 'g1', full_name: 'Sipho Dlamini', specialties: ['Rock climbing', 'Abseiling'], languages: ['English', 'Zulu'], initials: 'SD' },
+      { id: 'g5', full_name: 'Bongani Khumalo', specialties: ['Rock climbing', 'Mountain biking'], languages: ['English', 'Zulu'], initials: 'BK' },
+    ],
+    supplier: { name: 'Drakensberg Adventures', member_since: '2020', response_rate: '98%' },
   },
   a3: {
     title: 'Bearded Vulture Hide', category: 'Wildlife', location: "Giant's Castle Game Reserve", duration: '3 h', group_size: '2–8 people', price_per_person: 290,
@@ -130,10 +130,12 @@ export default function ActivityDetailPage() {
 
   useEffect(() => {
     if (MOCK_ACTIVITIES[id]) return
-    getActivityById(id).then(data => {
-      if (data) setActivity(mapActivityToView(data))
-      setLoading(false)
-    })
+    getActivityById(id)
+      .then(data => {
+        if (data) setActivity(mapActivityToView(data))
+        setLoading(false)
+      })
+      .catch(() => setLoading(false))
   }, [id])
 
   const [date, setDate] = useState(booking.checkIn || '')
