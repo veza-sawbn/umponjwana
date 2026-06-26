@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { Search, CheckCircle, XCircle, RefreshCw } from 'lucide-react'
-import { admin } from '@/lib/api'
+import { getAdminSuppliers, setAdminSupplierVerified } from '@/lib/admin-supabase'
 
 type Supplier = {
   id: string
@@ -33,10 +33,10 @@ export default function AdminSuppliersPage() {
     setLoading(true)
     setError('')
     try {
-      const data = await admin.getSuppliers({ limit: 200 })
-      setSuppliers(data.items || [])
+      const data = await getAdminSuppliers()
+      setSuppliers(data)
     } catch {
-      setError('Could not load suppliers from the admin API.')
+      setError('Could not load suppliers from Supabase.')
     } finally {
       setLoading(false)
     }
@@ -59,7 +59,7 @@ export default function AdminSuppliersPage() {
   }
 
   async function setVerified(id: string, verified: boolean) {
-    await admin.verifySupplier(id, verified)
+    await setAdminSupplierVerified(id, verified)
     await loadSuppliers()
   }
 
@@ -69,7 +69,7 @@ export default function AdminSuppliersPage() {
         <div>
           <p className="font-sans text-[10px] tracking-[0.14em] uppercase text-gray-400 mb-1">Admin Console</p>
           <h1 className="font-display italic text-3xl text-[#000000]">Suppliers</h1>
-          <p className="font-sans text-sm text-gray-500 mt-1">Live supplier records from the platform API.</p>
+          <p className="font-sans text-sm text-gray-500 mt-1">Live supplier profile records from Supabase.</p>
         </div>
         <button
           onClick={loadSuppliers}
