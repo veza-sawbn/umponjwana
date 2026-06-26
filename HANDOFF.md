@@ -1,0 +1,171 @@
+# Visit Drakensberg — Platform Handoff
+
+**Branch:** `claude/wizardly-mayer-leonph`  
+**Repo:** `veza-sawbn/umponjwana`  
+**Stack:** Next.js 14 App Router · Supabase · Tailwind  
+**Date:** 2026-06-26
+
+---
+
+## Architecture
+
+### Data storage
+All data lives in a single Supabase table `site_content` as JSON blobs keyed by name:
+
+| Key | Contents |
+|-----|----------|
+| `properties` | Supplier-listed accommodations |
+| `rooms` | Rooms per property |
+| `activities` | Supplier-listed activities |
+| `tours` | Guided tour products |
+| `departures` | Scheduled tour dates |
+| `bookings` | Confirmed guest bookings |
+| `message_threads` | Visitor ↔ supplier conversations |
+
+All lib files follow the same pattern: private `getAll()` / `saveAll()`, plus named exports for CRUD.  
+**Critical:** Always use `.maybeSingle()`, never `.single()` — `.single()` throws 406 on missing rows.
+
+### Auth
+- `lib/auth.ts` exports `supabase` client
+- Supplier identity = `supabase.auth.getUser()` → `user.id`  
+- Supplier name/company = `useSupplier()` from `lib/supplier-context.tsx`
+- Visitor identity = `supabase.auth.getUser()` in each page
+
+### Design tokens
+| Token | Value | Usage |
+|-------|-------|-------|
+| Gold | `#C9A96E` | CTAs, accents, highlights |
+| Forest | `#2d6a4f` | Primary text-on-white, buttons |
+| Mist | `#F7F5F2` | Page backgrounds |
+| Black | `#000000` | Headings |
+| Supplier UI | `rounded-xl` borders | Supplier dashboard cards |
+| Public UI | Sharp (no radius) borders | Visitor-facing pages |
+
+Typography: `font-display italic` for headings · `font-sans` for body
+
+---
+
+## What's fully wired (Supabase-persisted)
+
+### Supplier dashboard (`/supplier/*`)
+| Section | List | New | Edit |
+|---------|------|-----|------|
+| Properties | ✅ real data | ✅ 5-step wizard | ✅ pre-filled 5-step wizard |
+| Rooms | ✅ real data | ✅ 5-step wizard (images/features/inclusions) | ✅ pre-filled |
+| Tours | ✅ real data | ✅ | ✅ real data |
+| Departures | ✅ real data | ✅ | n/a (inline edit on list) |
+| Activities | ✅ real data | ✅ | ✅ real data |
+| Bookings | ✅ filtered by supplierId | — | — |
+| Messages | ✅ real data, 5s polling | — | — |
+
+### Public visitor pages
+| Page | Status |
+|------|--------|
+| `/stays` | Merges hardcoded showcase + live Supabase properties; price = min room basePrice |
+| `/stays/[id]` | Hardcoded IDs (s1-s3) use static data; real `prop-*` IDs fetch from Supabase |
+| `/hikes/[id]` | Loads live departures from Supabase, maps to TourDate format |
+| `/activities/[id]` | Hardcoded showcase (a1, a2); departures from `lib/tour-dates.ts` |
+| `/account/itinerary` | Full trip detail, polling messaging for every addon + stay property |
+| `/checkout/*` | Booking creation, payment summary, success page |
+| `/trip` | Booking cart with smart suggestions |
+
+---
+
+## Key recent fixes (this session)
+
+### Booking data isolation
+`BookingAddon` now carries `supplierId`. It's set when a visitor books a real supplier departure (via `UpcomingDepartures`) or activity. The supplier bookings page filters by `addon.supplierId === user.id` and `stay.id ∈ supplier's properties` — no more cross-supplier leakage.
+
+### Property region
+`lib/properties.ts` exports `PROPERTY_REGIONS` (12 Drakensberg regions). Properties use `region: string` instead of the old `nearestTown`. New and edit property forms use a dropdown. The stays listing and supplier properties list display the region.
+
+### `/stays` price
+Previously showed "Contact for rates" for all supplier-listed stays. Now fetches rooms per active property on load and uses the minimum `basePrice` as the displayed price.
+
+### `/stays/[id]` mobile rooms
+Desktop: rooms shown inline as always. Mobile: "View Rooms (N)" button toggles room list visibility and shows the room picker in the booking sidebar.
+
+### Property edit page
+`/supplier/properties/[id]/edit` — same 5-step wizard as new property, pre-populated from `getPropertyById(id)`, saves via `updateProperty(id, ...)`.
+
+### Messaging fixes
+1. **Thread persistence** — lookup now matches by `bookingId + addonTitle` only (previously required `supplierId` to match exactly, which caused duplicate threads and lost history). On match, backfills `supplierId` if it was missing.
+2. **Live updates** — both visitor itinerary (when panel is open) and supplier inbox poll every 5 seconds. No manual refresh required.
+3. **Stay messaging** — accommodation section now has "Message Property" button with full thread UI. Uses `property.supplierId` fetched from Supabase.
+4. **Activity messaging** — `resolvedSupplierId` now includes `addon.supplierId`, so activity supplier threads route correctly.
+
+---
+
+## Still mock / not wired
+
+These supplier dashboard sections exist as UI shells but use local state or `MOCK` arrays — none persist to Supabase:
+
+| Section | State |
+|---------|-------|
+| `/supplier/reviews` | MOCK array, read-only display |
+| `/supplier/experiences` | MOCK array |
+| `/supplier/packages` | UI shell, no persistence |
+| `/supplier/events` | UI shell, no persistence |
+| `/supplier/discounts` | Local state only |
+| `/supplier/availability` | Local state only |
+| `/supplier/staff` | Local state only |
+| `/supplier/guides` | Local state only |
+| `/supplier/drivers` | MOCK array |
+| `/supplier/vehicles` | MOCK array |
+| `/supplier/routes` | MOCK array |
+| `/supplier/shuttle` | UI shell |
+| `/supplier/estimator` | Functional calculator, no persistence |
+| `/admin/*` | Entire admin panel is UI-only shells |
+
+### Public pages not yet wired
+- `/activities` listing — shows hardcoded activities (a1, a2); live Supabase activities not surfaced here yet
+- Photo upload — the photos step in all supplier wizards accepts URL strings only; no Supabase Storage upload
+- Booking status updates — suppliers cannot mark bookings confirmed/cancelled from their dashboard
+- Availability calendar — no real blocking or seat-count enforcement at booking time
+
+---
+
+## Known architectural limitation
+
+All Supabase data is stored as a single JSON blob per key in `site_content`. Every write reads the full array, modifies it, and saves it back. This means:
+- **Race condition risk** on concurrent writes (two tabs sending messages simultaneously can overwrite each other)
+- **No row-level security** — any authenticated user can read all keys
+- Long-term: migrate to proper normalised tables with RLS policies
+
+---
+
+## Lib file reference
+
+```
+lib/
+  auth.ts             — supabase client
+  booking-context.tsx — BookingAddon, BookingStay, BookingState (cart)
+  bookings.ts         — SavedBooking CRUD (key: bookings)
+  properties.ts       — Property CRUD + PROPERTY_REGIONS (key: properties)
+  rooms.ts            — Room CRUD (key: rooms)
+  activities.ts       — Activity CRUD (key: activities)
+  tours.ts            — Tour CRUD (key: tours)
+  departures.ts       — Departure CRUD (key: departures)
+  messages.ts         — MessageThread CRUD + polling helpers (key: message_threads)
+  tour-dates.ts       — Hardcoded TourDate[] for showcase hike/activity pages
+  trails.ts           — Trail data (stored in site_content key: trails)
+  supplier-context.tsx — useSupplier() hook (company name, type)
+  supplier-config.ts  — Supplier type detection
+```
+
+---
+
+## Important patterns
+
+### Adding a new Supabase-persisted entity
+Follow the pattern in `lib/properties.ts`:
+1. Define a `type Foo = { id: string; ... }`
+2. Private `getAll()` and `saveAll(items)` using `maybeSingle()`
+3. Export `getFoos()`, `getFooById(id)`, `addFoo(...)`, `updateFoo(id, patch)`, `deleteFoo(id)`
+4. Key format: lowercase plural, e.g. `'foo_items'`
+
+### Supplier filtering
+Always filter by `user.id` (from `supabase.auth.getUser()`), never by display name. The auth user ID is the canonical supplier identifier.
+
+### `useSearchParams()` requires `<Suspense>`
+Any page using `useSearchParams()` must be wrapped in `<Suspense>` or Next.js will throw during build.
