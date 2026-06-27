@@ -23,7 +23,7 @@ type LocationOption = {
   lng: number
 }
 
-type Fee = {
+type EstimatorCustomFee = {
   id: number
   label: string
   amount: number
@@ -50,11 +50,6 @@ const VEHICLE_MULTIPLIER: Record<string, number> = {
   'Sedan': 0.9,
 }
 
-type Fee = {
-  id: number
-  label: string
-  amount: number
-}
 
 type VehicleRateKey = '4×4' | 'Minibus' | 'Sedan'
 
@@ -105,7 +100,7 @@ export default function EstimatorPage() {
   const [luggage, setLuggage] = useState('Standard')
   const [ratePerKm, setRatePerKm] = useState(12)
   const [minimumFare, setMinimumFare] = useState(350)
-  const [fees, setFees] = useState<Fee[]>([{ id: 1, label: 'Booking/admin fee', amount: 150 }])
+  const [fees, setFees] = useState<EstimatorCustomFee[]>([{ id: 1, label: 'Booking/admin fee', amount: 150 }])
   const [returnTrip, setReturnTrip] = useState(false)
   const [notes, setNotes] = useState('')
 
@@ -139,7 +134,7 @@ export default function EstimatorPage() {
     return { total, lineItems }
   }, [distanceKm, ratePerKm, vehicleType, returnTrip, luggage, fees, minimumFare])
 
-  function updateFee(id: number, field: keyof Omit<Fee, 'id'>, value: string) {
+  function updateFee(id: number, field: keyof Omit<EstimatorCustomFee, 'id'>, value: string) {
     setFees(current => current.map(fee => fee.id === id ? { ...fee, [field]: field === 'amount' ? Number(value) : value } : fee))
   }
 
