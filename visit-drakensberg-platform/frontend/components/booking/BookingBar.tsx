@@ -3,10 +3,11 @@
 import { useState } from 'react'
 import { usePathname, useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { Calendar, Users, MapPin, Bed, Plus, X, ChevronUp, ChevronDown, ShoppingBag, Trash2 } from 'lucide-react'
+import { Calendar, Users, MapPin, Bed, Plus, X, ChevronUp, ChevronDown, ShoppingBag, Trash2, Bus } from 'lucide-react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { useBooking } from '@/lib/booking-context'
 import { slideUp, slideUpBar } from '@/lib/motion'
+import { buildContextualShuttleRecommendations } from '@/lib/shuttle-service'
 
 function fmt(iso: string) {
   if (!iso) return ''
@@ -21,6 +22,7 @@ export default function BookingBar() {
 
   const hidden = ['/admin', '/checkout', '/auth'].some(p => pathname.startsWith(p))
   const itemCount = (booking.stay ? 1 : 0) + booking.addons.length + (booking.shuttle ? 1 : 0)
+  const shuttleRecommendations = buildContextualShuttleRecommendations(booking).slice(0, 2)
   const visible = !hidden && (booking.hasActiveSearch || itemCount > 0)
 
   function handleCheckout() {
@@ -140,6 +142,30 @@ export default function BookingBar() {
                         </motion.div>
                       ))}
                     </AnimatePresence>
+
+                    {!booking.shuttle && shuttleRecommendations.length > 0 && (
+                      <div className="space-y-2">
+                        {shuttleRecommendations.map(shuttle => (
+                          <button
+                            key={shuttle.id}
+                            onClick={() => booking.setShuttle(shuttle)}
+                            className="w-full flex items-center justify-between bg-[#2d6a4f]/5 border border-[#2d6a4f]/20 px-4 py-3 text-left hover:border-[#2d6a4f] transition-colors"
+                          >
+                            <div className="flex items-center gap-2">
+                              <Bus size={13} className="text-[#2d6a4f] shrink-0" />
+                              <div>
+                                <p className="font-sans text-sm font-medium">Private Transfer Available</p>
+                                <p className="font-sans text-xs text-gray-400">{shuttle.label} · {shuttle.date}</p>
+                              </div>
+                            </div>
+                            <div className="text-right">
+                              <p className="font-display italic text-sm text-[#2d6a4f]">R {shuttle.price.toLocaleString()}</p>
+                              <p className="font-sans text-[10px] text-gray-400">Add transfer</p>
+                            </div>
+                          </button>
+                        ))}
+                      </div>
+                    )}
 
                     {/* Shuttle */}
                     <AnimatePresence>
