@@ -20,9 +20,8 @@ export default function BookingBar() {
   const [open, setOpen] = useState(false)
 
   const hidden = ['/admin', '/checkout', '/auth'].some(p => pathname.startsWith(p))
-  if (hidden || !booking.hasActiveSearch) return null
-
   const itemCount = (booking.stay ? 1 : 0) + booking.addons.length + (booking.shuttle ? 1 : 0)
+  const visible = !hidden && (booking.hasActiveSearch || itemCount > 0)
 
   function handleCheckout() {
     if (!booking.shuttle) {
@@ -35,10 +34,9 @@ export default function BookingBar() {
   return (
     <motion.div
       className="fixed bottom-0 inset-x-0 z-40 shadow-2xl"
-      variants={slideUpBar}
-      initial="hidden"
-      animate="show"
-      exit="exit"
+      initial={{ y: '100%' }}
+      animate={{ y: visible ? 0 : '100%' }}
+      transition={{ type: 'spring', stiffness: 380, damping: 32 }}
     >
       {/* Expanded panel */}
       <AnimatePresence>
