@@ -1,5 +1,7 @@
 import { supabase } from './auth'
 
+export type Subregion = { id: string; name: string; description: string }
+
 export type Region = {
   id: string
   slug: string
@@ -12,6 +14,7 @@ export type Region = {
   gettingThere: string
   bestTime: string
   keyAttractions: { id: string; name: string; description: string }[]
+  subregions: Subregion[]
   seoTitle: string
   seoDescription: string
   createdAt?: string
@@ -31,6 +34,7 @@ export const DEFAULT_REGIONS: Region[] = [
     gettingThere: '',
     bestTime: '',
     keyAttractions: [],
+    subregions: [],
     seoTitle: 'North Berg | Visit Drakensberg',
     seoDescription: 'Explore Royal Natal National Park, the Amphitheatre and Tugela Falls.',
   },
@@ -46,6 +50,7 @@ export const DEFAULT_REGIONS: Region[] = [
     gettingThere: '',
     bestTime: '',
     keyAttractions: [],
+    subregions: [],
     seoTitle: 'Central Berg | Visit Drakensberg',
     seoDescription: 'Explore Cathedral Peak, Giants Castle and Champagne Valley.',
   },
@@ -61,6 +66,7 @@ export const DEFAULT_REGIONS: Region[] = [
     gettingThere: '',
     bestTime: '',
     keyAttractions: [],
+    subregions: [],
     seoTitle: 'South Berg | Visit Drakensberg',
     seoDescription: 'Explore Sani Pass, Mkhomazi and Underberg.',
   },
@@ -84,6 +90,7 @@ function normalizeRegion(region: Partial<Region> & { name: string; id?: string }
     gettingThere: region.gettingThere || '',
     bestTime: region.bestTime || '',
     keyAttractions: region.keyAttractions || [],
+    subregions: region.subregions || [],
     seoTitle: region.seoTitle || `${region.name} | Visit Drakensberg`,
     seoDescription: region.seoDescription || '',
     createdAt: region.createdAt,
