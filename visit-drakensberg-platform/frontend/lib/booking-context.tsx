@@ -26,6 +26,13 @@ export type ShuttleOption = {
   label: string
   price: number
   description: string
+  pickup?: string
+  destination?: string
+  date?: string
+  passengers?: number
+  shuttleType?: string
+  durationMinutes?: number
+  vehicleType?: string
 }
 
 export type BookingState = {

@@ -1,7 +1,9 @@
 'use client'
 
 import Link from 'next/link'
-import { MapPin, Star, Mountain, Zap, Calendar } from 'lucide-react'
+import { MapPin, Star, Mountain, Zap, Calendar, Bus, Plus } from 'lucide-react'
+import { useBooking } from '@/lib/booking-context'
+import { buildContextualShuttleRecommendations } from '@/lib/shuttle-service'
 
 interface SmartRecommendation {
   title: string
@@ -57,7 +59,9 @@ interface Props {
 }
 
 export default function SmartRecommendations({ region, excludeListingId }: Props) {
+  const booking = useBooking()
   const recommendations = (REGION_DATA[region] || REGION_DATA['Central Berg']).slice(0, 4)
+  const shuttleRecommendations = buildContextualShuttleRecommendations(booking).slice(0, 2)
 
   if (recommendations.length === 0) return null
 
@@ -68,6 +72,31 @@ export default function SmartRecommendations({ region, excludeListingId }: Props
         <h3 className="font-display italic text-xl text-[#000000]">While You're in {region}</h3>
         <p className="font-sans text-xs text-gray-400 mt-1">Trails, activities and events near your stay</p>
       </div>
+
+      {shuttleRecommendations.length > 0 && (
+        <div className="space-y-3 mb-4">
+          {shuttleRecommendations.map(shuttle => (
+            <button
+              key={shuttle.id}
+              onClick={() => booking.setShuttle(shuttle)}
+              className="w-full text-left group flex gap-3 bg-white border border-[#2d6a4f]/30 hover:border-[#2d6a4f] transition-colors p-3"
+            >
+              <div className="w-14 h-14 shrink-0 bg-[#2d6a4f]/10 flex items-center justify-center text-[#2d6a4f]">
+                <Bus size={20} />
+              </div>
+              <div className="min-w-0 flex-1">
+                <span className="inline-flex items-center gap-1 font-sans text-[9px] tracking-[0.12em] uppercase text-[#2d6a4f]">Private Transfer Available</span>
+                <p className="font-display italic text-sm text-[#000000] leading-tight group-hover:text-[#2d6a4f] transition-colors">{shuttle.label}</p>
+                <p className="font-sans text-[10px] text-gray-400 mt-1">Travel date: {shuttle.date} · {shuttle.passengers} passenger{shuttle.passengers !== 1 ? 's' : ''}</p>
+              </div>
+              <div className="shrink-0 text-right">
+                <p className="font-display italic text-sm text-[#2d6a4f]">R{shuttle.price.toLocaleString()}</p>
+                <p className="font-sans text-[9px] text-gray-400 inline-flex items-center gap-1 justify-end"><Plus size={9} /> Add</p>
+              </div>
+            </button>
+          ))}
+        </div>
+      )}
 
       <div className="space-y-3">
         {recommendations.map(item => (
