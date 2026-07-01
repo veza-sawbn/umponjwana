@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { GoogleAddressField } from '@/components/maps/GoogleAddressField';
 
 const STEPS = [
   { id: 1, label: 'Basic Info' },
@@ -186,16 +187,20 @@ export default function NewListingPage() {
             <div className="space-y-5">
               <h2 className="text-xl font-semibold text-gray-800">Location</h2>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Full Address *</label>
-                <input
-                  type="text"
-                  value={form.address}
-                  onChange={(e) => update('address', e.target.value)}
-                  placeholder="e.g. Cathedral Peak Road, Cathedral Peak 3309"
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#2D6A4F]"
-                />
-              </div>
+              <GoogleAddressField
+                label="Full Address"
+                required
+                value={form.address}
+                lat={form.lat}
+                lng={form.lng}
+                placeholder="e.g. Cathedral Peak Road, Cathedral Peak 3309"
+                inputClassName="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#2D6A4F]"
+                onChange={({ address, lat, lng }) => {
+                  update('address', address)
+                  if (lat) update('lat', lat)
+                  if (lng) update('lng', lng)
+                }}
+              />
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
@@ -220,14 +225,6 @@ export default function NewListingPage() {
                 </div>
               </div>
 
-              {/* Mock map */}
-              <div className="bg-gradient-to-br from-green-100 to-blue-100 rounded-xl h-48 flex items-center justify-center border border-gray-200">
-                <div className="text-center text-gray-500">
-                  <span className="text-3xl block mb-2">🗺️</span>
-                  <p className="text-sm">Map preview will appear here</p>
-                  <p className="text-xs text-gray-400 mt-1">Enter coordinates above to pin your location</p>
-                </div>
-              </div>
             </div>
           )}
 

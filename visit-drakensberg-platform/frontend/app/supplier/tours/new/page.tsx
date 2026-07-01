@@ -5,6 +5,7 @@ import { ChevronLeft, Mountain, ChevronDown } from 'lucide-react'
 import { getTrails, type Trail } from '@/lib/trails'
 import { addTour } from '@/lib/tours'
 import { supabase } from '@/lib/auth'
+import { GoogleAddressField } from '@/components/maps/GoogleAddressField'
 
 const DIFFICULTIES = ['Easy', 'Moderate', 'Challenging', 'Extreme']
 const INCLUDED_OPTIONS = ['Meals', 'Accommodation', 'Guides', 'Permits', 'Equipment', 'Transport']
@@ -143,9 +144,7 @@ export default function NewTourPage() {
           <F label="Max Group Size"><input type="number" value={form.maxGroup} onChange={e => set('maxGroup', +e.target.value)} min="1" className={inp} /></F>
         </div>
 
-        <F label="Meeting Point / Start Location" required>
-          <input value={form.meetingPoint} onChange={e => set('meetingPoint', e.target.value)} placeholder="e.g. Cathedral Peak Hotel carpark" className={inp} />
-        </F>
+        <GoogleAddressField label="Meeting Point / Start Location" required value={form.meetingPoint} lat={form.gpsLat} lng={form.gpsLng} placeholder="e.g. Cathedral Peak Hotel carpark" inputClassName={inp} labelClassName="font-sans text-sm font-medium text-black/70" onChange={({ address, lat, lng }) => { set('meetingPoint', address); if (lat) set('gpsLat', lat); if (lng) set('gpsLng', lng) }} />
         <div className="grid grid-cols-2 gap-4">
           <F label="GPS Latitude"><input value={form.gpsLat} onChange={e => set('gpsLat', e.target.value)} placeholder="-28.9833" className={inp} /></F>
           <F label="GPS Longitude"><input value={form.gpsLng} onChange={e => set('gpsLng', e.target.value)} placeholder="29.2333" className={inp} /></F>

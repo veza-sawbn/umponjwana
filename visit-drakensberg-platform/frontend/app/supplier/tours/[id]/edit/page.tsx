@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { ChevronLeft } from 'lucide-react'
 import { getTours, updateTour } from '@/lib/tours'
+import { GoogleAddressField } from '@/components/maps/GoogleAddressField'
 
 const DIFFICULTIES = ['Easy', 'Moderate', 'Challenging', 'Extreme']
 const INCLUDED_OPTIONS = ['Meals', 'Accommodation', 'Guides', 'Permits', 'Equipment', 'Transport']
@@ -97,7 +98,7 @@ export default function EditTourPage() {
           <F label="Max Group Size"><input type="number" value={form.maxGroup} onChange={e => set('maxGroup', +e.target.value)} min="1" className={inp} /></F>
         </div>
 
-        <F label="Meeting Point / Start Location" required><input value={form.meetingPoint} onChange={e => set('meetingPoint', e.target.value)} className={inp} /></F>
+        <GoogleAddressField label="Meeting Point / Start Location" required value={form.meetingPoint} lat={form.gpsLat} lng={form.gpsLng} placeholder="Start typing the meeting point" inputClassName={inp} labelClassName="font-sans text-sm font-medium text-black/70" onChange={({ address, lat, lng }) => { set('meetingPoint', address); if (lat) set('gpsLat', lat); if (lng) set('gpsLng', lng) }} />
         <div className="grid grid-cols-2 gap-4">
           <F label="GPS Latitude"><input value={form.gpsLat} onChange={e => set('gpsLat', e.target.value)} className={inp} /></F>
           <F label="GPS Longitude"><input value={form.gpsLng} onChange={e => set('gpsLng', e.target.value)} className={inp} /></F>

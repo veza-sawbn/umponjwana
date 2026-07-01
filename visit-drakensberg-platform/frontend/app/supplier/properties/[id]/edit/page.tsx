@@ -4,6 +4,7 @@ import { useParams, useRouter } from 'next/navigation'
 import { ChevronRight, ChevronLeft } from 'lucide-react'
 import { getPropertyById, updateProperty, PROPERTY_REGIONS } from '@/lib/properties'
 import { getRegionNames } from '@/lib/regions'
+import { GoogleAddressField } from '@/components/maps/GoogleAddressField'
 
 const PROPERTY_TYPES = ['Lodge', 'Guesthouse', 'Hotel', 'Self-catering Cottage', 'Campsite', 'Backpackers', 'Boutique Hotel']
 const AMENITIES = ['Swimming Pool', 'Braai Facilities', 'Wi-Fi', 'Restaurant', 'Bar', 'Spa', 'Gym', 'Laundry', 'Pet-Friendly', 'Wheelchair Access', 'Airport Transfers', 'Hiking Trails Access']
@@ -160,9 +161,20 @@ export default function EditPropertyPage() {
                 {regions.map(r => <option key={r} value={r}>{r}</option>)}
               </select>
             </Field>
-            <Field label="Street Address">
-              <input value={form.address} onChange={e => setField('address', e.target.value)} className={input} />
-            </Field>
+            <GoogleAddressField
+              label="Street Address"
+              value={form.address}
+              lat={form.gpsLat}
+              lng={form.gpsLng}
+              placeholder="Start typing the property address"
+              inputClassName={input}
+              labelClassName="font-sans text-sm font-medium text-black/70"
+              onChange={({ address, lat, lng }) => {
+                setField('address', address)
+                if (lat) setField('gpsLat', lat)
+                if (lng) setField('gpsLng', lng)
+              }}
+            />
             <div className="grid grid-cols-2 gap-4">
               <Field label="GPS Latitude">
                 <input value={form.gpsLat} onChange={e => setField('gpsLat', e.target.value)} placeholder="-29.123456" className={input} />
