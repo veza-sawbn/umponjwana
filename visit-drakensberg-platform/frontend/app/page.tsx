@@ -22,11 +22,11 @@ const STATS = [
 ]
 
 const CATEGORIES = [
-  { label: 'Stays', href: '/stays', img: 'https://images.unsplash.com/photo-1571896349842-33c89424de2d?w=600&q=80' },
-  { label: 'Hikes', href: '/hikes', img: 'https://images.unsplash.com/photo-1551632811-561732d1e306?w=600&q=80' },
-  { label: 'Activities', href: '/activities', img: 'https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?w=600&q=80' },
-  { label: 'Reserves', href: '/nature-reserves', img: 'https://images.unsplash.com/photo-1516426122078-c23e76319801?w=600&q=80' },
-  { label: 'Packages', href: '/packages', img: 'https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=600&q=80' },
+  { label: 'Destinations', href: '/regions', img: 'https://images.unsplash.com/photo-1503614472-8c93d56e92ce?w=600&q=80' },
+  { label: 'Attractions', href: '/nature-reserves', img: 'https://images.unsplash.com/photo-1516426122078-c23e76319801?w=600&q=80' },
+  { label: 'Nature', href: '/hikes', img: 'https://images.unsplash.com/photo-1551632811-561732d1e306?w=600&q=80' },
+  { label: 'Experiences', href: '/activities', img: 'https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?w=600&q=80' },
+  { label: 'Summer & Winter', href: '/stories', img: 'https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=600&q=80' },
 ]
 
 const REGIONS = [
@@ -197,8 +197,8 @@ export default function HomePage() {
       {/* ── 3. Categories ── */}
       <section className="max-w-[1440px] mx-auto px-6 lg:px-12 py-20">
         <div className="mb-10">
-          <p className="font-sans text-xs tracking-[0.2em] uppercase text-forest/40 mb-2">What to do</p>
-          <h2 className="font-display text-4xl text-forest">Explore the Berg</h2>
+          <p className="font-sans text-xs tracking-[0.2em] uppercase text-forest/40 mb-2">Digital destination guide</p>
+          <h2 className="font-display text-4xl text-forest">Start with where you want to go</h2>
         </div>
         <motion.div
           className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3"
