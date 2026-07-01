@@ -12,6 +12,7 @@ export type AdminRegion = {
   gettingThere: string
   bestTime: string
   keyAttractions: { id: string; name: string; description: string }[]
+  subregions: { id: string; name: string; description: string }[]
   seoTitle: string
   seoDescription: string
   createdAt?: string
@@ -66,6 +67,7 @@ export async function createAdminRegion(data: Omit<AdminRegion, 'id' | 'createdA
   const item: AdminRegion = {
     ...data,
     id: `region-${Date.now()}`,
+    subregions: data.subregions || [],
     seoTitle: data.seoTitle || `${data.name} | Visit Drakensberg`,
     createdAt: now,
     updatedAt: now,
