@@ -37,7 +37,7 @@ function loadGoogleMaps() {
 
     const script = document.createElement('script')
     script.dataset.googleMaps = 'true'
-    script.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(GOOGLE_MAPS_API_KEY)}&libraries=places,routes&loading=async`
+    script.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(GOOGLE_MAPS_API_KEY)}&libraries=places&loading=async`
     script.async = true
     script.defer = true
     script.onload = () => resolve()
@@ -57,6 +57,23 @@ export type DistanceResult = { distanceKm: number; durationMinutes: number; dura
 
 type DistanceOrigin = string | LatLngPoint
 
+/**
+ * DistanceMatrixService lives in the "routes" library, which the classic `libraries=` script
+ * param does not support — it must be fetched via importLibrary() instead (Google's newer
+ * dynamic-library loading, used whenever the script tag includes `loading=async`).
+ */
+async function getDistanceMatrixService(): Promise<any | null> {
+  if (!window.google?.maps) return null
+  if (window.google.maps.DistanceMatrixService) return new window.google.maps.DistanceMatrixService()
+  if (typeof window.google.maps.importLibrary !== 'function') return null
+  try {
+    const routesLibrary = await window.google.maps.importLibrary('routes')
+    return new routesLibrary.DistanceMatrixService()
+  } catch {
+    return null
+  }
+}
+
 /** Calls the Google Distance Matrix service to get driving distance/duration between two points or addresses. */
 export async function calculateDrivingDistance(origin: DistanceOrigin, destination: DistanceOrigin): Promise<DistanceResult | null> {
   if (typeof window === 'undefined') return null
@@ -66,11 +83,12 @@ export async function calculateDrivingDistance(origin: DistanceOrigin, destinati
     return null
   }
   if (!window.google?.maps) return null
+  const service = await getDistanceMatrixService()
+  if (!service) return null
 
   const toMapsPoint = (point: DistanceOrigin) => (typeof point === 'string' ? point : new window.google!.maps.LatLng(point.lat, point.lng))
 
   return new Promise((resolve) => {
-    const service = new window.google.maps.DistanceMatrixService()
     service.getDistanceMatrix(
       {
         origins: [toMapsPoint(origin)],
@@ -104,11 +122,12 @@ export async function calculateDrivingDistances(origin: DistanceOrigin, destinat
     return destinations.map(() => null)
   }
   if (!window.google?.maps) return destinations.map(() => null)
+  const service = await getDistanceMatrixService()
+  if (!service) return destinations.map(() => null)
 
   const toMapsPoint = (point: DistanceOrigin) => (typeof point === 'string' ? point : new window.google!.maps.LatLng(point.lat, point.lng))
 
   return new Promise((resolve) => {
-    const service = new window.google.maps.DistanceMatrixService()
     service.getDistanceMatrix(
       {
         origins: [toMapsPoint(origin)],
