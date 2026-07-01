@@ -117,6 +117,9 @@ function propToStay(prop: Property, rooms: Room[]) {
     title: prop.name,
     category: prop.type,
     location: prop.region || prop.address,
+    address: prop.address || prop.region,
+    gpsLat: prop.gpsLat,
+    gpsLng: prop.gpsLng,
     region: prop.region || '',
     rating: null as null | number,
     review_count: 0,
@@ -488,7 +491,13 @@ export default function StayDetailPage() {
               <p className="font-sans text-xs text-center text-gray-400 mt-3">Free cancellation up to 48 hours before check-in</p>
 
               <div className="mt-6">
-                <SmartRecommendations region={stay.region} excludeListingId={id} />
+                <SmartRecommendations
+                  region={stay.region}
+                  excludeListingId={id}
+                  originLocation={stay.address || stay.location}
+                  originLat={stay.gpsLat}
+                  originLng={stay.gpsLng}
+                />
               </div>
 
               <div className="mt-5 border-t border-gray-100 pt-5">
