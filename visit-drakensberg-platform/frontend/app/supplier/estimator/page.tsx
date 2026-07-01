@@ -1,8 +1,9 @@
 'use client'
 
 import { useRouter } from 'next/navigation'
-import { useState, useMemo } from 'react'
-import { ChevronLeft, Copy, Send, CheckCircle, MapPin, Plus, Trash2, Calculator } from 'lucide-react'
+import { useState, useMemo, useEffect } from 'react'
+import { ChevronLeft, Copy, Send, CheckCircle, MapPin, Plus, Trash2 } from 'lucide-react'
+import { GoogleAddressField, useAutoDrivingDistance } from '@/components/maps/GoogleAddressField'
 
 function F({ label, required, children }: { label: string; required?: boolean; children: React.ReactNode }) {
   return (
@@ -16,11 +17,6 @@ function F({ label, required, children }: { label: string; required?: boolean; c
 }
 
 const INPUT = 'w-full font-sans text-sm border border-black/10 rounded-lg px-3 py-2 outline-none focus:border-[#C9A96E]/50 bg-white'
-
-type GeoPoint = {
-  lat: number
-  lng: number
-}
 
 type EstimatorCustomFee = {
   id: number
@@ -47,21 +43,6 @@ function fmt(n: number) {
   return `R ${n.toLocaleString('en-ZA', { minimumFractionDigits: 0 })}`
 }
 
-function toRad(value: number) {
-  return (value * Math.PI) / 180
-}
-
-function calculateDistanceKm(from: GeoPoint, to: GeoPoint) {
-  const earthRadiusKm = 6371
-  const dLat = toRad(to.lat - from.lat)
-  const dLng = toRad(to.lng - from.lng)
-  const a = Math.sin(dLat / 2) ** 2 + Math.cos(toRad(from.lat)) * Math.cos(toRad(to.lat)) * Math.sin(dLng / 2) ** 2
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
-
-  // Road transfers are usually longer than straight-line distances; this keeps the estimator practical without a maps API key.
-  return Math.round(earthRadiusKm * c * 1.25)
-}
-
 function isVehicleRateKey(value: string): value is VehicleRateKey {
   return VEHICLE_TYPES.includes(value as VehicleRateKey)
 }
@@ -73,10 +54,12 @@ export default function EstimatorPage() {
   const [guestName, setGuestName] = useState('')
   const [guestEmail, setGuestEmail] = useState('')
   const [pickupAddress, setPickupAddress] = useState('King Shaka International Airport, Durban')
+  const [pickupLat, setPickupLat] = useState<string | undefined>(undefined)
+  const [pickupLng, setPickupLng] = useState<string | undefined>(undefined)
   const [dropoffAddress, setDropoffAddress] = useState('Champagne Valley, Central Drakensberg')
+  const [dropoffLat, setDropoffLat] = useState<string | undefined>(undefined)
+  const [dropoffLng, setDropoffLng] = useState<string | undefined>(undefined)
   const [distanceKm, setDistanceKm] = useState(0)
-  const [distanceStatus, setDistanceStatus] = useState('Enter pickup and drop-off addresses, then calculate distance.')
-  const [calculatingDistance, setCalculatingDistance] = useState(false)
   const [pickupDate, setPickupDate] = useState('')
   const [pickupTime, setPickupTime] = useState('')
   const [passengers, setPassengers] = useState(1)
@@ -94,6 +77,21 @@ export default function EstimatorPage() {
 
   const routeLabel = `${pickupAddress || 'Pickup address'} → ${dropoffAddress || 'Drop-off address'}`
   const selectedRatePerKm = vehicleRates[vehicleType] ?? 0
+
+  const { result: autoDistance, status: distanceCalcStatus } = useAutoDrivingDistance(
+    { address: pickupAddress, lat: pickupLat, lng: pickupLng },
+    { address: dropoffAddress, lat: dropoffLat, lng: dropoffLng }
+  )
+
+  useEffect(() => {
+    if (autoDistance) setDistanceKm(autoDistance.distanceKm)
+  }, [autoDistance])
+
+  const distanceStatus =
+    distanceCalcStatus === 'idle' ? 'Enter pickup and drop-off addresses — distance calculates automatically.'
+    : distanceCalcStatus === 'calculating' ? 'Calculating route distance in the background…'
+    : distanceCalcStatus === 'error' ? 'Could not calculate a driving distance for those addresses. Try more specific locations.'
+    : `Distance calculated automatically${autoDistance?.durationText ? ` · ~${autoDistance.durationText} drive` : ''}.`
 
   const { total, lineItems } = useMemo(() => {
     const oneWayDistanceFare = Math.round(distanceKm * Math.max(selectedRatePerKm, 0))
@@ -122,42 +120,6 @@ export default function EstimatorPage() {
 
   function updateVehicleRate(type: VehicleRateKey, value: string) {
     setVehicleRates(current => ({ ...current, [type]: Number(value) }))
-  }
-
-  async function geocodeAddress(address: string): Promise<GeoPoint | null> {
-    const response = await fetch(`https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${encodeURIComponent(address)}`)
-    const results = await response.json()
-    if (!Array.isArray(results) || !results[0]) return null
-    return { lat: Number(results[0].lat), lng: Number(results[0].lon) }
-  }
-
-  async function calculateAddressDistance() {
-    if (!pickupAddress.trim() || !dropoffAddress.trim()) {
-      setDistanceStatus('Add both a pickup and drop-off address before calculating distance.')
-      return
-    }
-
-    setCalculatingDistance(true)
-    setDistanceStatus('Finding addresses and calculating route distance…')
-    try {
-      const [from, to] = await Promise.all([geocodeAddress(pickupAddress), geocodeAddress(dropoffAddress)])
-      if (!from || !to) {
-        setDistanceStatus('Could not find one of those addresses. Add more detail and try again.')
-        return
-      }
-
-      const routeResponse = await fetch(`https://router.project-osrm.org/route/v1/driving/${from.lng},${from.lat};${to.lng},${to.lat}?overview=false`)
-      const routeData = await routeResponse.json()
-      const routeDistance = routeData?.routes?.[0]?.distance
-      const nextDistanceKm = routeDistance ? Math.round(routeDistance / 1000) : calculateDistanceKm(from, to)
-      setDistanceKm(nextDistanceKm)
-      setDistanceStatus(routeDistance ? 'Distance calculated from the entered addresses.' : 'Road route unavailable; using an adjusted straight-line estimate.')
-    } catch (error) {
-      console.error('[estimator] distance calculation failed:', error)
-      setDistanceStatus('Distance service is unavailable right now. Please try again or enter a manual estimate later.')
-    } finally {
-      setCalculatingDistance(false)
-    }
   }
 
   function updateFee(id: number, field: keyof Omit<EstimatorCustomFee, 'id'>, value: string) {
@@ -205,8 +167,28 @@ export default function EstimatorPage() {
             </div>
 
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-              <F label="Pickup Address" required><input className={INPUT} value={pickupAddress} onChange={e => setPickupAddress(e.target.value)} placeholder="Full pickup address" /></F>
-              <F label="Drop-off Address" required><input className={INPUT} value={dropoffAddress} onChange={e => setDropoffAddress(e.target.value)} placeholder="Full drop-off address" /></F>
+              <GoogleAddressField
+                label="Pickup Address"
+                required
+                value={pickupAddress}
+                lat={pickupLat}
+                lng={pickupLng}
+                placeholder="Full pickup address"
+                inputClassName={INPUT}
+                labelClassName="font-sans text-sm font-medium text-black/70"
+                onChange={({ address, lat, lng }) => { setPickupAddress(address); if (lat) setPickupLat(lat); if (lng) setPickupLng(lng) }}
+              />
+              <GoogleAddressField
+                label="Drop-off Address"
+                required
+                value={dropoffAddress}
+                lat={dropoffLat}
+                lng={dropoffLng}
+                placeholder="Full drop-off address"
+                inputClassName={INPUT}
+                labelClassName="font-sans text-sm font-medium text-black/70"
+                onChange={({ address, lat, lng }) => { setDropoffAddress(address); if (lat) setDropoffLat(lat); if (lng) setDropoffLng(lng) }}
+              />
             </div>
 
             <div className="rounded-xl border border-[#C9A96E]/20 bg-[#C9A96E]/5 p-4 flex items-start gap-3">
@@ -215,7 +197,6 @@ export default function EstimatorPage() {
                 <p className="font-sans text-sm font-semibold text-black">Estimated route distance: {distanceKm > 0 ? `${distanceKm} km` : 'Not calculated yet'}</p>
                 <p className="font-sans text-xs text-black/50 mt-1">{distanceStatus}</p>
               </div>
-              <button type="button" onClick={calculateAddressDistance} disabled={calculatingDistance} className="flex items-center gap-1.5 rounded-lg bg-[#C9A96E] px-3 py-2 font-sans text-xs text-white hover:bg-[#b8935a] disabled:opacity-60"><Calculator size={13} /> {calculatingDistance ? 'Calculating…' : 'Calculate'}</button>
             </div>
 
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">

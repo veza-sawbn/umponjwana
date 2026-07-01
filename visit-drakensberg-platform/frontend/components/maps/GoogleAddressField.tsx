@@ -52,6 +52,89 @@ export function hasGoogleMapsKey() {
   return Boolean(GOOGLE_MAPS_API_KEY)
 }
 
+export type LatLngPoint = { lat: number; lng: number }
+export type DistanceResult = { distanceKm: number; durationMinutes: number; durationText: string }
+
+type DistanceOrigin = string | LatLngPoint
+
+/** Calls the Google Distance Matrix service to get driving distance/duration between two points or addresses. */
+export async function calculateDrivingDistance(origin: DistanceOrigin, destination: DistanceOrigin): Promise<DistanceResult | null> {
+  if (typeof window === 'undefined') return null
+  try {
+    await loadGoogleMaps()
+  } catch {
+    return null
+  }
+  if (!window.google?.maps) return null
+
+  const toMapsPoint = (point: DistanceOrigin) => (typeof point === 'string' ? point : new window.google!.maps.LatLng(point.lat, point.lng))
+
+  return new Promise((resolve) => {
+    const service = new window.google.maps.DistanceMatrixService()
+    service.getDistanceMatrix(
+      {
+        origins: [toMapsPoint(origin)],
+        destinations: [toMapsPoint(destination)],
+        travelMode: window.google.maps.TravelMode.DRIVING,
+        unitSystem: window.google.maps.UnitSystem.METRIC,
+      },
+      (response: any, status: string) => {
+        const element = response?.rows?.[0]?.elements?.[0]
+        if (status !== 'OK' || !element || element.status !== 'OK') {
+          resolve(null)
+          return
+        }
+        resolve({
+          distanceKm: Math.round(((element.distance?.value ?? 0) / 100)) / 10,
+          durationMinutes: Math.round((element.duration?.value ?? 0) / 60),
+          durationText: element.duration?.text ?? '',
+        })
+      }
+    )
+  })
+}
+
+export type DistancePlace = { address: string; lat?: string; lng?: string }
+
+/** Watches an origin/destination pair and (re)calculates driving distance in the background whenever both are set. */
+export function useAutoDrivingDistance(origin: DistancePlace, destination: DistancePlace) {
+  const [result, setResult] = useState<DistanceResult | null>(null)
+  const [status, setStatus] = useState<'idle' | 'calculating' | 'done' | 'error'>('idle')
+
+  const originKey = origin.lat && origin.lng ? `${origin.lat},${origin.lng}` : origin.address.trim()
+  const destinationKey = destination.lat && destination.lng ? `${destination.lat},${destination.lng}` : destination.address.trim()
+
+  useEffect(() => {
+    if (!originKey || !destinationKey) {
+      setStatus('idle')
+      setResult(null)
+      return
+    }
+
+    let cancelled = false
+    setStatus('calculating')
+
+    const timer = setTimeout(() => {
+      const originPoint: DistanceOrigin = origin.lat && origin.lng ? { lat: Number(origin.lat), lng: Number(origin.lng) } : origin.address
+      const destinationPoint: DistanceOrigin = destination.lat && destination.lng ? { lat: Number(destination.lat), lng: Number(destination.lng) } : destination.address
+
+      calculateDrivingDistance(originPoint, destinationPoint).then((res) => {
+        if (cancelled) return
+        setResult(res)
+        setStatus(res ? 'done' : 'error')
+      })
+    }, 600)
+
+    return () => {
+      cancelled = true
+      clearTimeout(timer)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [originKey, destinationKey])
+
+  return { result, status }
+}
+
 export function GoogleAddressField({
   label,
   value,

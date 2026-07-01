@@ -1,9 +1,10 @@
 'use client'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { ChevronLeft } from 'lucide-react'
+import { GoogleAddressField, useAutoDrivingDistance } from '@/components/maps/GoogleAddressField'
 
-const MOCK: Record<string, { from: string; to: string; distanceKm: number; durationH: number; durationM: number; pricePerPerson: number; groupRate: number; vehicleTypes: string[]; notes: string; status: string }> = {
+const MOCK: Record<string, { from: string; to: string; fromLat?: string; fromLng?: string; toLat?: string; toLng?: string; distanceKm: number; durationH: number; durationM: number; pricePerPerson: number; groupRate: number; vehicleTypes: string[]; notes: string; status: string }> = {
   '1': { from: 'King Shaka International Airport', to: 'Central Berg',          distanceKm: 210, durationH: 2, durationM: 30, pricePerPerson: 950, groupRate: 0,    vehicleTypes: ['4×4', 'Minibus'], notes: 'N3 highway, then R74 to Winterton.', status: 'active' },
   '2': { from: 'Durban CBD',                       to: 'Drakensberg Sun',       distanceKm: 185, durationH: 2, durationM: 15, pricePerPerson: 850, groupRate: 0,    vehicleTypes: ['Minibus', 'Sedan'], notes: '',                                   status: 'active' },
   '3': { from: 'Central Berg',                     to: "Monk's Cowl Trailhead", distanceKm: 42,  durationH: 0, durationM: 45, pricePerPerson: 350, groupRate: 1200, vehicleTypes: ['4×4'],              notes: 'Gravel road last 8 km.',             status: 'active' },
@@ -21,6 +22,16 @@ export default function EditRoutePage() {
   const [form, setForm] = useState(seed)
   const set = (k: string, v: unknown) => setForm(f => ({ ...f, [k]: v }))
 
+  const { result: autoDistance, status: distanceCalcStatus } = useAutoDrivingDistance(
+    { address: form.from, lat: form.fromLat, lng: form.fromLng },
+    { address: form.to, lat: form.toLat, lng: form.toLng }
+  )
+
+  useEffect(() => {
+    if (!autoDistance) return
+    setForm(f => ({ ...f, distanceKm: autoDistance.distanceKm, durationH: Math.floor(autoDistance.durationMinutes / 60), durationM: autoDistance.durationMinutes % 60 }))
+  }, [autoDistance])
+
   function toggleVehicle(v: string) {
     setForm(prev => ({
       ...prev,
@@ -34,8 +45,9 @@ export default function EditRoutePage() {
       <h1 className="font-display italic text-2xl text-black/90 mb-6">Edit Route</h1>
 
       <div className="bg-white rounded-xl border border-black/8 p-6 space-y-5">
-        <F label="From (Pickup Location)" required><input value={form.from} onChange={e => set('from', e.target.value)} className={inp} /></F>
-        <F label="To (Drop-off Location)" required><input value={form.to} onChange={e => set('to', e.target.value)} className={inp} /></F>
+        <GoogleAddressField label="From (Pickup Location)" required value={form.from} lat={form.fromLat} lng={form.fromLng} inputClassName={inp} onChange={({ address, lat, lng }) => { set('from', address); if (lat) set('fromLat', lat); if (lng) set('fromLng', lng) }} />
+        <GoogleAddressField label="To (Drop-off Location)" required value={form.to} lat={form.toLat} lng={form.toLng} inputClassName={inp} onChange={({ address, lat, lng }) => { set('to', address); if (lat) set('toLat', lat); if (lng) set('toLng', lng) }} />
+        <p className="font-sans text-xs text-black/40">{distanceCalcStatus === 'calculating' ? 'Calculating distance and drive time in the background…' : distanceCalcStatus === 'done' ? `Distance and duration updated automatically (~${autoDistance?.durationText} drive).` : distanceCalcStatus === 'error' ? 'Could not auto-calculate distance for those locations — enter manually.' : 'Distance and duration below update automatically when both locations are set.'}</p>
         <div className="grid grid-cols-2 gap-4">
           <F label="Distance (km)"><input type="number" value={form.distanceKm} onChange={e => set('distanceKm', +e.target.value)} className={inp} /></F>
           <F label="Duration">
