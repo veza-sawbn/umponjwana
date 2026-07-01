@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { supabase } from '@/lib/auth'
 import { addActivity } from '@/lib/activities'
+import { GoogleAddressField } from '@/components/maps/GoogleAddressField'
 
 const CATEGORIES = ['Adventure', 'Nature', 'Water', 'Cultural', 'Wellness', 'Family']
 const DIFFICULTY = ['Easy', 'Moderate', 'Challenging', 'Extreme']
@@ -116,7 +117,7 @@ export default function NewActivityPage() {
               <F label="Min. Age"><input type="number" value={form.minAge} onChange={e => set('minAge', e.target.value)} min="0" placeholder="e.g. 10" className={inp} /></F>
             </div>
             <F label="Max Group Size" required><input type="number" value={form.maxGroupSize} onChange={e => set('maxGroupSize', e.target.value)} className={inp} /></F>
-            <F label="Meeting Point / Start Location" required><input value={form.meetingPoint} onChange={e => set('meetingPoint', e.target.value)} className={inp} /></F>
+            <GoogleAddressField label="Meeting Point / Start Location" required value={form.meetingPoint} lat={form.gpsLat} lng={form.gpsLng} placeholder="Start typing the meeting point" inputClassName={inp} labelClassName="font-sans text-sm font-medium text-black/70" onChange={({ address, lat, lng }) => { set('meetingPoint', address); if (lat) set('gpsLat', lat); if (lng) set('gpsLng', lng) }} />
             <div className="grid grid-cols-2 gap-4">
               <F label="GPS Latitude"><input value={form.gpsLat} onChange={e => set('gpsLat', e.target.value)} placeholder="-29.123456" className={inp} /></F>
               <F label="GPS Longitude"><input value={form.gpsLng} onChange={e => set('gpsLng', e.target.value)} placeholder="29.123456" className={inp} /></F>

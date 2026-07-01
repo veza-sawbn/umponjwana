@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { ChevronLeft } from 'lucide-react'
 import { getActivityById, updateActivity } from '@/lib/activities'
+import { GoogleAddressField } from '@/components/maps/GoogleAddressField'
 
 const CATEGORIES = ['Adventure', 'Nature', 'Water', 'Cultural', 'Wellness', 'Family']
 const DIFFICULTIES = ['Easy', 'Moderate', 'Challenging', 'Extreme']
@@ -116,7 +117,7 @@ export default function EditActivityPage() {
 
         <F label="Min Age"><input type="number" value={form.minAge} onChange={e => set('minAge', +e.target.value)} min="0" className={inp} /></F>
 
-        <F label="Meeting Point" required><input value={form.meetingPoint} onChange={e => set('meetingPoint', e.target.value)} className={inp} /></F>
+        <GoogleAddressField label="Meeting Point" required value={form.meetingPoint} lat={form.gpsLat} lng={form.gpsLng} placeholder="Start typing the meeting point" inputClassName={inp} labelClassName="font-sans text-sm font-medium text-black/70" onChange={({ address, lat, lng }) => { set('meetingPoint', address); if (lat) set('gpsLat', lat); if (lng) set('gpsLng', lng) }} />
 
         <div className="grid grid-cols-2 gap-4">
           <F label="GPS Latitude"><input value={form.gpsLat} onChange={e => set('gpsLat', e.target.value)} className={inp} /></F>

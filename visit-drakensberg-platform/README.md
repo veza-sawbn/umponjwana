@@ -116,3 +116,19 @@ Managed via Alembic migrations. Key tables:
 ## License
 
 Proprietary — visitdrakensberg.com
+
+## Google Maps setup
+
+Address and location fields in the supplier listing, property, activity, and tour forms use the Google Maps JavaScript API with the Places library when a browser API key is available.
+
+1. In Google Cloud Console, enable **Maps JavaScript API** and **Places API** for your project.
+2. Create an API key and restrict it to your web app domains (for local development, include `http://localhost:3000/*`).
+3. Put the key in `visit-drakensberg-platform/frontend/.env.local`:
+
+   ```bash
+   NEXT_PUBLIC_GOOGLE_MAPS_API_KEY=your_google_maps_browser_key_here
+   ```
+
+4. Restart the Next.js dev server after changing `.env.local`.
+
+The key must be prefixed with `NEXT_PUBLIC_` because Google Places autocomplete and map previews run in the browser. Keep the key restricted in Google Cloud Console instead of committing a real key to the repository.
