@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { DESTINATIONS } from '@/lib/destination-ia';
 
 const STEPS = [
   { id: 1, label: 'Basic Info' },
@@ -24,9 +25,14 @@ interface FormData {
   title: string;
   category: string;
   description: string;
+  region: string;
+  subRegion: string;
+  town: string;
   address: string;
   lat: string;
   lng: string;
+  nearbyLandmark: string;
+  meetingPoint: string;
   price: string;
   priceUnit: string;
   maxGuests: string;
@@ -38,9 +44,14 @@ const initialForm: FormData = {
   title: '',
   category: '',
   description: '',
+  region: '',
+  subRegion: '',
+  town: '',
   address: '',
   lat: '',
   lng: '',
+  nearbyLandmark: '',
+  meetingPoint: '',
   price: '',
   priceUnit: 'per night',
   maxGuests: '',
@@ -71,12 +82,18 @@ export default function NewListingPage() {
 
   const canNext = () => {
     if (step === 1) return form.title.trim() && form.category && form.description.trim();
-    if (step === 2) return form.address.trim();
+    if (step === 2) return form.region && form.subRegion.trim() && form.town.trim() && form.address.trim() && form.lat.trim() && form.lng.trim();
     if (step === 3) return form.price && form.maxGuests;
     return true;
   };
 
+  const locationComplete = Boolean(form.region && form.subRegion.trim() && form.town.trim() && form.address.trim() && form.lat.trim() && form.lng.trim());
+
   const handleSubmit = async () => {
+    if (!locationComplete) {
+      setStep(2);
+      return;
+    }
     setSubmitting(true);
     await new Promise((r) => setTimeout(r, 1500));
     router.push('/supplier/listings');
@@ -184,10 +201,48 @@ export default function NewListingPage() {
           {/* Step 2: Location */}
           {step === 2 && (
             <div className="space-y-5">
-              <h2 className="text-xl font-semibold text-gray-800">Location</h2>
+              <h2 className="text-xl font-semibold text-gray-800">Destination & Location</h2>
+              <div className="bg-green-50 border border-green-200 rounded-lg p-4 text-sm text-gray-600">
+                Listings cannot be published until destination hierarchy and GPS coordinates are complete. This powers search, maps, distance calculations, recommendations, analytics and shuttle suggestions.
+              </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Full Address *</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Primary Region *</label>
+                <select
+                  value={form.region}
+                  onChange={(e) => update('region', e.target.value)}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#2D6A4F]"
+                >
+                  <option value="">Select region</option>
+                  {Array.from(new Set(DESTINATIONS.map((d) => d.region))).map((region) => <option key={region}>{region}</option>)}
+                </select>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Sub-region *</label>
+                  <input
+                    type="text"
+                    value={form.subRegion}
+                    onChange={(e) => update('subRegion', e.target.value)}
+                    placeholder="e.g. Cathedral Peak & Champagne Valley"
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#2D6A4F]"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Town / Village *</label>
+                  <input
+                    type="text"
+                    value={form.town}
+                    onChange={(e) => update('town', e.target.value)}
+                    placeholder="e.g. Winterton or Champagne Valley"
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#2D6A4F]"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Full Street Address *</label>
                 <input
                   type="text"
                   value={form.address}
@@ -199,7 +254,7 @@ export default function NewListingPage() {
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Latitude</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Latitude *</label>
                   <input
                     type="text"
                     value={form.lat}
@@ -209,7 +264,7 @@ export default function NewListingPage() {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Longitude</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Longitude *</label>
                   <input
                     type="text"
                     value={form.lng}
@@ -219,6 +274,35 @@ export default function NewListingPage() {
                   />
                 </div>
               </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Nearby Landmark</label>
+                  <input
+                    type="text"
+                    value={form.nearbyLandmark}
+                    onChange={(e) => update('nearbyLandmark', e.target.value)}
+                    placeholder="e.g. Monks Cowl entrance"
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#2D6A4F]"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Meeting Point</label>
+                  <input
+                    type="text"
+                    value={form.meetingPoint}
+                    onChange={(e) => update('meetingPoint', e.target.value)}
+                    placeholder="Required for activities, guides and shuttles"
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#2D6A4F]"
+                  />
+                </div>
+              </div>
+
+              {!locationComplete && (
+                <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 text-sm text-amber-700">
+                  Publish lock: complete region, sub-region, town, exact address and GPS coordinates before this listing can go live.
+                </div>
+              )}
 
               {/* Mock map */}
               <div className="bg-gradient-to-br from-green-100 to-blue-100 rounded-xl h-48 flex items-center justify-center border border-gray-200">
@@ -412,7 +496,7 @@ export default function NewListingPage() {
             ) : (
               <button
                 onClick={handleSubmit}
-                disabled={submitting}
+                disabled={submitting || !locationComplete}
                 className="px-6 py-2.5 bg-[#2D6A4F] text-white rounded-lg text-sm font-semibold hover:bg-[#245a42] transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
               >
                 {submitting ? (

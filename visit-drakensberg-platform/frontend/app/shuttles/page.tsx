@@ -1,61 +1,106 @@
 'use client'
-import Link from 'next/link'
-import { ArrowRight } from 'lucide-react'
-import Footer from '@/components/layout/Footer'
 
-const ROUTES = [
-  { id: 's1', from: 'Durban King Shaka Airport', to: 'Northern Berg (Royal Natal)', duration: '3.5 h', price: 850, perPerson: true, img: 'https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?w=800&q=80', provider: 'Berg Transfers' },
-  { id: 's2', from: 'Johannesburg OR Tambo', to: 'Central Berg (Cathedral Peak)', duration: '5 h', price: 1100, perPerson: true, img: 'https://images.unsplash.com/photo-1590098563548-8f14eed3a47f?w=800&q=80', provider: 'Drakensberg Shuttles' },
-  { id: 's3', from: 'Durban King Shaka Airport', to: 'Southern Berg (Underberg)', duration: '2.5 h', price: 720, perPerson: true, img: 'https://images.unsplash.com/photo-1503614472-8c93d56e92ce?w=800&q=80', provider: 'Berg Transfers' },
-  { id: 's4', from: 'Northern Berg', to: 'Central Berg', duration: '1.5 h', price: 450, perPerson: true, img: 'https://images.unsplash.com/photo-1542587222-e14b891ee40b?w=800&q=80', provider: 'Local Link' },
-  { id: 's5', from: 'Pietermaritzburg', to: 'Any Berg Region', duration: '2–3 h', price: 600, perPerson: true, img: 'https://images.unsplash.com/photo-1551632811-561732d1e306?w=800&q=80', provider: 'Drakensberg Shuttles' },
-]
+import { useMemo, useState } from 'react'
+import { ArrowRight, Bus, Calendar, MapPin, Users } from 'lucide-react'
+import Footer from '@/components/layout/Footer'
+import { useBooking } from '@/lib/booking-context'
+import {
+  SHUTTLE_LOCATIONS, findAvailableRoutes, toShuttleOption,
+  type LocationType, type ShuttleType,
+} from '@/lib/shuttle-service'
+
+const LOCATION_TYPES: LocationType[] = ['Accommodation', 'Airport', 'Hiking trail', 'Town', 'Attraction', 'Landmark', 'GPS location']
+const SHUTTLE_TYPES: ShuttleType[] = ['Shared Shuttle', 'Private Shuttle', 'Premium Shuttle']
+
+function fmtMinutes(minutes: number) {
+  const h = Math.floor(minutes / 60)
+  const m = minutes % 60
+  return m ? `${h}h ${m}m` : `${h}h`
+}
 
 export default function ShuttlesPage() {
+  const booking = useBooking()
+  const [pickupType, setPickupType] = useState<LocationType>('Airport')
+  const [destinationType, setDestinationType] = useState<LocationType>('Accommodation')
+  const [pickupId, setPickupId] = useState('jnb-or-tambo')
+  const [destinationId, setDestinationId] = useState(booking.stay?.title.toLowerCase().includes('cathedral') ? 'cathedral-peak-hotel' : 'champagne-valley')
+  const [date, setDate] = useState(booking.checkIn || '')
+  const [passengers, setPassengers] = useState(booking.guests || 2)
+  const [shuttleType, setShuttleType] = useState<ShuttleType>('Private Shuttle')
+
+  const pickupOptions = SHUTTLE_LOCATIONS.filter(l => l.type === pickupType)
+  const destinationOptions = SHUTTLE_LOCATIONS.filter(l => l.type === destinationType)
+  const available = useMemo(() => date ? findAvailableRoutes({ pickupId, destinationId, date, passengers, shuttleType }) : [], [pickupId, destinationId, date, passengers, shuttleType])
+  const routeForCapacity = findAvailableRoutes({ pickupId, destinationId, date: date || 'pending', passengers: 1, shuttleType }).at(0)?.route
+  const capacityError = routeForCapacity && passengers > routeForCapacity.capacity
+
+  function chooseLocation(type: LocationType, kind: 'pickup' | 'destination') {
+    if (kind === 'pickup') {
+      setPickupType(type)
+      setPickupId(SHUTTLE_LOCATIONS.find(l => l.type === type)?.id || '')
+    } else {
+      setDestinationType(type)
+      setDestinationId(SHUTTLE_LOCATIONS.find(l => l.type === type)?.id || '')
+    }
+  }
+
   return (
     <main className="bg-mist min-h-screen pt-16">
       <section className="bg-forest text-white py-16 px-6 lg:px-12">
         <div className="max-w-[1440px] mx-auto">
-          <p className="font-sans text-xs tracking-[0.2em] uppercase text-white/30 mb-3">Getting here</p>
+          <p className="font-sans text-xs tracking-[0.2em] uppercase text-white/30 mb-3">Ride-style booking</p>
           <h1 className="font-display text-5xl lg:text-6xl text-white leading-none mb-4">Shuttles & Transfers</h1>
-          <p className="font-sans text-sm text-white/50">Airport to Berg transfers and inter-region connections</p>
+          <p className="font-sans text-sm text-white/50">Choose pickup, destination, travel date, passengers and shuttle type.</p>
         </div>
       </section>
 
-      <div className="max-w-[1440px] mx-auto px-6 lg:px-12 py-12">
-        <div className="bg-white border border-black/8 divide-y divide-black/6 mb-12">
-          {ROUTES.map((r) => (
-            <Link key={r.id} href={`/shuttles/${r.id}`}
-              className="group flex items-center gap-6 px-6 py-6 hover:bg-mist transition-colors">
-              <div className="w-24 h-16 shrink-0 overflow-hidden hidden md:block">
-                <img src={r.img} alt="" className="w-full h-full object-cover" />
-              </div>
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <p className="font-display text-lg text-forest">{r.from}</p>
-                  <span className="text-gold">→</span>
-                  <p className="font-display text-lg text-forest">{r.to}</p>
-                </div>
-                <p className="font-sans text-xs text-forest/40 mt-0.5">{r.provider} · {r.duration}</p>
-              </div>
-              <div className="text-right shrink-0">
-                <p className="font-display text-xl text-forest">R{r.price.toLocaleString()}</p>
-                <p className="font-sans text-xs text-forest/40">per person</p>
-              </div>
-              <ArrowRight className="w-4 h-4 text-forest/20 group-hover:text-gold transition-colors shrink-0" />
-            </Link>
-          ))}
+      <div className="max-w-[1440px] mx-auto px-6 lg:px-12 py-12 grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <div className="lg:col-span-2 bg-white border border-black/8 p-6 space-y-8">
+          <section>
+            <p className="font-sans text-[10px] tracking-[0.16em] uppercase text-gold mb-3">Step 1 · Choose Pickup Location</p>
+            <div className="flex flex-wrap gap-2 mb-4">{LOCATION_TYPES.map(type => <button key={type} disabled={type === 'GPS location'} onClick={() => chooseLocation(type, 'pickup')} className={`px-3 py-2 font-sans text-xs border ${pickupType === type ? 'bg-forest text-white border-forest' : 'border-gray-200 text-forest/70'} disabled:opacity-40`}>{type}</button>)}</div>
+            <select value={pickupId} onChange={e => setPickupId(e.target.value)} className="w-full border border-gray-200 px-4 py-3 font-sans text-sm">{pickupOptions.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}</select>
+          </section>
+
+          <section>
+            <p className="font-sans text-[10px] tracking-[0.16em] uppercase text-gold mb-3">Step 2 · Choose Destination</p>
+            <div className="flex flex-wrap gap-2 mb-4">{LOCATION_TYPES.filter(t => t !== 'GPS location').map(type => <button key={type} onClick={() => chooseLocation(type, 'destination')} className={`px-3 py-2 font-sans text-xs border ${destinationType === type ? 'bg-forest text-white border-forest' : 'border-gray-200 text-forest/70'}`}>{type}</button>)}</div>
+            <select value={destinationId} onChange={e => setDestinationId(e.target.value)} className="w-full border border-gray-200 px-4 py-3 font-sans text-sm">{destinationOptions.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}</select>
+          </section>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+            <section><p className="font-sans text-[10px] tracking-[0.16em] uppercase text-gold mb-3">Step 3 · Date</p><input type="date" value={date} onChange={e => setDate(e.target.value)} className="w-full border border-gray-200 px-4 py-3 font-sans text-sm" /></section>
+            <section><p className="font-sans text-[10px] tracking-[0.16em] uppercase text-gold mb-3">Step 4 · Passengers</p><input type="number" min={1} max={20} value={passengers} onChange={e => setPassengers(parseInt(e.target.value) || 1)} className="w-full border border-gray-200 px-4 py-3 font-sans text-sm" />{capacityError && <p className="font-sans text-xs text-red-500 mt-2">Passenger count exceeds vehicle capacity of {routeForCapacity.capacity}.</p>}</section>
+            <section><p className="font-sans text-[10px] tracking-[0.16em] uppercase text-gold mb-3">Step 5 · Shuttle Type</p><select value={shuttleType} onChange={e => setShuttleType(e.target.value as ShuttleType)} className="w-full border border-gray-200 px-4 py-3 font-sans text-sm">{SHUTTLE_TYPES.map(t => <option key={t} value={t} disabled={t === 'Premium Shuttle'}>{t}{t === 'Premium Shuttle' ? ' (future)' : ''}</option>)}</select></section>
+          </div>
+
+          <section>
+            <p className="font-sans text-[10px] tracking-[0.16em] uppercase text-gold mb-3">Available shuttle schedules</p>
+            <div className="divide-y divide-gray-100 border border-gray-100">
+              {!date && <p className="p-5 font-sans text-sm text-gray-400">Select a travel date to view schedules.</p>}
+              {date && available.length === 0 && <p className="p-5 font-sans text-sm text-gray-400">No available route matches these details. Try a private transfer, fewer passengers, or another pickup/destination.</p>}
+              {available.map(({ route, price }) => (
+                <button key={route.id} onClick={() => booking.setShuttle(toShuttleOption(route, { pickupId, destinationId, date, passengers, shuttleType }))} className="w-full flex items-center gap-4 p-5 text-left hover:bg-mist transition-colors">
+                  <Bus className="text-forest" size={20} /><div className="flex-1"><p className="font-display text-lg text-forest">{route.schedules.join(' · ')}</p><p className="font-sans text-xs text-forest/40">{fmtMinutes(route.durationMinutes)} · {route.vehicleType} · capacity {route.capacity}</p></div><p className="font-display text-xl text-forest">R{price.toLocaleString()}</p><ArrowRight className="text-gold" size={16} />
+                </button>
+              ))}
+            </div>
+          </section>
         </div>
 
-        <div className="bg-forest text-white p-10 max-w-2xl">
-          <h2 className="font-display text-3xl mb-3">Private charter</h2>
-          <p className="font-sans text-sm text-white/60 leading-relaxed mb-6">
-            Need a flexible, private transfer? We arrange door-to-door shuttles for groups and families. Vehicles range from sedans to minibuses.
-          </p>
-          <Link href="/contact" className="font-sans text-sm border border-white/30 text-white px-5 py-2.5 hover:bg-white hover:text-forest transition-colors inline-block">
-            Request quote
-          </Link>
-        </div>
+        <aside className="bg-forest text-white p-8 h-fit sticky top-24">
+          <p className="font-sans text-[10px] tracking-[0.16em] uppercase text-white/40 mb-3">Step 6 · Review Booking</p>
+          <div className="space-y-4 font-sans text-sm text-white/70">
+            <p className="flex gap-2"><MapPin size={14} />Pickup: {SHUTTLE_LOCATIONS.find(l => l.id === pickupId)?.name || '—'}</p>
+            <p className="flex gap-2"><MapPin size={14} />Destination: {SHUTTLE_LOCATIONS.find(l => l.id === destinationId)?.name || '—'}</p>
+            <p className="flex gap-2"><Calendar size={14} />Date: {date || 'Select date'}</p>
+            <p className="flex gap-2"><Users size={14} />Passengers: {passengers}</p>
+            <p>Vehicle type: {available[0]?.route.vehicleType || '—'}</p>
+            <p>Estimated duration: {available[0] ? fmtMinutes(available[0].route.durationMinutes) : '—'}</p>
+          </div>
+          <div className="border-t border-white/10 mt-6 pt-6 flex items-end justify-between"><span className="font-sans text-xs text-white/40">Price</span><span className="font-display text-3xl text-gold">{available[0] ? `R${available[0].price.toLocaleString()}` : '—'}</span></div>
+          <p className="font-sans text-xs text-white/40 mt-4">Selecting a schedule adds the shuttle directly to your itinerary and checkout.</p>
+        </aside>
       </div>
       <Footer />
     </main>

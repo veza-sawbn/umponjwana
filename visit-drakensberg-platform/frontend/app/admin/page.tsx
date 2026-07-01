@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
-import { CheckCircle, Clock, XCircle, TrendingUp, Users, ListChecks, DollarSign, Building2, AlertTriangle } from 'lucide-react'
+import { CheckCircle, Clock, XCircle, TrendingUp, Users, ListChecks, DollarSign, Building2, AlertTriangle, Map, MapPinned } from 'lucide-react'
 import { admin } from '@/lib/api'
 
 type Stats = { total_users: number; total_suppliers: number; total_listings: number; total_bookings: number; total_revenue: number; pending_bookings: number }
@@ -49,6 +49,8 @@ export default function AdminOverviewPage() {
   }
 
   const cards = [
+    { label: 'Destination Hubs', value: 'Regions', sub: 'Manage regions before products', icon: Map, color: 'text-[#2d6a4f]', bg: 'bg-[#2d6a4f]/8' },
+    { label: 'Location Quality', value: 'Required', sub: 'Region, town, address and GPS pins', icon: MapPinned, color: 'text-[#C9A96E]', bg: 'bg-[#C9A96E]/10' },
     { label: 'Published Listings', value: stats?.total_listings ?? '—', sub: 'Live listings in database', icon: ListChecks, color: 'text-[#2d6a4f]', bg: 'bg-[#2d6a4f]/8' },
     { label: 'Total Bookings', value: stats?.total_bookings ?? '—', sub: `${stats?.pending_bookings ?? 0} pending`, icon: TrendingUp, color: 'text-[#C9A96E]', bg: 'bg-[#C9A96E]/10' },
     { label: 'Total Revenue', value: `R ${(stats?.total_revenue ?? 0).toLocaleString()}`, sub: 'Paid payments', icon: DollarSign, color: 'text-[#2d6a4f]', bg: 'bg-[#2d6a4f]/8' },
@@ -58,8 +60,9 @@ export default function AdminOverviewPage() {
   ]
 
   return <div className="p-8">
-    <div className="mb-8"><p className="font-sans text-[10px] tracking-[0.14em] uppercase text-gray-400 mb-1">Admin Console</p><h1 className="font-display italic text-3xl text-[#000000]">Platform Overview</h1><p className="font-sans text-sm text-gray-500 mt-1">Live data from the platform API</p>{error && <p className="mt-3 text-sm text-red-500">{error}</p>}</div>
-    <div className="grid grid-cols-2 lg:grid-cols-3 gap-4 mb-10">{cards.map(s => { const Icon=s.icon; return <div key={s.label} className="bg-white border border-gray-200 p-5"><div className={`${s.bg} p-2 inline-block mb-3`}><Icon size={16} className={s.color}/></div><p className="font-display italic text-2xl text-[#000000] mb-0.5">{s.value}</p><p className="font-sans text-[10px] tracking-[0.1em] uppercase text-gray-400">{s.label}</p><p className="font-sans text-xs text-gray-500 mt-1">{s.sub}</p></div> })}</div>
+    <div className="mb-8"><p className="font-sans text-[10px] tracking-[0.14em] uppercase text-gray-400 mb-1">Admin Console</p><h1 className="font-display italic text-3xl text-[#000000]">Destination Operating System</h1><p className="font-sans text-sm text-gray-500 mt-1">Manage destinations first, then the supplier products connected to them.</p>{error && <p className="mt-3 text-sm text-red-500">{error}</p>}</div>
+    <div className="bg-white border border-gray-200 p-5 mb-8"><p className="font-sans text-[10px] tracking-[0.14em] uppercase text-[#C9A96E] mb-3">Administrative hierarchy</p><div className="flex flex-wrap gap-2">{['Regions', 'Sub-regions', 'Towns', 'Points of Interest', 'Supplier Listings', 'Tourism Categories', 'Content', 'Events', 'SEO', 'Media', 'Analytics', 'Recommendations'].map(item => <Link key={item} href={item === 'Regions' ? '/admin/regions' : item === 'Supplier Listings' ? '/admin/listings' : item === 'Analytics' ? '/admin/analytics' : '/admin'} className="px-3 py-2 bg-[#F7F5F2] border border-gray-100 font-sans text-xs text-gray-600 hover:border-[#2d6a4f]/30 transition-colors">{item}</Link>)}</div></div>
+    <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-10">{cards.map(s => { const Icon=s.icon; return <div key={s.label} className="bg-white border border-gray-200 p-5"><div className={`${s.bg} p-2 inline-block mb-3`}><Icon size={16} className={s.color}/></div><p className="font-display italic text-2xl text-[#000000] mb-0.5">{s.value}</p><p className="font-sans text-[10px] tracking-[0.1em] uppercase text-gray-400">{s.label}</p><p className="font-sans text-xs text-gray-500 mt-1">{s.sub}</p></div> })}</div>
     <div className="grid grid-cols-1 xl:grid-cols-2 gap-8">
       <div className="bg-white border border-gray-200"><div className="flex items-center justify-between px-6 py-4 border-b border-gray-100"><div><h2 className="font-display italic text-xl text-[#000000]">Pending Approvals</h2><p className="font-sans text-xs text-gray-400">{suppliers.length} suppliers and {guides.length} guides awaiting review</p></div><Link href="/admin/suppliers" className="font-sans text-xs text-[#2d6a4f] hover:underline">View suppliers →</Link></div><div className="divide-y divide-gray-100">
         {suppliers.map(s => <div key={s.id} className="px-6 py-4 flex items-center gap-4"><div className="flex-1"><p className="font-sans text-sm font-medium">{s.business_name}</p><p className="font-sans text-xs text-gray-400">{s.description}</p></div><button onClick={() => verifySupplier(s.id)} className="bg-[#2d6a4f] text-white px-3 py-1.5 font-sans text-xs">Approve</button></div>)}

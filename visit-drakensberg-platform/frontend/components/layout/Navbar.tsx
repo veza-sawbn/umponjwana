@@ -11,16 +11,10 @@ import type { User as SupabaseUser } from '@supabase/supabase-js'
 import { AnimatePresence, motion } from 'framer-motion'
 import { scaleFade, fade, staggerContainer, staggerChild } from '@/lib/motion'
 import Logo from '@/components/Logo'
+import { PRIMARY_NAVIGATION } from '@/lib/destination-ia'
 
-const NAV_LINKS = [
-  { label: 'Stays', href: '/stays' },
-  { label: 'Hikes', href: '/hikes' },
-  { label: 'Activities', href: '/activities' },
-  { label: 'Reserves', href: '/nature-reserves' },
-  { label: 'Regions', href: '/regions' },
-  { label: 'Stories', href: '/mydrakensberg' },
-  { label: 'Plan', href: '/plan' },
-]
+const NAV_LINKS = PRIMARY_NAVIGATION
+
 
 const VISITOR_LINKS = [
   { label: 'My Account', href: '/account/settings', icon: User },
@@ -104,15 +98,34 @@ export default function Navbar() {
           </Link>
 
           {/* Desktop nav */}
-          <nav className="hidden lg:flex items-center gap-7">
+          <nav className="hidden lg:flex items-center gap-6">
             {NAV_LINKS.map((link) => (
-              <Link
-                key={link.href}
-                href={link.href}
-                className={`font-sans text-sm tracking-wide transition-colors duration-200 ${textColor} hover:text-gold`}
-              >
-                {link.label}
-              </Link>
+              <div key={link.href} className="relative group">
+                <Link
+                  href={link.href}
+                  className={`inline-flex items-center gap-1 font-sans text-sm tracking-wide transition-colors duration-200 ${textColor} hover:text-gold`}
+                >
+                  {link.label}
+                  <ChevronDown className="w-3 h-3 opacity-60" />
+                </Link>
+                <div className="invisible opacity-0 group-hover:visible group-hover:opacity-100 transition-all duration-200 absolute left-0 top-full pt-4 w-72">
+                  <div className="bg-white border border-black/8 shadow-card p-4">
+                    <p className="font-sans text-[10px] tracking-[0.16em] uppercase text-gold mb-3">Explore {link.label}</p>
+                    <div className="grid gap-1">
+                      {link.items.map((item) => (
+                        <Link
+                          key={item}
+                          href={`${link.href}?section=${encodeURIComponent(item.toLowerCase().replaceAll(' ', '-'))}`}
+                          className="flex items-center justify-between px-2 py-2 font-sans text-sm text-forest hover:bg-mist transition-colors"
+                        >
+                          {item}
+                          <ChevronRight size={12} className="text-forest/20" />
+                        </Link>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </div>
             ))}
           </nav>
 
