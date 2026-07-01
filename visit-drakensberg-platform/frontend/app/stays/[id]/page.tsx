@@ -117,6 +117,9 @@ function propToStay(prop: Property, rooms: Room[]) {
     title: prop.name,
     category: prop.type,
     location: prop.region || prop.address,
+    address: prop.address || prop.region,
+    gpsLat: prop.gpsLat,
+    gpsLng: prop.gpsLng,
     region: prop.region || '',
     rating: null as null | number,
     review_count: 0,
@@ -473,7 +476,7 @@ export default function StayDetailPage() {
                 onClick={() => {
                   if (!selectedRoom) return
                   booking.setSearch(stay.region, checkIn, checkOut, guests)
-                  booking.setStay({ id, title: stay.title, region: stay.region, price_per_night: selectedRoom.price_per_night, img: stay.images?.[0] })
+                  booking.setStay({ id, title: stay.title, region: stay.region, price_per_night: selectedRoom.price_per_night, img: stay.images?.[0], address: stay.address, lat: stay.gpsLat, lng: stay.gpsLng })
                   router.push(`/search?region=${encodeURIComponent(stay.region)}&check_in=${checkIn}&check_out=${checkOut}&guests=${guests}`)
                 }}
                 className={`w-full py-3.5 font-sans text-sm font-medium transition-colors ${selectedRoom ? 'bg-[#2d6a4f] text-white hover:bg-[#235a3f]' : 'bg-gray-100 text-gray-400 cursor-not-allowed'}`}
@@ -488,7 +491,13 @@ export default function StayDetailPage() {
               <p className="font-sans text-xs text-center text-gray-400 mt-3">Free cancellation up to 48 hours before check-in</p>
 
               <div className="mt-6">
-                <SmartRecommendations region={stay.region} excludeListingId={id} />
+                <SmartRecommendations
+                  region={stay.region}
+                  excludeListingId={id}
+                  originLocation={stay.address || stay.location}
+                  originLat={stay.gpsLat}
+                  originLng={stay.gpsLng}
+                />
               </div>
 
               <div className="mt-5 border-t border-gray-100 pt-5">

@@ -1,9 +1,10 @@
 'use client'
 
 import Link from 'next/link'
-import { MapPin, Star, Mountain, Zap, Calendar, Bus, Plus } from 'lucide-react'
+import { MapPin, Star, Mountain, Zap, Calendar, Bus, Plus, Navigation } from 'lucide-react'
 import { useBooking } from '@/lib/booking-context'
-import { buildContextualShuttleRecommendations } from '@/lib/shuttle-service'
+import { useShuttleRecommendations } from '@/lib/shuttle-service'
+import { useAutoDrivingDistances, type DistancePlace } from '@/components/maps/GoogleAddressField'
 
 interface SmartRecommendation {
   title: string
@@ -56,12 +57,29 @@ const TYPE_COLOR: Record<string, string> = {
 interface Props {
   region: string
   excludeListingId?: string
+  originLocation?: string
+  originLat?: string
+  originLng?: string
 }
 
-export default function SmartRecommendations({ region, excludeListingId }: Props) {
+function formatDistance(result: { distanceKm: number; durationText: string } | null | undefined) {
+  if (!result) return null
+  return `${result.distanceKm} km · ~${result.durationText} away`
+}
+
+export default function SmartRecommendations({ region, excludeListingId, originLocation, originLat, originLng }: Props) {
   const booking = useBooking()
   const recommendations = (REGION_DATA[region] || REGION_DATA['Central Berg']).slice(0, 4)
-  const shuttleRecommendations = buildContextualShuttleRecommendations(booking).slice(0, 2)
+  const shuttleRecommendations = useShuttleRecommendations(booking)
+
+  const origin: DistancePlace | null = originLocation ? { address: `${originLocation}, South Africa`, lat: originLat, lng: originLng } : null
+  const destinations: DistancePlace[] = [
+    ...recommendations.map(item => ({ address: `${item.location}, South Africa` })),
+    ...shuttleRecommendations.map(shuttle => ({ address: `${shuttle.destination || shuttle.label}, South Africa` })),
+  ]
+  const { results: distances, status: distanceStatus } = useAutoDrivingDistances(origin, destinations)
+  const recommendationDistances = distances.slice(0, recommendations.length)
+  const shuttleDistances = distances.slice(recommendations.length)
 
   if (recommendations.length === 0) return null
 
@@ -75,31 +93,43 @@ export default function SmartRecommendations({ region, excludeListingId }: Props
 
       {shuttleRecommendations.length > 0 && (
         <div className="space-y-3 mb-4">
-          {shuttleRecommendations.map(shuttle => (
-            <button
-              key={shuttle.id}
-              onClick={() => booking.setShuttle(shuttle)}
-              className="w-full text-left group flex gap-3 bg-white border border-[#2d6a4f]/30 hover:border-[#2d6a4f] transition-colors p-3"
-            >
-              <div className="w-14 h-14 shrink-0 bg-[#2d6a4f]/10 flex items-center justify-center text-[#2d6a4f]">
-                <Bus size={20} />
-              </div>
-              <div className="min-w-0 flex-1">
-                <span className="inline-flex items-center gap-1 font-sans text-[9px] tracking-[0.12em] uppercase text-[#2d6a4f]">Private Transfer Available</span>
-                <p className="font-display italic text-sm text-[#000000] leading-tight group-hover:text-[#2d6a4f] transition-colors">{shuttle.label}</p>
-                <p className="font-sans text-[10px] text-gray-400 mt-1">Travel date: {shuttle.date} · {shuttle.passengers} passenger{shuttle.passengers !== 1 ? 's' : ''}</p>
-              </div>
-              <div className="shrink-0 text-right">
-                <p className="font-display italic text-sm text-[#2d6a4f]">R{shuttle.price.toLocaleString()}</p>
-                <p className="font-sans text-[9px] text-gray-400 inline-flex items-center gap-1 justify-end"><Plus size={9} /> Add</p>
-              </div>
-            </button>
-          ))}
+          {shuttleRecommendations.map((shuttle, i) => {
+            const shuttleDistanceLabel = formatDistance(shuttleDistances[i])
+            return (
+              <button
+                key={shuttle.id}
+                onClick={() => booking.setShuttle(shuttle)}
+                className="w-full text-left group flex gap-3 bg-white border border-[#2d6a4f]/30 hover:border-[#2d6a4f] transition-colors p-3"
+              >
+                <div className="w-14 h-14 shrink-0 bg-[#2d6a4f]/10 flex items-center justify-center text-[#2d6a4f]">
+                  <Bus size={20} />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <span className="inline-flex items-center gap-1 font-sans text-[9px] tracking-[0.12em] uppercase text-[#2d6a4f]">Private Transfer Available</span>
+                  <p className="font-display italic text-sm text-[#000000] leading-tight group-hover:text-[#2d6a4f] transition-colors">{shuttle.label}</p>
+                  <p className="font-sans text-[10px] text-gray-400 mt-1">Travel date: {shuttle.date} · {shuttle.passengers} passenger{shuttle.passengers !== 1 ? 's' : ''}</p>
+                  {origin && (
+                    <p className="font-sans text-[10px] text-[#2d6a4f]/70 mt-0.5 flex items-center gap-1">
+                      <Navigation size={9} />
+                      {distanceStatus === 'calculating' ? 'Calculating distance…' : shuttleDistanceLabel || '—'}
+                    </p>
+                  )}
+                </div>
+                <div className="shrink-0 text-right">
+                  <p className="font-display italic text-sm text-[#2d6a4f]">R{shuttle.price.toLocaleString()}</p>
+                  <p className="font-sans text-[9px] text-gray-400 inline-flex items-center gap-1 justify-end"><Plus size={9} /> Add</p>
+                </div>
+              </button>
+            )
+          })}
         </div>
       )}
 
       <div className="space-y-3">
-        {recommendations.map(item => (
+        {recommendations.map((item, i) => {
+          const liveDistance = formatDistance(recommendationDistances[i])
+          const distanceLabel = liveDistance || (distanceStatus === 'calculating' && origin ? 'Calculating…' : item.distance)
+          return (
           <Link
             key={item.href}
             href={item.href}
@@ -114,8 +144,8 @@ export default function SmartRecommendations({ region, excludeListingId }: Props
                   {TYPE_ICON[item.type]}
                   {item.type}
                 </span>
-                {item.distance && (
-                  <span className="font-sans text-[9px] text-gray-300">{item.distance}</span>
+                {distanceLabel && (
+                  <span className="font-sans text-[9px] text-gray-300">{distanceLabel}</span>
                 )}
               </div>
               <p className="font-display italic text-sm text-[#000000] leading-tight group-hover:text-[#2d6a4f] transition-colors">{item.title}</p>
@@ -138,7 +168,8 @@ export default function SmartRecommendations({ region, excludeListingId }: Props
               </div>
             )}
           </Link>
-        ))}
+          )
+        })}
       </div>
 
       <Link

@@ -1,8 +1,9 @@
 'use client'
 import { useState, useEffect } from 'react'
 import { useParams, useRouter } from 'next/navigation'
-import { ChevronLeft } from 'lucide-react'
+import { ChevronLeft, Plus, Trash2 } from 'lucide-react'
 import { getActivityById, updateActivity } from '@/lib/activities'
+import { getRegionNames } from '@/lib/regions'
 import { GoogleAddressField } from '@/components/maps/GoogleAddressField'
 
 const CATEGORIES = ['Adventure', 'Nature', 'Water', 'Cultural', 'Wellness', 'Family']
@@ -12,39 +13,82 @@ const HOURS = Array.from({ length: 13 }, (_, i) => i)
 const MINUTES = [0, 15, 30, 45]
 
 type FormState = {
-  name: string; category: string; difficulty: string; durationH: number; durationM: number;
+  name: string; category: string; region: string; difficulty: string; durationH: number; durationM: number;
   minAge: number; maxGroup: number; meetingPoint: string; gpsLat: string; gpsLng: string;
-  description: string; whatToWear: string; included: string[]; safetyNotes: string;
+  description: string; whatToWear: string; photos: string[]; included: string[]; safetyNotes: string;
   pricePerPerson: number; priceGroup: number; depositRequired: boolean; depositPercent: string;
   status: 'active' | 'draft'
 }
 
 const EMPTY: FormState = {
-  name: '', category: '', difficulty: 'Moderate', durationH: 0, durationM: 0,
+  name: '', category: '', region: '', difficulty: 'Moderate', durationH: 0, durationM: 0,
   minAge: 0, maxGroup: 1, meetingPoint: '', gpsLat: '', gpsLng: '',
-  description: '', whatToWear: '', included: [], safetyNotes: '',
+  description: '', whatToWear: '', photos: [], included: [], safetyNotes: '',
   pricePerPerson: 0, priceGroup: 0, depositRequired: false, depositPercent: '30',
   status: 'active',
+}
+
+function ImageList({ images, onChange }: { images: string[]; onChange: (v: string[]) => void }) {
+  const [draft, setDraft] = useState('')
+  function add() {
+    const url = draft.trim()
+    if (!url) return
+    onChange([...images, url])
+    setDraft('')
+  }
+  return (
+    <div className="space-y-2">
+      <p className="font-sans text-sm font-medium text-black/70">Photos</p>
+      {images.map((url, i) => (
+        <div key={i} className="flex gap-2 items-center">
+          <input value={url} onChange={e => { const next = [...images]; next[i] = e.target.value; onChange(next) }} className={`${inp} flex-1 text-xs`} />
+          <button type="button" onClick={() => onChange(images.filter((_, j) => j !== i))} className="text-red-400 hover:text-red-600 shrink-0">
+            <Trash2 size={14} />
+          </button>
+        </div>
+      ))}
+      <div className="flex gap-2">
+        <input value={draft} onChange={e => setDraft(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); add() } }} placeholder="https://… paste image URL and press Enter" className={`${inp} flex-1 text-xs`} />
+        <button type="button" onClick={add} className="shrink-0 flex items-center gap-1 font-sans text-xs text-[#C9A96E] border border-[#C9A96E]/30 rounded-lg px-2.5 py-1.5 hover:border-[#C9A96E]/60">
+          <Plus size={12} /> Add
+        </button>
+      </div>
+      {images.length > 0 && (
+        <div className="grid grid-cols-3 gap-2 mt-2">
+          {images.map((url, i) => (
+            <div key={i} className="aspect-video rounded-lg overflow-hidden bg-black/5 border border-black/8">
+              <img src={url} alt="" className="w-full h-full object-cover" onError={e => { (e.target as HTMLImageElement).style.display = 'none' }} />
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
 }
 
 export default function EditActivityPage() {
   const { id } = useParams<{ id: string }>()
   const router = useRouter()
   const [form, setForm] = useState<FormState>(EMPTY)
+  const [regions, setRegions] = useState<string[]>([])
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const set = (k: string, v: unknown) => setForm(f => ({ ...f, [k]: v }))
 
   useEffect(() => {
+    getRegionNames().then(setRegions)
+  }, [])
+
+  useEffect(() => {
     getActivityById(id).then(a => {
       if (a) {
         setForm({
-          name: a.name, category: a.category, difficulty: a.difficulty,
+          name: a.name, category: a.category, region: a.region ?? '', difficulty: a.difficulty,
           durationH: a.durationH, durationM: a.durationM,
           minAge: a.minAge, maxGroup: a.maxGroup,
           meetingPoint: a.meetingPoint, gpsLat: a.gpsLat, gpsLng: a.gpsLng,
-          description: a.description, whatToWear: a.whatToWear ?? '',
+          description: a.description, whatToWear: a.whatToWear ?? '', photos: a.photos ?? [],
           included: a.included, safetyNotes: a.safetyNotes,
           pricePerPerson: a.pricePerPerson, priceGroup: a.priceGroup,
           depositRequired: a.depositRequired, depositPercent: a.depositPercent,
@@ -95,6 +139,13 @@ export default function EditActivityPage() {
           </div>
         </F>
 
+        <F label="Region" required>
+          <select value={form.region} onChange={e => set('region', e.target.value)} className={inp}>
+            <option value="">Select region…</option>
+            {regions.map(r => <option key={r} value={r}>{r}</option>)}
+          </select>
+        </F>
+
         <F label="Difficulty">
           <div className="flex gap-2 flex-wrap">
             {DIFFICULTIES.map(d => <button key={d} onClick={() => set('difficulty', d)} className={chip(form.difficulty === d)}>{d}</button>)}
@@ -127,6 +178,8 @@ export default function EditActivityPage() {
         <F label="Description" required><textarea value={form.description} onChange={e => set('description', e.target.value)} rows={3} className={`${inp} resize-none`} /></F>
 
         <F label="What to Wear / Bring"><textarea value={form.whatToWear} onChange={e => set('whatToWear', e.target.value)} rows={3} className={`${inp} resize-none`} /></F>
+
+        <ImageList images={form.photos} onChange={v => set('photos', v)} />
 
         <F label="What's Included">
           <div className="flex flex-wrap gap-2">

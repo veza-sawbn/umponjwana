@@ -94,7 +94,87 @@ export async function calculateDrivingDistance(origin: DistanceOrigin, destinati
   })
 }
 
+/** Calls the Google Distance Matrix service once to get driving distance/duration from one origin to many destinations. */
+export async function calculateDrivingDistances(origin: DistanceOrigin, destinations: DistanceOrigin[]): Promise<(DistanceResult | null)[]> {
+  if (destinations.length === 0) return []
+  if (typeof window === 'undefined') return destinations.map(() => null)
+  try {
+    await loadGoogleMaps()
+  } catch {
+    return destinations.map(() => null)
+  }
+  if (!window.google?.maps) return destinations.map(() => null)
+
+  const toMapsPoint = (point: DistanceOrigin) => (typeof point === 'string' ? point : new window.google!.maps.LatLng(point.lat, point.lng))
+
+  return new Promise((resolve) => {
+    const service = new window.google.maps.DistanceMatrixService()
+    service.getDistanceMatrix(
+      {
+        origins: [toMapsPoint(origin)],
+        destinations: destinations.map(toMapsPoint),
+        travelMode: window.google.maps.TravelMode.DRIVING,
+        unitSystem: window.google.maps.UnitSystem.METRIC,
+      },
+      (response: any, status: string) => {
+        const elements = response?.rows?.[0]?.elements
+        if (status !== 'OK' || !Array.isArray(elements)) {
+          resolve(destinations.map(() => null))
+          return
+        }
+        resolve(elements.map((element: any) => {
+          if (!element || element.status !== 'OK') return null
+          return {
+            distanceKm: Math.round(((element.distance?.value ?? 0) / 100)) / 10,
+            durationMinutes: Math.round((element.duration?.value ?? 0) / 60),
+            durationText: element.duration?.text ?? '',
+          }
+        }))
+      }
+    )
+  })
+}
+
 export type DistancePlace = { address: string; lat?: string; lng?: string }
+
+/** Watches an origin and a list of destinations, (re)calculating driving distances in the background in a single request. */
+export function useAutoDrivingDistances(origin: DistancePlace | null, destinations: DistancePlace[]) {
+  const [results, setResults] = useState<(DistanceResult | null)[]>([])
+  const [status, setStatus] = useState<'idle' | 'calculating' | 'done' | 'error'>('idle')
+
+  const originKey = origin ? (origin.lat && origin.lng ? `${origin.lat},${origin.lng}` : origin.address.trim()) : ''
+  const destinationsKey = destinations.map(d => (d.lat && d.lng ? `${d.lat},${d.lng}` : d.address.trim())).join('|')
+
+  useEffect(() => {
+    if (!originKey || destinations.length === 0) {
+      setStatus('idle')
+      setResults([])
+      return
+    }
+
+    let cancelled = false
+    setStatus('calculating')
+
+    const timer = setTimeout(() => {
+      const originPoint: DistanceOrigin = origin!.lat && origin!.lng ? { lat: Number(origin!.lat), lng: Number(origin!.lng) } : origin!.address
+      const destinationPoints: DistanceOrigin[] = destinations.map(d => (d.lat && d.lng ? { lat: Number(d.lat), lng: Number(d.lng) } : d.address))
+
+      calculateDrivingDistances(originPoint, destinationPoints).then((res) => {
+        if (cancelled) return
+        setResults(res)
+        setStatus(res.some(Boolean) ? 'done' : 'error')
+      })
+    }, 500)
+
+    return () => {
+      cancelled = true
+      clearTimeout(timer)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [originKey, destinationsKey])
+
+  return { results, status }
+}
 
 /** Watches an origin/destination pair and (re)calculates driving distance in the background whenever both are set. */
 export function useAutoDrivingDistance(origin: DistancePlace, destination: DistancePlace) {
