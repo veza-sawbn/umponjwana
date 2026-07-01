@@ -119,9 +119,9 @@ Proprietary — visitdrakensberg.com
 
 ## Google Maps setup
 
-Address and location fields in the supplier listing, property, activity, and tour forms use the Google Maps JavaScript API with the Places library when a browser API key is available.
+Address and location fields in the supplier listing, property, activity, and tour forms use the Google Maps JavaScript API with the Places library when a browser API key is available. The shuttle route estimator and supplier routes forms additionally use the Distance Matrix API to auto-calculate driving distance/duration in the background once both addresses are set.
 
-1. In Google Cloud Console, enable **Maps JavaScript API** and **Places API** for your project.
+1. In Google Cloud Console, enable **Maps JavaScript API**, **Places API**, and **Distance Matrix API** for your project.
 2. Create an API key and restrict it to your web app domains (for local development, include `http://localhost:3000/*`).
 3. Put the key in `visit-drakensberg-platform/frontend/.env.local`:
 
