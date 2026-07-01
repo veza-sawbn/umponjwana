@@ -7,7 +7,7 @@ import { Calendar, Users, MapPin, Bed, Plus, X, ChevronUp, ChevronDown, Shopping
 import { AnimatePresence, motion } from 'framer-motion'
 import { useBooking } from '@/lib/booking-context'
 import { slideUp, slideUpBar } from '@/lib/motion'
-import { buildContextualShuttleRecommendations } from '@/lib/shuttle-service'
+import { useShuttleRecommendations } from '@/lib/shuttle-service'
 
 function fmt(iso: string) {
   if (!iso) return ''
@@ -22,7 +22,7 @@ export default function BookingBar() {
 
   const hidden = ['/admin', '/checkout', '/auth'].some(p => pathname.startsWith(p))
   const itemCount = (booking.stay ? 1 : 0) + booking.addons.length + (booking.shuttle ? 1 : 0)
-  const shuttleRecommendations = buildContextualShuttleRecommendations(booking).slice(0, 2)
+  const shuttleRecommendations = useShuttleRecommendations(booking)
   const visible = !hidden && (booking.hasActiveSearch || itemCount > 0)
 
   function handleCheckout() {

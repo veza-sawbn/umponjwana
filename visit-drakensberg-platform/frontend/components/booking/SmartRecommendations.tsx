@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import { MapPin, Star, Mountain, Zap, Calendar, Bus, Plus, Navigation } from 'lucide-react'
 import { useBooking } from '@/lib/booking-context'
-import { buildContextualShuttleRecommendations } from '@/lib/shuttle-service'
+import { useShuttleRecommendations } from '@/lib/shuttle-service'
 import { useAutoDrivingDistances, type DistancePlace } from '@/components/maps/GoogleAddressField'
 
 interface SmartRecommendation {
@@ -70,7 +70,7 @@ function formatDistance(result: { distanceKm: number; durationText: string } | n
 export default function SmartRecommendations({ region, excludeListingId, originLocation, originLat, originLng }: Props) {
   const booking = useBooking()
   const recommendations = (REGION_DATA[region] || REGION_DATA['Central Berg']).slice(0, 4)
-  const shuttleRecommendations = buildContextualShuttleRecommendations(booking).slice(0, 2)
+  const shuttleRecommendations = useShuttleRecommendations(booking)
 
   const origin: DistancePlace | null = originLocation ? { address: `${originLocation}, South Africa`, lat: originLat, lng: originLng } : null
   const destinations: DistancePlace[] = [

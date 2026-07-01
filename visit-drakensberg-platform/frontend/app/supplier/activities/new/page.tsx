@@ -1,9 +1,10 @@
 'use client'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { ChevronLeft, ChevronRight } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Plus, Trash2 } from 'lucide-react'
 import { supabase } from '@/lib/auth'
 import { addActivity } from '@/lib/activities'
+import { getRegionNames } from '@/lib/regions'
 import { GoogleAddressField } from '@/components/maps/GoogleAddressField'
 
 const CATEGORIES = ['Adventure', 'Nature', 'Water', 'Cultural', 'Wellness', 'Family']
@@ -11,18 +12,61 @@ const DIFFICULTY = ['Easy', 'Moderate', 'Challenging', 'Extreme']
 const INCLUDED = ['Helmet & Harness', 'Guide', 'Safety Briefing', 'Refreshments', 'Transport to Site', 'Photos/Video', 'Equipment']
 const STEPS = ['Activity Details', 'Logistics', 'Inclusions & Safety', 'Pricing', 'Review']
 
+function ImageList({ images, onChange }: { images: string[]; onChange: (v: string[]) => void }) {
+  const [draft, setDraft] = useState('')
+  function add() {
+    const url = draft.trim()
+    if (!url) return
+    onChange([...images, url])
+    setDraft('')
+  }
+  return (
+    <div className="space-y-2">
+      <p className="font-sans text-sm font-medium text-black/70">Photos</p>
+      {images.map((url, i) => (
+        <div key={i} className="flex gap-2 items-center">
+          <input value={url} onChange={e => { const next = [...images]; next[i] = e.target.value; onChange(next) }} className={`${inp} flex-1 text-xs`} />
+          <button type="button" onClick={() => onChange(images.filter((_, j) => j !== i))} className="text-red-400 hover:text-red-600 shrink-0">
+            <Trash2 size={14} />
+          </button>
+        </div>
+      ))}
+      <div className="flex gap-2">
+        <input value={draft} onChange={e => setDraft(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); add() } }} placeholder="https://… paste image URL and press Enter" className={`${inp} flex-1 text-xs`} />
+        <button type="button" onClick={add} className="shrink-0 flex items-center gap-1 font-sans text-xs text-[#C9A96E] border border-[#C9A96E]/30 rounded-lg px-2.5 py-1.5 hover:border-[#C9A96E]/60">
+          <Plus size={12} /> Add
+        </button>
+      </div>
+      {images.length > 0 && (
+        <div className="grid grid-cols-3 gap-2 mt-2">
+          {images.map((url, i) => (
+            <div key={i} className="aspect-video rounded-lg overflow-hidden bg-black/5 border border-black/8">
+              <img src={url} alt="" className="w-full h-full object-cover" onError={e => { (e.target as HTMLImageElement).style.display = 'none' }} />
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
 export default function NewActivityPage() {
   const router = useRouter()
   const [step, setStep] = useState(0)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
+  const [regions, setRegions] = useState<string[]>([])
   const [form, setForm] = useState({
-    name: '', category: '', description: '', difficulty: '',
+    name: '', category: '', region: '', description: '', difficulty: '',
     durationH: '', minAge: '', maxGroupSize: '',
-    meetingPoint: '', gpsLat: '', gpsLng: '', whatToWear: '',
+    meetingPoint: '', gpsLat: '', gpsLng: '', whatToWear: '', photos: [] as string[],
     included: [] as string[], safetyNotes: '',
     pricePerPerson: '', priceGroup: '', depositRequired: false, depositPercent: '30',
   })
+
+  useEffect(() => {
+    getRegionNames().then(setRegions)
+  }, [])
 
   const set = (k: string, v: unknown) => setForm(f => ({ ...f, [k]: v }))
 
@@ -42,6 +86,7 @@ export default function NewActivityPage() {
         supplierName: user.user_metadata?.full_name || user.email || '',
         name: form.name,
         category: form.category,
+        region: form.region,
         difficulty: form.difficulty,
         description: form.description,
         durationH: +form.durationH || 0,
@@ -52,6 +97,7 @@ export default function NewActivityPage() {
         gpsLat: form.gpsLat,
         gpsLng: form.gpsLng,
         whatToWear: form.whatToWear,
+        photos: form.photos,
         included: form.included,
         safetyNotes: form.safetyNotes,
         pricePerPerson: +form.pricePerPerson || 0,
@@ -97,6 +143,12 @@ export default function NewActivityPage() {
                 {CATEGORIES.map(c => <option key={c}>{c}</option>)}
               </select>
             </F>
+            <F label="Region" required>
+              <select value={form.region} onChange={e => set('region', e.target.value)} className={inp}>
+                <option value="">Select region…</option>
+                {regions.map(r => <option key={r} value={r}>{r}</option>)}
+              </select>
+            </F>
             <F label="Difficulty">
               <div className="flex gap-2 flex-wrap">
                 {DIFFICULTY.map(d => (
@@ -123,6 +175,7 @@ export default function NewActivityPage() {
               <F label="GPS Longitude"><input value={form.gpsLng} onChange={e => set('gpsLng', e.target.value)} placeholder="29.123456" className={inp} /></F>
             </div>
             <F label="What to Wear / Bring"><textarea value={form.whatToWear} onChange={e => set('whatToWear', e.target.value)} rows={3} className={`${inp} resize-none`} /></F>
+            <ImageList images={form.photos} onChange={v => set('photos', v)} />
           </>
         )}
 
@@ -164,7 +217,7 @@ export default function NewActivityPage() {
           <div className="space-y-3">
             <p className="font-sans text-sm text-black/60">Review your activity before submitting.</p>
             <div className="rounded-lg bg-black/3 p-4 space-y-2">
-              {[['Name', form.name], ['Category', form.category], ['Difficulty', form.difficulty], ['Duration', form.durationH ? `${form.durationH}h` : ''], ['Max Group', form.maxGroupSize], ['Meeting Point', form.meetingPoint], ['Price/Person', form.pricePerPerson ? `R ${form.pricePerPerson}` : '']].map(([k, v]) => v ? (
+              {[['Name', form.name], ['Category', form.category], ['Region', form.region], ['Difficulty', form.difficulty], ['Duration', form.durationH ? `${form.durationH}h` : ''], ['Max Group', form.maxGroupSize], ['Meeting Point', form.meetingPoint], ['Price/Person', form.pricePerPerson ? `R ${form.pricePerPerson}` : '']].map(([k, v]) => v ? (
                 <div key={k} className="flex gap-3 font-sans text-sm">
                   <span className="text-black/40 w-32 shrink-0">{k}</span>
                   <span className="text-black/80">{v}</span>

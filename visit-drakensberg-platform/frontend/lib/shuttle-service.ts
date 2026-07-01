@@ -1,3 +1,4 @@
+import { useAutoDrivingDistances, type DistancePlace, type DistanceResult } from '@/components/maps/GoogleAddressField'
 import type { BookingAddon, BookingState, ShuttleOption } from './booking-context'
 
 export type LocationType = 'Accommodation' | 'Airport' | 'Hiking trail' | 'Town' | 'Attraction' | 'Landmark' | 'GPS location'
@@ -90,16 +91,11 @@ function locationForAddon(addon: BookingAddon) {
   return 'cathedral-peak-trailhead'
 }
 
-export function buildContextualShuttleRecommendations(booking: BookingState): ShuttleOption[] {
+/** Addon-to-accommodation shuttle guesses from the static mock route table (used only when no real stay address is available). */
+function buildAddonShuttleRecommendations(booking: BookingState): ShuttleOption[] {
   const recommendations: ShuttleOption[] = []
   const passengers = booking.guests || 2
   const accommodationId = booking.stay?.title.toLowerCase().includes('cathedral') ? 'cathedral-peak-hotel' : 'champagne-valley'
-  const arrivalDate = booking.checkIn
-
-  if (booking.stay && arrivalDate) {
-    const route = SHUTTLE_ROUTES.find(r => r.pickupId === 'jnb-or-tambo' && r.destinationId === accommodationId)
-    if (route && passengers <= route.capacity) recommendations.push(toShuttleOption(route, { pickupId: route.pickupId, destinationId: route.destinationId, date: arrivalDate, passengers, shuttleType: 'Private Shuttle' }))
-  }
 
   booking.addons.forEach(addon => {
     const date = addon.date || booking.checkIn
@@ -109,5 +105,70 @@ export function buildContextualShuttleRecommendations(booking: BookingState): Sh
     if (route && passengers <= route.capacity) recommendations.push(toShuttleOption(route, { pickupId: route.pickupId, destinationId, date, passengers, shuttleType: 'Private Shuttle' }))
   })
 
-  return recommendations.filter(rec => rec.id !== booking.shuttle?.id)
+  return recommendations
+}
+
+/** Kept for backwards compatibility with any remaining direct callers; prefer useShuttleRecommendations(). */
+export function buildContextualShuttleRecommendations(booking: BookingState): ShuttleOption[] {
+  return buildAddonShuttleRecommendations(booking).filter(rec => rec.id !== booking.shuttle?.id)
+}
+
+const MAJOR_HUBS = [
+  { id: 'jnb-or-tambo', name: 'OR Tambo International Airport, Johannesburg' },
+  { id: 'dur-king-shaka', name: 'King Shaka International Airport, Durban' },
+]
+
+const AIRPORT_TRANSFER_RATE_PER_KM = 9
+const AIRPORT_TRANSFER_MIN_FARE = 650
+const AIRPORT_TRANSFER_PER_PASSENGER_KM = 1
+
+/** Calculates a real driving-distance-based airport transfer suggestion to the guest's actual selected stay, using Google Distance Matrix. */
+export function useAirportTransferRecommendation(booking: BookingState): { recommendation: ShuttleOption | null; status: 'idle' | 'calculating' | 'done' | 'error' } {
+  const stay = booking.stay
+  const origin: DistancePlace | null = stay
+    ? { address: stay.address || `${stay.title}, ${stay.region}, South Africa`, lat: stay.lat, lng: stay.lng }
+    : null
+  const destinations: DistancePlace[] = MAJOR_HUBS.map(hub => ({ address: hub.name }))
+  const { results, status } = useAutoDrivingDistances(origin, destinations)
+
+  if (!stay || !booking.checkIn || status !== 'done') return { recommendation: null, status }
+
+  type HubDistance = { hub: typeof MAJOR_HUBS[number]; result: DistanceResult }
+  const best = results.reduce<HubDistance | null>((closest, result, i) => {
+    if (!result) return closest
+    if (!closest || result.distanceKm < closest.result.distanceKm) return { hub: MAJOR_HUBS[i], result }
+    return closest
+  }, null)
+  if (!best) return { recommendation: null, status: 'error' }
+
+  const passengers = booking.guests || 2
+  const basePrice = Math.max(AIRPORT_TRANSFER_MIN_FARE, Math.round(best.result.distanceKm * AIRPORT_TRANSFER_RATE_PER_KM))
+  const extraPassengerFee = Math.round(best.result.distanceKm * AIRPORT_TRANSFER_PER_PASSENGER_KM) * Math.max(0, passengers - 1)
+  const price = basePrice + extraPassengerFee
+
+  return {
+    recommendation: {
+      id: `airport-transfer-${best.hub.id}-${booking.checkIn}`,
+      label: `${best.hub.name} → ${stay.title}`,
+      price,
+      description: `Private transfer on ${booking.checkIn}. ${best.result.distanceKm} km · ~${best.result.durationText} drive · ${passengers} passenger${passengers !== 1 ? 's' : ''}. Estimated fare based on live driving distance.`,
+      pickup: best.hub.name,
+      destination: stay.title,
+      date: booking.checkIn,
+      passengers,
+      shuttleType: 'Private Shuttle',
+      durationMinutes: best.result.durationMinutes,
+      vehicleType: 'Minibus / SUV',
+    },
+    status: 'done',
+  }
+}
+
+/** Combines the live airport-transfer suggestion with addon-based shuttle guesses into one ready-to-render list. */
+export function useShuttleRecommendations(booking: BookingState, limit = 2): ShuttleOption[] {
+  const { recommendation: airportTransfer } = useAirportTransferRecommendation(booking)
+  const addonRecommendations = buildAddonShuttleRecommendations(booking)
+  return [...(airportTransfer ? [airportTransfer] : []), ...addonRecommendations]
+    .filter(rec => rec.id !== booking.shuttle?.id)
+    .slice(0, limit)
 }

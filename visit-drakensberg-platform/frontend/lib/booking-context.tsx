@@ -19,6 +19,9 @@ export type BookingStay = {
   region: string
   price_per_night: number
   img?: string
+  address?: string
+  lat?: string
+  lng?: string
 }
 
 export type ShuttleOption = {

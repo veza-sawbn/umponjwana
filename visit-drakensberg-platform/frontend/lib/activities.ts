@@ -6,6 +6,7 @@ export type Activity = {
   supplierName: string
   name: string
   category: string
+  region: string
   difficulty: string
   description: string
   durationH: number
@@ -16,6 +17,7 @@ export type Activity = {
   gpsLat: string
   gpsLng: string
   whatToWear: string
+  photos: string[]
   included: string[]
   safetyNotes: string
   pricePerPerson: number

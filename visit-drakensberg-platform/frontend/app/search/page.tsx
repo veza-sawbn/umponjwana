@@ -8,6 +8,9 @@ import Footer from '@/components/layout/Footer'
 import { Calendar, Users, MapPin, ArrowRight, Search, SlidersHorizontal, X, Check, Bed } from 'lucide-react'
 import { useBooking } from '@/lib/booking-context'
 import { getRegionNames, DEFAULT_REGIONS } from '@/lib/regions'
+import { getProperties, type Property } from '@/lib/properties'
+import { getRoomsByProperty } from '@/lib/rooms'
+import { getActivities, type Activity } from '@/lib/activities'
 
 /* ── Mock data ─────────────────────────────────────────────────────────────── */
 
@@ -51,9 +54,62 @@ const ALL_RESTAURANTS = [
   { id: 'r4', title: "The Drakensberg Kitchen", region: 'Central Berg', cuisine: 'Farm-to-Table', price_range: 'R160–R320', rating: 4.8, img: 'https://images.unsplash.com/photo-1466978913421-dad2ebd01d17?w=600&q=80' },
 ]
 
+type LiveStay = {
+  id: string
+  title: string
+  region: string
+  price: number
+  rating?: number
+  reviews?: number
+  img?: string
+  available: boolean
+  address?: string
+  lat?: string
+  lng?: string
+}
+
+type LiveActivity = {
+  id: string
+  title: string
+  region: string
+  price: number
+  category: string
+  img?: string
+}
+
+function propertyToLiveStay(p: Property, minPrice: number): LiveStay {
+  return {
+    id: p.id,
+    title: p.name,
+    region: p.region,
+    price: minPrice,
+    img: p.photos[0] || undefined,
+    available: true,
+    address: p.address || p.region,
+    lat: p.gpsLat || undefined,
+    lng: p.gpsLng || undefined,
+  }
+}
+
+function activityToLiveActivity(a: Activity): LiveActivity {
+  return {
+    id: a.id,
+    title: a.name,
+    region: a.region,
+    price: a.pricePerPerson,
+    category: a.category,
+    img: a.photos?.[0] || undefined,
+  }
+}
+
 /* ── Helpers ───────────────────────────────────────────────────────────────── */
 
 const DIFF_COLOR: Record<string, string> = { Easy: '#4A7251', Moderate: '#C9A96E', Hard: '#c0392b', Strenuous: '#c0392b' }
+
+// "North Berg" (canonical region name) and "Northern Berg" (used by showcase content) refer to the same region.
+function normalizeRegionName(region: string) {
+  return region.toLowerCase().trim().replace(/\bnorthern\b/, 'north').replace(/\bsouthern\b/, 'south')
+}
 
 function nights(checkIn: string, checkOut: string) {
   if (!checkIn || !checkOut) return null
@@ -101,12 +157,39 @@ function SearchResults() {
   const [showFilters, setShowFilters] = useState(false)
   const [regionOptions, setRegionOptions] = useState(DEFAULT_REGIONS.map(r => r.name))
   const [availableOnly, setAvailableOnly] = useState(false)
+  const [liveStays, setLiveStays] = useState<LiveStay[]>([])
+  const [liveActivities, setLiveActivities] = useState<LiveActivity[]>([])
 
   const today = new Date().toISOString().split('T')[0]
 
   useEffect(() => {
     getRegionNames().then(setRegionOptions)
   }, [])
+
+  // Seed the shared booking context from the URL on first load, so the booking bar / shuttle
+  // suggestions have the right dates even if the visitor lands here directly without clicking "Update".
+  useEffect(() => {
+    if (regionParam || checkInParam || checkOutParam) {
+      booking.setSearch(regionParam, checkInParam, checkOutParam, guestsParam)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  useEffect(() => {
+    getProperties().then(async props => {
+      const active = props.filter(p => p.status === 'active')
+      const cards = await Promise.all(active.map(async p => {
+        const rooms = await getRoomsByProperty(p.id)
+        const minPrice = rooms.length > 0 ? Math.min(...rooms.map(r => r.basePrice)) : 0
+        return propertyToLiveStay(p, minPrice)
+      }))
+      setLiveStays(cards)
+    })
+    getActivities().then(items => {
+      setLiveActivities(items.filter(a => a.status === 'active').map(activityToLiveActivity))
+    })
+  }, [])
+
   const numNights = nights(checkIn, checkOut)
 
   function refine() {
@@ -119,14 +202,18 @@ function SearchResults() {
     router.push(`/search?${p.toString()}`)
   }
 
-  // Filter by region when one is selected
+  // Filter by region when one is selected — normalized so "North Berg" (canonical) and
+  // "Northern Berg" (showcase content / URL params) are treated as the same region.
   function matchRegion(r: string) {
-    return !region || r.toLowerCase().includes(region.toLowerCase())
+    if (!region) return true
+    const a = normalizeRegionName(r)
+    const b = normalizeRegionName(region)
+    return a.includes(b) || b.includes(a)
   }
 
-  const stays = ALL_STAYS.filter(s => matchRegion(s.region) && (!availableOnly || s.available))
+  const stays = [...ALL_STAYS, ...liveStays].filter(s => matchRegion(s.region) && (!availableOnly || s.available))
   const hikes = ALL_HIKES.filter(h => matchRegion(h.region))
-  const activities = ALL_ACTIVITIES.filter(a => matchRegion(a.region))
+  const activities = [...ALL_ACTIVITIES, ...liveActivities].filter(a => matchRegion(a.region))
   const events = ALL_EVENTS.filter(e => matchRegion(e.region))
   const restaurants = ALL_RESTAURANTS.filter(r => matchRegion(r.region))
 
@@ -234,8 +321,14 @@ function SearchResults() {
                 return (
                   <div key={stay.id} className={`group bg-white flex flex-col ${!stay.available ? 'opacity-60' : ''} border ${isSelected ? 'border-[#2d6a4f]' : 'border-transparent'}`}>
                     <Link href={`/stays/${stay.id}?check_in=${checkIn}&check_out=${checkOut}&guests=${guests}`}>
-                      <div className="aspect-[4/3] overflow-hidden relative">
-                        <img src={stay.img} alt={stay.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" />
+                      <div className="aspect-[4/3] overflow-hidden relative bg-[#2d6a4f]/10">
+                        {stay.img ? (
+                          <img src={stay.img} alt={stay.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center">
+                            <span className="font-display italic text-lg text-[#2d6a4f]/40">{stay.title}</span>
+                          </div>
+                        )}
                         {isSelected && (
                           <div className="absolute top-3 left-3 bg-[#2d6a4f] text-white font-sans text-[10px] tracking-[0.1em] uppercase px-2.5 py-1 flex items-center gap-1">
                             <Check size={10} /> Selected
@@ -250,16 +343,24 @@ function SearchResults() {
                       <div className="p-4 flex-1">
                         <div className="flex items-center justify-between mb-1">
                           <span className="font-sans text-[10px] tracking-[0.12em] uppercase text-gray-400">{stay.region}</span>
-                          <span className="font-sans text-xs text-[#2d6a4f]">★ {stay.rating} <span className="text-gray-400">({stay.reviews})</span></span>
+                          {stay.rating ? (
+                            <span className="font-sans text-xs text-[#2d6a4f]">★ {stay.rating} <span className="text-gray-400">({stay.reviews ?? 0})</span></span>
+                          ) : null}
                         </div>
                         <h3 className="font-display italic text-lg mb-2">{stay.title}</h3>
                         <div className="flex items-end justify-between">
-                          <span className="font-sans text-xs text-gray-400">
-                            {numNights ? `R ${(stay.price * numNights).toLocaleString()} total` : 'From'}
-                          </span>
-                          <p className="font-display italic text-xl text-[#2d6a4f]">
-                            R {stay.price.toLocaleString()}<span className="font-sans text-xs text-gray-400">/night</span>
-                          </p>
+                          {stay.price > 0 ? (
+                            <>
+                              <span className="font-sans text-xs text-gray-400">
+                                {numNights ? `R ${(stay.price * numNights).toLocaleString()} total` : 'From'}
+                              </span>
+                              <p className="font-display italic text-xl text-[#2d6a4f]">
+                                R {stay.price.toLocaleString()}<span className="font-sans text-xs text-gray-400">/night</span>
+                              </p>
+                            </>
+                          ) : (
+                            <span className="font-sans text-xs text-gray-400">Contact for rates</span>
+                          )}
                         </div>
                       </div>
                     </Link>
@@ -268,7 +369,7 @@ function SearchResults() {
                         <button
                           onClick={() => isSelected
                             ? booking.setStay(null)
-                            : booking.setStay({ id: stay.id, title: stay.title, region: stay.region, price_per_night: stay.price, img: stay.img })
+                            : booking.setStay({ id: stay.id, title: stay.title, region: stay.region, price_per_night: stay.price, img: stay.img, address: (stay as LiveStay).address, lat: (stay as LiveStay).lat, lng: (stay as LiveStay).lng })
                           }
                           className={`w-full py-2.5 font-sans text-sm transition-colors flex items-center justify-center gap-1.5 ${
                             isSelected
@@ -321,14 +422,24 @@ function SearchResults() {
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
               {activities.map(a => (
                 <Link key={a.id} href={`/activities/${a.id}`} className="group bg-white">
-                  <div className="aspect-[4/3] overflow-hidden relative">
-                    <img src={a.img} alt={a.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" />
-                    <span className="absolute top-3 left-3 bg-black/60 text-white font-sans text-[10px] tracking-[0.12em] uppercase px-2.5 py-1">{a.category}</span>
+                  <div className="aspect-[4/3] overflow-hidden relative bg-[#C9A96E]/10">
+                    {a.img ? (
+                      <img src={a.img} alt={a.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center">
+                        <span className="font-display italic text-lg text-[#C9A96E]/50">{a.title}</span>
+                      </div>
+                    )}
+                    {a.category && <span className="absolute top-3 left-3 bg-black/60 text-white font-sans text-[10px] tracking-[0.12em] uppercase px-2.5 py-1">{a.category}</span>}
                   </div>
                   <div className="p-4">
                     <span className="font-sans text-[10px] tracking-[0.12em] uppercase text-gray-400">{a.region}</span>
                     <h3 className="font-display italic text-lg mt-1 mb-2">{a.title}</h3>
-                    <p className="font-display italic text-xl text-[#2d6a4f]">R {a.price.toLocaleString()} <span className="font-sans text-xs text-gray-400">pp</span></p>
+                    {a.price > 0 ? (
+                      <p className="font-display italic text-xl text-[#2d6a4f]">R {a.price.toLocaleString()} <span className="font-sans text-xs text-gray-400">pp</span></p>
+                    ) : (
+                      <p className="font-sans text-xs text-gray-400">Contact for pricing</p>
+                    )}
                   </div>
                 </Link>
               ))}

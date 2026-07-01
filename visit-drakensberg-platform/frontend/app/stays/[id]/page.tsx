@@ -476,7 +476,7 @@ export default function StayDetailPage() {
                 onClick={() => {
                   if (!selectedRoom) return
                   booking.setSearch(stay.region, checkIn, checkOut, guests)
-                  booking.setStay({ id, title: stay.title, region: stay.region, price_per_night: selectedRoom.price_per_night, img: stay.images?.[0] })
+                  booking.setStay({ id, title: stay.title, region: stay.region, price_per_night: selectedRoom.price_per_night, img: stay.images?.[0], address: stay.address, lat: stay.gpsLat, lng: stay.gpsLng })
                   router.push(`/search?region=${encodeURIComponent(stay.region)}&check_in=${checkIn}&check_out=${checkOut}&guests=${guests}`)
                 }}
                 className={`w-full py-3.5 font-sans text-sm font-medium transition-colors ${selectedRoom ? 'bg-[#2d6a4f] text-white hover:bg-[#235a3f]' : 'bg-gray-100 text-gray-400 cursor-not-allowed'}`}
