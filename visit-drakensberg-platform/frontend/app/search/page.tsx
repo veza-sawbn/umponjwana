@@ -81,21 +81,22 @@ function propertyToLiveStay(p: Property, minPrice: number): LiveStay {
   return {
     id: p.id,
     title: p.name,
-    region: p.region,
+    region: p.region || '',
     price: minPrice,
-    img: p.photos[0] || undefined,
+    img: p.photos?.[0] || undefined,
     available: true,
-    address: p.address || p.region,
+    address: p.address || p.region || '',
     lat: p.gpsLat || undefined,
     lng: p.gpsLng || undefined,
   }
 }
 
+// Activities created before the region/photos fields existed won't have them set in Supabase.
 function activityToLiveActivity(a: Activity): LiveActivity {
   return {
     id: a.id,
     title: a.name,
-    region: a.region,
+    region: a.region || '',
     price: a.pricePerPerson,
     category: a.category,
     img: a.photos?.[0] || undefined,
@@ -107,8 +108,8 @@ function activityToLiveActivity(a: Activity): LiveActivity {
 const DIFF_COLOR: Record<string, string> = { Easy: '#4A7251', Moderate: '#C9A96E', Hard: '#c0392b', Strenuous: '#c0392b' }
 
 // "North Berg" (canonical region name) and "Northern Berg" (used by showcase content) refer to the same region.
-function normalizeRegionName(region: string) {
-  return region.toLowerCase().trim().replace(/\bnorthern\b/, 'north').replace(/\bsouthern\b/, 'south')
+function normalizeRegionName(region: string | undefined | null) {
+  return (region || '').toLowerCase().trim().replace(/\bnorthern\b/, 'north').replace(/\bsouthern\b/, 'south')
 }
 
 function nights(checkIn: string, checkOut: string) {
