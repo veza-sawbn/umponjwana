@@ -3,6 +3,7 @@ import Link from 'next/link'
 import { ArrowRight, AlertCircle } from 'lucide-react'
 import { useSupplier } from '@/lib/supplier-context'
 import { SUPPLIER_CONFIG } from '@/lib/supplier-config'
+import { hasGoogleMapsKey } from '@/components/maps/GoogleAddressField'
 
 /* ── per-type stat cards ─────────────────────────────────────────── */
 const TYPE_STATS: Record<string, { label: string; value: string }[]> = {
@@ -80,6 +81,7 @@ export default function SupplierOverview() {
   }
 
   const stats = supplierType ? (TYPE_STATS[supplierType] ?? []) : []
+  const googleMapsConfigured = hasGoogleMapsKey()
 
   // Quick-links: first type-specific nav items (skip Overview and shared tail)
   const typeSpecificLinks = nav.filter(item =>
@@ -99,6 +101,20 @@ export default function SupplierOverview() {
             : (config?.label ?? 'Supplier')}
         </p>
         <h1 className="font-display italic text-3xl text-black/90">Dashboard Overview</h1>
+      </div>
+
+      <div className={`${googleMapsConfigured ? 'bg-emerald-50 border-emerald-200' : 'bg-amber-50 border-amber-200'} border rounded-xl p-4 flex gap-3`}>
+        <AlertCircle className={`${googleMapsConfigured ? 'text-emerald-600' : 'text-amber-500'} shrink-0 mt-0.5`} size={18} />
+        <div>
+          <p className={`${googleMapsConfigured ? 'text-emerald-800' : 'text-amber-800'} font-sans text-sm font-semibold`}>
+            {googleMapsConfigured ? 'Google Maps is configured for this deployment.' : 'Google Maps is not configured for this deployment.'}
+          </p>
+          <p className={`${googleMapsConfigured ? 'text-emerald-700' : 'text-amber-700'} font-sans text-xs mt-1`}>
+            {googleMapsConfigured
+              ? 'Address autocomplete and map previews are available on supplier create/edit forms that collect addresses or meeting points.'
+              : 'Add NEXT_PUBLIC_GOOGLE_MAPS_API_KEY to the live frontend environment variables, then redeploy. Editing frontend/.env.example is only a template and will not change the live site.'}
+          </p>
+        </div>
       </div>
 
       {/* Stats */}
