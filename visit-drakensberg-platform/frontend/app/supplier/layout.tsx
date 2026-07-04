@@ -5,6 +5,7 @@ import { LogOut, Mountain } from 'lucide-react'
 import { signOut } from '@/lib/auth'
 import { SupplierProvider, useSupplier } from '@/lib/supplier-context'
 import Logo from '@/components/Logo'
+import NotificationsBell from '@/components/ui/NotificationsBell'
 
 function SidebarNav() {
   const pathname = usePathname()
@@ -94,6 +95,9 @@ export default function SupplierLayout({ children }: { children: React.ReactNode
       <div className="min-h-screen bg-[#0a0a0a] flex">
         <SidebarNav />
         <div className="ml-60 flex-1 min-h-screen bg-[#F7F5F2]">
+          <div className="flex items-center justify-end px-8 pt-4 -mb-4">
+            <NotificationsBell />
+          </div>
           {children}
         </div>
       </div>

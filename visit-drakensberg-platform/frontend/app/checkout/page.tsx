@@ -8,7 +8,7 @@ import Footer from '@/components/layout/Footer'
 import { ArrowLeft, ShieldCheck, Lock, CreditCard, Calendar, Users, MapPin, Bus } from 'lucide-react'
 import { useBooking } from '@/lib/booking-context'
 import { addBooking } from '@/lib/bookings'
-import { getDepartures, updateDepartureSeats } from '@/lib/departures'
+import { getDepartures, bookDepartureSeats, releaseDepartureSeats } from '@/lib/departures'
 import { supabase } from '@/lib/auth'
 
 function formatCardNumber(val: string) {
@@ -97,9 +97,36 @@ export default function CheckoutPage() {
         shuttle: booking.shuttle,
       }
 
+      if (!user) {
+        toast.error('Your session has expired. Please sign in again to complete the booking.')
+        router.push('/auth/login?redirect=/checkout')
+        return
+      }
+
+      // Reserve departure seats FIRST — atomic and capacity-checked
+      // server-side, so a full departure aborts the booking cleanly.
+      const allDeps = await getDepartures()
+      const departureAddons = snap.addons.filter(a => allDeps.some(d => d.id === a.id))
+      const reserved: { id: string; seats: number }[] = []
+      try {
+        for (const addon of departureAddons) {
+          await bookDepartureSeats(addon.id, addon.guests)
+          reserved.push({ id: addon.id, seats: addon.guests })
+        }
+      } catch (seatErr) {
+        // Roll back any seats we already took, then surface the problem.
+        await Promise.all(reserved.map(r => releaseDepartureSeats(r.id, r.seats).catch(() => {})))
+        const msg = seatErr instanceof Error && seatErr.message.includes('seats')
+          ? 'One of your tour departures no longer has enough seats. Please adjust your trip.'
+          : 'We could not reserve your tour seats. Please try again.'
+        toast.error(msg)
+        setLoading(false)
+        return
+      }
+
       // Persist booking
       const saved = await addBooking({
-        userId: user?.id ?? 'guest',
+        userId: user.id,
         customerName: `${firstName} ${lastName}`.trim(),
         customerEmail: email,
         customerPhone: phone,
@@ -111,16 +138,6 @@ export default function CheckoutPage() {
         total,
         status: 'confirmed',
       })
-
-      // Update departure seat counts in parallel
-      const allDeps = await getDepartures()
-      await Promise.all(
-        snap.addons.map(addon => {
-          const dep = allDeps.find(d => d.id === addon.id)
-          if (dep) return updateDepartureSeats(dep.id, dep.bookedSeats + addon.guests)
-          return Promise.resolve()
-        })
-      )
 
       booking.clearBooking()
       router.push(`/checkout/success?id=${saved.id}`)

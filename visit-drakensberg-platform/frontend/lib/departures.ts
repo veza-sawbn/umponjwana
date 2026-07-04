@@ -1,4 +1,5 @@
 import { supabase } from './auth'
+import { listEntities, insertEntity, updateEntity, deleteEntity, newEntityId } from './entities'
 
 export type Departure = {
   id: string
@@ -17,49 +18,44 @@ export type Departure = {
   createdAt: string
 }
 
-export async function getDepartures(): Promise<Departure[]> {
-  try {
-    const { data } = await supabase
-      .from('site_content')
-      .select('value')
-      .eq('key', 'departures')
-      .maybeSingle()
-    if (data?.value?.items && Array.isArray(data.value.items)) {
-      return data.value.items as Departure[]
-    }
-  } catch {
-    // fall through
-  }
-  return []
-}
+const KIND = 'departure'
 
-export async function saveDepartures(departures: Departure[]): Promise<void> {
-  await supabase.from('site_content').upsert(
-    { key: 'departures', value: { items: departures }, updated_at: new Date().toISOString() },
-    { onConflict: 'key' }
-  )
+export async function getDepartures(): Promise<Departure[]> {
+  return listEntities<Departure>(KIND)
 }
 
 export async function addDeparture(dep: Omit<Departure, 'id' | 'createdAt'>): Promise<Departure> {
-  const all = await getDepartures()
-  const newDep: Departure = {
-    ...dep,
-    id: `dep-${Date.now()}`,
-    createdAt: new Date().toISOString(),
-  }
-  await saveDepartures([...all, newDep])
-  return newDep
+  const newDep: Departure = { ...dep, id: newEntityId('dep'), createdAt: new Date().toISOString() }
+  return insertEntity(KIND, newDep)
 }
 
+// Owner-side edit (supplier adjusting counts on their own departure).
 export async function updateDepartureSeats(id: string, bookedSeats: number): Promise<void> {
   const all = await getDepartures()
   const dep = all.find(d => d.id === id)
   if (!dep) return
   const status: Departure['status'] = bookedSeats >= dep.maxSeats ? 'full' : dep.status
-  await saveDepartures(all.map(d => d.id === id ? { ...d, bookedSeats, status } : d))
+  await updateEntity(KIND, id, { bookedSeats, status })
+}
+
+// Visitor-side booking: atomic, capacity-checked, executed server-side.
+// Throws with a readable message when the departure is full.
+export async function bookDepartureSeats(id: string, seats: number): Promise<void> {
+  const { error } = await supabase.rpc('vd_book_seats', { p_departure_id: id, p_seats: seats })
+  if (error) throw new Error(error.message || 'Could not reserve seats')
+}
+
+// Free seats after a cancellation (booking owner or supplier).
+export async function releaseDepartureSeats(id: string, seats: number): Promise<void> {
+  const { error } = await supabase.rpc('vd_release_seats', { p_departure_id: id, p_seats: seats })
+  if (error) throw new Error(error.message || 'Could not release seats')
 }
 
 export async function deleteDeparture(id: string): Promise<void> {
+  await deleteEntity(KIND, id)
+}
+
+export async function deleteDeparturesByTour(tourId: string): Promise<void> {
   const all = await getDepartures()
-  await saveDepartures(all.filter(d => d.id !== id))
+  await Promise.all(all.filter(d => d.tourId === tourId).map(d => deleteEntity(KIND, d.id)))
 }

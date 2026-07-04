@@ -1,6 +1,5 @@
-import { supabase } from './auth'
-
 import { DEFAULT_REGIONS } from './regions'
+import { listEntities, getEntity, insertEntity, updateEntity, deleteEntity, newEntityId } from './entities'
 
 export const PROPERTY_REGIONS = DEFAULT_REGIONS.map(region => region.name)
 
@@ -26,55 +25,30 @@ export type Property = {
   createdAt: string
 }
 
-async function getAll(): Promise<Property[]> {
-  try {
-    const { data } = await supabase
-      .from('site_content')
-      .select('value')
-      .eq('key', 'properties')
-      .maybeSingle()
-    if (data?.value?.items && Array.isArray(data.value.items)) {
-      return data.value.items as Property[]
-    }
-  } catch {}
-  return []
-}
-
-async function saveAll(items: Property[]): Promise<void> {
-  await supabase.from('site_content').upsert(
-    { key: 'properties', value: { items }, updated_at: new Date().toISOString() },
-    { onConflict: 'key' },
-  )
-}
+const KIND = 'property'
 
 export async function getProperties(): Promise<Property[]> {
-  return getAll()
+  return listEntities<Property>(KIND)
 }
 
 export async function getPropertyById(id: string): Promise<Property | null> {
-  const all = await getAll()
-  return all.find(p => p.id === id) ?? null
+  return getEntity<Property>(KIND, id)
 }
 
 export async function getPropertiesBySupplier(supplierId: string): Promise<Property[]> {
-  const all = await getAll()
+  const all = await listEntities<Property>(KIND)
   return all.filter(p => p.supplierId === supplierId)
 }
 
 export async function addProperty(p: Omit<Property, 'id' | 'createdAt'>): Promise<Property> {
-  const all = await getAll()
-  const now = new Date().toISOString()
-  const prop: Property = { ...p, id: `prop-${Date.now()}`, createdAt: now }
-  await saveAll([...all, prop])
-  return prop
+  const prop: Property = { ...p, id: newEntityId('prop'), createdAt: new Date().toISOString() }
+  return insertEntity(KIND, prop)
 }
 
 export async function updateProperty(id: string, updates: Partial<Property>): Promise<void> {
-  const all = await getAll()
-  await saveAll(all.map(p => p.id === id ? { ...p, ...updates } : p))
+  await updateEntity(KIND, id, updates)
 }
 
 export async function deleteProperty(id: string): Promise<void> {
-  const all = await getAll()
-  await saveAll(all.filter(p => p.id !== id))
+  await deleteEntity(KIND, id)
 }

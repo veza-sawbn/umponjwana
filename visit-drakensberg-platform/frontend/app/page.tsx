@@ -164,16 +164,9 @@ export default function HomePage() {
     }
     setSubscribing(true)
     try {
-      const { data } = await supabase.from('site_content').select('value').eq('key', 'newsletter_subscribers').maybeSingle()
-      const items: { email: string; subscribedAt: string }[] = data?.value?.items ?? []
-      if (!items.some(s => s.email === email)) {
-        items.push({ email, subscribedAt: new Date().toISOString() })
-        const { error } = await supabase.from('site_content').upsert(
-          { key: 'newsletter_subscribers', value: { items }, updated_at: new Date().toISOString() },
-          { onConflict: 'key' },
-        )
-        if (error) throw error
-      }
+      const { error } = await supabase.from('vd_newsletter_subscribers').insert({ email })
+      // 23505 = already subscribed; treat as success.
+      if (error && error.code !== '23505') throw error
       toast.success('You’re on the list — see you in the next dispatch.')
       setNewsletterEmail('')
     } catch {

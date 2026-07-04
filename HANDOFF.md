@@ -169,3 +169,48 @@ Always filter by `user.id` (from `supabase.auth.getUser()`), never by display na
 
 ### `useSearchParams()` requires `<Suspense>`
 Any page using `useSearchParams()` must be wrapped in `<Suspense>` or Next.js will throw during build.
+
+---
+
+# UPDATE — 2026-07-04 production-hardening branch
+
+**Branch:** `claude/drakensberg-production-audit-5pipb7`
+
+The architecture description above is now partially obsolete:
+
+## New data layer (replaces the site_content blobs)
+Operational data no longer lives in `site_content` JSON blobs. Run
+`frontend/supabase/migrations/20260704_secure_data_layer.sql` before deploying.
+
+| Table | Contents | Access (RLS) |
+|-------|----------|--------------|
+| `vd_entities` | properties, rooms, activities, tours, departures, supplier_* entities — one row per item (`kind` column) | public read of live rows; owner/admin write; inserts require an **approved** supplier |
+| `vd_bookings` | bookings (customer PII) | owner, involved suppliers (`supplier_ids uuid[]`), admin |
+| `vd_message_threads` | conversations | participants only |
+| `vd_notifications` | in-app notifications | recipient only (any authed user can insert) |
+| `vd_newsletter_subscribers` | emails | insert-only public; admin read |
+| `site_content` | CMS content only (hero, footer, regions, trails, admin_media…) | public read, **admin-only write** |
+
+Lib files kept their exported signatures — pages did not change. New libs:
+`lib/entities.ts` (core store), `lib/notifications.ts`, `lib/recommendations.ts`, `lib/fuzzy.ts`.
+
+Departure seats are booked via the atomic `vd_book_seats()` RPC (checked
+capacity, rollback on failure) and released via `vd_release_seats()`.
+
+## Roles & approval
+- `profiles.role` / `is_approved` cannot be self-edited (column grants); approval
+  flips only via `admin_set_supplier_approval()` (admin-only SECURITY DEFINER).
+- New suppliers register unapproved and cannot publish until approved
+  (existing suppliers were grandfathered by the migration).
+- Middleware prefers `app_metadata.role`; real enforcement is RLS.
+
+## Admin
+Overview / Suppliers / Bookings / Listings now operate on live Supabase data
+(`lib/admin-supabase.ts`). The Render FastAPI backend only backs the analytics
+shell — retire or finish it.
+
+## Still open (see PRODUCTION_READINESS_REPORT.md)
+- **Payment is not integrated** (deliberately deferred) — checkout still fakes it.
+- Email notifications, room-level availability, remaining supplier shell
+  modules (experiences/packages/events/discounts/availability/staff/guides/
+  media/analytics), rate limiting, analytics instrumentation.

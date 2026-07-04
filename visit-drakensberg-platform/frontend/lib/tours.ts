@@ -1,5 +1,5 @@
-import { supabase } from './auth'
-import { getDepartures, saveDepartures } from './departures'
+import { listEntities, insertEntity, updateEntity, deleteEntity, newEntityId } from './entities'
+import { deleteDeparturesByTour } from './departures'
 
 export type Tour = {
   id: string
@@ -25,49 +25,21 @@ export type Tour = {
   createdAt: string
 }
 
-export async function getTours(): Promise<Tour[]> {
-  try {
-    const { data } = await supabase
-      .from('site_content')
-      .select('value')
-      .eq('key', 'tours')
-      .maybeSingle()
-    if (data?.value?.items && Array.isArray(data.value.items)) {
-      return data.value.items as Tour[]
-    }
-  } catch {
-    // fall through
-  }
-  return []
-}
+const KIND = 'tour'
 
-export async function saveTours(tours: Tour[]): Promise<void> {
-  await supabase.from('site_content').upsert(
-    { key: 'tours', value: { items: tours }, updated_at: new Date().toISOString() },
-    { onConflict: 'key' }
-  )
+export async function getTours(): Promise<Tour[]> {
+  return listEntities<Tour>(KIND)
 }
 
 export async function addTour(tour: Omit<Tour, 'id' | 'createdAt'>): Promise<Tour> {
-  const all = await getTours()
-  const newTour: Tour = {
-    ...tour,
-    id: `tour-${Date.now()}`,
-    createdAt: new Date().toISOString(),
-  }
-  await saveTours([...all, newTour])
-  return newTour
+  const newTour: Tour = { ...tour, id: newEntityId('tour'), createdAt: new Date().toISOString() }
+  return insertEntity(KIND, newTour)
 }
 
 export async function updateTour(id: string, patch: Partial<Tour>): Promise<void> {
-  const all = await getTours()
-  await saveTours(all.map(t => t.id === id ? { ...t, ...patch } : t))
+  await updateEntity(KIND, id, patch)
 }
 
 export async function deleteTour(id: string): Promise<void> {
-  const [all, departures] = await Promise.all([getTours(), getDepartures()])
-  await Promise.all([
-    saveTours(all.filter(t => t.id !== id)),
-    saveDepartures(departures.filter(d => d.tourId !== id)),
-  ])
+  await Promise.all([deleteEntity(KIND, id), deleteDeparturesByTour(id)])
 }

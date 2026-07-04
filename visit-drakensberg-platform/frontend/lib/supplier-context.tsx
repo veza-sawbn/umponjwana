@@ -53,7 +53,7 @@ export function SupplierProvider({ children }: { children: React.ReactNode }) {
       const config = primaryType ? getSupplierConfig(primaryType) : null
 
       // is_approved comes from profiles table
-      const { data: profile } = await supabase.from('profiles').select('is_approved').eq('id', user.id).single()
+      const { data: profile } = await supabase.from('profiles').select('is_approved').eq('id', user.id).maybeSingle()
       const isApproved = profile?.is_approved ?? false
 
       setValue({

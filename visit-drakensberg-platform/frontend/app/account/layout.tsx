@@ -7,6 +7,7 @@ import {
   CalendarDays, Heart, Star, Gift, Map, Settings, LogOut, User, ChevronDown,
 } from 'lucide-react'
 import Footer from '@/components/layout/Footer'
+import NotificationsBell from '@/components/ui/NotificationsBell'
 import { supabase, signOut } from '@/lib/auth'
 
 const NAV = [
@@ -67,6 +68,7 @@ export default function AccountLayout({ children }: { children: React.ReactNode 
               <p className="font-display italic text-lg leading-tight truncate">{userName || 'My Account'}</p>
               <p className="font-sans text-xs text-gray-400 truncate">{userEmail}</p>
             </div>
+            <NotificationsBell />
             <button
               onClick={handleSignOut}
               className="shrink-0 font-sans text-xs text-gray-400 hover:text-red-500 transition-colors flex items-center gap-1"
@@ -141,8 +143,11 @@ export default function AccountLayout({ children }: { children: React.ReactNode 
           {/* Desktop sidebar */}
           <aside className="w-56 shrink-0 sticky top-24 hidden lg:block">
             <div className="bg-white border border-gray-200 p-5 mb-4">
-              <div className="w-12 h-12 bg-[#2d6a4f]/10 flex items-center justify-center font-display italic text-[#2d6a4f] text-xl mb-3">
-                {initials}
+              <div className="flex items-start justify-between">
+                <div className="w-12 h-12 bg-[#2d6a4f]/10 flex items-center justify-center font-display italic text-[#2d6a4f] text-xl mb-3">
+                  {initials}
+                </div>
+                <NotificationsBell />
               </div>
               <p className="font-display italic text-lg leading-tight truncate">{userName || 'My Account'}</p>
               <p className="font-sans text-xs text-gray-400 mt-0.5 truncate">{userEmail || 'Visitor Portal'}</p>

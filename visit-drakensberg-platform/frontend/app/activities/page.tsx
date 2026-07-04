@@ -60,7 +60,13 @@ export default function ActivitiesPage() {
         {loading ? (
           <p className="font-sans text-sm text-forest/50">Loading activities…</p>
         ) : filtered.length === 0 ? (
-          <p className="font-sans text-sm text-forest/50">No activities found.</p>
+          <div className="py-12 text-center">
+            <p className="font-display italic text-2xl text-forest/30 mb-2">No activities {category ? `in ${category}` : 'yet'}</p>
+            <p className="font-sans text-sm text-forest/50">
+              {category ? 'Try another category, or ' : 'New experiences are added as suppliers publish them. '}
+              <Link href="/search" className="text-forest underline hover:text-gold">browse everything</Link>.
+            </p>
+          </div>
         ) : (
           <>
             <p className="font-sans text-sm text-forest/50 mb-8">
@@ -72,6 +78,15 @@ export default function ActivitiesPage() {
                 return (
                   <Link key={a.id} href={`/activities/${a.id}`} className="group block">
                     <div className="relative overflow-hidden aspect-square mb-4 bg-[#1a1a2e]">
+                      {a.photos?.[0] && (
+                        <img
+                          src={a.photos[0]}
+                          alt={a.name}
+                          loading="lazy"
+                          decoding="async"
+                          className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                        />
+                      )}
                       <span className="absolute top-3 left-3 font-sans text-[10px] tracking-[0.1em] uppercase bg-white/90 text-forest px-2.5 py-1">
                         {a.category}
                       </span>

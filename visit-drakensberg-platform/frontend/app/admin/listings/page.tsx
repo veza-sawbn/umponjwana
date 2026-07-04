@@ -1,54 +1,58 @@
 'use client'
 
-import { useState } from 'react'
-import Link from 'next/link'
-import { Plus, Search, Eye, Pencil, Archive, Trash2, ChevronDown } from 'lucide-react'
-
-const LISTINGS = [
-  { id: 'l1', title: 'Cathedral Peak Mountain Lodge', type: 'accommodation', supplier: 'Mountain Retreats SA', region: 'Northern Berg', price: 1850, status: 'published', created: '12 Jan 2026' },
-  { id: 'l2', title: 'Guided Rock Climbing Experience', type: 'activity', supplier: 'Drakensberg Adventures', region: 'Northern Berg', price: 750, status: 'published', created: '15 Jan 2026' },
-  { id: 'l3', title: 'Tugela Falls Circuit', type: 'hike', supplier: 'Berg Trail Co.', region: 'Northern Berg', price: 580, status: 'published', created: '20 Jan 2026' },
-  { id: 'l4', title: 'Tendele Tented Camp', type: 'accommodation', supplier: 'Wilderness Stays', region: 'Northern Berg', price: 2400, status: 'published', created: '3 Feb 2026' },
-  { id: 'l5', title: "Giant's Castle Restcamp", type: 'accommodation', supplier: 'Ezemvelo KZN Wildlife', region: 'Central Berg', price: 680, status: 'published', created: '8 Feb 2026' },
-  { id: 'l6', title: 'San Rock Art Full-Day Tour', type: 'experience', supplier: 'Berg Cultural Tours', region: 'Central Berg', price: 620, status: 'published', created: '14 Feb 2026' },
-  { id: 'l7', title: 'Sani Pass 4x4 Experience', type: 'activity', supplier: 'Sani Adventures', region: 'Southern Berg', price: 1200, status: 'pending', created: '1 Jun 2026' },
-  { id: 'l8', title: 'Champagne Valley Glamping', type: 'accommodation', supplier: 'Champagne Glamping', region: 'Central Berg', price: 1650, status: 'pending', created: '5 Jun 2026' },
-  { id: 'l9', title: 'Berg Mountain Biking Trail', type: 'activity', supplier: 'Berg Adventures', region: 'Central Berg', price: 480, status: 'draft', created: '18 Jun 2026' },
-  { id: 'l10', title: 'Drakensberg Photography Tour', type: 'experience', supplier: 'Berg Photo Safaris', region: 'Northern Berg', price: 950, status: 'archived', created: '2 Mar 2026' },
-]
+import { useEffect, useState } from 'react'
+import { Search, Archive, Trash2, CheckCircle } from 'lucide-react'
+import {
+  getAdminListings, setAdminListingStatus, deleteAdminListing, type AdminListing,
+} from '@/lib/admin-supabase'
 
 const TYPE_LABEL: Record<string, string> = {
-  accommodation: 'Stay', activity: 'Activity', hike: 'Hike', experience: 'Experience', event: 'Event',
+  property: 'Stay', activity: 'Activity', tour: 'Tour',
 }
 
 const STATUS_STYLE: Record<string, string> = {
-  published: 'bg-[#2d6a4f]/10 text-[#2d6a4f]',
-  pending: 'bg-[#C9A96E]/15 text-[#8B6914]',
+  active: 'bg-[#2d6a4f]/10 text-[#2d6a4f]',
   draft: 'bg-gray-100 text-gray-500',
-  archived: 'bg-red-50 text-red-400',
 }
 
 export default function AdminListingsPage() {
   const [search, setSearch] = useState('')
   const [typeFilter, setTypeFilter] = useState('all')
   const [statusFilter, setStatusFilter] = useState('all')
-  const [listings, setListings] = useState(LISTINGS)
+  const [listings, setListings] = useState<AdminListing[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
+
+  async function load() {
+    try {
+      setListings(await getAdminListings())
+      setError('')
+    } catch {
+      setError('Could not load listings. Confirm you are signed in as an admin.')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => { load() }, [])
 
   const filtered = listings.filter(l => {
-    const matchSearch = l.title.toLowerCase().includes(search.toLowerCase()) || l.supplier.toLowerCase().includes(search.toLowerCase())
-    const matchType = typeFilter === 'all' || l.type === typeFilter
+    const q = search.toLowerCase()
+    const matchSearch = l.name.toLowerCase().includes(q) || l.supplierName.toLowerCase().includes(q) || l.region.toLowerCase().includes(q)
+    const matchType = typeFilter === 'all' || l.kind === typeFilter
     const matchStatus = statusFilter === 'all' || l.status === statusFilter
     return matchSearch && matchType && matchStatus
   })
 
-  function publish(id: string) {
-    setListings(p => p.map(l => l.id === id ? { ...l, status: 'published' } : l))
+  async function setStatus(l: AdminListing, status: string) {
+    await setAdminListingStatus(l.kind, l.id, status)
+    setListings(p => p.map(x => x.id === l.id ? { ...x, status } : x))
   }
-  function archive(id: string) {
-    setListings(p => p.map(l => l.id === id ? { ...l, status: 'archived' } : l))
-  }
-  function remove(id: string) {
-    setListings(p => p.filter(l => l.id !== id))
+
+  async function remove(l: AdminListing) {
+    if (!window.confirm(`Delete "${l.name}" permanently? This cannot be undone.`)) return
+    await deleteAdminListing(l.kind, l.id)
+    setListings(p => p.filter(x => x.id !== l.id))
   }
 
   return (
@@ -57,11 +61,11 @@ export default function AdminListingsPage() {
         <div>
           <p className="font-sans text-[10px] tracking-[0.14em] uppercase text-gray-400 mb-1">Admin Console</p>
           <h1 className="font-display italic text-3xl text-[#000000]">Listings</h1>
+          <p className="font-sans text-sm text-gray-500 mt-1">Every live supplier listing on the platform</p>
         </div>
-        <button className="inline-flex items-center gap-2 bg-[#2d6a4f] text-white px-5 py-2.5 font-sans text-sm hover:bg-[#235a3f] transition-colors">
-          <Plus size={15} /> New Listing
-        </button>
       </div>
+
+      {error && <p className="mb-4 font-sans text-sm text-red-500">{error}</p>}
 
       {/* Filters */}
       <div className="bg-white border border-gray-200 p-4 mb-6 flex flex-wrap gap-3">
@@ -70,42 +74,41 @@ export default function AdminListingsPage() {
           <input
             value={search}
             onChange={e => setSearch(e.target.value)}
-            placeholder="Search listings or suppliers…"
+            placeholder="Search listings, suppliers or regions…"
+            aria-label="Search listings"
             className="flex-1 font-sans text-sm focus:outline-none"
           />
         </div>
         <select
           value={typeFilter}
           onChange={e => setTypeFilter(e.target.value)}
+          aria-label="Filter by type"
           className="border border-gray-200 px-3 py-2 font-sans text-sm focus:outline-none"
         >
           <option value="all">All Types</option>
-          <option value="accommodation">Accommodation</option>
+          <option value="property">Accommodation</option>
           <option value="activity">Activity</option>
-          <option value="hike">Hike</option>
-          <option value="experience">Experience</option>
-          <option value="event">Event</option>
+          <option value="tour">Guided Tour</option>
         </select>
         <select
           value={statusFilter}
           onChange={e => setStatusFilter(e.target.value)}
+          aria-label="Filter by status"
           className="border border-gray-200 px-3 py-2 font-sans text-sm focus:outline-none"
         >
           <option value="all">All Statuses</option>
-          <option value="published">Published</option>
-          <option value="pending">Pending</option>
+          <option value="active">Active</option>
           <option value="draft">Draft</option>
-          <option value="archived">Archived</option>
         </select>
         <span className="font-sans text-xs text-gray-400 flex items-center">{filtered.length} result{filtered.length !== 1 ? 's' : ''}</span>
       </div>
 
       {/* Table */}
-      <div className="bg-white border border-gray-200 overflow-hidden">
-        <table className="w-full">
+      <div className="bg-white border border-gray-200 overflow-x-auto">
+        <table className="w-full min-w-[720px]">
           <thead>
             <tr className="border-b border-gray-100">
-              {['Title', 'Type', 'Supplier', 'Region', 'Price', 'Status', 'Actions'].map(h => (
+              {['Title', 'Type', 'Supplier', 'Region', 'Status', 'Actions'].map(h => (
                 <th key={h} className="text-left px-5 py-3 font-sans text-[10px] tracking-[0.12em] uppercase text-gray-400">{h}</th>
               ))}
             </tr>
@@ -114,38 +117,48 @@ export default function AdminListingsPage() {
             {filtered.map(l => (
               <tr key={l.id} className="hover:bg-[#F7F5F2] transition-colors">
                 <td className="px-5 py-4">
-                  <p className="font-sans text-sm font-medium text-gray-800">{l.title}</p>
-                  <p className="font-sans text-xs text-gray-400">{l.created}</p>
+                  <p className="font-sans text-sm font-medium text-gray-800">{l.name}</p>
+                  <p className="font-sans text-xs text-gray-400">{new Date(l.createdAt).toLocaleDateString('en-ZA', { day: 'numeric', month: 'short', year: 'numeric' })}</p>
                 </td>
                 <td className="px-5 py-4">
-                  <span className="font-sans text-xs bg-[#F7F5F2] px-2 py-1 text-gray-600">{TYPE_LABEL[l.type] || l.type}</span>
+                  <span className="font-sans text-xs bg-[#F7F5F2] px-2 py-1 text-gray-600">{TYPE_LABEL[l.kind] || l.kind}</span>
                 </td>
-                <td className="px-5 py-4 font-sans text-sm text-gray-600">{l.supplier}</td>
+                <td className="px-5 py-4 font-sans text-sm text-gray-600">{l.supplierName}</td>
                 <td className="px-5 py-4 font-sans text-sm text-gray-500">{l.region}</td>
-                <td className="px-5 py-4 font-display italic text-[#2d6a4f]">R {l.price.toLocaleString()}</td>
                 <td className="px-5 py-4">
-                  <span className={`font-sans text-[10px] tracking-[0.1em] uppercase px-2.5 py-1 ${STATUS_STYLE[l.status]}`}>{l.status}</span>
+                  <span className={`font-sans text-[10px] tracking-[0.1em] uppercase px-2.5 py-1 ${STATUS_STYLE[l.status] || 'bg-gray-100 text-gray-500'}`}>{l.status}</span>
                 </td>
                 <td className="px-5 py-4">
                   <div className="flex items-center gap-1">
-                    <button title="Preview" className="p-1.5 text-gray-400 hover:text-[#2d6a4f] transition-colors"><Eye size={14} /></button>
-                    <button title="Edit" className="p-1.5 text-gray-400 hover:text-[#2d6a4f] transition-colors"><Pencil size={14} /></button>
-                    {l.status === 'pending' && (
-                      <button onClick={() => publish(l.id)} className="px-2.5 py-1 bg-[#2d6a4f] text-white font-sans text-xs hover:bg-[#235a3f] transition-colors">Publish</button>
+                    {l.status !== 'active' && (
+                      <button onClick={() => setStatus(l, 'active')} className="inline-flex items-center gap-1 px-2.5 py-1 bg-[#2d6a4f] text-white font-sans text-xs hover:bg-[#235a3f] transition-colors">
+                        <CheckCircle size={11} /> Publish
+                      </button>
                     )}
-                    {l.status !== 'archived' && (
-                      <button onClick={() => archive(l.id)} title="Archive" className="p-1.5 text-gray-400 hover:text-[#C9A96E] transition-colors"><Archive size={14} /></button>
+                    {l.status === 'active' && (
+                      <button onClick={() => setStatus(l, 'draft')} title="Unpublish (set to draft)" aria-label={`Unpublish ${l.name}`} className="p-1.5 text-gray-400 hover:text-[#C9A96E] transition-colors">
+                        <Archive size={14} />
+                      </button>
                     )}
-                    <button onClick={() => remove(l.id)} title="Delete" className="p-1.5 text-gray-400 hover:text-red-400 transition-colors"><Trash2 size={14} /></button>
+                    <button onClick={() => remove(l)} title="Delete" aria-label={`Delete ${l.name}`} className="p-1.5 text-gray-400 hover:text-red-400 transition-colors">
+                      <Trash2 size={14} />
+                    </button>
                   </div>
                 </td>
               </tr>
             ))}
           </tbody>
         </table>
-        {filtered.length === 0 && (
+        {!loading && filtered.length === 0 && (
           <div className="py-12 text-center">
-            <p className="font-sans text-sm text-gray-400">No listings match your filters.</p>
+            <p className="font-sans text-sm text-gray-400">
+              {listings.length === 0 ? 'No listings yet — they appear here as suppliers publish them.' : 'No listings match your filters.'}
+            </p>
+          </div>
+        )}
+        {loading && (
+          <div className="py-12 text-center">
+            <p className="font-sans text-sm text-gray-400">Loading listings…</p>
           </div>
         )}
       </div>

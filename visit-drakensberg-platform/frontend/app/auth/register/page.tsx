@@ -12,7 +12,7 @@ const schema = z.object({
   email: z.string().email('Enter a valid email'),
   password: z.string().min(8, 'At least 8 characters').regex(/[A-Z]/, 'Needs an uppercase letter').regex(/[0-9]/, 'Needs a number'),
   confirmPassword: z.string(),
-  role: z.enum(['guest', 'supplier']),
+  role: z.enum(['visitor', 'supplier']),
 }).refine((d) => d.password === d.confirmPassword, { message: 'Passwords do not match', path: ['confirmPassword'] })
 
 type Form = z.infer<typeof schema>
@@ -22,7 +22,7 @@ export default function RegisterPage() {
   const [authError, setAuthError] = useState<string | null>(null)
   const { register, handleSubmit, watch, formState: { errors, isSubmitting } } = useForm<Form>({
     resolver: zodResolver(schema),
-    defaultValues: { role: 'guest' },
+    defaultValues: { role: 'visitor' },
   })
 
   const role = watch('role')
@@ -75,11 +75,11 @@ export default function RegisterPage() {
             <div>
               <p className="font-sans text-xs tracking-[0.1em] uppercase text-forest/50 mb-3">I am a</p>
               <div className="grid grid-cols-2 gap-3">
-                {(['guest', 'supplier'] as const).map((r) => (
+                {(['visitor', 'supplier'] as const).map((r) => (
                   <label key={r}
                     className={`flex items-center justify-center gap-2 border px-4 py-3 cursor-pointer transition-colors ${role === r ? 'border-forest bg-forest text-white' : 'border-black/15 bg-white text-forest/60 hover:border-forest'}`}>
                     <input {...register('role')} type="radio" value={r} className="sr-only" />
-                    <span className="font-sans text-sm capitalize">{r === 'guest' ? 'Guest / Traveller' : 'Property / Activity Supplier'}</span>
+                    <span className="font-sans text-sm capitalize">{r === 'visitor' ? 'Guest / Traveller' : 'Property / Activity Supplier'}</span>
                   </label>
                 ))}
               </div>

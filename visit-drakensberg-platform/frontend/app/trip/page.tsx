@@ -5,34 +5,8 @@ import Link from 'next/link'
 import Footer from '@/components/layout/Footer'
 import { Mountain, Bed, Car, Compass, ChevronRight, Trash2, Users, Calendar, ArrowLeft, Pencil } from 'lucide-react'
 import { useBooking } from '@/lib/booking-context'
-import { useState } from 'react'
-
-const ACTIVITY_SUGGESTIONS = [
-  {
-    type: 'Heritage',
-    title: 'San Rock Art Tour',
-    desc: "Visit Giant's Castle Main Caves with a certified heritage guide",
-    href: '/activities',
-  },
-  {
-    type: 'Adventure',
-    title: 'Guided Rock Climbing',
-    desc: 'Beginner-friendly routes with certified instructors',
-    href: '/activities',
-  },
-  {
-    type: 'Wildlife',
-    title: 'Lammergeier Hide Visit',
-    desc: "Spot Africa's largest flying bird at a dedicated feeding site",
-    href: '/activities',
-  },
-  {
-    type: 'Scenic',
-    title: 'Sani Pass 4×4 Tour',
-    desc: 'Drive the legendary pass up to the Lesotho border',
-    href: '/activities',
-  },
-]
+import { getRecommendations, type Recommendation } from '@/lib/recommendations'
+import { useState, useEffect } from 'react'
 
 function formatDate(iso: string) {
   return new Date(iso).toLocaleDateString('en-ZA', { weekday: 'short', day: 'numeric', month: 'short' })
@@ -53,6 +27,24 @@ export default function TripPage() {
   const checkIn = booking.checkIn
   const checkOut = booking.checkOut
   const guests = booking.guests || 1
+
+  // Live, context-aware suggestions: same region as the trip, inside the
+  // travel dates, enough seats for the party, minus what's already added.
+  const [suggestions, setSuggestions] = useState<Recommendation[]>([])
+  useEffect(() => {
+    if (isEmpty) { setSuggestions([]); return }
+    getRecommendations({
+      region: booking.stay?.region || booking.region,
+      checkIn,
+      checkOut,
+      guests,
+      excludeIds: [
+        ...booking.addons.map(a => a.id),
+        ...(booking.stay ? [booking.stay.id] : []),
+      ],
+    }, 4).then(recs => setSuggestions(recs.filter(r => r.kind !== 'stay')))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isEmpty, booking.addons.length, booking.stay?.id, booking.region, checkIn, checkOut, guests])
 
   function startEditDates() {
     setDraftIn(checkIn)
@@ -253,26 +245,31 @@ export default function TripPage() {
               </section>
             )}
 
-            {/* Activities suggestion */}
-            {hikeAddons.length > 0 && (
+            {/* Context-aware suggestions from live listings */}
+            {suggestions.length > 0 && (
               <section>
                 <div className="flex items-center gap-2 mb-1">
                   <Compass size={16} className="text-[#C9A96E]" />
                   <h2 className="font-display italic text-2xl">Make the most of your trip</h2>
                 </div>
                 <p className="font-sans text-xs text-black/40 mb-4">
-                  Other experiences to enjoy before or after your hike
+                  Matched to your {booking.stay?.region || booking.region ? 'region and ' : ''}travel dates
                 </p>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  {ACTIVITY_SUGGESTIONS.map(a => (
+                  {suggestions.map(s => (
                     <Link
-                      key={a.title}
-                      href={a.href}
+                      key={s.id}
+                      href={s.href}
                       className="bg-white border border-black/8 rounded-xl p-5 hover:border-[#C9A96E]/50 transition-colors group"
                     >
-                      <p className="font-sans text-[10px] text-[#C9A96E] uppercase tracking-widest mb-1.5">{a.type}</p>
-                      <p className="font-sans font-medium text-sm text-black/80 mb-1">{a.title}</p>
-                      <p className="font-sans text-xs text-black/40 leading-relaxed">{a.desc}</p>
+                      <p className="font-sans text-[10px] text-[#C9A96E] uppercase tracking-widest mb-1.5">
+                        {s.kind === 'tour-departure' ? 'Guided tour' : 'Activity'}{s.region ? ` · ${s.region}` : ''}
+                      </p>
+                      <p className="font-sans font-medium text-sm text-black/80 mb-1">{s.title}</p>
+                      <p className="font-sans text-xs text-black/40 leading-relaxed">{s.reason}</p>
+                      {s.price != null && (
+                        <p className="font-sans text-xs font-semibold text-[#2d6a4f] mt-2">R {s.price.toLocaleString()} pp</p>
+                      )}
                     </Link>
                   ))}
                 </div>

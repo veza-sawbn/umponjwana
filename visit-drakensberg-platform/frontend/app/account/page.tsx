@@ -2,8 +2,10 @@
 
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
+import toast from 'react-hot-toast'
 import { MapPin, Calendar, Users, CheckCircle, Clock, XCircle, Download, ChevronRight } from 'lucide-react'
-import { getBookingsByUser, type SavedBooking } from '@/lib/bookings'
+import { getBookingsByUser, updateBookingStatus, type SavedBooking } from '@/lib/bookings'
+import { getDepartures, releaseDepartureSeats } from '@/lib/departures'
 import { supabase } from '@/lib/auth'
 
 const STATUS_STYLE: Record<string, string> = {
@@ -21,7 +23,7 @@ function fmt(d: string) {
   return new Date(d).toLocaleDateString('en-ZA', { day: 'numeric', month: 'short', year: 'numeric' })
 }
 
-function BookingCard({ b }: { b: SavedBooking }) {
+function BookingCard({ b, onCancel }: { b: SavedBooking; onCancel?: (b: SavedBooking) => void }) {
   const status = b.status
   const Icon = STATUS_ICON[status] || CheckCircle
   const title = b.stay?.title || (b.addons[0]?.title ?? 'Booking')
@@ -61,6 +63,14 @@ function BookingCard({ b }: { b: SavedBooking }) {
         <div className="flex items-center justify-between mt-4 pt-3 border-t border-gray-100">
           <p className="font-display italic text-2xl text-[#2d6a4f]">R {b.total.toLocaleString()}</p>
           <div className="flex gap-2">
+            {onCancel && status === 'confirmed' && (
+              <button
+                onClick={() => onCancel(b)}
+                className="inline-flex items-center gap-1 border border-red-200 text-red-500 px-3 py-1.5 font-sans text-xs hover:bg-red-50 transition-colors"
+              >
+                <XCircle size={12} /> Cancel
+              </button>
+            )}
             <Link
               href={`/checkout/success?id=${b.id}`}
               className="inline-flex items-center gap-1 border border-gray-200 text-gray-500 px-3 py-1.5 font-sans text-xs hover:bg-[#F7F5F2] transition-colors"
@@ -92,6 +102,24 @@ export default function AccountBookingsPage() {
 
   const upcoming = bookings.filter(b => b.status !== 'cancelled' && (b.checkOut >= today || (!b.stay && b.addons.some(a => (a.date || '') >= today))))
   const past = bookings.filter(b => b.status === 'cancelled' || (!upcoming.includes(b)))
+
+  async function cancelBooking(b: SavedBooking) {
+    if (!window.confirm(`Cancel booking ${b.reference}? Free cancellation applies until 48 hours before check-in.`)) return
+    try {
+      await updateBookingStatus(b.id, 'cancelled', { notifySuppliers: true })
+      // Release any tour departure seats held by this booking.
+      const deps = await getDepartures()
+      await Promise.all(
+        b.addons
+          .filter(a => deps.some(d => d.id === a.id))
+          .map(a => releaseDepartureSeats(a.id, a.guests).catch(() => {}))
+      )
+      setBookings(prev => prev.map(x => x.id === b.id ? { ...x, status: 'cancelled' } : x))
+      toast.success('Booking cancelled. The suppliers have been notified.')
+    } catch {
+      toast.error('Could not cancel this booking. Please try again.')
+    }
+  }
 
   if (loading) {
     return (
@@ -128,7 +156,7 @@ export default function AccountBookingsPage() {
               <p className="font-sans text-sm text-gray-400 mb-5">Time to plan your next Drakensberg adventure.</p>
               <Link href="/stays" className="inline-block bg-[#2d6a4f] text-white px-6 py-3 font-sans text-sm hover:bg-[#235a3f] transition-colors">Browse Stays</Link>
             </div>
-          ) : upcoming.map(b => <BookingCard key={b.id} b={b} />)}
+          ) : upcoming.map(b => <BookingCard key={b.id} b={b} onCancel={cancelBooking} />)}
         </div>
       )}
 

@@ -1,4 +1,4 @@
-import { supabase } from './auth'
+import { listEntities, getEntity, insertEntity, updateEntity, deleteEntity, newEntityId } from './entities'
 
 export type Activity = {
   id: string
@@ -28,55 +28,30 @@ export type Activity = {
   createdAt: string
 }
 
-async function getAll(): Promise<Activity[]> {
-  try {
-    const { data } = await supabase
-      .from('site_content')
-      .select('value')
-      .eq('key', 'activities')
-      .maybeSingle()
-    if (data?.value?.items && Array.isArray(data.value.items)) {
-      return data.value.items as Activity[]
-    }
-  } catch {}
-  return []
-}
-
-async function saveAll(items: Activity[]): Promise<void> {
-  await supabase.from('site_content').upsert(
-    { key: 'activities', value: { items }, updated_at: new Date().toISOString() },
-    { onConflict: 'key' },
-  )
-}
+const KIND = 'activity'
 
 export async function getActivities(): Promise<Activity[]> {
-  return getAll()
+  return listEntities<Activity>(KIND)
 }
 
 export async function getActivitiesBySupplier(supplierId: string): Promise<Activity[]> {
-  const all = await getAll()
+  const all = await listEntities<Activity>(KIND)
   return all.filter(a => a.supplierId === supplierId)
 }
 
 export async function getActivityById(id: string): Promise<Activity | null> {
-  const all = await getAll()
-  return all.find(a => a.id === id) ?? null
+  return getEntity<Activity>(KIND, id)
 }
 
 export async function addActivity(a: Omit<Activity, 'id' | 'createdAt'>): Promise<Activity> {
-  const all = await getAll()
-  const now = new Date().toISOString()
-  const activity: Activity = { ...a, id: `act-${Date.now()}`, createdAt: now }
-  await saveAll([...all, activity])
-  return activity
+  const activity: Activity = { ...a, id: newEntityId('act'), createdAt: new Date().toISOString() }
+  return insertEntity(KIND, activity)
 }
 
 export async function updateActivity(id: string, patch: Partial<Activity>): Promise<void> {
-  const all = await getAll()
-  await saveAll(all.map(a => a.id === id ? { ...a, ...patch } : a))
+  await updateEntity(KIND, id, patch)
 }
 
 export async function deleteActivity(id: string): Promise<void> {
-  const all = await getAll()
-  await saveAll(all.filter(a => a.id !== id))
+  await deleteEntity(KIND, id)
 }

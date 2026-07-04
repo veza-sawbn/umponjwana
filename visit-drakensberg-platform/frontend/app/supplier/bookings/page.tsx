@@ -1,8 +1,10 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { CalendarDays, Search, Phone, Mail, Users, MessageSquare } from 'lucide-react'
-import { getBookings, type SavedBooking } from '@/lib/bookings'
+import toast from 'react-hot-toast'
+import { CalendarDays, Search, Phone, Mail, Users, MessageSquare, XCircle } from 'lucide-react'
+import { getBookings, updateBookingStatus, type SavedBooking } from '@/lib/bookings'
+import { getDepartures, releaseDepartureSeats } from '@/lib/departures'
 import { getPropertiesBySupplier } from '@/lib/properties'
 import { supabase } from '@/lib/auth'
 
@@ -41,6 +43,24 @@ export default function BookingsPage() {
       setLoading(false)
     })
   }, [])
+
+  async function cancelBooking(b: SavedBooking) {
+    if (!window.confirm(`Cancel booking ${b.reference} for ${b.customerName}? The guest will be notified.`)) return
+    try {
+      await updateBookingStatus(b.id, 'cancelled', { notifyUser: true })
+      // Free any tour departure seats this booking held.
+      const deps = await getDepartures()
+      await Promise.all(
+        b.addons
+          .filter(a => deps.some(d => d.id === a.id))
+          .map(a => releaseDepartureSeats(a.id, a.guests).catch(() => {}))
+      )
+      setBookings(prev => prev.map(x => x.id === b.id ? { ...x, status: 'cancelled' } : x))
+      toast.success('Booking cancelled and guest notified.')
+    } catch {
+      toast.error('Could not cancel this booking. Please try again.')
+    }
+  }
 
   const filtered = bookings.filter(b =>
     (filter === 'all' || b.status === filter) &&
@@ -194,9 +214,19 @@ export default function BookingsPage() {
                     </div>
                   )}
 
-                  <div className="md:col-span-2 pt-2 border-t border-black/6 flex justify-between items-center">
+                  <div className="md:col-span-2 pt-2 border-t border-black/6 flex flex-wrap gap-3 justify-between items-center">
                     <p className="font-sans text-xs text-black/30">Booked {new Date(b.createdAt).toLocaleDateString('en-ZA', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</p>
-                    <p className="font-display italic text-lg text-[#2d6a4f]">Total: R {b.total.toLocaleString()}</p>
+                    <div className="flex items-center gap-4">
+                      {b.status === 'confirmed' && (
+                        <button
+                          onClick={() => cancelBooking(b)}
+                          className="inline-flex items-center gap-1.5 font-sans text-xs text-red-500 border border-red-200 px-3 py-1.5 hover:bg-red-50 transition-colors"
+                        >
+                          <XCircle size={12} /> Cancel booking
+                        </button>
+                      )}
+                      <p className="font-display italic text-lg text-[#2d6a4f]">Total: R {b.total.toLocaleString()}</p>
+                    </div>
                   </div>
                 </div>
               )}

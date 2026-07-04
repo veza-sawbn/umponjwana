@@ -6,6 +6,7 @@ import Link from 'next/link'
 import Footer from '@/components/layout/Footer'
 import { Calendar, Users, MapPin, ArrowRight, Search, SlidersHorizontal, X, Check, Bed } from 'lucide-react'
 import { useBooking } from '@/lib/booking-context'
+import { fuzzyFilter } from '@/lib/fuzzy'
 import { getRegionNames, DEFAULT_REGIONS } from '@/lib/regions'
 import { getProperties, type Property } from '@/lib/properties'
 import { getRoomsByProperty } from '@/lib/rooms'
@@ -153,7 +154,9 @@ function SearchResults() {
   const checkInParam = params.get('check_in') || booking.checkIn || ''
   const checkOutParam = params.get('check_out') || booking.checkOut || ''
   const guestsParam = parseInt(params.get('guests') || String(booking.guests) || '2')
+  const queryParam = params.get('q') || ''
 
+  const [query, setQuery] = useState(queryParam)
   const [region, setRegion] = useState(regionParam)
   const [checkIn, setCheckIn] = useState(checkInParam)
   const [checkOut, setCheckOut] = useState(checkOutParam)
@@ -199,6 +202,7 @@ function SearchResults() {
   function refine() {
     booking.setSearch(region, checkIn, checkOut, guests)
     const p = new URLSearchParams()
+    if (query.trim()) p.set('q', query.trim())
     if (region) p.set('region', region)
     if (checkIn) p.set('check_in', checkIn)
     if (checkOut) p.set('check_out', checkOut)
@@ -215,11 +219,29 @@ function SearchResults() {
     return a.includes(b) || b.includes(a)
   }
 
-  const stays = [...ALL_STAYS, ...liveStays].filter(s => matchRegion(s.region) && (!availableOnly || s.available))
-  const hikes = ALL_HIKES.filter(h => matchRegion(h.region))
-  const activities = [...ALL_ACTIVITIES, ...liveActivities].filter(a => matchRegion(a.region))
-  const events = ALL_EVENTS.filter(e => matchRegion(e.region))
-  const restaurants = ALL_RESTAURANTS.filter(r => matchRegion(r.region))
+  // Region narrows first; the free-text query then fuzzy-matches (typo- and
+  // partial-match tolerant) across titles, regions and categories.
+  const q = query.trim()
+  const stays = fuzzyFilter(
+    [...ALL_STAYS, ...liveStays].filter(s => matchRegion(s.region) && (!availableOnly || s.available)),
+    q, s => `${s.title} ${s.region}`,
+  )
+  const hikes = fuzzyFilter(
+    ALL_HIKES.filter(h => matchRegion(h.region)),
+    q, h => `${h.title} ${h.region} ${h.difficulty} hike trail`,
+  )
+  const activities = fuzzyFilter(
+    [...ALL_ACTIVITIES, ...liveActivities].filter(a => matchRegion(a.region)),
+    q, a => `${a.title} ${a.region} ${a.category}`,
+  )
+  const events = fuzzyFilter(
+    ALL_EVENTS.filter(e => matchRegion(e.region)),
+    q, e => `${e.title} ${e.region} event`,
+  )
+  const restaurants = fuzzyFilter(
+    ALL_RESTAURANTS.filter(r => matchRegion(r.region)),
+    q, r => `${r.title} ${r.region} ${r.cuisine} restaurant dining`,
+  )
 
   const hasResults = stays.length + hikes.length + activities.length + events.length + restaurants.length > 0
 
@@ -230,6 +252,20 @@ function SearchResults() {
       <div className="bg-white border-b border-gray-200 mt-16 sticky top-16 z-30">
         <div className="max-w-[1440px] mx-auto px-6 lg:px-12 py-4">
           <div className="flex items-center gap-3 flex-wrap">
+            {/* Free-text query */}
+            <div className="flex items-center gap-2 border border-gray-200 px-3 py-2 bg-[#F7F5F2] flex-1 min-w-[180px] max-w-xs">
+              <Search size={12} className="text-gray-400 shrink-0" />
+              <input
+                type="search"
+                value={query}
+                onChange={e => setQuery(e.target.value)}
+                onKeyDown={e => { if (e.key === 'Enter') refine() }}
+                placeholder="Lodge, hike, activity…"
+                aria-label="Search by name"
+                className="w-full font-sans text-sm bg-transparent focus:outline-none"
+              />
+            </div>
+
             {/* Region */}
             <div className="flex items-center gap-2 border border-gray-200 px-3 py-2 bg-[#F7F5F2]">
               <MapPin size={12} className="text-gray-400" />
@@ -295,8 +331,11 @@ function SearchResults() {
       <div className="max-w-[1440px] mx-auto px-6 lg:px-12 pt-10 pb-4">
         <div className="flex items-baseline gap-3 flex-wrap">
           <h1 className="font-display italic text-3xl text-[#000000]">
-            {region || 'All Drakensberg'}
+            {queryParam ? `“${queryParam}”` : (region || 'All Drakensberg')}
           </h1>
+          {queryParam && (
+            <span className="font-sans text-sm text-gray-500">in {region || 'All Drakensberg'}</span>
+          )}
           {(checkIn || checkOut) && (
             <span className="font-sans text-sm text-gray-500">
               {fmt(checkIn)} {checkOut && `→ ${fmt(checkOut)}`}

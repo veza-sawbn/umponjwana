@@ -11,6 +11,7 @@ const DEFAULT_REGION_LABELS = ['All Drakensberg']
 export default function SearchBar() {
   const router = useRouter()
   const { setSearch, region: savedRegion, checkIn: savedCheckIn, checkOut: savedCheckOut, guests: savedGuests } = useBooking()
+  const [query, setQuery] = useState('')
   const [region, setRegion] = useState(savedRegion || '')
   const [regions, setRegions] = useState(DEFAULT_REGION_LABELS)
   const [checkIn, setCheckIn] = useState(savedCheckIn || '')
@@ -26,6 +27,7 @@ export default function SearchBar() {
   function handleSearch() {
     setSearch(region, checkIn, checkOut, guests)
     const params = new URLSearchParams()
+    if (query.trim()) params.set('q', query.trim())
     if (region) params.set('region', region)
     if (checkIn) params.set('check_in', checkIn)
     if (checkOut) params.set('check_out', checkOut)
@@ -35,6 +37,20 @@ export default function SearchBar() {
 
   return (
     <div className="bg-white border border-white/20 shadow-2xl">
+      {/* Free-text query */}
+      <div className="px-5 py-4 border-b border-black/10 flex items-center gap-3">
+        <Search size={14} className="text-gray-400 shrink-0" />
+        <input
+          type="search"
+          value={query}
+          onChange={e => setQuery(e.target.value)}
+          onKeyDown={e => { if (e.key === 'Enter') handleSearch() }}
+          placeholder="Search lodges, hikes, activities, towns…"
+          aria-label="Search the Drakensberg"
+          className="w-full font-sans text-sm text-[#111] placeholder:text-gray-400 bg-transparent focus:outline-none"
+        />
+      </div>
+
       {/* Fields row */}
       <div className="grid grid-cols-1 md:grid-cols-4 divide-y md:divide-y-0 md:divide-x divide-black/10">
 
@@ -90,11 +106,13 @@ export default function SearchBar() {
           <div className="flex items-center gap-3">
             <button
               onClick={() => setGuests(g => Math.max(1, g - 1))}
+              aria-label="Remove one guest"
               className="w-6 h-6 border border-gray-300 text-gray-500 hover:border-[#2d6a4f] hover:text-[#2d6a4f] text-sm transition-colors flex items-center justify-center"
             >−</button>
-            <span className="font-sans text-sm text-[#111] min-w-[2ch] text-center">{guests}</span>
+            <span className="font-sans text-sm text-[#111] min-w-[2ch] text-center" aria-live="polite">{guests}</span>
             <button
               onClick={() => setGuests(g => g + 1)}
+              aria-label="Add one guest"
               className="w-6 h-6 border border-gray-300 text-gray-500 hover:border-[#2d6a4f] hover:text-[#2d6a4f] text-sm transition-colors flex items-center justify-center"
             >+</button>
           </div>
