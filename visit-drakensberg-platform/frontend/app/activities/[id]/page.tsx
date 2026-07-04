@@ -24,6 +24,8 @@ function mapActivityToView(a: any) {
     title: a.name,
     category: a.category,
     location: a.meetingPoint || '',
+    gpsLat: a.gpsLat,
+    gpsLng: a.gpsLng,
     duration,
     group_size: a.maxGroup ? `Up to ${a.maxGroup} people` : '',
     price_per_person: a.pricePerPerson || 0,
@@ -93,6 +95,9 @@ export default function ActivityDetailPage() {
         date: date || undefined,
         price_per_person: activity.price_per_person,
         guests: groupSize,
+        location: activity.location || undefined,
+        lat: activity.gpsLat || undefined,
+        lng: activity.gpsLng || undefined,
       })
     }
   }

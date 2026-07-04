@@ -11,6 +11,9 @@ export type BookingAddon = {
   date?: string
   price_per_person: number
   guests: number
+  location?: string
+  lat?: string
+  lng?: string
 }
 
 export type BookingStay = {
@@ -36,6 +39,8 @@ export type ShuttleOption = {
   shuttleType?: string
   durationMinutes?: number
   vehicleType?: string
+  distanceKm?: number
+  durationText?: string
 }
 
 export type BookingState = {

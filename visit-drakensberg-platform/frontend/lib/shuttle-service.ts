@@ -122,53 +122,100 @@ const AIRPORT_TRANSFER_RATE_PER_KM = 9
 const AIRPORT_TRANSFER_MIN_FARE = 650
 const AIRPORT_TRANSFER_PER_PASSENGER_KM = 1
 
-/** Calculates a real driving-distance-based airport transfer suggestion to the guest's actual selected stay, using Google Distance Matrix. */
-export function useAirportTransferRecommendation(booking: BookingState): { recommendation: ShuttleOption | null; status: 'idle' | 'calculating' | 'done' | 'error' } {
+// Local transfers (stay to activity meeting point) cost more per km than long airport runs, with a lower minimum.
+const LOCAL_TRANSFER_RATE_PER_KM = 12
+const LOCAL_TRANSFER_MIN_FARE = 350
+const LOCAL_TRANSFER_PER_PASSENGER_KM = 1.2
+
+function priceForDistance(distanceKm: number, passengers: number, ratePerKm: number, minFare: number, perPassengerKm: number) {
+  const basePrice = Math.max(minFare, Math.round(distanceKm * ratePerKm))
+  const extraPassengerFee = Math.round(distanceKm * perPassengerKm) * Math.max(0, passengers - 1)
+  return basePrice + extraPassengerFee
+}
+
+function hasLocation(addon: BookingAddon) {
+  return Boolean(addon.location || (addon.lat && addon.lng))
+}
+
+/**
+ * Combines a live airport-transfer suggestion and live stay-to-activity transfer suggestions
+ * (calculated from real driving distance to the guest's actual selected stay and each addon's
+ * real location, in one batched Distance Matrix request) with mock route-table guesses for any
+ * addon that has no location data on record. Ready-to-render, capped at `limit`.
+ */
+export function useShuttleRecommendations(booking: BookingState, limit = 2): ShuttleOption[] {
   const stay = booking.stay
+  const passengers = booking.guests || 2
+  const addonsWithLocation = booking.addons.filter(hasLocation)
+  const addonsWithoutLocation = booking.addons.filter(a => !hasLocation(a))
+
   const origin: DistancePlace | null = stay
     ? { address: stay.address || `${stay.title}, ${stay.region}, South Africa`, lat: stay.lat, lng: stay.lng }
     : null
-  const destinations: DistancePlace[] = MAJOR_HUBS.map(hub => ({ address: hub.name }))
+  const destinations: DistancePlace[] = [
+    ...MAJOR_HUBS.map(hub => ({ address: hub.name })),
+    ...addonsWithLocation.map(addon => ({ address: `${addon.location || addon.title}, South Africa`, lat: addon.lat, lng: addon.lng })),
+  ]
   const { results, status } = useAutoDrivingDistances(origin, destinations)
 
-  if (!stay || !booking.checkIn || status !== 'done') return { recommendation: null, status }
+  const liveRecommendations: ShuttleOption[] = []
 
-  type HubDistance = { hub: typeof MAJOR_HUBS[number]; result: DistanceResult }
-  const best = results.reduce<HubDistance | null>((closest, result, i) => {
-    if (!result) return closest
-    if (!closest || result.distanceKm < closest.result.distanceKm) return { hub: MAJOR_HUBS[i], result }
-    return closest
-  }, null)
-  if (!best) return { recommendation: null, status: 'error' }
+  if (stay && booking.checkIn && status === 'done') {
+    type HubDistance = { hub: typeof MAJOR_HUBS[number]; result: DistanceResult }
+    const best = results.slice(0, MAJOR_HUBS.length).reduce<HubDistance | null>((closest, result, i) => {
+      if (!result) return closest
+      if (!closest || result.distanceKm < closest.result.distanceKm) return { hub: MAJOR_HUBS[i], result }
+      return closest
+    }, null)
 
-  const passengers = booking.guests || 2
-  const basePrice = Math.max(AIRPORT_TRANSFER_MIN_FARE, Math.round(best.result.distanceKm * AIRPORT_TRANSFER_RATE_PER_KM))
-  const extraPassengerFee = Math.round(best.result.distanceKm * AIRPORT_TRANSFER_PER_PASSENGER_KM) * Math.max(0, passengers - 1)
-  const price = basePrice + extraPassengerFee
-
-  return {
-    recommendation: {
-      id: `airport-transfer-${best.hub.id}-${booking.checkIn}`,
-      label: `${best.hub.name} → ${stay.title}`,
-      price,
-      description: `Private transfer on ${booking.checkIn}. ${best.result.distanceKm} km · ~${best.result.durationText} drive · ${passengers} passenger${passengers !== 1 ? 's' : ''}. Estimated fare based on live driving distance.`,
-      pickup: best.hub.name,
-      destination: stay.title,
-      date: booking.checkIn,
-      passengers,
-      shuttleType: 'Private Shuttle',
-      durationMinutes: best.result.durationMinutes,
-      vehicleType: 'Minibus / SUV',
-    },
-    status: 'done',
+    if (best) {
+      const price = priceForDistance(best.result.distanceKm, passengers, AIRPORT_TRANSFER_RATE_PER_KM, AIRPORT_TRANSFER_MIN_FARE, AIRPORT_TRANSFER_PER_PASSENGER_KM)
+      liveRecommendations.push({
+        id: `airport-transfer-${best.hub.id}-${booking.checkIn}`,
+        label: `${best.hub.name} → ${stay.title}`,
+        price,
+        description: `Private transfer on ${booking.checkIn}. ${best.result.distanceKm} km · ~${best.result.durationText} drive · ${passengers} passenger${passengers !== 1 ? 's' : ''}. Estimated fare based on live driving distance.`,
+        pickup: best.hub.name,
+        destination: stay.title,
+        date: booking.checkIn,
+        passengers,
+        shuttleType: 'Private Shuttle',
+        durationMinutes: best.result.durationMinutes,
+        vehicleType: 'Minibus / SUV',
+        distanceKm: best.result.distanceKm,
+        durationText: best.result.durationText,
+      })
+    }
   }
-}
 
-/** Combines the live airport-transfer suggestion with addon-based shuttle guesses into one ready-to-render list. */
-export function useShuttleRecommendations(booking: BookingState, limit = 2): ShuttleOption[] {
-  const { recommendation: airportTransfer } = useAirportTransferRecommendation(booking)
-  const addonRecommendations = buildAddonShuttleRecommendations(booking)
-  return [...(airportTransfer ? [airportTransfer] : []), ...addonRecommendations]
+  if (stay && status === 'done') {
+    addonsWithLocation.forEach((addon, i) => {
+      const result = results[MAJOR_HUBS.length + i]
+      const date = addon.date || booking.checkIn
+      if (!result || !date) return
+      const addonPassengers = addon.guests || passengers
+      const price = priceForDistance(result.distanceKm, addonPassengers, LOCAL_TRANSFER_RATE_PER_KM, LOCAL_TRANSFER_MIN_FARE, LOCAL_TRANSFER_PER_PASSENGER_KM)
+      liveRecommendations.push({
+        id: `addon-transfer-${addon.id}`,
+        label: `${stay.title} → ${addon.title}`,
+        price,
+        description: `Private transfer on ${date}. ${result.distanceKm} km · ~${result.durationText} drive · ${addonPassengers} passenger${addonPassengers !== 1 ? 's' : ''}. Estimated fare based on live driving distance.`,
+        pickup: stay.title,
+        destination: addon.title,
+        date,
+        passengers: addonPassengers,
+        shuttleType: 'Private Shuttle',
+        durationMinutes: result.durationMinutes,
+        vehicleType: 'Touring van',
+        distanceKm: result.distanceKm,
+        durationText: result.durationText,
+      })
+    })
+  }
+
+  const fallbackRecommendations = buildAddonShuttleRecommendations({ ...booking, addons: addonsWithoutLocation })
+
+  return [...liveRecommendations, ...fallbackRecommendations]
     .filter(rec => rec.id !== booking.shuttle?.id)
     .slice(0, limit)
 }
