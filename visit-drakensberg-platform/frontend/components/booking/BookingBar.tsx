@@ -156,6 +156,9 @@ export default function BookingBar() {
                               <div>
                                 <p className="font-sans text-sm font-medium">Private Transfer Available</p>
                                 <p className="font-sans text-xs text-gray-400">{shuttle.label} · {shuttle.date}</p>
+                                {shuttle.distanceKm != null && (
+                                  <p className="font-sans text-[10px] text-[#2d6a4f]/70 mt-0.5">{shuttle.distanceKm} km · ~{shuttle.durationText} drive</p>
+                                )}
                               </div>
                             </div>
                             <div className="text-right">
