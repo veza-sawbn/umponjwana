@@ -1,6 +1,12 @@
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
 
-export const supabase = createClientComponentClient()
+// Fall back to placeholder credentials so static prerendering doesn't crash
+// when env vars are absent at build time (e.g. CI). All real queries happen
+// client-side at runtime, where the genuine NEXT_PUBLIC_* values are present.
+export const supabase = createClientComponentClient({
+  supabaseUrl: process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://placeholder.supabase.co',
+  supabaseKey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'placeholder-anon-key',
+})
 
 export async function signIn(email: string, password: string) {
   const { data, error } = await supabase.auth.signInWithPassword({ email, password })

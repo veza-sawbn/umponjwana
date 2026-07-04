@@ -3,7 +3,6 @@
 import { useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
-import Navbar from '@/components/layout/Navbar'
 import Footer from '@/components/layout/Footer'
 import { ArrowLeft, MapPin, Star, Wifi, Flame, Utensils, Car, Waves, Coffee, TreePine, ShieldCheck, Users, Calendar, Check, Plus, X, ChevronLeft, ChevronRight } from 'lucide-react'
 import { useBooking } from '@/lib/booking-context'
@@ -98,7 +97,6 @@ export default function ListingDetailPage() {
 
   return (
     <div className="min-h-screen bg-[#F7F5F2]">
-      <Navbar />
 
       {/* Hero header */}
       <section className="bg-[#000000] text-white pt-32 pb-10 px-6 lg:px-12">

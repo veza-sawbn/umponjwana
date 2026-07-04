@@ -1,9 +1,9 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import Navbar from '@/components/layout/Navbar'
+import toast from 'react-hot-toast'
 import Footer from '@/components/layout/Footer'
 import { ArrowLeft, ShieldCheck, Lock, CreditCard, Calendar, Users, MapPin, Bus } from 'lucide-react'
 import { useBooking } from '@/lib/booking-context'
@@ -40,6 +40,14 @@ export default function CheckoutPage() {
   const [phone, setPhone] = useState('')
   const [specialRequests, setSpecialRequests] = useState('')
 
+  const isEmpty = !booking.stay && booking.addons.length === 0 && !booking.shuttle
+
+  // Nothing to pay for — send the visitor back to trip planning instead of
+  // letting them submit an empty R0 booking.
+  useEffect(() => {
+    if (isEmpty) router.replace('/trip')
+  }, [isEmpty, router])
+
   const nights = booking.nights
   const stayTotal = booking.stay ? booking.stay.price_per_night * nights : 0
   const addonTotal = booking.addons.reduce((s, a) => s + a.price_per_person * a.guests, 0)
@@ -49,9 +57,30 @@ export default function CheckoutPage() {
   const tax = Math.round((subtotal + serviceFee) * 0.15)
   const total = subtotal + serviceFee + tax
 
+  function expiryIsValid(val: string) {
+    const m = val.match(/^(\d{2})\/(\d{2})$/)
+    if (!m) return false
+    const month = parseInt(m[1], 10)
+    if (month < 1 || month > 12) return false
+    const year = 2000 + parseInt(m[2], 10)
+    return new Date(year, month, 0, 23, 59, 59) >= new Date()
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!agreed) return
+    if (!agreed || isEmpty) return
+    if (cardNumber.replace(/\s/g, '').length < 15) {
+      toast.error('Please enter a valid card number.')
+      return
+    }
+    if (!expiryIsValid(expiry)) {
+      toast.error('Card expiry must be a valid future date (MM/YY).')
+      return
+    }
+    if (cvc.length < 3) {
+      toast.error('Please enter your card security code (CVV).')
+      return
+    }
     setLoading(true)
     try {
       const { data: { user } } = await supabase.auth.getUser()
@@ -97,13 +126,13 @@ export default function CheckoutPage() {
       router.push(`/checkout/success?id=${saved.id}`)
     } catch (err) {
       console.error('Booking save failed:', err)
+      toast.error('We could not complete your booking. You have not been charged — please try again.')
       setLoading(false)
     }
   }
 
   return (
     <div className="min-h-screen bg-[#F7F5F2]">
-      <Navbar />
 
       <section className="bg-[#000000] text-white pt-32 pb-10 px-6 lg:px-12">
         <div className="max-w-[1440px] mx-auto">

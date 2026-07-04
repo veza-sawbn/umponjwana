@@ -3,7 +3,6 @@
 import { useState, useEffect, Suspense } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
-import Navbar from '@/components/layout/Navbar'
 import Footer from '@/components/layout/Footer'
 import { Calendar, Users, MapPin, ArrowRight, Search, SlidersHorizontal, X, Check, Bed } from 'lucide-react'
 import { useBooking } from '@/lib/booking-context'
@@ -125,16 +124,20 @@ function fmt(date: string) {
 
 /* ── Section wrappers ─────────────────────────────────────────────────────── */
 
-function SectionHeader({ label, heading, count, href }: { label: string; heading: string; count: number; href: string }) {
+function SectionHeader({ label, heading, count, href }: { label: string; heading: string; count: number; href?: string }) {
   return (
     <div className="flex items-end justify-between mb-6">
       <div>
         <p className="font-sans text-[10px] tracking-[0.16em] uppercase text-[#C9A96E] mb-1">{label}</p>
         <h2 className="font-display italic text-2xl text-[#000000]">{heading}</h2>
       </div>
-      <Link href={href} className="font-sans text-xs text-[#2d6a4f] hover:underline hidden sm:block">
-        See all ({count}) →
-      </Link>
+      {href ? (
+        <Link href={href} className="font-sans text-xs text-[#2d6a4f] hover:underline hidden sm:block">
+          See all ({count}) →
+        </Link>
+      ) : (
+        <span className="font-sans text-xs text-gray-400 hidden sm:block">{count} in this area</span>
+      )}
     </div>
   )
 }
@@ -222,7 +225,6 @@ function SearchResults() {
 
   return (
     <div className="min-h-screen bg-[#F7F5F2]">
-      <Navbar />
 
       {/* Sticky search refinement bar */}
       <div className="bg-white border-b border-gray-200 mt-16 sticky top-16 z-30">
@@ -256,9 +258,9 @@ function SearchResults() {
             {/* Guests */}
             <div className="flex items-center gap-2 border border-gray-200 px-3 py-2 bg-[#F7F5F2]">
               <Users size={12} className="text-gray-400" />
-              <button onClick={() => setGuests(g => Math.max(1, g - 1))} className="text-gray-400 hover:text-[#2d6a4f] font-bold w-4 text-center">−</button>
-              <span className="font-sans text-sm min-w-[2ch] text-center">{guests}</span>
-              <button onClick={() => setGuests(g => g + 1)} className="text-gray-400 hover:text-[#2d6a4f] font-bold w-4 text-center">+</button>
+              <button onClick={() => setGuests(g => Math.max(1, g - 1))} aria-label="Remove one guest" className="text-gray-400 hover:text-[#2d6a4f] font-bold w-4 text-center">−</button>
+              <span className="font-sans text-sm min-w-[2ch] text-center" aria-live="polite">{guests}</span>
+              <button onClick={() => setGuests(g => g + 1)} aria-label="Add one guest" className="text-gray-400 hover:text-[#2d6a4f] font-bold w-4 text-center">+</button>
               <span className="font-sans text-xs text-gray-400">guests</span>
             </div>
 
@@ -400,7 +402,7 @@ function SearchResults() {
               {hikes.map(h => (
                 <Link key={h.id} href={`/hikes/${h.id}`} className="group bg-white">
                   <div className="aspect-[4/3] overflow-hidden">
-                    <img src={h.img} alt={h.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" />
+                    <img loading="lazy" decoding="async" src={h.img} alt={h.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" />
                   </div>
                   <div className="p-4">
                     <div className="flex items-center justify-between mb-1">
@@ -425,7 +427,7 @@ function SearchResults() {
                 <Link key={a.id} href={`/activities/${a.id}`} className="group bg-white">
                   <div className="aspect-[4/3] overflow-hidden relative bg-[#C9A96E]/10">
                     {a.img ? (
-                      <img src={a.img} alt={a.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" />
+                      <img loading="lazy" decoding="async" src={a.img} alt={a.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" />
                     ) : (
                       <div className="w-full h-full flex items-center justify-center">
                         <span className="font-display italic text-lg text-[#C9A96E]/50">{a.title}</span>
@@ -456,7 +458,7 @@ function SearchResults() {
               {events.map(ev => (
                 <Link key={ev.id} href="/events" className="group bg-white">
                   <div className="aspect-[3/2] overflow-hidden">
-                    <img src={ev.img} alt={ev.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" />
+                    <img loading="lazy" decoding="async" src={ev.img} alt={ev.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" />
                   </div>
                   <div className="p-4">
                     <p className="font-sans text-[10px] tracking-[0.12em] uppercase text-[#C9A96E] mb-1">{ev.date}</p>
@@ -473,12 +475,12 @@ function SearchResults() {
         {/* ── Restaurants ── */}
         {restaurants.length > 0 && (
           <section>
-            <SectionHeader label="Where to eat" heading="Restaurants & Dining" count={restaurants.length} href="/dining" />
+            <SectionHeader label="Where to eat" heading="Restaurants & Dining" count={restaurants.length} />
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
               {restaurants.map(r => (
                 <div key={r.id} className="bg-white">
                   <div className="aspect-[4/3] overflow-hidden">
-                    <img src={r.img} alt={r.title} className="w-full h-full object-cover hover:scale-105 transition-transform duration-700" />
+                    <img loading="lazy" decoding="async" src={r.img} alt={r.title} className="w-full h-full object-cover hover:scale-105 transition-transform duration-700" />
                   </div>
                   <div className="p-4">
                     <div className="flex items-center justify-between mb-1">

@@ -30,7 +30,10 @@ export async function middleware(req: NextRequest) {
   }
 
   if (session) {
-    const role = session.user.user_metadata?.role ?? 'visitor'
+    // Prefer app_metadata.role (only settable server-side) over
+    // user_metadata.role, which a user can edit on their own account via
+    // supabase.auth.updateUser. Roles should be assigned in app_metadata.
+    const role = session.user.app_metadata?.role ?? session.user.user_metadata?.role ?? 'visitor'
     if (ADMIN_ROUTES.some(r => pathname.startsWith(r)) && role !== 'admin') {
       return NextResponse.redirect(new URL('/account', req.url))
     }

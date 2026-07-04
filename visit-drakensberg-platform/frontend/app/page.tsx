@@ -1,7 +1,9 @@
 'use client'
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
+import toast from 'react-hot-toast'
 import { ArrowRight, ChevronDown, X } from 'lucide-react'
+import { supabase } from '@/lib/auth'
 import { motion } from 'framer-motion'
 import SearchBar from '@/components/search/SearchBar'
 import PanoramaViewer from '@/components/panorama/PanoramaViewer'
@@ -56,23 +58,23 @@ const REGIONS = [
 const STORIES = [
   {
     tag: 'Wildlife',
-    title: 'The bearded vulture — rarest raptor in Southern Africa',
+    title: "Africa's rarest raptor: the bearded vulture of the Berg",
     img: 'https://images.unsplash.com/photo-1508739773434-c26b3d09e071?w=800&q=80',
-    href: '/stories/bearded-vulture',
+    href: '/mydrakensberg/bearded-vulture-lammergeier',
     date: 'March 2025',
   },
   {
-    tag: 'Culture',
-    title: 'Reading the rock: San art and the spirit world',
+    tag: 'Heritage',
+    title: "The ancient language of the San: rock art at Giant's Castle",
     img: 'https://images.unsplash.com/photo-1529946179074-1f3cf40c0a0e?w=800&q=80',
-    href: '/stories/san-rock-art',
+    href: '/mydrakensberg/san-bushmen-rock-art-giants-castle',
     date: 'January 2025',
   },
   {
     tag: 'Adventure',
-    title: 'Five days on the Drakensberg Grand Traverse',
+    title: 'Climbing the Chain Ladder: what nobody tells you',
     img: 'https://images.unsplash.com/photo-1551632811-561732d1e306?w=800&q=80',
-    href: '/stories/grand-traverse',
+    href: '/mydrakensberg/tugela-falls-chain-ladder-guide',
     date: 'November 2024',
   },
 ]
@@ -150,6 +152,36 @@ export default function HomePage() {
   const [promos, setPromos] = useState(SITE_CONTENT_DEFAULTS.promotions)
   const [promoBannerDismissed, setPromoBannerDismissed] = useState(false)
   const [trails, setTrails] = useState<Trail[]>([])
+  const [newsletterEmail, setNewsletterEmail] = useState('')
+  const [subscribing, setSubscribing] = useState(false)
+
+  async function subscribeNewsletter(e: React.FormEvent) {
+    e.preventDefault()
+    const email = newsletterEmail.trim().toLowerCase()
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      toast.error('Please enter a valid email address.')
+      return
+    }
+    setSubscribing(true)
+    try {
+      const { data } = await supabase.from('site_content').select('value').eq('key', 'newsletter_subscribers').maybeSingle()
+      const items: { email: string; subscribedAt: string }[] = data?.value?.items ?? []
+      if (!items.some(s => s.email === email)) {
+        items.push({ email, subscribedAt: new Date().toISOString() })
+        const { error } = await supabase.from('site_content').upsert(
+          { key: 'newsletter_subscribers', value: { items }, updated_at: new Date().toISOString() },
+          { onConflict: 'key' },
+        )
+        if (error) throw error
+      }
+      toast.success('You’re on the list — see you in the next dispatch.')
+      setNewsletterEmail('')
+    } catch {
+      toast.error('Subscription failed. Please try again later.')
+    } finally {
+      setSubscribing(false)
+    }
+  }
 
   useEffect(() => {
     getAllSiteContent().then(content => {
@@ -210,7 +242,7 @@ export default function HomePage() {
           {CATEGORIES.map((cat) => (
             <motion.div key={cat.href} variants={staggerChild} whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }} transition={{ duration: 0.2, ease: [0, 0, 0.2, 1] }}>
               <Link href={cat.href} className="group relative overflow-hidden aspect-[3/4] block">
-                <img
+                <img loading="lazy" decoding="async"
                   src={cat.img}
                   alt={cat.label}
                   className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
@@ -248,7 +280,7 @@ export default function HomePage() {
               <motion.div key={r.href} variants={staggerChild}>
                 <Link href={r.href} className="group block">
                   <div className="relative overflow-hidden aspect-[4/3] mb-4">
-                    <img
+                    <img loading="lazy" decoding="async"
                       src={r.img}
                       alt={r.name}
                       className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
@@ -296,7 +328,7 @@ export default function HomePage() {
               <p className="font-sans text-xs tracking-[0.2em] uppercase text-forest/40 mb-2">Journal</p>
               <h2 className="font-display text-4xl text-forest">Stories from the Berg</h2>
             </div>
-            <Link href="/stories" className="hidden sm:flex items-center gap-2 font-sans text-sm text-forest/50 hover:text-forest transition-colors">
+            <Link href="/mydrakensberg" className="hidden sm:flex items-center gap-2 font-sans text-sm text-forest/50 hover:text-forest transition-colors">
               All stories <ArrowRight className="w-4 h-4" />
             </Link>
           </div>
@@ -312,7 +344,7 @@ export default function HomePage() {
               <motion.div key={s.href} variants={staggerChild} whileHover={{ y: -3 }} transition={{ duration: 0.2, ease: [0, 0, 0.2, 1] }}>
                 <Link href={s.href} className="group block">
                   <div className="relative overflow-hidden aspect-[3/2] mb-4">
-                    <img src={s.img} alt={s.title} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" style={{ willChange: 'transform' }} />
+                    <img loading="lazy" decoding="async" src={s.img} alt={s.title} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" style={{ willChange: 'transform' }} />
                   </div>
                   <p className="font-sans text-[10px] tracking-[0.15em] uppercase text-gold mb-2">{s.tag} · {s.date}</p>
                   <h3 className="font-display text-xl text-forest leading-snug group-hover:text-sage transition-colors">{s.title}</h3>
@@ -374,17 +406,23 @@ export default function HomePage() {
             <p className="font-sans text-sm text-forest/55 mb-8 leading-relaxed">
               Seasonal trail conditions, new accommodation, and stories from the escarpment — delivered monthly.
             </p>
-            <form className="flex gap-0 max-w-md" onSubmit={(e) => e.preventDefault()}>
+            <form className="flex gap-0 max-w-md" onSubmit={subscribeNewsletter}>
+              <label htmlFor="newsletter-email" className="sr-only">Email address</label>
               <input
+                id="newsletter-email"
                 type="email"
+                required
+                value={newsletterEmail}
+                onChange={(e) => setNewsletterEmail(e.target.value)}
                 placeholder="Your email address"
                 className="flex-1 px-4 py-3 bg-white border border-black/10 font-sans text-sm text-forest placeholder:text-forest/30 focus:outline-none focus:border-forest transition-colors"
               />
               <button
                 type="submit"
-                className="px-6 py-3 bg-forest text-white font-sans text-sm hover:bg-sage transition-colors whitespace-nowrap"
+                disabled={subscribing}
+                className="px-6 py-3 bg-forest text-white font-sans text-sm hover:bg-sage transition-colors whitespace-nowrap disabled:opacity-60"
               >
-                Subscribe
+                {subscribing ? 'Subscribing…' : 'Subscribe'}
               </button>
             </form>
           </div>

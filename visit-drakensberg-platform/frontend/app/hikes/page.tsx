@@ -108,7 +108,7 @@ export default function HikesPage() {
               {filtered.map((t) => (
                 <Link key={t.id} href={`/hikes/${t.id}`} className="group block">
                   <div className="relative overflow-hidden aspect-[4/3] mb-4">
-                    <img src={t.image} alt={t.name}
+                    <img loading="lazy" decoding="async" src={t.image} alt={t.name}
                       className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" />
                     <span
                       className="absolute bottom-3 left-3 font-sans text-[10px] px-2.5 py-1 uppercase tracking-wide"

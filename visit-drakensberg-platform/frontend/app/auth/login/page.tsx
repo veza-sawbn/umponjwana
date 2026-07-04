@@ -26,7 +26,7 @@ export default function LoginPage() {
       const result = await signIn(data.email, data.password)
       const role = result?.user?.user_metadata?.role
       const redirect = new URLSearchParams(window.location.search).get('redirect')
-      const defaultPath = role === 'supplier' ? '/supplier' : role === 'admin' ? '/admin' : '/dashboard'
+      const defaultPath = role === 'supplier' ? '/supplier' : role === 'admin' ? '/admin' : '/account'
       const targetPath = redirect?.startsWith('/') && !redirect.startsWith('//') ? redirect : defaultPath
       router.push(targetPath)
     } catch (err: unknown) {

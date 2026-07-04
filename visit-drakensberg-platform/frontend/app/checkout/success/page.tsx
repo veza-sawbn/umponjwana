@@ -3,7 +3,6 @@
 import { Suspense, useEffect, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
-import Navbar from '@/components/layout/Navbar'
 import Footer from '@/components/layout/Footer'
 import { CheckCircle, Download, Calendar, MapPin, Users, ArrowRight, Mail, Mountain, Bus, Printer } from 'lucide-react'
 import { getBookingById, type SavedBooking } from '@/lib/bookings'
@@ -51,7 +50,6 @@ function SuccessInner() {
   return (
     <div className="min-h-screen bg-[#F7F5F2]">
       <div className="print:hidden">
-        <Navbar />
       </div>
 
       <section className="bg-[#2d6a4f] text-white pt-32 pb-16 px-6 lg:px-12 print:pt-8 print:pb-8">

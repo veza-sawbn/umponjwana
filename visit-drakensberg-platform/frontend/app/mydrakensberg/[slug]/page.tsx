@@ -1,8 +1,7 @@
 'use client'
 
-import { useParams } from 'next/navigation'
+import { useParams, notFound } from 'next/navigation'
 import Link from 'next/link'
-import Navbar from '@/components/layout/Navbar'
 import Footer from '@/components/layout/Footer'
 import { Clock, ArrowLeft, MapPin, Mountain, Bird, ChefHat, Sword, Leaf, ArrowRight } from 'lucide-react'
 
@@ -116,11 +115,11 @@ const CATEGORY_ICONS: Record<string, React.ReactNode> = {
 export default function ArticleDetailPage() {
   const params = useParams()
   const slug = typeof params.slug === 'string' ? params.slug : Array.isArray(params.slug) ? params.slug[0] : ''
-  const article = ARTICLES[slug] || ARTICLES['san-bushmen-rock-art-giants-castle']
+  const article = ARTICLES[slug]
+  if (!article) notFound()
 
   return (
     <div className="min-h-screen bg-[#F7F5F2]">
-      <Navbar />
 
       {/* Hero */}
       <section className="bg-[#000000] text-white pt-32 pb-0">

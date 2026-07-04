@@ -3,7 +3,6 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import Navbar from '@/components/layout/Navbar'
 import { ArrowLeft, Car, Bus, Check, MapPin, Clock, Users, ChevronRight, X } from 'lucide-react'
 import { useBooking } from '@/lib/booking-context'
 
@@ -157,7 +156,6 @@ export default function ShuttlePage() {
 
   return (
     <div className="min-h-screen bg-[#F7F5F2]">
-      <Navbar />
 
       <section className="bg-[#000000] text-white pt-32 pb-10 px-6 lg:px-12">
         <div className="max-w-[1440px] mx-auto">

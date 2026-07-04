@@ -25,7 +25,8 @@ export async function requireAuth() {
 
 export async function requireRole(role: 'admin' | 'supplier' | 'visitor') {
   const session = await requireAuth()
-  const userRole = session.user.user_metadata?.role ?? 'visitor'
+  // app_metadata is only settable server-side; user_metadata is self-editable.
+  const userRole = session.user.app_metadata?.role ?? session.user.user_metadata?.role ?? 'visitor'
   if (userRole !== role && !(role === 'visitor')) {
     throw new Error(`Forbidden: requires ${role} role`)
   }

@@ -3,7 +3,6 @@
 import { useState, useEffect } from 'react'
 import { useParams } from 'next/navigation'
 import Link from 'next/link'
-import Navbar from '@/components/layout/Navbar'
 import Footer from '@/components/layout/Footer'
 import { ArrowLeft, Clock, Users, CheckCircle, Calendar, MapPin } from 'lucide-react'
 import UpcomingDepartures from '@/components/tours/UpcomingDepartures'
@@ -58,7 +57,6 @@ export default function ActivityDetailPage() {
   if (loading) {
     return (
       <div className="min-h-screen bg-[#F7F5F2]">
-        <Navbar />
         <div className="flex items-center justify-center min-h-[60vh]">
           <p className="font-sans text-gray-500">Loading activity…</p>
         </div>
@@ -70,7 +68,6 @@ export default function ActivityDetailPage() {
   if (!activity) {
     return (
       <div className="min-h-screen bg-[#F7F5F2]">
-        <Navbar />
         <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4">
           <p className="font-display italic text-2xl text-gray-700">Activity not found</p>
           <Link href="/activities" className="font-sans text-sm text-[#2d6a4f] hover:underline">← Back to Activities</Link>
@@ -104,7 +101,6 @@ export default function ActivityDetailPage() {
 
   return (
     <div className="min-h-screen bg-[#F7F5F2]">
-      <Navbar />
 
       <section className="bg-[#000000] text-white py-20 px-6 lg:px-12 mt-16">
         <div className="max-w-[1440px] mx-auto">

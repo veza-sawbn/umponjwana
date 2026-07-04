@@ -2,7 +2,6 @@
 
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import Navbar from '@/components/layout/Navbar'
 import Footer from '@/components/layout/Footer'
 import { Mountain, Bed, Car, Compass, ChevronRight, Trash2, Users, Calendar, ArrowLeft, Pencil } from 'lucide-react'
 import { useBooking } from '@/lib/booking-context'
@@ -72,7 +71,6 @@ export default function TripPage() {
 
   return (
     <div className="min-h-screen bg-[#F7F5F2]">
-      <Navbar />
 
       <div className="max-w-[1200px] mx-auto px-6 lg:px-12 pt-28 pb-20">
         <button

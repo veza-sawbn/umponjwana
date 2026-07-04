@@ -26,7 +26,7 @@ const VISITOR_LINKS = [
   { label: 'My Account', href: '/account/settings', icon: User },
   { label: 'Bookings & Trips', href: '/account', icon: CalendarDays },
   { label: 'Rewards & Wallet', href: '/account/loyalty', icon: Gift },
-  { label: 'Reviews', href: '/account/reviews', icon: Star },
+  { label: 'Recommendations', href: '/account/recommendations', icon: Star },
   { label: 'Saved', href: '/account/saved', icon: Heart },
 ]
 

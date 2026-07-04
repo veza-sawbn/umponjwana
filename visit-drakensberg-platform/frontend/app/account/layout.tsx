@@ -6,7 +6,6 @@ import { usePathname, useRouter } from 'next/navigation'
 import {
   CalendarDays, Heart, Star, Gift, Map, Settings, LogOut, User, ChevronDown,
 } from 'lucide-react'
-import Navbar from '@/components/layout/Navbar'
 import Footer from '@/components/layout/Footer'
 import { supabase, signOut } from '@/lib/auth'
 
@@ -55,7 +54,6 @@ export default function AccountLayout({ children }: { children: React.ReactNode 
 
   return (
     <div className="min-h-screen bg-[#F7F5F2]">
-      <Navbar />
 
       <div className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-12 pt-20 sm:pt-24 lg:pt-28 pb-16">
 

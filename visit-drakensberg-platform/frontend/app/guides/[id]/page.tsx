@@ -2,7 +2,6 @@
 
 import { useParams } from 'next/navigation'
 import Link from 'next/link'
-import Navbar from '@/components/layout/Navbar'
 import Footer from '@/components/layout/Footer'
 import { CheckCircle, Star, MapPin, ArrowLeft } from 'lucide-react'
 
@@ -30,7 +29,6 @@ export default function GuideProfilePage() {
 
   return (
     <div className="min-h-screen bg-[#F7F5F2]">
-      <Navbar />
 
       <section className={`${guide.color} text-white py-20 px-6 lg:px-12 mt-16`}>
         <div className="max-w-[1440px] mx-auto">

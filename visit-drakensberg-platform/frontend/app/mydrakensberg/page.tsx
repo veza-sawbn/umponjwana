@@ -2,7 +2,6 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
-import Navbar from '@/components/layout/Navbar'
 import Footer from '@/components/layout/Footer'
 import { Clock, ArrowRight } from 'lucide-react'
 
@@ -86,7 +85,6 @@ export default function MyDrakensbergPage() {
 
   return (
     <div className="min-h-screen bg-[#F7F5F2]">
-      <Navbar />
 
       {/* Hero */}
       <section className="bg-[#000000] text-white pt-32 pb-20 px-6 lg:px-12">
@@ -154,7 +152,7 @@ export default function MyDrakensbergPage() {
           {grid.map(article => (
             <Link key={article.slug} href={`/mydrakensberg/${article.slug}`} className="group bg-white border border-gray-200 overflow-hidden hover:border-[#2d6a4f] transition-colors">
               <div className="h-52 overflow-hidden">
-                <img src={article.image} alt={article.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+                <img loading="lazy" decoding="async" src={article.image} alt={article.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
               </div>
               <div className="p-6">
                 <span className="font-sans text-[10px] tracking-[0.14em] uppercase text-[#C9A96E] mb-3 block">{article.category}</span>

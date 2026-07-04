@@ -3,7 +3,6 @@
 import { useParams } from 'next/navigation'
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
-import Navbar from '@/components/layout/Navbar'
 import Footer from '@/components/layout/Footer'
 import { ArrowLeft, Mountain, Clock, TrendingUp, Users, Star, CheckCircle, ChevronRight, X } from 'lucide-react'
 import { getTrails, Trail, DEFAULT_TRAILS } from '@/lib/trails'
@@ -63,7 +62,6 @@ export default function HikeDetailPage() {
   if (!trail) {
     return (
       <div className="min-h-screen bg-[#F7F5F2]">
-        <Navbar />
         <div className="flex items-center justify-center h-96 mt-16">
           <div className="animate-pulse space-y-4 w-full max-w-2xl px-6">
             <div className="h-10 bg-gray-200 w-2/3" />
@@ -82,7 +80,6 @@ export default function HikeDetailPage() {
 
   return (
     <div className="min-h-screen bg-[#F7F5F2]">
-      <Navbar />
 
       {/* Hero header */}
       <section className={`${headerBg} text-white py-20 px-6 lg:px-12 mt-16 relative overflow-hidden`}>

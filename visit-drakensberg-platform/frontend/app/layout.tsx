@@ -1,40 +1,65 @@
-'use client'
 import './globals.css'
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { Toaster } from 'react-hot-toast'
-import { useState } from 'react'
-import Navbar from '@/components/layout/Navbar'
-import { BookingProvider } from '@/lib/booking-context'
-import BookingBar from '@/components/booking/BookingBar'
-import EditModeGate from '@/components/editor/EditModeGate'
-import { usePathname } from 'next/navigation'
+import type { Metadata, Viewport } from 'next'
+import AppShell from '@/components/layout/AppShell'
+
+const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://visitdrakensberg.com'
+
+export const metadata: Metadata = {
+  metadataBase: new URL(SITE_URL),
+  title: {
+    default: 'Visit Drakensberg | Book Your Mountain Escape',
+    template: '%s | Visit Drakensberg',
+  },
+  description:
+    'Discover and book stays, activities, hikes, shuttles and holiday packages in the breathtaking Drakensberg mountains of South Africa.',
+  keywords: [
+    'Drakensberg', 'South Africa', 'accommodation', 'hiking', 'uKhahlamba',
+    'KwaZulu-Natal', 'mountain holidays', 'Tugela Falls', 'Sani Pass',
+  ],
+  alternates: { canonical: '/' },
+  openGraph: {
+    type: 'website',
+    siteName: 'Visit Drakensberg',
+    title: 'Visit Drakensberg | Book Your Mountain Escape',
+    description:
+      'Discover and book stays, activities, hikes, shuttles and holiday packages in the breathtaking Drakensberg mountains of South Africa.',
+    url: SITE_URL,
+    locale: 'en_ZA',
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'Visit Drakensberg | Book Your Mountain Escape',
+    description:
+      'Discover and book stays, activities, hikes, shuttles and holiday packages in the Drakensberg mountains of South Africa.',
+  },
+  robots: { index: true, follow: true },
+  icons: { icon: '/favicon.svg' },
+}
+
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1,
+}
+
+const ORG_JSONLD = {
+  '@context': 'https://schema.org',
+  '@type': 'TravelAgency',
+  name: 'Visit Drakensberg',
+  url: SITE_URL,
+  description:
+    'Tourism discovery and booking platform for the uKhahlamba-Drakensberg Park, a UNESCO World Heritage Site.',
+  areaServed: { '@type': 'Place', name: 'Drakensberg, KwaZulu-Natal, South Africa' },
+}
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
-  const pathname = usePathname()
-  const isAdmin = pathname.startsWith('/admin') || pathname.startsWith('/supplier')
-  const [queryClient] = useState(() => new QueryClient({
-    defaultOptions: { queries: { staleTime: 60 * 1000 } },
-  }))
-
   return (
     <html lang="en">
-      <head>
-        <title>Visit Drakensberg | Book Your Mountain Escape</title>
-        <meta name="description" content="Discover and book stays, activities, hikes, shuttles and holiday packages in the breathtaking Drakensberg mountains of South Africa." />
-        <meta name="viewport" content="width=device-width, initial-scale=1" />
-        <link rel="icon" href="/favicon.ico" />
-      </head>
       <body>
-        <QueryClientProvider client={queryClient}>
-          <BookingProvider>
-            <EditModeGate>
-            {!isAdmin && <Navbar />}
-            {children}
-            {!isAdmin && <BookingBar />}
-            <Toaster position="top-right" toastOptions={{ duration: 4000 }} />
-            </EditModeGate>
-          </BookingProvider>
-        </QueryClientProvider>
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(ORG_JSONLD) }}
+        />
+        <AppShell>{children}</AppShell>
       </body>
     </html>
   )

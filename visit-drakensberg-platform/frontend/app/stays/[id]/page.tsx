@@ -3,7 +3,6 @@
 import { useState, useEffect } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
-import Navbar from '@/components/layout/Navbar'
 import Footer from '@/components/layout/Footer'
 import { MapPin, Star, Users, Wifi, Flame, Utensils, Car, ArrowLeft, Calendar, Coffee, Waves, TreePine, ShieldCheck, BedDouble } from 'lucide-react'
 import SmartRecommendations from '@/components/booking/SmartRecommendations'
@@ -184,7 +183,6 @@ export default function StayDetailPage() {
   if (!stay) {
     return (
       <div className="min-h-screen bg-[#F7F5F2] flex flex-col items-center justify-center gap-4">
-        <Navbar />
         <p className="font-sans text-black/40">Property not found.</p>
         <Link href="/stays" className="font-sans text-sm text-[#C9A96E] hover:underline">← Back to Stays</Link>
       </div>
@@ -193,7 +191,6 @@ export default function StayDetailPage() {
 
   return (
     <div className="min-h-screen bg-[#F7F5F2]">
-      <Navbar />
 
       {/* Hero header */}
       <section className={`${stay.hero} text-white py-20 px-6 lg:px-12 mt-16`}>

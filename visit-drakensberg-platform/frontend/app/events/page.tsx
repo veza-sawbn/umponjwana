@@ -1,7 +1,6 @@
 'use client'
 
 import { useState } from 'react'
-import Navbar from '@/components/layout/Navbar'
 import Footer from '@/components/layout/Footer'
 import { CalendarDays, MapPin, Ticket, Star, Filter } from 'lucide-react'
 
@@ -109,7 +108,6 @@ export default function EventsPage() {
 
   return (
     <div className="min-h-screen bg-[#F7F5F2]">
-      <Navbar />
 
       <section className="bg-[#2d6a4f] text-white py-20 px-6 lg:px-12 mt-16">
         <div className="max-w-[1440px] mx-auto">
