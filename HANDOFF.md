@@ -214,3 +214,22 @@ shell — retire or finish it.
 - Email notifications, room-level availability, remaining supplier shell
   modules (experiences/packages/events/discounts/availability/staff/guides/
   media/analytics), rate limiting, analytics instrumentation.
+
+## UPDATE 2 — per-supplier booking orders (2026-07-05)
+
+Run `frontend/supabase/migrations/20260705_booking_orders.sql` after the first
+migration. Key change: **suppliers no longer see the visitor's whole booking.**
+
+- `vd_bookings` = the visitor's single itinerary (visitor + admin only now).
+- `vd_booking_orders` = one row per (booking × supplier), created at checkout
+  by `lib/booking-orders.ts`. Contains only that supplier's items + the guest
+  details needed to deliver the service. `/supplier/bookings` reads orders.
+- Supplier cancellation cancels *their order only*; visitor cancellation
+  cancels the booking and all its orders.
+
+Also in this round: auth uses hard navigation + `prefetch={false}` on
+role-gated links (fixes dead Dashboard button / login not redirecting);
+middleware falls back to `profiles.role` when auth metadata has no role;
+availability / discounts / guides / staff / packages / events supplier
+modules persist via `supplier-entities` (no more mock data returning);
+checkout enforces supplier availability blocks on stays.

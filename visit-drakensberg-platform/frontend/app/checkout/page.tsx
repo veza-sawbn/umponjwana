@@ -9,6 +9,7 @@ import { ArrowLeft, ShieldCheck, Lock, CreditCard, Calendar, Users, MapPin, Bus 
 import { useBooking } from '@/lib/booking-context'
 import { addBooking } from '@/lib/bookings'
 import { getDepartures, bookDepartureSeats, releaseDepartureSeats } from '@/lib/departures'
+import { getSupplierEntities } from '@/lib/supplier-entities'
 import { supabase } from '@/lib/auth'
 
 function formatCardNumber(val: string) {
@@ -101,6 +102,21 @@ export default function CheckoutPage() {
         toast.error('Your session has expired. Please sign in again to complete the booking.')
         router.push('/auth/login?redirect=/checkout')
         return
+      }
+
+      // Respect supplier-blocked dates on the stay.
+      if (snap.stay?.id?.startsWith('prop-') && snap.checkIn && snap.checkOut) {
+        try {
+          const blocks = await getSupplierEntities<any>('availability_blocks')
+          const clash = blocks.find(b =>
+            b.listingId === snap.stay!.id && b.from < snap.checkOut && b.to >= snap.checkIn
+          )
+          if (clash) {
+            toast.error(`${snap.stay.title} is unavailable ${clash.from} → ${clash.to}. Please choose different dates.`)
+            setLoading(false)
+            return
+          }
+        } catch {}
       }
 
       // Reserve departure seats FIRST — atomic and capacity-checked

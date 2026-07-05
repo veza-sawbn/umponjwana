@@ -2,6 +2,7 @@ import { supabase } from './auth'
 import type { BookingAddon, BookingStay, ShuttleOption } from './booking-context'
 import { getPropertyById } from './properties'
 import { notify } from './notifications'
+import { createOrdersForBooking, cancelOrdersForBooking } from './booking-orders'
 
 export type SavedBooking = {
   id: string
@@ -112,15 +113,20 @@ export async function addBooking(booking: Omit<SavedBooking, 'id' | 'reference' 
     throw error
   }
 
-  // Tell every involved supplier about the new booking.
-  const summary = [
-    newBooking.stay ? `Stay: ${newBooking.stay.title}` : null,
-    newBooking.addons.length ? `${newBooking.addons.length} activity/tour item(s)` : null,
-    newBooking.checkIn ? `${newBooking.checkIn} → ${newBooking.checkOut}` : null,
-  ].filter(Boolean).join(' · ')
+  // Split into per-supplier orders: each supplier receives only their own
+  // items and the guest details needed to deliver the service.
+  try {
+    await createOrdersForBooking(newBooking)
+  } catch (err) {
+    console.error('Order fan-out failed (booking saved):', err)
+  }
+
+  // Tell each involved supplier a new order arrived — no itinerary details
+  // beyond their own service in the notification.
   await Promise.all(supplierIds.map(sid =>
     notify(sid, 'booking', `New booking ${newBooking.reference}`,
-      `${newBooking.customerName} booked. ${summary}`, '/supplier/bookings')
+      `${newBooking.customerName} booked with you (${newBooking.guests} guest${newBooking.guests !== 1 ? 's' : ''}). Open your bookings for details.`,
+      '/supplier/bookings')
   ))
 
   return newBooking
@@ -161,6 +167,8 @@ export async function updateBookingStatus(
   if (error) throw error
 
   if (status === 'cancelled') {
+    // Keep the per-supplier orders in sync with the parent booking.
+    await cancelOrdersForBooking(id)
     if (opts?.notifyUser) {
       await notify(booking.userId, 'cancellation', `Booking ${booking.reference} cancelled`,
         'Your booking has been cancelled by the supplier. If you were charged, a refund will follow within 5 business days.',

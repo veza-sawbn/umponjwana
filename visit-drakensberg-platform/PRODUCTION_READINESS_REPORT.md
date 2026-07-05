@@ -9,9 +9,18 @@
 Payment processing (deliberately deferred — see C1) is now the single remaining launch blocker. The other three critical findings from the first audit pass — the world-readable data layer, the role-escalation path, and the disconnected admin panel — have been remediated in this branch, alongside the booking-management, search and recommendation gaps.
 
 > **⚠️ DEPLOYMENT REQUIREMENT**
-> This branch pairs with a database migration:
-> `frontend/supabase/migrations/20260704_secure_data_layer.sql`
-> Run it in the Supabase SQL editor **before** deploying the frontend. It creates the secure tables (`vd_entities`, `vd_bookings`, `vd_message_threads`, `vd_notifications`, `vd_newsletter_subscribers`), installs RLS policies and helper functions, copies existing blob data across, grandfathers existing suppliers as approved, and locks `site_content` down to admin-written CMS content. Deploying the frontend without the migration (or vice-versa) breaks reads/writes.
+> This branch pairs with two database migrations, run in order in the Supabase SQL editor **before** deploying the frontend:
+> 1. `frontend/supabase/migrations/20260704_secure_data_layer.sql` — secure tables (`vd_entities`, `vd_bookings`, `vd_message_threads`, `vd_notifications`, `vd_newsletter_subscribers`), RLS policies and helper functions, blob-data migration, supplier grandfathering, admin-only `site_content` writes.
+> 2. `frontend/supabase/migrations/20260705_booking_orders.sql` — per-supplier `vd_booking_orders` (splits each booking into supplier-scoped orders), removes supplier access to the full booking record, splits existing bookings into orders.
+>
+> Deploying the frontend without the migrations (or vice-versa) breaks reads/writes.
+
+### Round 3 — fixes from field testing
+| Report | Root cause | Fix |
+|--------|-----------|-----|
+| Whole itinerary shared with the accommodation provider | Every involved supplier had RLS access to the complete booking row (all items, contacts, platform total) | Bookings are now split at checkout into **one order per supplier** (`vd_booking_orders`). A supplier sees only: their own items, guest name/contact, party size, dates and special requests, and *their* order total. Supplier read/update access to `vd_bookings` is revoked entirely; the visitor keeps the single-itinerary view. Suppliers cancel only their own service (guest notified, seats released, rest of the trip untouched). |
+| Supplier login didn't land on the dashboard; Dashboard menu button dead | The Next.js router prefetched `/supplier` before/at login and cached the middleware's redirect response, replaying it on click; `router.push` immediately after `signInWithPassword` also raced the session cookie | Auth flows now use hard navigation (`window.location.assign`); all role-gated navbar links (`/supplier`, `/admin`) set `prefetch={false}`; navbar role checks also honour `app_metadata.role`; middleware falls back to `profiles.role` when auth metadata carries no role. |
+| Deleted mock listings in `/supplier/availability` reappeared | Page was demo local state — nothing persisted | Availability blocks now persist per supplier, the listing dropdown shows the supplier's real properties/activities/tours, and checkout **enforces** blocks (a stay whose dates overlap a block cannot be booked). Same sweep applied to the other demo modules: **discounts, guides, staff (guide availability + departure reminders), packages, events** all persist to the secure store and start empty instead of showing fake records. |
 
 ---
 

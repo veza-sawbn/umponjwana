@@ -87,8 +87,9 @@ export default function Navbar() {
 
   const userName = user?.user_metadata?.full_name ?? user?.email?.split('@')[0] ?? 'My Account'
   const userEmail = user?.email ?? ''
-  const isSupplier = user?.user_metadata?.role === 'supplier'
-  const isAdmin = user?.user_metadata?.role === 'admin'
+  const role = user?.app_metadata?.role ?? user?.user_metadata?.role
+  const isSupplier = role === 'supplier'
+  const isAdmin = role === 'admin'
 
   return (
     <>
@@ -120,6 +121,7 @@ export default function Navbar() {
           <div className="hidden lg:flex items-center gap-5">
             <Link
               href="/supplier"
+              prefetch={false}
               className={`font-sans text-sm tracking-wide transition-colors duration-200 ${textColor} hover:text-gold`}
             >
               List Property
@@ -152,7 +154,7 @@ export default function Navbar() {
                       </p>
 
                       {isAdmin && (
-                        <Link href="/admin" onClick={() => setDropdownOpen(false)}
+                        <Link href="/admin" prefetch={false} onClick={() => setDropdownOpen(false)}
                           className="flex items-center gap-2 px-4 py-2.5 font-sans text-sm text-forest hover:bg-mist transition-colors">
                           <LayoutDashboard className="w-4 h-4" /> Admin Panel
                         </Link>
@@ -160,7 +162,7 @@ export default function Navbar() {
 
                       {isSupplier ? (
                         <>
-                          <Link href="/supplier" onClick={() => setDropdownOpen(false)}
+                          <Link href="/supplier" prefetch={false} onClick={() => setDropdownOpen(false)}
                             className="flex items-center gap-2 px-4 py-2.5 font-sans text-sm text-forest hover:bg-mist transition-colors">
                             <LayoutDashboard className="w-4 h-4" /> Dashboard
                           </Link>
@@ -336,6 +338,7 @@ export default function Navbar() {
                       <Link
                         key={item.href}
                         href={item.href}
+                        prefetch={false}
                         className="flex items-center justify-between px-5 py-3.5 font-sans text-sm text-gray-700 hover:bg-[#F7F5F2] border-b border-black/5 last:border-0 transition-colors"
                       >
                         <span className="flex items-center gap-3">
@@ -384,6 +387,7 @@ export default function Navbar() {
               >
                 <Link
                   href="/supplier"
+                  prefetch={false}
                   className="font-sans text-sm tracking-widest uppercase text-forest/40 hover:text-gold transition-colors"
                 >
                   List your property →

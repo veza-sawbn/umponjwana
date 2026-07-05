@@ -24,11 +24,13 @@ export default function LoginPage() {
     setAuthError(null)
     try {
       const result = await signIn(data.email, data.password)
-      const role = result?.user?.user_metadata?.role
+      const role = result?.user?.app_metadata?.role ?? result?.user?.user_metadata?.role
       const redirect = new URLSearchParams(window.location.search).get('redirect')
       const defaultPath = role === 'supplier' ? '/supplier' : role === 'admin' ? '/admin' : '/account'
       const targetPath = redirect?.startsWith('/') && !redirect.startsWith('//') ? redirect : defaultPath
-      router.push(targetPath)
+      // Hard navigation: guarantees the middleware sees the fresh session
+      // cookie and bypasses any prefetched redirect cached by the router.
+      window.location.assign(targetPath)
     } catch (err: unknown) {
       setAuthError(err instanceof Error ? err.message : 'Sign in failed')
     }

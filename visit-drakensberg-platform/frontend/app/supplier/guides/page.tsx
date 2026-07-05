@@ -1,16 +1,17 @@
 'use client'
-import { useState } from 'react'
-import { Users, Plus, Mountain, Star, CheckCircle, Clock, XCircle, Trash2, User } from 'lucide-react'
+import { useState, useEffect } from 'react'
+import toast from 'react-hot-toast'
+import { Users, Plus, Mountain, Star, CheckCircle, Clock, XCircle, User } from 'lucide-react'
+import { supabase } from '@/lib/auth'
+import {
+  getSupplierEntities, addSupplierEntity, deleteSupplierEntity, type SupplierEntity,
+} from '@/lib/supplier-entities'
 
-interface Guide {
-  id: string; name: string; certs: string; guideNo: string; speciality: string; languages: string; rating: number; tours: number; status: 'verified' | 'pending' | 'rejected'
+type Guide = SupplierEntity & {
+  name: string; certs: string; guideNo: string; speciality: string; languages: string; rating: number; tours: number; status: 'verified' | 'pending' | 'rejected'
 }
 
-const INIT: Guide[] = [
-  { id: '1', name: 'Bongani Ndlovu',   certs: 'FGASA Level 2, Mountain Guide', guideNo: 'TBCSA-G-0091', speciality: 'Summit Routes',    languages: 'English, Zulu',           rating: 4.9, tours: 87, status: 'verified' },
-  { id: '2', name: 'Marné du Plessis', certs: 'FGASA Level 1',                 guideNo: 'TBCSA-G-0144', speciality: 'Cultural Tours',   languages: 'Afrikaans, English',       rating: 4.7, tours: 53, status: 'verified' },
-  { id: '3', name: 'Zanele Mthembu',   certs: 'Wilderness First Aid, FGASA',   guideNo: 'TBCSA-G-0201', speciality: 'Multi-day Hikes',  languages: 'English, Zulu, Sotho',    rating: 4.8, tours: 61, status: 'pending' },
-]
+const ENTITY = 'guides'
 
 const STATUS: Record<Guide['status'], { label: string; Icon: typeof CheckCircle; cls: string }> = {
   verified: { label: 'Verified',        Icon: CheckCircle, cls: 'bg-emerald-100 text-emerald-700' },
@@ -19,16 +20,48 @@ const STATUS: Record<Guide['status'], { label: string; Icon: typeof CheckCircle;
 }
 
 export default function GuidesPage() {
-  const [guides, setGuides] = useState<Guide[]>(INIT)
+  const [guides, setGuides] = useState<Guide[]>([])
+  const [loading, setLoading] = useState(true)
   const [adding, setAdding] = useState(false)
   const [form, setForm] = useState({ name: '', certs: '', guideNo: '', speciality: '', languages: '' })
   const set = (k: string, v: string) => setForm(f => ({ ...f, [k]: v }))
 
-  function add() {
+  useEffect(() => {
+    supabase.auth.getUser().then(async ({ data: { user } }) => {
+      if (user) setGuides(await getSupplierEntities<Guide>(ENTITY, user.id))
+      setLoading(false)
+    })
+  }, [])
+
+  async function add() {
     if (!form.name) return
-    setGuides(g => [...g, { id: Date.now().toString(), name: form.name, certs: form.certs, guideNo: form.guideNo, speciality: form.speciality, languages: form.languages, rating: 0, tours: 0, status: 'pending' }])
-    setForm({ name: '', certs: '', guideNo: '', speciality: '', languages: '' })
-    setAdding(false)
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) throw new Error('no session')
+      const saved = await addSupplierEntity<Guide>(ENTITY, {
+        supplierId: user.id,
+        name: form.name, certs: form.certs, guideNo: form.guideNo,
+        speciality: form.speciality, languages: form.languages,
+        rating: 0, tours: 0, status: 'pending', blocked: [],
+      } as unknown as Omit<Guide, 'id' | 'createdAt'>)
+      setGuides(g => [...g, saved])
+      setForm({ name: '', certs: '', guideNo: '', speciality: '', languages: '' })
+      setAdding(false)
+      toast.success('Guide registered.')
+    } catch {
+      toast.error('Could not register the guide. Please try again.')
+    }
+  }
+
+  async function remove(id: string) {
+    const prev = guides
+    setGuides(gs => gs.filter(x => x.id !== id))
+    try {
+      await deleteSupplierEntity(ENTITY, id)
+    } catch {
+      setGuides(prev)
+      toast.error('Could not remove the guide. Please try again.')
+    }
   }
 
   return (
@@ -63,7 +96,7 @@ export default function GuidesPage() {
 
       <div className="grid gap-3">
         {guides.map(g => {
-          const s = STATUS[g.status]
+          const s = STATUS[g.status as Guide['status']] ?? STATUS.pending
           const Icon = s.Icon
           return (
             <div key={g.id} className="bg-white rounded-xl border border-black/8 p-5 flex items-center gap-4">
@@ -81,12 +114,15 @@ export default function GuidesPage() {
               </div>
               <div className="flex items-center gap-3 shrink-0">
                 <span className={`font-sans text-xs px-2 py-0.5 rounded-full flex items-center gap-1 ${s.cls}`}><Icon size={10} /> {s.label}</span>
-                <button onClick={() => setGuides(gs => gs.filter(x => x.id !== g.id))} className="font-sans text-xs text-red-400 hover:text-red-600">Remove</button>
+                <button onClick={() => remove(g.id)} className="font-sans text-xs text-red-400 hover:text-red-600">Remove</button>
               </div>
             </div>
           )
         })}
-        {guides.length === 0 && (
+        {loading && (
+          <p className="font-sans text-sm text-black/30 py-8 text-center">Loading guides…</p>
+        )}
+        {!loading && guides.length === 0 && (
           <div className="bg-white rounded-xl border border-black/8 py-16 text-center">
             <User size={32} className="text-black/15 mx-auto mb-3" />
             <p className="font-sans text-sm text-black/30">No guides registered yet</p>

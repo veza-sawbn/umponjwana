@@ -1,24 +1,83 @@
 'use client'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import toast from 'react-hot-toast'
 import { Tag, Plus, Trash2 } from 'lucide-react'
+import { supabase } from '@/lib/auth'
+import { getPropertiesBySupplier } from '@/lib/properties'
+import { getActivitiesBySupplier } from '@/lib/activities'
+import {
+  getSupplierEntities, addSupplierEntity, deleteSupplierEntity, type SupplierEntity,
+} from '@/lib/supplier-entities'
 
-interface Discount { id: string; code: string; type: 'percent' | 'flat'; value: number; listing: string; validUntil: string; uses: number }
+type Discount = SupplierEntity & {
+  code: string
+  type: 'percent' | 'flat'
+  value: number
+  listing: string
+  validUntil: string
+  uses: number
+}
 
-const INIT: Discount[] = [
-  { id: 'd1', code: 'BERG15',    type: 'percent', value: 15,  listing: 'Cathedral Peak Mountain Lodge', validUntil: '2025-09-30', uses: 12 },
-  { id: 'd2', code: 'WINTER200', type: 'flat',    value: 200, listing: 'Berg Valley Guesthouse',        validUntil: '2025-08-31', uses: 5  },
-]
+const ENTITY = 'discounts'
 
 export default function DiscountsPage() {
-  const [rows, setRows] = useState(INIT)
+  const [rows, setRows] = useState<Discount[]>([])
+  const [listings, setListings] = useState<string[]>([])
+  const [loading, setLoading] = useState(true)
   const [adding, setAdding] = useState(false)
+  const [saving, setSaving] = useState(false)
   const [form, setForm] = useState({ code: '', type: 'percent' as 'percent' | 'flat', value: '', listing: '', validUntil: '' })
 
-  function add() {
+  useEffect(() => {
+    supabase.auth.getUser().then(async ({ data: { user } }) => {
+      if (!user) { setLoading(false); return }
+      const [mine, props, acts] = await Promise.all([
+        getSupplierEntities<Discount>(ENTITY, user.id),
+        getPropertiesBySupplier(user.id),
+        getActivitiesBySupplier(user.id),
+      ])
+      setRows(mine)
+      setListings([...props.map(p => p.name), ...acts.map(a => a.name)])
+      setLoading(false)
+    })
+  }, [])
+
+  async function add() {
     if (!form.code || !form.value) return
-    setRows(r => [...r, { id: Date.now().toString(), code: form.code.toUpperCase(), type: form.type, value: +form.value, listing: form.listing, validUntil: form.validUntil, uses: 0 }])
-    setForm({ code: '', type: 'percent', value: '', listing: '', validUntil: '' })
-    setAdding(false)
+    setSaving(true)
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) throw new Error('no session')
+      const saved = await addSupplierEntity<Discount>(ENTITY, {
+        supplierId: user.id,
+        code: form.code.toUpperCase(),
+        type: form.type,
+        value: +form.value,
+        listing: form.listing,
+        validUntil: form.validUntil,
+        uses: 0,
+        status: 'active',
+      } as Omit<Discount, 'id' | 'createdAt'>)
+      setRows(r => [...r, saved])
+      setForm({ code: '', type: 'percent', value: '', listing: '', validUntil: '' })
+      setAdding(false)
+      toast.success('Discount created.')
+    } catch {
+      toast.error('Could not create the discount. Please try again.')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  async function remove(id: string) {
+    const prev = rows
+    setRows(rs => rs.filter(x => x.id !== id))
+    try {
+      await deleteSupplierEntity(ENTITY, id)
+    } catch {
+      setRows(prev)
+      toast.error('Could not delete the discount. Please try again.')
+    }
   }
 
   return (
@@ -59,12 +118,14 @@ export default function DiscountsPage() {
               <label className="font-sans text-sm font-medium text-black/70">Apply to Listing (optional)</label>
               <select value={form.listing} onChange={e => setForm(f => ({ ...f, listing: e.target.value }))} className={inp}>
                 <option value="">All listings</option>
-                {['Cathedral Peak Mountain Lodge', 'Berg Valley Guesthouse'].map(l => <option key={l}>{l}</option>)}
+                {listings.map(l => <option key={l}>{l}</option>)}
               </select>
             </div>
           </div>
           <div className="flex gap-3">
-            <button onClick={add} className="bg-[#C9A96E] text-white font-sans text-sm px-4 py-2 rounded-lg">Create</button>
+            <button onClick={add} disabled={saving} className="bg-[#C9A96E] text-white font-sans text-sm px-4 py-2 rounded-lg disabled:opacity-60">
+              {saving ? 'Saving…' : 'Create'}
+            </button>
             <button onClick={() => setAdding(false)} className="font-sans text-sm px-4 py-2 border border-black/10 rounded-lg text-black/50">Cancel</button>
           </div>
         </div>
@@ -72,16 +133,18 @@ export default function DiscountsPage() {
 
       <div className="bg-white rounded-xl border border-black/8 overflow-hidden">
         <table className="w-full">
-          <thead><tr className="border-b border-black/6">{['Code', 'Discount', 'Listing', 'Valid Until', 'Uses', ''].map(h => <th key={h} className="px-4 py-3 text-left font-sans text-xs font-semibold text-black/40 uppercase tracking-wider">{h}</th>)}</tr></thead>
+          <thead><tr className="border-b border-black/6">{['Code', 'Discount', 'Listing', 'Valid Until', 'Uses', ''].map((h, i) => <th key={i} className="px-4 py-3 text-left font-sans text-xs font-semibold text-black/40 uppercase tracking-wider">{h}</th>)}</tr></thead>
           <tbody>
+            {loading && <tr><td colSpan={6} className="px-4 py-10 text-center font-sans text-sm text-black/30">Loading…</td></tr>}
+            {!loading && rows.length === 0 && <tr><td colSpan={6} className="px-4 py-10 text-center font-sans text-sm text-black/30">No discounts yet — create a code to offer guests a deal.</td></tr>}
             {rows.map((r, i) => (
               <tr key={r.id} className={i < rows.length - 1 ? 'border-b border-black/5' : ''}>
                 <td className="px-4 py-3 font-mono text-sm font-semibold text-black/80">{r.code}</td>
                 <td className="px-4 py-3 font-sans text-sm text-black/80">{r.type === 'percent' ? `${r.value}%` : `R ${r.value}`} off</td>
                 <td className="px-4 py-3 font-sans text-sm text-black/60 max-w-[160px] truncate">{r.listing || 'All listings'}</td>
-                <td className="px-4 py-3 font-sans text-sm text-black/60">{r.validUntil}</td>
+                <td className="px-4 py-3 font-sans text-sm text-black/60">{r.validUntil || '—'}</td>
                 <td className="px-4 py-3 font-sans text-sm text-black/60">{r.uses}</td>
-                <td className="px-4 py-3"><button onClick={() => setRows(rs => rs.filter(x => x.id !== r.id))} className="text-red-400 hover:text-red-600"><Trash2 size={14} /></button></td>
+                <td className="px-4 py-3"><button onClick={() => remove(r.id)} aria-label={`Delete ${r.code}`} className="text-red-400 hover:text-red-600"><Trash2 size={14} /></button></td>
               </tr>
             ))}
           </tbody>

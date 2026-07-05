@@ -31,7 +31,8 @@ export default function RegisterPage() {
     setAuthError(null)
     try {
       await signUp(data.email, data.password, data.fullName, data.role)
-      router.push(data.role === 'supplier' ? '/supplier' : '/account')
+      // Hard navigation so middleware sees the fresh session cookie.
+      window.location.assign(data.role === 'supplier' ? '/supplier' : '/account')
     } catch (err: unknown) {
       setAuthError(err instanceof Error ? err.message : 'Registration failed')
     }

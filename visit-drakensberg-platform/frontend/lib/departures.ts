@@ -29,6 +29,11 @@ export async function addDeparture(dep: Omit<Departure, 'id' | 'createdAt'>): Pr
   return insertEntity(KIND, newDep)
 }
 
+// Owner-side edit of arbitrary departure fields (guide, notified flag, …).
+export async function updateDeparture(id: string, patch: Partial<Departure> & Record<string, unknown>): Promise<void> {
+  await updateEntity(KIND, id, patch)
+}
+
 // Owner-side edit (supplier adjusting counts on their own departure).
 export async function updateDepartureSeats(id: string, bookedSeats: number): Promise<void> {
   const all = await getDepartures()

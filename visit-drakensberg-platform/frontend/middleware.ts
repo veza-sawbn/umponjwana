@@ -33,7 +33,17 @@ export async function middleware(req: NextRequest) {
     // Prefer app_metadata.role (only settable server-side) over
     // user_metadata.role, which a user can edit on their own account via
     // supabase.auth.updateUser. Roles should be assigned in app_metadata.
-    const role = session.user.app_metadata?.role ?? session.user.user_metadata?.role ?? 'visitor'
+    let role = session.user.app_metadata?.role ?? session.user.user_metadata?.role
+    if (!role) {
+      // Accounts created outside the signup form may have no role in auth
+      // metadata at all — fall back to the profiles table (RLS: own row).
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('role')
+        .eq('id', session.user.id)
+        .maybeSingle()
+      role = profile?.role ?? 'visitor'
+    }
     if (ADMIN_ROUTES.some(r => pathname.startsWith(r)) && role !== 'admin') {
       return NextResponse.redirect(new URL('/account', req.url))
     }

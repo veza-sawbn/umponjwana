@@ -1,6 +1,7 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import toast from 'react-hot-toast'
 import Link from 'next/link'
 import Navbar from '@/components/layout/Navbar'
 import Footer from '@/components/layout/Footer'
@@ -20,37 +21,23 @@ interface SupplierEvent {
   is_published: boolean
 }
 
-const INIT: SupplierEvent[] = [
-  {
-    id: '1',
-    title: 'Drakensberg Star Gazing Night',
-    description: 'Join us for a guided star gazing session at 1800m altitude with a certified astronomer.',
-    event_type: 'event',
-    location: 'Cathedral Peak Hotel',
-    starts_at: '2026-07-20T19:00',
-    ends_at: '2026-07-20T22:00',
-    ticket_price: 350,
-    total_tickets: 30,
-    tickets_sold: 12,
-    is_published: true,
-  },
-  {
-    id: '2',
-    title: 'Winter Wildflower Walk Special',
-    description: '20% off guided wildflower identification walks throughout July.',
-    event_type: 'special',
-    location: 'Monk\'s Cowl Trail',
-    starts_at: '2026-07-01T08:00',
-    ends_at: '2026-07-31T17:00',
-    ticket_price: 180,
-    total_tickets: 100,
-    tickets_sold: 45,
-    is_published: true,
-  },
-]
+import { supabase } from '@/lib/auth'
+import {
+  getSupplierEntities, addSupplierEntity, updateSupplierEntity, deleteSupplierEntity,
+} from '@/lib/supplier-entities'
+
+const ENTITY = 'events'
 
 export default function EventsManagePage() {
-  const [events, setEvents] = useState<SupplierEvent[]>(INIT)
+  const [events, setEvents] = useState<SupplierEvent[]>([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    supabase.auth.getUser().then(async ({ data: { user } }) => {
+      if (user) setEvents(await getSupplierEntities<any>(ENTITY, user.id) as unknown as SupplierEvent[])
+      setLoading(false)
+    })
+  }, [])
   const [showForm, setShowForm] = useState(false)
   const [form, setForm] = useState({
     title: '',
@@ -63,32 +50,55 @@ export default function EventsManagePage() {
     total_tickets: '',
   })
 
-  function handleCreate() {
+  async function handleCreate() {
     if (!form.title || !form.ticket_price || !form.starts_at) return
-    const ev: SupplierEvent = {
-      id: Date.now().toString(),
-      title: form.title,
-      description: form.description,
-      event_type: form.event_type,
-      location: form.location,
-      starts_at: form.starts_at,
-      ends_at: form.ends_at,
-      ticket_price: parseFloat(form.ticket_price),
-      total_tickets: parseInt(form.total_tickets) || 0,
-      tickets_sold: 0,
-      is_published: true,
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) throw new Error('no session')
+      const saved = await addSupplierEntity<any>(ENTITY, {
+        supplierId: user.id,
+        title: form.title,
+        description: form.description,
+        event_type: form.event_type,
+        location: form.location,
+        starts_at: form.starts_at,
+        ends_at: form.ends_at,
+        ticket_price: parseFloat(form.ticket_price),
+        total_tickets: parseInt(form.total_tickets) || 0,
+        tickets_sold: 0,
+        is_published: true,
+        status: 'active',
+      })
+      setEvents(prev => [...prev, saved as unknown as SupplierEvent])
+      setForm({ title: '', description: '', event_type: 'event', location: '', starts_at: '', ends_at: '', ticket_price: '', total_tickets: '' })
+      setShowForm(false)
+      toast.success('Event created.')
+    } catch {
+      toast.error('Could not create the event. Please try again.')
     }
-    setEvents(prev => [...prev, ev])
-    setForm({ title: '', description: '', event_type: 'event', location: '', starts_at: '', ends_at: '', ticket_price: '', total_tickets: '' })
-    setShowForm(false)
   }
 
-  function handleDelete(id: string) {
-    setEvents(prev => prev.filter(e => e.id !== id))
+  async function handleDelete(id: string) {
+    const prev = events
+    setEvents(es => es.filter(e => e.id !== id))
+    try {
+      await deleteSupplierEntity(ENTITY, id)
+    } catch {
+      setEvents(prev)
+      toast.error('Could not delete the event.')
+    }
   }
 
-  function togglePublish(id: string) {
-    setEvents(prev => prev.map(e => e.id === id ? { ...e, is_published: !e.is_published } : e))
+  async function togglePublish(id: string) {
+    const ev = events.find(e => e.id === id)
+    if (!ev) return
+    const is_published = !ev.is_published
+    try {
+      await updateSupplierEntity(ENTITY, id, { is_published, status: is_published ? 'active' : 'draft' })
+      setEvents(prev => prev.map(e => e.id === id ? { ...e, is_published } : e))
+    } catch {
+      toast.error('Could not update the event.')
+    }
   }
 
   return (

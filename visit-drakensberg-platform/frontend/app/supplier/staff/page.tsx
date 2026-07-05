@@ -1,63 +1,108 @@
 'use client'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import toast from 'react-hot-toast'
+import Link from 'next/link'
 import { Users, CalendarDays, Bell, CheckCircle, Clock, Send } from 'lucide-react'
+import { supabase } from '@/lib/auth'
+import { getDepartures, updateDeparture, type Departure } from '@/lib/departures'
+import {
+  getSupplierEntities, updateSupplierEntity, type SupplierEntity,
+} from '@/lib/supplier-entities'
 
 interface BlockedRange { id: string; from: string; to: string; reason: string }
-interface Guide { id: string; name: string; initials: string; status: string; blocked: BlockedRange[] }
+type Guide = SupplierEntity & { name: string; status: string; blocked?: BlockedRange[] }
+type Dep = Departure & { guideNotified?: boolean }
 
-const DEPARTURES = [
-  { id: '1', tour: 'Cathedral Peak Summit Hike',  date: '2025-07-12', guide: 'Bongani Ndlovu',   guideId: '1', notified: true  },
-  { id: '2', tour: 'Amphitheatre Circular Trail',  date: '2025-07-19', guide: 'Zanele Mthembu',   guideId: '3', notified: false },
-  { id: '3', tour: 'Giants Castle Cultural Tour',  date: '2025-08-02', guide: 'Marné du Plessis', guideId: '2', notified: true  },
-]
-
-const INIT_GUIDES: Guide[] = [
-  { id: '1', name: 'Bongani Ndlovu',   initials: 'BN', status: 'active', blocked: [{ id: 'b1', from: '2025-08-10', to: '2025-08-15', reason: 'Family commitment' }] },
-  { id: '2', name: 'Marné du Plessis', initials: 'MD', status: 'active', blocked: [] },
-  { id: '3', name: 'Zanele Mthembu',   initials: 'ZM', status: 'active', blocked: [] },
-]
+const GUIDE_ENTITY = 'guides'
 
 const STATUS_STYLE: Record<string, string> = {
   active:    'bg-emerald-100 text-emerald-700',
+  verified:  'bg-emerald-100 text-emerald-700',
+  pending:   'bg-amber-100 text-amber-700',
   'on leave': 'bg-amber-100 text-amber-700',
   inactive:  'bg-slate-100 text-slate-500',
 }
 
+function initialsOf(name: string) {
+  return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
+}
+
 export default function StaffPage() {
-  const [guides, setGuides]                 = useState(INIT_GUIDES)
-  const [departures, setDepartures]         = useState(DEPARTURES)
-  const [blockForms, setBlockForms]         = useState<Record<string, { from: string; to: string; reason: string }>>({})
-  const [bulkMessage, setBulkMessage]       = useState('')
-  const [bulkSent, setBulkSent]             = useState(false)
+  const [guides, setGuides] = useState<Guide[]>([])
+  const [departures, setDepartures] = useState<Dep[]>([])
+  const [loading, setLoading] = useState(true)
+  const [blockForms, setBlockForms] = useState<Record<string, { from: string; to: string; reason: string }>>({})
+
+  useEffect(() => {
+    supabase.auth.getUser().then(async ({ data: { user } }) => {
+      if (!user) { setLoading(false); return }
+      const today = new Date().toISOString().slice(0, 10)
+      const [roster, deps] = await Promise.all([
+        getSupplierEntities<Guide>(GUIDE_ENTITY, user.id),
+        getDepartures(),
+      ])
+      setGuides(roster)
+      setDepartures(
+        (deps as Dep[])
+          .filter(d => d.supplierId === user.id && d.date >= today)
+          .sort((a, b) => a.date.localeCompare(b.date))
+      )
+      setLoading(false)
+    })
+  }, [])
 
   function setBlockField(guideId: string, key: string, val: string) {
     setBlockForms(f => ({ ...f, [guideId]: { ...(f[guideId] ?? { from: '', to: '', reason: '' }), [key]: val } }))
   }
 
-  function addBlock(guideId: string) {
+  async function addBlock(guideId: string) {
     const f = blockForms[guideId]
     if (!f?.from || !f?.to) return
-    setGuides(gs => gs.map(g => g.id !== guideId ? g : {
-      ...g,
-      blocked: [...g.blocked, { id: Date.now().toString(), from: f.from, to: f.to, reason: f.reason }],
-    }))
-    setBlockForms(f => ({ ...f, [guideId]: { from: '', to: '', reason: '' } }))
+    const guide = guides.find(g => g.id === guideId)
+    if (!guide) return
+    const blocked = [...(guide.blocked ?? []), { id: `blk-${Date.now()}`, from: f.from, to: f.to, reason: f.reason }]
+    try {
+      await updateSupplierEntity(GUIDE_ENTITY, guideId, { blocked })
+      setGuides(gs => gs.map(g => g.id === guideId ? { ...g, blocked } : g))
+      setBlockForms(fm => ({ ...fm, [guideId]: { from: '', to: '', reason: '' } }))
+      toast.success('Unavailability saved.')
+    } catch {
+      toast.error('Could not save. Please try again.')
+    }
   }
 
-  function removeBlock(guideId: string, blockId: string) {
-    setGuides(gs => gs.map(g => g.id !== guideId ? g : { ...g, blocked: g.blocked.filter(b => b.id !== blockId) }))
+  async function removeBlock(guideId: string, blockId: string) {
+    const guide = guides.find(g => g.id === guideId)
+    if (!guide) return
+    const blocked = (guide.blocked ?? []).filter(b => b.id !== blockId)
+    try {
+      await updateSupplierEntity(GUIDE_ENTITY, guideId, { blocked })
+      setGuides(gs => gs.map(g => g.id === guideId ? { ...g, blocked } : g))
+    } catch {
+      toast.error('Could not remove. Please try again.')
+    }
   }
 
-  function notify(depId: string) {
-    setDepartures(ds => ds.map(d => d.id === depId ? { ...d, notified: true } : d))
+  async function markNotified(depId: string) {
+    try {
+      await updateDeparture(depId, { guideNotified: true })
+      setDepartures(ds => ds.map(d => d.id === depId ? { ...d, guideNotified: true } : d))
+      toast.success('Marked as notified.')
+    } catch {
+      toast.error('Could not update. Please try again.')
+    }
   }
 
-  function sendBulk() {
-    if (!bulkMessage.trim()) return
-    setDepartures(ds => ds.map(d => ({ ...d, notified: true })))
-    setBulkSent(true)
-    setBulkMessage('')
-    setTimeout(() => setBulkSent(false), 4000)
+  async function markAllNotified() {
+    const pending = departures.filter(d => !d.guideNotified)
+    if (pending.length === 0) return
+    try {
+      await Promise.all(pending.map(d => updateDeparture(d.id, { guideNotified: true })))
+      setDepartures(ds => ds.map(d => ({ ...d, guideNotified: true })))
+      toast.success(`Marked ${pending.length} departure${pending.length !== 1 ? 's' : ''} as notified.`)
+    } catch {
+      toast.error('Could not update all departures.')
+    }
   }
 
   return (
@@ -67,13 +112,21 @@ export default function StaffPage() {
         <h1 className="font-display italic text-2xl text-black/90">Staff Management</h1>
       </div>
 
-      <div className="grid grid-cols-5 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
         {/* Left: Guide availability */}
-        <div className="col-span-2 space-y-4">
+        <div className="lg:col-span-2 space-y-4">
           <div className="flex items-center gap-2 mb-1">
             <CalendarDays size={15} className="text-[#C9A96E]" />
-            <h2 className="font-sans text-sm font-semibold text-black/60 uppercase tracking-wider">Availability</h2>
+            <h2 className="font-sans text-sm font-semibold text-black/60 uppercase tracking-wider">Guide Availability</h2>
           </div>
+
+          {loading && <p className="font-sans text-sm text-black/30">Loading…</p>}
+          {!loading && guides.length === 0 && (
+            <div className="bg-white rounded-xl border border-black/8 p-6 text-center">
+              <p className="font-sans text-sm text-black/40 mb-3">No guides registered yet.</p>
+              <Link href="/supplier/guides" className="font-sans text-xs text-[#C9A96E] hover:underline">Register your guides →</Link>
+            </div>
+          )}
 
           {guides.map(g => {
             const bf = blockForms[g.id] ?? { from: '', to: '', reason: '' }
@@ -81,35 +134,33 @@ export default function StaffPage() {
               <div key={g.id} className="bg-white rounded-xl border border-black/8 p-4 space-y-3">
                 <div className="flex items-center gap-3">
                   <div className="w-9 h-9 rounded-full bg-[#C9A96E]/10 flex items-center justify-center shrink-0">
-                    <span className="font-sans text-xs font-semibold text-[#C9A96E]">{g.initials}</span>
+                    <span className="font-sans text-xs font-semibold text-[#C9A96E]">{initialsOf(g.name)}</span>
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="font-sans text-sm font-semibold text-black/80 truncate">{g.name}</p>
-                    <span className={`font-sans text-[10px] px-2 py-0.5 rounded-full capitalize ${STATUS_STYLE[g.status]}`}>{g.status}</span>
+                    <span className={`font-sans text-[10px] px-2 py-0.5 rounded-full capitalize ${STATUS_STYLE[g.status] ?? STATUS_STYLE.pending}`}>{g.status}</span>
                   </div>
                 </div>
 
-                {/* Blocked dates */}
-                {g.blocked.length > 0 && (
+                {(g.blocked ?? []).length > 0 && (
                   <div className="space-y-1.5">
-                    {g.blocked.map(b => (
+                    {(g.blocked ?? []).map(b => (
                       <div key={b.id} className="flex items-start justify-between gap-2 bg-black/3 rounded-lg px-3 py-2">
                         <div>
                           <p className="font-sans text-xs font-medium text-black/70">{b.from} – {b.to}</p>
                           {b.reason && <p className="font-sans text-[10px] text-black/40">{b.reason}</p>}
                         </div>
-                        <button onClick={() => removeBlock(g.id, b.id)} className="font-sans text-[10px] text-red-400 hover:text-red-600 shrink-0">×</button>
+                        <button onClick={() => removeBlock(g.id, b.id)} aria-label="Remove unavailability" className="font-sans text-[10px] text-red-400 hover:text-red-600 shrink-0">×</button>
                       </div>
                     ))}
                   </div>
                 )}
 
-                {/* Add block form */}
                 <div className="space-y-2 border-t border-black/6 pt-3">
                   <p className="font-sans text-[10px] font-semibold text-black/30 uppercase tracking-wider">Mark Unavailable</p>
                   <div className="grid grid-cols-2 gap-1.5">
-                    <input type="date" value={bf.from} onChange={e => setBlockField(g.id, 'from', e.target.value)} placeholder="From" className={`${inp} text-xs`} />
-                    <input type="date" value={bf.to} onChange={e => setBlockField(g.id, 'to', e.target.value)} placeholder="To" className={`${inp} text-xs`} />
+                    <input type="date" value={bf.from} onChange={e => setBlockField(g.id, 'from', e.target.value)} aria-label="Unavailable from" className={`${inp} text-xs`} />
+                    <input type="date" value={bf.to} min={bf.from || undefined} onChange={e => setBlockField(g.id, 'to', e.target.value)} aria-label="Unavailable to" className={`${inp} text-xs`} />
                   </div>
                   <div className="flex gap-1.5">
                     <input value={bf.reason} onChange={e => setBlockField(g.id, 'reason', e.target.value)} placeholder="Reason (optional)" className={`${inp} text-xs flex-1`} />
@@ -121,8 +172,8 @@ export default function StaffPage() {
           })}
         </div>
 
-        {/* Right: Notifications */}
-        <div className="col-span-3 space-y-4">
+        {/* Right: Departure reminders */}
+        <div className="lg:col-span-3 space-y-4">
           <div className="flex items-center gap-2 mb-1">
             <Bell size={15} className="text-[#C9A96E]" />
             <h2 className="font-sans text-sm font-semibold text-black/60 uppercase tracking-wider">Upcoming Departures</h2>
@@ -132,21 +183,24 @@ export default function StaffPage() {
             <table className="w-full">
               <thead>
                 <tr className="border-b border-black/6">
-                  {['Tour', 'Date', 'Guide', 'Status', ''].map(h => (
-                    <th key={h} className="px-4 py-3 text-left font-sans text-xs font-semibold text-black/40 uppercase tracking-wider">{h}</th>
+                  {['Tour', 'Date', 'Guide', 'Status', ''].map((h, i) => (
+                    <th key={i} className="px-4 py-3 text-left font-sans text-xs font-semibold text-black/40 uppercase tracking-wider">{h}</th>
                   ))}
                 </tr>
               </thead>
               <tbody>
+                {!loading && departures.length === 0 && (
+                  <tr><td colSpan={5} className="px-4 py-10 text-center font-sans text-sm text-black/30">No upcoming departures — schedule one under Departures.</td></tr>
+                )}
                 {departures.map((d, i) => (
                   <tr key={d.id} className={i < departures.length - 1 ? 'border-b border-black/5' : ''}>
                     <td className="px-4 py-3 font-sans text-sm text-black/80 max-w-[160px]">
                       <span className="line-clamp-2">{d.tour}</span>
                     </td>
                     <td className="px-4 py-3 font-sans text-sm text-black/60 whitespace-nowrap">{d.date}</td>
-                    <td className="px-4 py-3 font-sans text-sm text-black/60 whitespace-nowrap">{d.guide}</td>
+                    <td className="px-4 py-3 font-sans text-sm text-black/60 whitespace-nowrap">{d.guide || 'Unassigned'}</td>
                     <td className="px-4 py-3">
-                      {d.notified ? (
+                      {d.guideNotified ? (
                         <span className="flex items-center gap-1 font-sans text-xs bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full whitespace-nowrap">
                           <CheckCircle size={10} /> Guide notified
                         </span>
@@ -157,12 +211,14 @@ export default function StaffPage() {
                       )}
                     </td>
                     <td className="px-4 py-3">
-                      <button
-                        onClick={() => notify(d.id)}
-                        className="font-sans text-xs text-[#C9A96E] hover:underline whitespace-nowrap"
-                      >
-                        {d.notified ? 'Re-notify' : 'Notify Now'}
-                      </button>
+                      {!d.guideNotified && (
+                        <button
+                          onClick={() => markNotified(d.id)}
+                          className="font-sans text-xs text-[#C9A96E] hover:underline whitespace-nowrap"
+                        >
+                          Mark notified
+                        </button>
+                      )}
                     </td>
                   </tr>
                 ))}
@@ -170,32 +226,22 @@ export default function StaffPage() {
             </table>
           </div>
 
-          {/* Bulk notification */}
           <div className="bg-white rounded-xl border border-black/8 p-5 space-y-3">
             <div className="flex items-center gap-2">
               <Send size={14} className="text-[#C9A96E]" />
-              <p className="font-sans text-sm font-semibold text-black/70">Send Bulk Notification</p>
+              <p className="font-sans text-sm font-semibold text-black/70">Guide reminders</p>
             </div>
-            <textarea
-              value={bulkMessage}
-              onChange={e => setBulkMessage(e.target.value)}
-              rows={3}
-              placeholder="Type a message to send to all assigned guides for upcoming departures…"
-              className={`${inp} resize-none`}
-            />
-            <div className="flex items-center gap-3">
-              <button
-                onClick={sendBulk}
-                className="flex items-center gap-2 bg-[#C9A96E] text-white font-sans text-sm px-4 py-2 rounded-lg hover:bg-[#b8965d] transition-colors"
-              >
-                <Send size={14} /> Send to All Assigned Guides
-              </button>
-              {bulkSent && (
-                <span className="flex items-center gap-1.5 font-sans text-sm text-emerald-600">
-                  <CheckCircle size={14} /> Notifications sent to {departures.length} guides
-                </span>
-              )}
-            </div>
+            <p className="font-sans text-xs text-black/40 leading-relaxed">
+              Track which guides you&apos;ve briefed for upcoming departures. Contact guides directly
+              by phone or WhatsApp, then mark the departure as notified.
+            </p>
+            <button
+              onClick={markAllNotified}
+              disabled={departures.every(d => d.guideNotified)}
+              className="flex items-center gap-2 bg-[#C9A96E] text-white font-sans text-sm px-4 py-2 rounded-lg hover:bg-[#b8965d] transition-colors disabled:opacity-40"
+            >
+              <CheckCircle size={14} /> Mark all as notified
+            </button>
           </div>
         </div>
       </div>

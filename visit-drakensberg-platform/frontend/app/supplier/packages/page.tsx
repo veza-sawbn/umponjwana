@@ -1,6 +1,7 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import toast from 'react-hot-toast'
 import Link from 'next/link'
 import Navbar from '@/components/layout/Navbar'
 import Footer from '@/components/layout/Footer'
@@ -21,25 +22,23 @@ interface TourPackage {
   created_by: string
 }
 
-const INIT: TourPackage[] = [
-  {
-    id: '1',
-    title: 'Drakensberg Royal Traverse',
-    description: '7-day guided traverse of the Northern and Central Berg, including Cathedral Peak and Monk\'s Cowl.',
-    price: 12500,
-    duration_days: 7,
-    includes: ['Accommodation', 'All meals', 'Professional guide', 'Park fees', 'Airport transfers'],
-    tour_start: '2026-07-15',
-    tour_end: '2026-07-22',
-    max_participants: 12,
-    is_published: true,
-    collaborators: ['Monk\'s Cowl Lodge'],
-    created_by: 'me',
-  },
-]
+import { supabase } from '@/lib/auth'
+import {
+  getSupplierEntities, addSupplierEntity, updateSupplierEntity, deleteSupplierEntity,
+} from '@/lib/supplier-entities'
+
+const ENTITY = 'packages'
 
 export default function PackagesPage() {
-  const [packages, setPackages] = useState<TourPackage[]>(INIT)
+  const [packages, setPackages] = useState<TourPackage[]>([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    supabase.auth.getUser().then(async ({ data: { user } }) => {
+      if (user) setPackages(await getSupplierEntities<any>(ENTITY, user.id) as unknown as TourPackage[])
+      setLoading(false)
+    })
+  }, [])
   const [showForm, setShowForm] = useState(false)
   const [collabInput, setCollabInput] = useState<Record<string, string>>({})
   const [form, setForm] = useState({
@@ -53,44 +52,71 @@ export default function PackagesPage() {
     max_participants: '',
   })
 
-  function handleCreate() {
+  async function handleCreate() {
     if (!form.title || !form.price) return
-    const pkg: TourPackage = {
-      id: Date.now().toString(),
-      title: form.title,
-      description: form.description,
-      price: parseFloat(form.price),
-      duration_days: parseInt(form.duration_days) || 0,
-      includes: form.includes.split(',').map(s => s.trim()).filter(Boolean),
-      tour_start: form.tour_start,
-      tour_end: form.tour_end,
-      max_participants: parseInt(form.max_participants) || 0,
-      is_published: false,
-      collaborators: [],
-      created_by: 'me',
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) throw new Error('no session')
+      const saved = await addSupplierEntity<any>(ENTITY, {
+        supplierId: user.id,
+        title: form.title,
+        description: form.description,
+        price: parseFloat(form.price),
+        duration_days: parseInt(form.duration_days) || 0,
+        includes: form.includes.split(',').map(s => s.trim()).filter(Boolean),
+        tour_start: form.tour_start,
+        tour_end: form.tour_end,
+        max_participants: parseInt(form.max_participants) || 0,
+        is_published: false,
+        collaborators: [],
+        created_by: user.id,
+        status: 'draft',
+      })
+      setPackages(prev => [...prev, saved as unknown as TourPackage])
+      setForm({ title: '', description: '', price: '', duration_days: '', includes: '', tour_start: '', tour_end: '', max_participants: '' })
+      setShowForm(false)
+      toast.success('Package created.')
+    } catch {
+      toast.error('Could not create the package. Please try again.')
     }
-    setPackages(prev => [...prev, pkg])
-    setForm({ title: '', description: '', price: '', duration_days: '', includes: '', tour_start: '', tour_end: '', max_participants: '' })
-    setShowForm(false)
   }
 
-  function togglePublish(id: string) {
-    setPackages(prev => prev.map(p => p.id === id ? { ...p, is_published: !p.is_published } : p))
+  async function togglePublish(id: string) {
+    const pkg = packages.find(p => p.id === id)
+    if (!pkg) return
+    const is_published = !pkg.is_published
+    try {
+      await updateSupplierEntity(ENTITY, id, { is_published, status: is_published ? 'active' : 'draft' })
+      setPackages(prev => prev.map(p => p.id === id ? { ...p, is_published } : p))
+    } catch {
+      toast.error('Could not update the package.')
+    }
   }
 
-  function addCollaborator(id: string) {
+  async function addCollaborator(id: string) {
     const name = collabInput[id]?.trim()
     if (!name) return
-    setPackages(prev => prev.map(p =>
-      p.id === id && !p.collaborators.includes(name)
-        ? { ...p, collaborators: [...p.collaborators, name] }
-        : p
-    ))
-    setCollabInput(prev => ({ ...prev, [id]: '' }))
+    const pkg = packages.find(p => p.id === id)
+    if (!pkg || pkg.collaborators.includes(name)) return
+    const collaborators = [...pkg.collaborators, name]
+    try {
+      await updateSupplierEntity(ENTITY, id, { collaborators })
+      setPackages(prev => prev.map(p => p.id === id ? { ...p, collaborators } : p))
+      setCollabInput(prev => ({ ...prev, [id]: '' }))
+    } catch {
+      toast.error('Could not add the collaborator.')
+    }
   }
 
-  function handleDelete(id: string) {
-    setPackages(prev => prev.filter(p => p.id !== id))
+  async function handleDelete(id: string) {
+    const prev = packages
+    setPackages(ps => ps.filter(p => p.id !== id))
+    try {
+      await deleteSupplierEntity(ENTITY, id)
+    } catch {
+      setPackages(prev)
+      toast.error('Could not delete the package.')
+    }
   }
 
   return (
