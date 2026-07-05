@@ -123,12 +123,13 @@ Address and location fields in the supplier listing, property, activity, and tou
 
 1. In Google Cloud Console, enable **Maps JavaScript API**, **Places API**, and **Distance Matrix API** for your project.
 2. Create an API key and restrict it to your web app domains (for local development, include `http://localhost:3000/*`).
-3. Put the key in `visit-drakensberg-platform/frontend/.env.local`:
+3. For local development, copy `visit-drakensberg-platform/frontend/.env.local.example` to `visit-drakensberg-platform/frontend/.env.local` and put the key there (do not put the real key in `.env.example`; that file is only a template):
 
    ```bash
    NEXT_PUBLIC_GOOGLE_MAPS_API_KEY=your_google_maps_browser_key_here
    ```
 
-4. Restart the Next.js dev server after changing `.env.local`.
+4. For the live site, add the same `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY` value to your frontend hosting provider environment variables (for example Vercel Project Settings → Environment Variables for Production/Preview/Development), make sure the variable is enabled for the environment you are viewing, then trigger a new frontend deployment. Vercel does not update already-built client bundles until you redeploy.
+5. Restart the Next.js dev server after changing `.env.local`.
 
-The key must be prefixed with `NEXT_PUBLIC_` because Google Places autocomplete and map previews run in the browser. Keep the key restricted in Google Cloud Console instead of committing a real key to the repository.
+The key must be prefixed with `NEXT_PUBLIC_` because Google Places autocomplete and map previews run in the browser. `NEXT_PUBLIC_*` values are read at Next.js build/deploy time, so changing `.env.example` or a local `.env.local` file will not update an already-deployed live site. Keep the key restricted in Google Cloud Console instead of committing a real key to the repository.
