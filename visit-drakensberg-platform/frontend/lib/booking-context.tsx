@@ -63,6 +63,9 @@ type BookingActions = {
   hasActiveSearch: boolean
   nights: number
   totalPrice: number
+  /** false until the cart has been restored from localStorage — guard any
+   *  "empty cart" redirect behind this to avoid bouncing a full cart. */
+  hydrated: boolean
 }
 
 const EMPTY: BookingState = {
@@ -86,6 +89,7 @@ const BookingContext = createContext<BookingState & BookingActions>({
   hasActiveSearch: false,
   nights: 0,
   totalPrice: 0,
+  hydrated: false,
 })
 
 const STORAGE_KEY = 'vd_booking_v1'
@@ -98,6 +102,7 @@ function calcNights(checkIn: string, checkOut: string) {
 
 export function BookingProvider({ children }: { children: React.ReactNode }) {
   const [state, setState] = useState<BookingState>(EMPTY)
+  const [hydrated, setHydrated] = useState(false)
 
   // Hydrate from localStorage on mount
   useEffect(() => {
@@ -105,14 +110,17 @@ export function BookingProvider({ children }: { children: React.ReactNode }) {
       const saved = localStorage.getItem(STORAGE_KEY)
       if (saved) setState(JSON.parse(saved))
     } catch {}
+    setHydrated(true)
   }, [])
 
-  // Persist to localStorage on change
+  // Persist to localStorage on change — only after hydration, so the initial
+  // EMPTY render can never overwrite a saved cart.
   useEffect(() => {
+    if (!hydrated) return
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(state))
     } catch {}
-  }, [state])
+  }, [state, hydrated])
 
   const setSearch = useCallback((region: string, checkIn: string, checkOut: string, guests: number) => {
     setState(s => ({ ...s, region, checkIn, checkOut, guests }))
@@ -164,6 +172,7 @@ export function BookingProvider({ children }: { children: React.ReactNode }) {
       hasActiveSearch,
       nights,
       totalPrice,
+      hydrated,
     }}>
       {children}
     </BookingContext.Provider>

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import toast from 'react-hot-toast'
@@ -43,11 +43,17 @@ export default function CheckoutPage() {
 
   const isEmpty = !booking.stay && booking.addons.length === 0 && !booking.shuttle
 
+  // True once payment succeeded: clearing the cart empties the state, and the
+  // empty-cart guard below must NOT hijack the redirect to the success page.
+  const completedRef = useRef(false)
+
   // Nothing to pay for — send the visitor back to trip planning instead of
-  // letting them submit an empty R0 booking.
+  // letting them submit an empty R0 booking. Only after the cart has hydrated
+  // from localStorage (it is always "empty" on the very first render) and
+  // never after a successful payment.
   useEffect(() => {
-    if (isEmpty) router.replace('/trip')
-  }, [isEmpty, router])
+    if (booking.hydrated && isEmpty && !completedRef.current) router.replace('/trip')
+  }, [booking.hydrated, isEmpty, router])
 
   const nights = booking.nights
   const stayTotal = booking.stay ? booking.stay.price_per_night * nights : 0
@@ -155,6 +161,7 @@ export default function CheckoutPage() {
         status: 'confirmed',
       })
 
+      completedRef.current = true
       booking.clearBooking()
       router.push(`/checkout/success?id=${saved.id}`)
     } catch (err) {
