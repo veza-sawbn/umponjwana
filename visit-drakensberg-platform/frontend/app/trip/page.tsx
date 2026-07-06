@@ -130,7 +130,9 @@ export default function TripPage() {
                         </div>
                         <div>
                           <p className="font-sans font-medium text-sm text-black/80">{booking.stay.title}</p>
-                          <p className="font-sans text-xs text-black/40 mt-0.5">{booking.stay.region}</p>
+                          <p className="font-sans text-xs text-black/40 mt-0.5">
+                            {booking.stay.roomName ? `${booking.stay.roomName} · ` : ''}{booking.stay.region}
+                          </p>
                         </div>
                       </div>
                       <div className="flex items-center gap-4 shrink-0">

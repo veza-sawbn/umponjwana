@@ -166,7 +166,14 @@ export default function CheckoutPage() {
       router.push(`/checkout/success?id=${saved.id}`)
     } catch (err) {
       console.error('Booking save failed:', err)
-      toast.error('We could not complete your booking. You have not been charged — please try again.')
+      const msg = err instanceof Error ? err.message : ''
+      if (/sold out/i.test(msg)) {
+        toast.error('That room has just sold out for your dates. Please pick another room or change your dates.')
+      } else if (/unavailable/i.test(msg)) {
+        toast.error('The property is unavailable for these dates. Please choose different dates.')
+      } else {
+        toast.error('We could not complete your booking. You have not been charged — please try again.')
+      }
       setLoading(false)
     }
   }
@@ -282,6 +289,9 @@ export default function CheckoutPage() {
                 {booking.stay ? (
                   <>
                     <h3 className="font-display italic text-2xl mb-1">{booking.stay.title}</h3>
+                    {booking.stay.roomName && (
+                      <p className="font-sans text-xs text-[#C9A96E] mb-1">{booking.stay.roomName}</p>
+                    )}
                     <p className="font-sans text-xs text-white/40 mb-1 flex items-center gap-1">
                       <MapPin size={10} />{booking.stay.region}
                     </p>

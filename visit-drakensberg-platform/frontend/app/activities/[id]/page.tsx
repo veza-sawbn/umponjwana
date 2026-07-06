@@ -31,6 +31,9 @@ function mapActivityToView(a: any) {
     description: a.description,
     includes: Array.isArray(a.included) ? a.included : [],
     what_to_bring: whatToWear,
+    // supplierId must travel with the cart item — it's what routes the
+    // booking order to this activity's supplier at checkout.
+    supplierId: a.supplierId || undefined,
     supplier: { name: a.supplierName || '' },
   }
 }
@@ -89,6 +92,8 @@ export default function ActivityDetailPage() {
         id: addonId,
         type: 'activity',
         title: activity.title,
+        operator: activity.supplier?.name || undefined,
+        supplierId: activity.supplierId,
         date: date || undefined,
         price_per_person: activity.price_per_person,
         guests: groupSize,

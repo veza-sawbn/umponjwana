@@ -9,7 +9,7 @@ import SmartRecommendations from '@/components/booking/SmartRecommendations'
 import { useBooking } from '@/lib/booking-context'
 import { Check } from 'lucide-react'
 import { getPropertyById, type Property } from '@/lib/properties'
-import { getRoomsByProperty, type Room } from '@/lib/rooms'
+import { getRoomsByProperty, getRoomUnitsLeft, type Room } from '@/lib/rooms'
 
 // Hardcoded showcase stays (keep existing behaviour for demo IDs)
 const HARDCODED: Record<string, any> = {
@@ -157,6 +157,8 @@ export default function StayDetailPage() {
   const [checkIn, setCheckIn] = useState(booking.checkIn || '')
   const [checkOut, setCheckOut] = useState(booking.checkOut || '')
   const [guests, setGuests] = useState(booking.guests || 2)
+  // roomId -> units still free for the chosen dates (null = unknown)
+  const [unitsLeft, setUnitsLeft] = useState<Record<string, number | null>>({})
 
   useEffect(() => {
     if (HARDCODED[id]) return
@@ -165,6 +167,28 @@ export default function StayDetailPage() {
       setLoading(false)
     })
   }, [id])
+
+  // Live room inventory for the selected dates (real supplier rooms only).
+  useEffect(() => {
+    if (HARDCODED[id] || !stay?.rooms?.length || !checkIn || !checkOut || checkOut <= checkIn) {
+      setUnitsLeft({})
+      return
+    }
+    let cancelled = false
+    Promise.all(
+      stay.rooms.map(async (r: any) => [r.id, await getRoomUnitsLeft(r.id, checkIn, checkOut)] as const)
+    ).then(entries => {
+      if (!cancelled) setUnitsLeft(Object.fromEntries(entries))
+    })
+    return () => { cancelled = true }
+  }, [id, stay, checkIn, checkOut])
+
+  const soldOut = (roomId: string) => unitsLeft[roomId] === 0
+  // Deselect a room that sells out while chosen dates change
+  useEffect(() => {
+    if (selectedRoom && soldOut(selectedRoom.id)) setSelectedRoom(null)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [unitsLeft])
 
   const isSelectedStay = booking.stay?.id === id
   const nights = checkIn && checkOut
@@ -304,8 +328,8 @@ export default function StayDetailPage() {
                   {stay.rooms.map((room: any) => (
                     <div
                       key={room.id}
-                      onClick={() => setSelectedRoom(room)}
-                      className={`bg-white border cursor-pointer transition-all ${selectedRoom?.id === room.id ? 'border-[#2d6a4f] shadow-sm' : 'border-gray-200 hover:border-gray-400'}`}
+                      onClick={() => { if (!soldOut(room.id)) setSelectedRoom(room) }}
+                      className={`bg-white border transition-all ${soldOut(room.id) ? 'border-gray-200 opacity-60 cursor-not-allowed' : selectedRoom?.id === room.id ? 'border-[#2d6a4f] shadow-sm cursor-pointer' : 'border-gray-200 hover:border-gray-400 cursor-pointer'}`}
                     >
                       {selectedRoom?.id === room.id && (
                         <div className="bg-[#2d6a4f] px-5 py-1.5">
@@ -314,11 +338,21 @@ export default function StayDetailPage() {
                       )}
                       <div className="p-5 flex items-start justify-between gap-4">
                         <div className="flex-1">
-                          <div className="flex items-center gap-3 mb-1.5">
+                          <div className="flex items-center gap-3 mb-1.5 flex-wrap">
                             <h3 className="font-display italic text-xl">{room.name}</h3>
                             <span className="flex items-center gap-1 font-sans text-xs text-gray-400">
                               <Users size={11} /> up to {room.max_guests}
                             </span>
+                            {soldOut(room.id) && (
+                              <span className="font-sans text-[10px] tracking-[0.1em] uppercase bg-red-50 text-red-500 px-2 py-0.5">
+                                Sold out for these dates
+                              </span>
+                            )}
+                            {!soldOut(room.id) && typeof unitsLeft[room.id] === 'number' && (unitsLeft[room.id] as number) <= 3 && (
+                              <span className="font-sans text-[10px] tracking-[0.1em] uppercase bg-[#C9A96E]/15 text-[#8B6914] px-2 py-0.5">
+                                Only {unitsLeft[room.id]} left
+                              </span>
+                            )}
                           </div>
                           <p className="font-sans text-sm text-gray-600 leading-relaxed mb-3">{room.description}</p>
                           {room.amenities?.length > 0 && (
@@ -333,10 +367,11 @@ export default function StayDetailPage() {
                           <p className="font-display italic text-2xl text-[#2d6a4f]">R {room.price_per_night.toLocaleString()}</p>
                           <p className="font-sans text-xs text-gray-400">/night</p>
                           <button
-                            onClick={e => { e.stopPropagation(); setSelectedRoom(room) }}
-                            className={`mt-3 px-4 py-2 font-sans text-xs transition-colors ${selectedRoom?.id === room.id ? 'bg-[#2d6a4f] text-white' : 'border border-[#2d6a4f] text-[#2d6a4f] hover:bg-[#2d6a4f] hover:text-white'}`}
+                            onClick={e => { e.stopPropagation(); if (!soldOut(room.id)) setSelectedRoom(room) }}
+                            disabled={soldOut(room.id)}
+                            className={`mt-3 px-4 py-2 font-sans text-xs transition-colors ${soldOut(room.id) ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : selectedRoom?.id === room.id ? 'bg-[#2d6a4f] text-white' : 'border border-[#2d6a4f] text-[#2d6a4f] hover:bg-[#2d6a4f] hover:text-white'}`}
                           >
-                            {selectedRoom?.id === room.id ? '✓ Selected' : 'Select'}
+                            {soldOut(room.id) ? 'Sold out' : selectedRoom?.id === room.id ? '✓ Selected' : 'Select'}
                           </button>
                         </div>
                       </div>
@@ -473,7 +508,7 @@ export default function StayDetailPage() {
                 onClick={() => {
                   if (!selectedRoom) return
                   booking.setSearch(stay.region, checkIn, checkOut, guests)
-                  booking.setStay({ id, title: stay.title, region: stay.region, price_per_night: selectedRoom.price_per_night, img: stay.images?.[0], address: stay.address, lat: stay.gpsLat, lng: stay.gpsLng })
+                  booking.setStay({ id, title: stay.title, region: stay.region, price_per_night: selectedRoom.price_per_night, roomId: selectedRoom.id, roomName: selectedRoom.name, img: stay.images?.[0], address: stay.address, lat: stay.gpsLat, lng: stay.gpsLng })
                   router.push(`/search?region=${encodeURIComponent(stay.region)}&check_in=${checkIn}&check_out=${checkOut}&guests=${guests}`)
                 }}
                 className={`w-full py-3.5 font-sans text-sm font-medium transition-colors ${selectedRoom ? 'bg-[#2d6a4f] text-white hover:bg-[#235a3f]' : 'bg-gray-100 text-gray-400 cursor-not-allowed'}`}

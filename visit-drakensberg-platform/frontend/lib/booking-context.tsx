@@ -21,6 +21,8 @@ export type BookingStay = {
   title: string
   region: string
   price_per_night: number
+  roomId?: string
+  roomName?: string
   img?: string
   address?: string
   lat?: string

@@ -95,22 +95,23 @@ export async function addBooking(booking: Omit<SavedBooking, 'id' | 'reference' 
     createdAt: new Date().toISOString(),
   }
 
+  // Created via an atomic RPC that checks room inventory and supplier
+  // availability blocks under a lock, so the last unit can't be double-sold.
   // Retry once with a fresh reference on the (rare) unique-constraint hit.
   for (let attempt = 0; attempt < 2; attempt++) {
-    const { error } = await supabase.from('vd_bookings').insert({
-      id: newBooking.id,
-      reference: newBooking.reference,
-      user_id: newBooking.userId,
-      supplier_ids: supplierIds,
-      status: newBooking.status,
-      value: newBooking,
+    const { error } = await supabase.rpc('vd_create_booking', {
+      p_id: newBooking.id,
+      p_reference: newBooking.reference,
+      p_supplier_ids: supplierIds,
+      p_status: newBooking.status,
+      p_value: newBooking,
     })
     if (!error) break
-    if (error.code === '23505' && attempt === 0) {
+    if (/duplicate key/i.test(error.message ?? '') && attempt === 0) {
       newBooking.reference = genRef()
       continue
     }
-    throw error
+    throw new Error(error.message || 'Booking failed')
   }
 
   // Split into per-supplier orders: each supplier receives only their own

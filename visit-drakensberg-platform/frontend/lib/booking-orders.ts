@@ -12,6 +12,7 @@ export type OrderItem = {
   id: string
   type: 'stay' | 'activity' | 'hike' | 'tour' | 'event'
   title: string
+  roomId?: string
   date?: string
   guests: number
   unitPrice: number
@@ -131,7 +132,8 @@ export async function createOrdersForBooking(booking: SavedBooking): Promise<voi
             items: [{
               id: booking.stay.id,
               type: 'stay',
-              title: booking.stay.title,
+              title: booking.stay.roomName ? `${booking.stay.title} — ${booking.stay.roomName}` : booking.stay.title,
+              roomId: booking.stay.roomId,
               guests: booking.guests,
               unitPrice: booking.stay.price_per_night,
               total,
