@@ -71,9 +71,10 @@ begin
   for bk in select * from vd_bookings loop
     seen := '{}';
 
-    -- Addon items grouped per supplier
+    -- Addon items grouped per supplier. coalesce() matters: a NULL
+    -- supplierId must skip too (NULL ~ pattern is NULL, not false).
     for addon in select * from jsonb_array_elements(coalesce(bk.value->'addons', '[]'::jsonb)) loop
-      if not (addon->>'supplierId' ~ '^[0-9a-f]{8}-') then continue; end if;
+      if coalesce(addon->>'supplierId', '') !~ '^[0-9a-f]{8}-' then continue; end if;
       sup := (addon->>'supplierId')::uuid;
       if sup = any(seen) then continue; end if;
       seen := seen || sup;
