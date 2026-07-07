@@ -120,11 +120,13 @@ export default function HikesPage() {
               {filtered.map((t) => (
                 <Link key={t.id} href={`/hikes/${t.id}`} className="group block">
                   <div className="relative overflow-hidden aspect-[4/3] mb-4">
-                    {t.analytics?.routeArtworkSvg ? (
-                      <RouteArtwork trail={t} className="w-full h-full bg-white p-8 transition-transform duration-700 group-hover:scale-105" />
-                    ) : (
-                      <img loading="lazy" decoding="async" src={t.image} alt={t.name}
-                        className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" />
+                    <img loading="lazy" decoding="async" src={t.image} alt={t.name}
+                      className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" />
+                    <div className="absolute inset-0 bg-black/25" />
+                    {t.analytics?.routeArtworkSvg && (
+                      <div className="pointer-events-none absolute bottom-3 right-3 h-12 w-20">
+                        <RouteArtwork trail={t} tone="white" className="h-full w-full" />
+                      </div>
                     )}
                     <span
                       className="absolute bottom-3 left-3 font-sans text-[10px] px-2.5 py-1 uppercase tracking-wide"
