@@ -1,7 +1,7 @@
 import {
   LayoutDashboard, List, Building2, BedDouble, Zap, Map, Users, Truck,
   Sparkles, CalendarDays, Tag, BarChart2, Image, MessageSquare, Star, Clock,
-  Calculator,
+  Calculator, CalendarPlus,
   type LucideIcon,
 } from 'lucide-react'
 
@@ -61,6 +61,8 @@ export const SUPPLIER_CONFIG: Record<SupplierType, SupplierTypeConfig> = {
       { href: '/supplier/tours',      label: 'Tours',         icon: Map },
       { href: '/supplier/guides',     label: 'Guides',        icon: Users },
       { href: '/supplier/departures', label: 'Departures',    icon: CalendarDays },
+      { href: '/supplier/requests',   label: 'Trip Requests', icon: CalendarPlus },
+      { href: '/supplier/company',    label: 'Company Profile', icon: Building2 },
       { href: '/supplier/staff',      label: 'Staff',         icon: List },
       ...SHARED_NAV,
     ],

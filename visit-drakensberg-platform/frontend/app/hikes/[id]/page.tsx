@@ -7,9 +7,12 @@ import Footer from '@/components/layout/Footer'
 import { ArrowLeft, Mountain, Clock, TrendingUp, Users, Star, CheckCircle, ChevronRight, X } from 'lucide-react'
 import { getTrails, Trail, DEFAULT_TRAILS } from '@/lib/trails'
 import UpcomingDepartures from '@/components/tours/UpcomingDepartures'
+import TrailExperiences from '@/components/experiences/TrailExperiences'
 import { getDepartures } from '@/lib/departures'
 import { getTours } from '@/lib/tours'
+import { getExperiencesByTrail, type TrekkingExperience } from '@/lib/experiences'
 import type { TourDate } from '@/components/tours/UpcomingDepartures'
+import { CalendarPlus } from 'lucide-react'
 
 const DIFF_COLOR: Record<string, string> = { Easy: '#4A7251', Moderate: '#C9A96E', Hard: '#c0392b', Strenuous: '#c0392b' }
 const DIFF_BG: Record<string, string> = { Easy: '#4A725122', Moderate: '#C9A96E22', Hard: '#c0392b22', Strenuous: '#c0392b22' }
@@ -28,6 +31,7 @@ export default function HikeDetailPage() {
   const [allTrails, setAllTrails] = useState<Trail[]>([])
   const [lightboxImg, setLightboxImg] = useState<string | null>(null)
   const [departures, setDepartures] = useState<TourDate[]>([])
+  const [experiences, setExperiences] = useState<TrekkingExperience[]>([])
 
   useEffect(() => {
     getTrails().then(trails => {
@@ -57,6 +61,7 @@ export default function HikeDetailPage() {
         }))
       setDepartures(tourDates)
     })
+    getExperiencesByTrail(id).then(setExperiences)
   }, [id])
 
   if (!trail) {
@@ -144,7 +149,11 @@ export default function HikeDetailPage() {
               dates={departures}
               context="Guided departures and experiences on this trail"
               trailRegion={trail.region}
+              customDatesHref={`/experiences/request?trail=${encodeURIComponent(trail.id)}`}
             />
+
+            {/* Marketplace: upcoming trekking experiences on this trail */}
+            <TrailExperiences trailId={trail.id} experiences={experiences} />
 
             {/* Multi-day breakdown */}
             {trail.is_multi_day && trail.days.length > 0 && (
@@ -265,6 +274,13 @@ export default function HikeDetailPage() {
               <Link href="/guides" className="block text-center bg-[#C9A96E] text-[#2d2d2d] py-3 font-sans text-sm font-medium hover:bg-[#b8935e] transition-colors">
                 Find a Guide →
               </Link>
+              <Link
+                href={`/experiences/request?trail=${encodeURIComponent(trail.id)}`}
+                className="mt-3 flex items-center justify-center gap-2 border border-white/30 text-white py-3 font-sans text-sm hover:bg-white/10 transition-colors"
+              >
+                <CalendarPlus size={14} /> Book on Custom Dates
+              </Link>
+              <p className="font-sans text-[11px] text-white/50 mt-2 text-center">Request a private trip instead of joining a scheduled departure</p>
             </div>
 
             <div className="bg-white border border-gray-200 p-5">

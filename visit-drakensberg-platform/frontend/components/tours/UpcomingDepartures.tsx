@@ -52,10 +52,12 @@ export default function UpcomingDepartures({
   dates,
   context,
   trailRegion,
+  customDatesHref,
 }: {
   dates: TourDate[]
   context?: string
   trailRegion?: string
+  customDatesHref?: string
 }) {
   const [filter, setFilter] = useState<'all' | TourDate['type']>('all')
   const [guestCounts, setGuestCounts] = useState<Record<string, number>>({})
@@ -268,8 +270,8 @@ export default function UpcomingDepartures({
           <p className="font-sans text-sm text-gray-700 font-medium">Can't find the right date?</p>
           <p className="font-sans text-xs text-gray-400">Request a private departure for your group</p>
         </div>
-        <Link href="/guides" className="font-sans text-sm border border-[#2d6a4f] text-[#2d6a4f] px-5 py-2.5 hover:bg-[#2d6a4f] hover:text-white transition-colors">
-          Enquire about private dates →
+        <Link href={customDatesHref ?? '/guides'} className="font-sans text-sm border border-[#2d6a4f] text-[#2d6a4f] px-5 py-2.5 hover:bg-[#2d6a4f] hover:text-white transition-colors">
+          {customDatesHref ? 'Book on Custom Dates →' : 'Enquire about private dates →'}
         </Link>
       </div>
     </div>

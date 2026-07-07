@@ -1,9 +1,25 @@
 'use client'
 import Link from 'next/link'
+import { useEffect, useState } from 'react'
 import { ArrowRight } from 'lucide-react'
 import Footer from '@/components/layout/Footer'
+import { getPublishedPackages } from '@/lib/packages'
 
-const PACKAGES = [
+type PackageCard = {
+  id: string
+  title: string
+  duration: string
+  price: number
+  originalPrice?: number
+  location: string
+  img: string
+  includes: string[]
+  tag?: string
+  rating?: number
+  reviews?: number
+}
+
+const PACKAGES: PackageCard[] = [
   {
     id: 'p1',
     title: 'Amphitheatre Weekend Escape',
@@ -55,6 +71,27 @@ const PACKAGES = [
 ]
 
 export default function PackagesPage() {
+  const [cards, setCards] = useState<PackageCard[]>(PACKAGES)
+
+  // Live admin-curated marketplace packages appear ahead of the showcase set.
+  useEffect(() => {
+    getPublishedPackages().then(live => {
+      if (live.length === 0) return
+      const liveCards: PackageCard[] = live.map(p => ({
+        id: p.id,
+        title: p.title,
+        duration: `${p.durationNights} night${p.durationNights !== 1 ? 's' : ''}`,
+        price: p.pricePerPerson,
+        originalPrice: p.originalPrice,
+        location: p.region || 'Drakensberg',
+        img: p.image || 'https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?w=900&q=80',
+        includes: p.components.map(c => c.title).filter(Boolean).slice(0, 5),
+        tag: p.featured ? (p.tag || 'Featured') : p.tag || undefined,
+      }))
+      setCards([...liveCards, ...PACKAGES])
+    })
+  }, [])
+
   return (
     <main className="bg-mist min-h-screen pt-16">
       {/* Header */}
@@ -68,7 +105,7 @@ export default function PackagesPage() {
 
       <div className="max-w-[1440px] mx-auto px-6 lg:px-12 py-12">
         <div className="grid lg:grid-cols-2 gap-8">
-          {PACKAGES.map((p) => (
+          {cards.map((p) => (
             <Link key={p.id} href={`/packages/${p.id}`} className="group bg-white border border-black/8 block hover:border-forest/30 transition-colors">
               <div className="relative overflow-hidden aspect-[16/9]">
                 <img src={p.img} alt={p.title}
@@ -109,7 +146,7 @@ export default function PackagesPage() {
                 </ul>
 
                 <div className="flex items-center justify-between border-t border-black/6 pt-4">
-                  <span className="font-sans text-xs text-forest/40">★ {p.rating} ({p.reviews} reviews)</span>
+                  <span className="font-sans text-xs text-forest/40">{p.rating ? `★ ${p.rating} (${p.reviews} reviews)` : 'Curated by Visit Drakensberg'}</span>
                   <span className="font-sans text-sm text-forest group-hover:text-gold transition-colors inline-flex items-center gap-1.5">
                     View package <ArrowRight className="w-3.5 h-3.5" />
                   </span>

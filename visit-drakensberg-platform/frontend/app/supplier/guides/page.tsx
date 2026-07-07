@@ -23,7 +23,10 @@ export default function GuidesPage() {
   const [guides, setGuides] = useState<Guide[]>([])
   const [loading, setLoading] = useState(true)
   const [adding, setAdding] = useState(false)
-  const [form, setForm] = useState({ name: '', certs: '', guideNo: '', speciality: '', languages: '' })
+  const [form, setForm] = useState({
+    name: '', certs: '', guideNo: '', speciality: '', languages: '',
+    qualifications: '', yearsExperience: '', highestSummit: '', completedExpeditions: '', portrait: '', bio: '',
+  })
   const set = (k: string, v: string) => setForm(f => ({ ...f, [k]: v }))
 
   useEffect(() => {
@@ -42,10 +45,15 @@ export default function GuidesPage() {
         supplierId: user.id,
         name: form.name, certs: form.certs, guideNo: form.guideNo,
         speciality: form.speciality, languages: form.languages,
+        qualifications: form.qualifications,
+        yearsExperience: Number(form.yearsExperience) || 0,
+        highestSummit: form.highestSummit,
+        completedExpeditions: Number(form.completedExpeditions) || 0,
+        portrait: form.portrait, bio: form.bio,
         rating: 0, tours: 0, status: 'pending', blocked: [],
       } as unknown as Omit<Guide, 'id' | 'createdAt'>)
       setGuides(g => [...g, saved])
-      setForm({ name: '', certs: '', guideNo: '', speciality: '', languages: '' })
+      setForm({ name: '', certs: '', guideNo: '', speciality: '', languages: '', qualifications: '', yearsExperience: '', highestSummit: '', completedExpeditions: '', portrait: '', bio: '' })
       setAdding(false)
       toast.success('Guide registered.')
     } catch {
@@ -85,7 +93,13 @@ export default function GuidesPage() {
             <F label="TBCSA Guide Number"><input value={form.guideNo} onChange={e => set('guideNo', e.target.value)} className={inp} /></F>
             <F label="Speciality"><input value={form.speciality} onChange={e => set('speciality', e.target.value)} className={inp} /></F>
             <F label="Languages"><input value={form.languages} onChange={e => set('languages', e.target.value)} placeholder="English, Zulu" className={inp} /></F>
+            <F label="Qualifications"><input value={form.qualifications} onChange={e => set('qualifications', e.target.value)} placeholder="FGASA Level 3, Wilderness First Responder" className={inp} /></F>
+            <F label="Years of Experience"><input type="number" min="0" value={form.yearsExperience} onChange={e => set('yearsExperience', e.target.value)} className={inp} /></F>
+            <F label="Highest Summit"><input value={form.highestSummit} onChange={e => set('highestSummit', e.target.value)} placeholder="e.g. Mafadi (3,450m)" className={inp} /></F>
+            <F label="Completed Expeditions"><input type="number" min="0" value={form.completedExpeditions} onChange={e => set('completedExpeditions', e.target.value)} className={inp} /></F>
+            <F label="Portrait URL"><input value={form.portrait} onChange={e => set('portrait', e.target.value)} placeholder="https://…" className={inp} /></F>
           </div>
+          <F label="Biography"><textarea rows={3} value={form.bio} onChange={e => set('bio', e.target.value)} className={`${inp} resize-none`} placeholder="Shown on the guide's public profile…" /></F>
           <p className="font-sans text-xs text-black/40">Guides will be reviewed within 2–3 business days before appearing publicly.</p>
           <div className="flex gap-3">
             <button onClick={add} className="bg-[#C9A96E] text-white font-sans text-sm px-4 py-2 rounded-lg hover:bg-[#b8965d]">Register Guide</button>

@@ -23,6 +23,17 @@ export type Tour = {
   supplierName: string
   supplierId: string
   createdAt: string
+  // Optional marketplace fields (trekking experience detail / comparison).
+  // Older tours won't carry these; readers must treat them as absent.
+  leadGuide?: string
+  accommodationStyle?: string
+  mealsIncluded?: string
+  transportIncluded?: boolean
+  equipmentIncluded?: boolean
+  guideExperienceYears?: number
+  rating?: number
+  reviewCount?: number
+  featured?: boolean
 }
 
 const KIND = 'tour'

@@ -233,3 +233,64 @@ middleware falls back to `profiles.role` when auth metadata has no role;
 availability / discounts / guides / staff / packages / events supplier
 modules persist via `supplier-entities` (no more mock data returning);
 checkout enforces supplier availability blocks on stays.
+
+## UPDATE 3 — marketplace extensions (2026-07-07)
+
+**Branch:** `claude/drakensberg-marketplace-extensions-kct62a`
+Run `frontend/supabase/migrations/20260707_marketplace.sql` (adds
+`vd_trip_requests` + widens the vd_entities public-read status list to
+include `verified` and `published`). Existing pages/navigation unchanged —
+everything below extends the platform.
+
+### Trekking experiences (marketplace view of tours × departures)
+- `lib/experiences.ts` composes `TrekkingExperience` from a supplier Tour +
+  Departure (both already store the Trail ID). Experience id = departure id.
+- `/hikes/[id]` gained an **Upcoming Trekking Experiences** section
+  (`components/experiences/TrailExperiences.tsx`) with View Experience /
+  Compare buttons, plus a **Book on Custom Dates** CTA. Trail content is
+  untouched and remains primary.
+- `/experiences/[id]` — dedicated commercial booking page per departure.
+- `/experiences/compare?trail=&ids=` — comparison, only between departures
+  sharing the same Trail ID.
+- `Tour` type gained optional marketplace fields (leadGuide,
+  accommodationStyle, mealsIncluded, transport/equipmentIncluded,
+  guideExperienceYears, rating, featured).
+
+### Custom-date booking journey (never instant)
+- `lib/custom-trips.ts` on `vd_trip_requests`. Status workflow: draft →
+  pending_guide → pending_operator → quote_ready → awaiting_payment →
+  confirmed | cancelled | rejected.
+- `/experiences/request?trail=&guide=` — 3-step form: details → matched
+  guides/operators (by trail, region, certifications, blocked-date
+  availability) → submit.
+- `/account/requests` — customer tracking, quote acceptance, simulated
+  payment (real payment still deferred platform-wide).
+- `/supplier/requests` — operator approves guide availability (validated
+  against blocked dates + overlapping requests), then operational approval +
+  quote with optional alternative dates/guide/pricing/itinerary, or decline.
+
+### Supplier directory (`/guides`)
+- Now operator-first: Tour Operator → Guide Team → Guide Profile.
+- `lib/operators.ts`: `operator_profile` entities (id `opr-<auth uuid>`) +
+  existing `supplier_guides`, merged with showcase fallbacks.
+- `/guides/operators/[id]` supplier profile; `/guides/[id]` now serves live
+  guides too and links back to the operator; **Book this Guide** enters the
+  custom-date journey with the guide preselected.
+- `/supplier/company` — operators edit/publish their public profile.
+- Supplier guide registration form gained public-profile fields
+  (qualifications, years, highest summit, expeditions, portrait, bio).
+
+### Admin marketplace
+- `/admin/packages` — Package Builder: create/edit/duplicate/archive/
+  publish/hide/feature/schedule; components carry supplier, cost/sell price,
+  margin, commission %, availability, booking/cancellation rules, notes.
+  Packages are admin-owned `package` entities (`lib/packages.ts`); status
+  column mirrors `published` → `active` for public read.
+- `/packages` merges live published packages ahead of the showcase set;
+  `/packages/[id]` books a live package in one step: master booking in
+  `vd_bookings` + per-supplier fulfilment orders in `vd_booking_orders`
+  (each supplier sees only their components, at cost price) —
+  `lib/package-bookings.ts`.
+- `/admin/marketplace` — operations dashboard tabs: operators, guides,
+  experiences, scheduled departures, custom trip requests, commissions;
+  revenue/margin analytics strip.
