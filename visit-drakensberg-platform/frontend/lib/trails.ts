@@ -6,7 +6,7 @@ export type TrailDay = {
   label: string
   distance: string
   elevation: string
-  difficulty: 'Easy' | 'Moderate' | 'Strenuous' | 'Challenging' | 'Difficult' | 'Extreme'
+  difficulty: 'Easy' | 'Moderate' | 'Strenuous' | 'Extreme'
   notes?: string
 }
 
@@ -14,7 +14,7 @@ export type Trail = {
   id: string
   name: string
   region: string
-  difficulty: 'Easy' | 'Moderate' | 'Strenuous'
+  difficulty: 'Easy' | 'Moderate' | 'Strenuous' | 'Extreme'
   distance: string
   duration: string
   elevation: string

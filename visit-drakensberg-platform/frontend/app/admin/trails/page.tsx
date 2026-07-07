@@ -7,12 +7,13 @@ import { analyseGpxAsync } from '@/lib/gpx'
 import RouteArtwork from '@/components/trails/RouteArtwork'
 
 const REGIONS = ['Northern Berg', 'Central Berg', 'Southern Berg', 'Royal Natal National Park', 'Champagne Valley', "Giant's Castle", 'Sani Pass']
-const DIFFICULTIES = ['Easy', 'Moderate', 'Strenuous'] as const
+const DIFFICULTIES = ['Easy', 'Moderate', 'Strenuous', 'Extreme'] as const
 
 const DIFF_STYLE: Record<string, string> = {
   Easy: 'bg-green-50 text-green-700',
   Moderate: 'bg-[#C9A96E]/15 text-[#8B6914]',
   Strenuous: 'bg-red-50 text-red-700',
+  Extreme: 'bg-red-100 text-red-900',
 }
 
 const inputCls = 'w-full border border-gray-200 px-3 py-2.5 font-sans text-sm focus:outline-none focus:border-[#2d6a4f] bg-[#F7F5F2]'
@@ -31,7 +32,7 @@ function GpxBuilder({ trail, onApply }: { trail: Trail; onApply: (patch: Partial
         gpx: { fileName, raw: text, uploadedAt: new Date().toISOString(), metadata: analytics.metadata },
         analytics,
         automatic_grade: analytics.automaticGrade,
-        difficulty: analytics.automaticGrade === 'Challenging' || analytics.automaticGrade === 'Difficult' || analytics.automaticGrade === 'Extreme' ? 'Strenuous' : analytics.automaticGrade,
+        difficulty: analytics.automaticGrade,
         distance: `${analytics.statistics.totalDistanceKm.toFixed(1)} km`,
         duration: `${Math.floor(analytics.statistics.estimatedHikingTimeHours)}h ${Math.round((analytics.statistics.estimatedHikingTimeHours % 1) * 60)}m`,
         elevation: `+${Math.round(analytics.statistics.totalAscentM)}m`,
@@ -213,7 +214,7 @@ function DaysEditor({ days, onChange }: { days: TrailDay[]; onChange: (days: Tra
               </div>
               <div className="md:col-span-3">
                 <label className={labelCls}>Notes</label>
-                <input value={day.notes ?? ''} onChange={e => updateDay(i, 'notes', e.target.value)} placeholder="Optional notes for this day…" className={inputCls} />
+                <textarea value={day.notes ?? ''} onChange={e => updateDay(i, 'notes', e.target.value)} placeholder="Optional notes for this day. Use blank lines to create paragraphs…" rows={4} className={`${inputCls} resize-y`} />
               </div>
             </div>
           </div>

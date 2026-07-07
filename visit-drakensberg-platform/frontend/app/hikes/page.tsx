@@ -7,8 +7,8 @@ import TrailExperiences from '@/components/experiences/TrailExperiences'
 import { getUpcomingExperiences, type TrekkingExperience } from '@/lib/experiences'
 import RouteArtwork from '@/components/trails/RouteArtwork'
 
-const DIFF_COLOR: Record<string, string> = { Easy: '#4A7251', Moderate: '#C9A96E', Strenuous: '#c0392b' }
-const DIFF_OPTS = ['All', 'Easy', 'Moderate', 'Strenuous']
+const DIFF_COLOR: Record<string, string> = { Easy: '#4A7251', Moderate: '#C9A96E', Strenuous: '#c0392b', Extreme: '#7f1d1d' }
+const DIFF_OPTS = ['All', 'Easy', 'Moderate', 'Strenuous', 'Extreme']
 
 function parseKm(distance: string): number {
   const m = distance.match(/[\d.]+/)

@@ -14,15 +14,17 @@ import { getExperiencesByTrail, type TrekkingExperience } from '@/lib/experience
 import type { TourDate } from '@/components/tours/UpcomingDepartures'
 import { CalendarPlus } from 'lucide-react'
 import TrailPlanner from '@/components/trails/TrailPlanner'
+import RouteArtwork from '@/components/trails/RouteArtwork'
 
-const DIFF_COLOR: Record<string, string> = { Easy: '#4A7251', Moderate: '#C9A96E', Hard: '#c0392b', Strenuous: '#c0392b' }
-const DIFF_BG: Record<string, string> = { Easy: '#4A725122', Moderate: '#C9A96E22', Hard: '#c0392b22', Strenuous: '#c0392b22' }
+const DIFF_COLOR: Record<string, string> = { Easy: '#4A7251', Moderate: '#C9A96E', Hard: '#c0392b', Strenuous: '#c0392b', Extreme: '#7f1d1d' }
+const DIFF_BG: Record<string, string> = { Easy: '#4A725122', Moderate: '#C9A96E22', Hard: '#c0392b22', Strenuous: '#c0392b22', Extreme: '#7f1d1d22' }
 
 const TRAIL_COLOR: Record<string, string> = {
   Easy: 'bg-[#4A7251]',
   Moderate: 'bg-[#2d6a4f]',
   Strenuous: 'bg-[#1a1a2e]',
   Hard: 'bg-[#1a1a2e]',
+  Extreme: 'bg-[#1a1a2e]',
 }
 
 
@@ -99,7 +101,12 @@ export default function HikeDetailPage() {
           <Link href="/hikes" className="inline-flex items-center gap-2 text-white/60 hover:text-white text-sm mb-8 transition-colors">
             <ArrowLeft size={16} /> All Trails
           </Link>
-          <div className="flex items-start justify-between flex-wrap gap-4">
+          {trail.analytics?.routeArtworkSvg && (
+            <div className="pointer-events-none absolute right-0 top-1/2 hidden h-52 w-[42%] -translate-y-1/2 items-center justify-center rounded-full border border-white/10 bg-white/5 p-8 md:flex">
+              <RouteArtwork trail={trail} tone="light" className="h-full w-full opacity-90" />
+            </div>
+          )}
+          <div className="relative z-10 flex items-start justify-between flex-wrap gap-4">
             <div>
               <p className="font-sans text-[10px] tracking-[0.2em] uppercase text-[#C9A96E] mb-2">{trail.region}</p>
               <h1 className="font-display italic text-5xl lg:text-6xl mb-4">{trail.name}</h1>
@@ -185,7 +192,7 @@ export default function HikeDetailPage() {
                         </div>
                       </div>
                       {day.notes && (
-                        <p className="font-sans text-sm text-gray-600 leading-relaxed border-t border-gray-100 pt-3">{day.notes}</p>
+                        <div className="font-sans text-sm text-gray-600 leading-relaxed border-t border-gray-100 pt-3 whitespace-pre-line">{day.notes}</div>
                       )}
                     </div>
                   ))}
