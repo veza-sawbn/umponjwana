@@ -24,9 +24,15 @@ function formatDate(iso: string) {
 export default function TrailExperiences({
   trailId,
   experiences,
+  title = 'Upcoming Trekking Experiences',
+  subtitle = 'Commercial departures offered by marketplace suppliers on this trail',
+  titleHref,
 }: {
   trailId: string
   experiences: TrekkingExperience[]
+  title?: string
+  subtitle?: string
+  titleHref?: string
 }) {
   const [selected, setSelected] = useState<string[]>([])
   const router = useRouter()
@@ -45,10 +51,12 @@ export default function TrailExperiences({
     <div>
       <div className="flex items-end justify-between mb-2 flex-wrap gap-3">
         <div>
-          <h2 className="font-display italic text-2xl text-[#000000]">Upcoming Trekking Experiences</h2>
-          <p className="font-sans text-xs text-gray-400 mt-0.5">
-            Commercial departures offered by marketplace suppliers on this trail
-          </p>
+          <h2 className="font-display italic text-2xl text-[#000000]">
+            {titleHref ? (
+              <Link href={titleHref} className="hover:text-[#2d6a4f] transition-colors">{title}</Link>
+            ) : title}
+          </h2>
+          {subtitle && <p className="font-sans text-xs text-gray-400 mt-0.5">{subtitle}</p>}
         </div>
         {experiences.length > 1 && (
           <button

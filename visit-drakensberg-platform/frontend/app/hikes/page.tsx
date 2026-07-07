@@ -3,6 +3,8 @@ import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import Footer from '@/components/layout/Footer'
 import { getTrails, type Trail } from '@/lib/trails'
+import TrailExperiences from '@/components/experiences/TrailExperiences'
+import { getUpcomingExperiences, type TrekkingExperience } from '@/lib/experiences'
 
 const DIFF_COLOR: Record<string, string> = { Easy: '#4A7251', Moderate: '#C9A96E', Strenuous: '#c0392b' }
 const DIFF_OPTS = ['All', 'Easy', 'Moderate', 'Strenuous']
@@ -14,16 +16,25 @@ function parseKm(distance: string): number {
 
 export default function HikesPage() {
   const [trails, setTrails] = useState<Trail[]>([])
+  const [experiences, setExperiences] = useState<TrekkingExperience[]>([])
   const [diff, setDiff] = useState('All')
   const [maxDist, setMaxDist] = useState(250)
 
   useEffect(() => {
     getTrails().then(all => setTrails(all.filter(t => t.status === 'published')))
+    getUpcomingExperiences().then(setExperiences)
   }, [])
 
   const filtered = trails.filter(t =>
     (diff === 'All' || t.difficulty === diff) && parseKm(t.distance) <= maxDist
   )
+
+  // Marketplace departures grouped per trail, following the active filters.
+  // Comparison stays scoped to one Trail ID, so each trail gets its own block.
+  const experienceGroups = filtered
+    .map(t => ({ trail: t, exps: experiences.filter(e => e.trailId === t.id) }))
+    .filter(g => g.exps.length > 0)
+    .sort((a, b) => a.exps[0].departureDate.localeCompare(b.exps[0].departureDate))
 
   const allKms = trails.map(t => parseKm(t.distance))
   const sliderMax = allKms.length ? Math.max(...allKms) : 250
@@ -123,6 +134,32 @@ export default function HikesPage() {
                 </Link>
               ))}
             </div>
+
+            {/* Marketplace: upcoming trekking experiences across these trails */}
+            {experienceGroups.length > 0 && (
+              <>
+                <div className="h-px bg-black/8 mt-12 mb-10" />
+                <div className="mb-8">
+                  <p className="font-sans text-xs tracking-[0.2em] uppercase text-gold mb-2">Marketplace</p>
+                  <h2 className="font-display text-3xl text-forest leading-none mb-2">Upcoming Trekking Experiences</h2>
+                  <p className="font-sans text-sm text-forest/50">
+                    Commercial departures offered by marketplace suppliers on these trails — compare and book, or open a trail for the full route details
+                  </p>
+                </div>
+                <div className="space-y-12">
+                  {experienceGroups.map(({ trail, exps }) => (
+                    <TrailExperiences
+                      key={trail.id}
+                      trailId={trail.id}
+                      experiences={exps}
+                      title={trail.name}
+                      subtitle={`${trail.region} · ${trail.distance} · ${trail.difficulty}`}
+                      titleHref={`/hikes/${trail.id}`}
+                    />
+                  ))}
+                </div>
+              </>
+            )}
           </>
         )}
       </div>
