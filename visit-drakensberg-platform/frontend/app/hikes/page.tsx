@@ -5,9 +5,10 @@ import Footer from '@/components/layout/Footer'
 import { getTrails, type Trail } from '@/lib/trails'
 import TrailExperiences from '@/components/experiences/TrailExperiences'
 import { getUpcomingExperiences, type TrekkingExperience } from '@/lib/experiences'
+import RouteArtwork from '@/components/trails/RouteArtwork'
 
-const DIFF_COLOR: Record<string, string> = { Easy: '#4A7251', Moderate: '#C9A96E', Strenuous: '#c0392b' }
-const DIFF_OPTS = ['All', 'Easy', 'Moderate', 'Strenuous']
+const DIFF_COLOR: Record<string, string> = { Easy: '#4A7251', Moderate: '#C9A96E', Strenuous: '#c0392b', Extreme: '#7f1d1d' }
+const DIFF_OPTS = ['All', 'Easy', 'Moderate', 'Strenuous', 'Extreme']
 
 function parseKm(distance: string): number {
   const m = distance.match(/[\d.]+/)
@@ -119,8 +120,12 @@ export default function HikesPage() {
               {filtered.map((t) => (
                 <Link key={t.id} href={`/hikes/${t.id}`} className="group block">
                   <div className="relative overflow-hidden aspect-[4/3] mb-4">
-                    <img loading="lazy" decoding="async" src={t.image} alt={t.name}
-                      className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" />
+                    {t.analytics?.routeArtworkSvg ? (
+                      <RouteArtwork trail={t} className="w-full h-full bg-white p-8 transition-transform duration-700 group-hover:scale-105" />
+                    ) : (
+                      <img loading="lazy" decoding="async" src={t.image} alt={t.name}
+                        className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" />
+                    )}
                     <span
                       className="absolute bottom-3 left-3 font-sans text-[10px] px-2.5 py-1 uppercase tracking-wide"
                       style={{ background: DIFF_COLOR[t.difficulty] + 'dd', color: '#fff' }}

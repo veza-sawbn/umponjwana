@@ -3,18 +3,58 @@
 import { useState, useEffect, useRef } from 'react'
 import { Plus, Pencil, Trash2, Star, X, Check, GripVertical, ImagePlus, CalendarDays } from 'lucide-react'
 import { Trail, TrailDay, getTrails, saveTrails, DEFAULT_TRAILS } from '@/lib/trails'
+import { analyseGpxAsync } from '@/lib/gpx'
+import RouteArtwork from '@/components/trails/RouteArtwork'
 
 const REGIONS = ['Northern Berg', 'Central Berg', 'Southern Berg', 'Royal Natal National Park', 'Champagne Valley', "Giant's Castle", 'Sani Pass']
-const DIFFICULTIES = ['Easy', 'Moderate', 'Strenuous'] as const
+const DIFFICULTIES = ['Easy', 'Moderate', 'Strenuous', 'Extreme'] as const
 
 const DIFF_STYLE: Record<string, string> = {
   Easy: 'bg-green-50 text-green-700',
   Moderate: 'bg-[#C9A96E]/15 text-[#8B6914]',
   Strenuous: 'bg-red-50 text-red-700',
+  Extreme: 'bg-red-100 text-red-900',
 }
 
 const inputCls = 'w-full border border-gray-200 px-3 py-2.5 font-sans text-sm focus:outline-none focus:border-[#2d6a4f] bg-[#F7F5F2]'
 const labelCls = 'block font-sans text-[10px] tracking-[0.12em] uppercase text-gray-400 mb-1.5'
+
+
+function GpxBuilder({ trail, onApply }: { trail: Trail; onApply: (patch: Partial<Trail>) => void }) {
+  const [busy, setBusy] = useState(false)
+  const [message, setMessage] = useState<string | null>(null)
+  async function process(text: string, fileName = 'uploaded-route.gpx') {
+    if (!text.trim()) return
+    setBusy(true); setMessage('Processing GPX analytics asynchronously…')
+    try {
+      const analytics = await analyseGpxAsync(text)
+      onApply({
+        gpx: { fileName, raw: text, uploadedAt: new Date().toISOString(), metadata: analytics.metadata },
+        analytics,
+        automatic_grade: analytics.automaticGrade,
+        difficulty: analytics.automaticGrade,
+        distance: `${analytics.statistics.totalDistanceKm.toFixed(1)} km`,
+        duration: `${Math.floor(analytics.statistics.estimatedHikingTimeHours)}h ${Math.round((analytics.statistics.estimatedHikingTimeHours % 1) * 60)}m`,
+        elevation: `+${Math.round(analytics.statistics.totalAscentM)}m`,
+        cruxes: analytics.cruxes,
+        waypoints: analytics.waypoints,
+        generated_at: analytics.metadata.processedAt,
+      })
+      setMessage(`Validated ${analytics.statistics.trackPointCount} track points, ${analytics.statistics.waypointCount} waypoints and ${analytics.cruxes.length} cruxes.`)
+    } catch (e) { setMessage(e instanceof Error ? e.message : 'Unable to parse GPX') }
+    setBusy(false)
+  }
+  return <div className="border-t border-gray-100 pt-6 space-y-4">
+    <div className="flex items-center justify-between gap-3"><div><label className={labelCls}>GPX Trail Builder</label><p className="font-sans text-xs text-gray-500">Upload, validate, recalculate analytics, detect cruxes and generate cached SVG route artwork.</p></div>{trail.analytics && <button type="button" onClick={() => process(trail.gpx?.raw || '')} className="border border-[#2d6a4f] px-3 py-2 font-sans text-xs text-[#2d6a4f]">Recalculate analytics</button>}</div>
+    <input type="file" accept=".gpx,application/gpx+xml,application/xml,text/xml" onChange={e => { const f=e.target.files?.[0]; if (f) f.text().then(t => process(t, f.name)) }} className="block w-full text-sm text-gray-500 file:mr-4 file:border-0 file:bg-[#2d6a4f] file:px-4 file:py-2 file:text-sm file:text-white" />
+    {message && <p className={`font-sans text-xs ${message.includes('Unable') || message.includes('Invalid') ? 'text-red-600' : 'text-[#2d6a4f]'}`}>{busy ? '⏳ ' : '✓ '}{message}</p>}
+    {trail.analytics && <div className="grid md:grid-cols-3 gap-4">
+      <div className="bg-[#F7F5F2] border border-gray-200 p-3"><p className={labelCls}>Route Artwork Preview</p><RouteArtwork trail={trail} className="h-32" /><button type="button" onClick={() => navigator.clipboard?.writeText(trail.analytics?.routeArtworkSvg || '')} className="mt-2 font-sans text-xs text-[#2d6a4f]">Copy SVG</button></div>
+      <div className="md:col-span-2 bg-[#F7F5F2] border border-gray-200 p-3"><p className={labelCls}>Automatically Generated Values</p><div className="grid grid-cols-2 md:grid-cols-4 gap-3 font-sans text-xs">{[['Distance', trail.analytics.statistics.totalDistanceKm.toFixed(1)+' km'], ['Gain', Math.round(trail.analytics.statistics.totalAscentM)+' m'], ['Loss', Math.round(trail.analytics.statistics.totalDescentM)+' m'], ['Min elev.', Math.round(trail.analytics.statistics.minimumElevationM)+' m'], ['Max elev.', Math.round(trail.analytics.statistics.maximumElevationM)+' m'], ['Avg slope', trail.analytics.statistics.averageSlopePct.toFixed(1)+'%'], ['Max slope', trail.analytics.statistics.maximumSlopePct.toFixed(0)+'%'], ['Difficulty', trail.analytics.automaticGrade]].map(([l,v]) => <div key={l}><p className="text-gray-400 uppercase tracking-wide">{l}</p><p className="font-medium text-gray-800">{v}</p></div>)}</div><p className="mt-3 font-sans text-xs text-gray-500">{trail.analytics.automaticExplanation}</p></div>
+    </div>}
+    {trail.analytics && <details className="bg-[#F7F5F2] border border-gray-200 p-3"><summary className="cursor-pointer font-sans text-xs uppercase tracking-wide text-gray-500">Crux and waypoint management</summary><div className="mt-3 grid md:grid-cols-2 gap-3 font-sans text-xs"><div><p className="font-medium mb-2">Detected cruxes</p>{trail.analytics.cruxes.map(c => <div key={c.id} className="border-t border-gray-200 py-2">{c.severity} · {c.distanceKm.toFixed(1)} km · {c.description}</div>)}</div><div><p className="font-medium mb-2">Waypoints</p>{trail.analytics.waypoints.length ? trail.analytics.waypoints.map(w => <div key={w.id} className="border-t border-gray-200 py-2">{w.category} · {w.name}</div>) : <p className="text-gray-400">No GPX waypoints detected. Manual marker editing can be added to this structured list.</p>}</div></div></details>}
+  </div>
+}
 
 function GalleryEditor({ images, onChange }: { images: string[]; onChange: (imgs: string[]) => void }) {
   const [newUrl, setNewUrl] = useState('')
@@ -174,7 +214,7 @@ function DaysEditor({ days, onChange }: { days: TrailDay[]; onChange: (days: Tra
               </div>
               <div className="md:col-span-3">
                 <label className={labelCls}>Notes</label>
-                <input value={day.notes ?? ''} onChange={e => updateDay(i, 'notes', e.target.value)} placeholder="Optional notes for this day…" className={inputCls} />
+                <textarea value={day.notes ?? ''} onChange={e => updateDay(i, 'notes', e.target.value)} placeholder="Optional notes for this day. Use blank lines to create paragraphs…" rows={4} className={`${inputCls} resize-y`} />
               </div>
             </div>
           </div>
@@ -252,6 +292,8 @@ function TrailForm({ trail, onChange, onSave, onCancel, saveLabel, saving }: {
         </div>
       </div>
 
+      <GpxBuilder trail={trail} onApply={patch => Object.entries(patch).forEach(([field, value]) => onChange(field, value))} />
+
       {/* Gallery */}
       <GalleryEditor images={trail.gallery} onChange={imgs => onChange('gallery', imgs)} />
 
@@ -306,7 +348,7 @@ function TrailForm({ trail, onChange, onSave, onCancel, saveLabel, saving }: {
 
 const BLANK_TRAIL: Trail = {
   id: '', name: '', region: 'Northern Berg', difficulty: 'Moderate', distance: '', duration: '', elevation: '',
-  status: 'draft', featured: false, image: '', gallery: [], description: '', trailhead: '',
+  status: 'draft', featured: false, image: '', gallery: [], description: '', trailhead: '', slug: '', park: '', visibility: 'public', trail_type: 'Out and back',
   permit_required: false, permit_cost: 0, what_to_bring: [], is_multi_day: false, days: [],
 }
 
@@ -459,6 +501,7 @@ export default function AdminTrailsPage() {
                   { label: 'Distance', value: trail.distance },
                   { label: 'Duration', value: trail.duration },
                   { label: 'Elevation', value: trail.elevation },
+                  ...(trail.analytics ? [{ label: 'GPX points', value: `${trail.analytics.statistics.trackPointCount}` }, { label: 'Cruxes', value: `${trail.analytics.cruxes.length}` }] : []),
                   ...(trail.is_multi_day ? [{ label: 'Days', value: `${trail.days.length}` }] : []),
                 ].map(s => (
                   <div key={s.label}>
