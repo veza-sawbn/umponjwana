@@ -1,10 +1,12 @@
 import { supabase } from './auth'
 
+import type { GpxAnalysis, TrailCrux, TrailGrade, TrailWaypoint } from './gpx'
+
 export type TrailDay = {
   label: string
   distance: string
   elevation: string
-  difficulty: 'Easy' | 'Moderate' | 'Strenuous'
+  difficulty: 'Easy' | 'Moderate' | 'Strenuous' | 'Challenging' | 'Difficult' | 'Extreme'
   notes?: string
 }
 
@@ -27,6 +29,20 @@ export type Trail = {
   what_to_bring: string[]
   is_multi_day: boolean
   days: TrailDay[]
+  slug?: string
+  park?: string
+  visibility?: 'public' | 'private'
+  trail_type?: string
+  gpx?: { fileName?: string; uploadedAt?: string; raw?: string; metadata?: GpxAnalysis['metadata'] }
+  analytics?: GpxAnalysis
+  manual_overrides?: Partial<Record<keyof GpxAnalysis['statistics'] | 'difficulty' | 'duration' | 'distance' | 'elevation', string | number>>
+  automatic_grade?: TrailGrade
+  manual_grade?: TrailGrade
+  grade_override_reason?: string
+  admin_notes?: string
+  cruxes?: TrailCrux[]
+  waypoints?: TrailWaypoint[]
+  generated_at?: string
 }
 
 export const DEFAULT_TRAILS: Trail[] = [

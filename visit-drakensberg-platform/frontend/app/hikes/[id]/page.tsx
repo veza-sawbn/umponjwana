@@ -13,6 +13,7 @@ import { getTours } from '@/lib/tours'
 import { getExperiencesByTrail, type TrekkingExperience } from '@/lib/experiences'
 import type { TourDate } from '@/components/tours/UpcomingDepartures'
 import { CalendarPlus } from 'lucide-react'
+import TrailPlanner from '@/components/trails/TrailPlanner'
 
 const DIFF_COLOR: Record<string, string> = { Easy: '#4A7251', Moderate: '#C9A96E', Hard: '#c0392b', Strenuous: '#c0392b' }
 const DIFF_BG: Record<string, string> = { Easy: '#4A725122', Moderate: '#C9A96E22', Hard: '#c0392b22', Strenuous: '#c0392b22' }
@@ -143,6 +144,8 @@ export default function HikeDetailPage() {
               <h2 className="font-display italic text-2xl text-[#000000] mb-4">About this Trail</h2>
               <p className="font-sans text-gray-700 leading-relaxed">{trail.description}</p>
             </div>
+
+            <TrailPlanner trail={trail} />
 
             {/* Upcoming departures */}
             <UpcomingDepartures
