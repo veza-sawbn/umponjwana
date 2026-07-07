@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { Plus, Pencil, Trash2, Star, X, Check, GripVertical, ImagePlus, CalendarDays } from 'lucide-react'
 import { Trail, TrailDay, getTrails, saveTrails, DEFAULT_TRAILS } from '@/lib/trails'
-import { analyseGpxAsync } from '@/lib/gpx'
+import { analyseGpxAsync, ROUTE_TYPES } from '@/lib/gpx'
 import RouteArtwork from '@/components/trails/RouteArtwork'
 
 const REGIONS = ['Northern Berg', 'Central Berg', 'Southern Berg', 'Royal Natal National Park', 'Champagne Valley', "Giant's Castle", 'Sani Pass']
@@ -27,7 +27,7 @@ function GpxBuilder({ trail, onApply }: { trail: Trail; onApply: (patch: Partial
     if (!text.trim()) return
     setBusy(true); setMessage('Processing GPX analytics asynchronously…')
     try {
-      const analytics = await analyseGpxAsync(text)
+      const analytics = await analyseGpxAsync(text, { routeType: trail.trail_type, distanceOverrideKm: trail.distance_override_km })
       onApply({
         gpx: { fileName, raw: text, uploadedAt: new Date().toISOString(), metadata: analytics.metadata },
         analytics,
@@ -45,12 +45,12 @@ function GpxBuilder({ trail, onApply }: { trail: Trail; onApply: (patch: Partial
     setBusy(false)
   }
   return <div className="border-t border-gray-100 pt-6 space-y-4">
-    <div className="flex items-center justify-between gap-3"><div><label className={labelCls}>GPX Trail Builder</label><p className="font-sans text-xs text-gray-500">Upload, validate, recalculate analytics, detect cruxes and generate cached SVG route artwork.</p></div>{trail.analytics && <button type="button" onClick={() => process(trail.gpx?.raw || '')} className="border border-[#2d6a4f] px-3 py-2 font-sans text-xs text-[#2d6a4f]">Recalculate analytics</button>}</div>
+    <div className="flex items-center justify-between gap-3"><div><label className={labelCls}>GPX Trail Builder</label><p className="font-sans text-xs text-gray-500">Upload, validate, recalculate analytics, detect cruxes and generate cached SVG route artwork. The route type and distance override above are applied during processing — change them and hit Recalculate analytics.</p></div>{trail.analytics && <button type="button" onClick={() => process(trail.gpx?.raw || '')} className="border border-[#2d6a4f] px-3 py-2 font-sans text-xs text-[#2d6a4f]">Recalculate analytics</button>}</div>
     <input type="file" accept=".gpx,application/gpx+xml,application/xml,text/xml" onChange={e => { const f=e.target.files?.[0]; if (f) f.text().then(t => process(t, f.name)) }} className="block w-full text-sm text-gray-500 file:mr-4 file:border-0 file:bg-[#2d6a4f] file:px-4 file:py-2 file:text-sm file:text-white" />
     {message && <p className={`font-sans text-xs ${message.includes('Unable') || message.includes('Invalid') ? 'text-red-600' : 'text-[#2d6a4f]'}`}>{busy ? '⏳ ' : '✓ '}{message}</p>}
     {trail.analytics && <div className="grid md:grid-cols-3 gap-4">
       <div className="bg-[#F7F5F2] border border-gray-200 p-3"><p className={labelCls}>Route Artwork Preview</p><RouteArtwork trail={trail} className="h-32" /><button type="button" onClick={() => navigator.clipboard?.writeText(trail.analytics?.routeArtworkSvg || '')} className="mt-2 font-sans text-xs text-[#2d6a4f]">Copy SVG</button></div>
-      <div className="md:col-span-2 bg-[#F7F5F2] border border-gray-200 p-3"><p className={labelCls}>Automatically Generated Values</p><div className="grid grid-cols-2 md:grid-cols-4 gap-3 font-sans text-xs">{[['Distance', trail.analytics.statistics.totalDistanceKm.toFixed(1)+' km'], ['Gain', Math.round(trail.analytics.statistics.totalAscentM)+' m'], ['Loss', Math.round(trail.analytics.statistics.totalDescentM)+' m'], ['Min elev.', Math.round(trail.analytics.statistics.minimumElevationM)+' m'], ['Max elev.', Math.round(trail.analytics.statistics.maximumElevationM)+' m'], ['Avg slope', trail.analytics.statistics.averageSlopePct.toFixed(1)+'%'], ['Max slope', trail.analytics.statistics.maximumSlopePct.toFixed(0)+'%'], ['Difficulty', trail.analytics.automaticGrade]].map(([l,v]) => <div key={l}><p className="text-gray-400 uppercase tracking-wide">{l}</p><p className="font-medium text-gray-800">{v}</p></div>)}</div><p className="mt-3 font-sans text-xs text-gray-500">{trail.analytics.automaticExplanation}</p></div>
+      <div className="md:col-span-2 bg-[#F7F5F2] border border-gray-200 p-3"><p className={labelCls}>Automatically Generated Values</p><div className="grid grid-cols-2 md:grid-cols-4 gap-3 font-sans text-xs">{[['Distance', trail.analytics.statistics.totalDistanceKm.toFixed(1)+' km'], ['Gain', Math.round(trail.analytics.statistics.totalAscentM)+' m'], ['Loss', Math.round(trail.analytics.statistics.totalDescentM)+' m'], ['Min elev.', Math.round(trail.analytics.statistics.minimumElevationM)+' m'], ['Max elev.', Math.round(trail.analytics.statistics.maximumElevationM)+' m'], ['Avg slope', trail.analytics.statistics.averageSlopePct.toFixed(1)+'%'], ['Max slope', trail.analytics.statistics.maximumSlopePct.toFixed(0)+'%'], ['Difficulty', trail.analytics.automaticGrade], ...(trail.analytics.routeType ? [['Route type', trail.analytics.routeType]] : []), ...(trail.analytics.distanceOverrideKm ? [['GPX distance', trail.analytics.gpxDistanceKm.toFixed(1)+' km']] : [])].map(([l,v]) => <div key={l}><p className="text-gray-400 uppercase tracking-wide">{l}</p><p className="font-medium text-gray-800">{v}</p></div>)}</div><p className="mt-3 font-sans text-xs text-gray-500">{trail.analytics.automaticExplanation}</p></div>
     </div>}
     {trail.analytics && <details className="bg-[#F7F5F2] border border-gray-200 p-3"><summary className="cursor-pointer font-sans text-xs uppercase tracking-wide text-gray-500">Crux and waypoint management</summary><div className="mt-3 grid md:grid-cols-2 gap-3 font-sans text-xs"><div><p className="font-medium mb-2">Detected cruxes</p>{trail.analytics.cruxes.map(c => <div key={c.id} className="border-t border-gray-200 py-2">{c.severity} · {c.distanceKm.toFixed(1)} km · {c.description}</div>)}</div><div><p className="font-medium mb-2">Waypoints</p>{trail.analytics.waypoints.length ? trail.analytics.waypoints.map(w => <div key={w.id} className="border-t border-gray-200 py-2">{w.category} · {w.name}</div>) : <p className="text-gray-400">No GPX waypoints detected. Manual marker editing can be added to this structured list.</p>}</div></div></details>}
   </div>
@@ -253,8 +253,20 @@ function TrailForm({ trail, onChange, onSave, onCancel, saveLabel, saving }: {
           </select>
         </div>
         <div>
+          <label className={labelCls}>Route Type</label>
+          <select value={trail.trail_type || 'Out and back'} onChange={e => onChange('trail_type', e.target.value)} className={inputCls}>
+            {ROUTE_TYPES.map(r => <option key={r}>{r}</option>)}
+          </select>
+          <p className="mt-1 font-sans text-[11px] text-gray-400">Out and back doubles the one-way GPX track; loops and point-to-point routes use it as recorded.</p>
+        </div>
+        <div>
           <label className={labelCls}>Total Distance</label>
           <input value={trail.distance} onChange={e => onChange('distance', e.target.value)} placeholder="e.g. 14 km" className={inputCls} />
+        </div>
+        <div>
+          <label className={labelCls}>Actual Distance Override (km)</label>
+          <input type="number" min="0" step="0.1" value={trail.distance_override_km ?? ''} onChange={e => onChange('distance_override_km', e.target.value === '' ? undefined : Number(e.target.value))} placeholder="Optional, e.g. 14.2" className={inputCls} />
+          <p className="mt-1 font-sans text-[11px] text-gray-400">Corrects an inaccurate GPX distance so our figures match other platforms. Leave blank to use the calculated value.</p>
         </div>
         <div>
           <label className={labelCls}>Duration</label>
@@ -296,6 +308,14 @@ function TrailForm({ trail, onChange, onSave, onCancel, saveLabel, saving }: {
 
       {/* Gallery */}
       <GalleryEditor images={trail.gallery} onChange={imgs => onChange('gallery', imgs)} />
+
+      {/* Trail highlights */}
+      <ListEditor
+        label="Trail Highlights"
+        items={trail.highlights || []}
+        onChange={items => onChange('highlights', items)}
+        placeholder="e.g. Chain ladder ascent to the Amphitheatre"
+      />
 
       {/* What to bring */}
       <ListEditor
@@ -349,7 +369,7 @@ function TrailForm({ trail, onChange, onSave, onCancel, saveLabel, saving }: {
 const BLANK_TRAIL: Trail = {
   id: '', name: '', region: 'Northern Berg', difficulty: 'Moderate', distance: '', duration: '', elevation: '',
   status: 'draft', featured: false, image: '', gallery: [], description: '', trailhead: '', slug: '', park: '', visibility: 'public', trail_type: 'Out and back',
-  permit_required: false, permit_cost: 0, what_to_bring: [], is_multi_day: false, days: [],
+  permit_required: false, permit_cost: 0, what_to_bring: [], highlights: [], is_multi_day: false, days: [],
 }
 
 export default function AdminTrailsPage() {

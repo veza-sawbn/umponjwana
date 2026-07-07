@@ -27,12 +27,14 @@ export type Trail = {
   permit_required: boolean
   permit_cost: number
   what_to_bring: string[]
+  highlights?: string[]
   is_multi_day: boolean
   days: TrailDay[]
   slug?: string
   park?: string
   visibility?: 'public' | 'private'
   trail_type?: string
+  distance_override_km?: number
   gpx?: { fileName?: string; uploadedAt?: string; raw?: string; metadata?: GpxAnalysis['metadata'] }
   analytics?: GpxAnalysis
   manual_overrides?: Partial<Record<keyof GpxAnalysis['statistics'] | 'difficulty' | 'duration' | 'distance' | 'elevation', string | number>>
@@ -67,6 +69,8 @@ export const DEFAULT_TRAILS: Trail[] = [
     permit_required: true,
     permit_cost: 80,
     what_to_bring: ['Layers (summit wind is significant)', '3L water minimum', 'Snacks and lunch', 'Hiking poles', 'Rain jacket', 'Headlamp for early starts', 'Park entry permit'],
+    highlights: ['Chain ladder ascent to the Amphitheatre plateau', 'Tugela Falls — the second highest waterfall in the world', 'Panoramic views across the escarpment into Lesotho'],
+    trail_type: 'Out and back',
     is_multi_day: false,
     days: [],
   },
@@ -87,6 +91,8 @@ export const DEFAULT_TRAILS: Trail[] = [
     permit_required: false,
     permit_cost: 0,
     what_to_bring: ['2L water', 'Snacks', 'Sun protection', 'Light jacket'],
+    highlights: ['The iconic chain ladders', 'Views over the Amphitheatre wall', 'Escarpment-edge lookout points'],
+    trail_type: 'Out and back',
     is_multi_day: false,
     days: [],
   },
@@ -147,6 +153,7 @@ export const DEFAULT_TRAILS: Trail[] = [
     permit_required: true,
     permit_cost: 200,
     what_to_bring: ['Full camping kit', 'Navigation map & compass', '4L water capacity', 'Emergency beacon', 'Bear canister for food', 'All meals self-catered'],
+    trail_type: 'Point to point',
     is_multi_day: true,
     days: [
       { label: 'Day 1: Sentinel to Ifidi Pass', distance: '15 km', elevation: '+900m', difficulty: 'Strenuous', notes: 'Ascend via Chain Ladder, camp on the plateau.' },

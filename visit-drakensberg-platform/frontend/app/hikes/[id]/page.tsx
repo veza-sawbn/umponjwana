@@ -152,6 +152,21 @@ export default function HikeDetailPage() {
               <p className="font-sans text-gray-700 leading-relaxed">{trail.description}</p>
             </div>
 
+            {/* Trail highlights */}
+            {(trail.highlights?.length ?? 0) > 0 && (
+              <div>
+                <h2 className="font-display italic text-2xl text-[#000000] mb-4">Trail Highlights</h2>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                  {trail.highlights!.map(item => (
+                    <div key={item} className="flex items-start gap-2.5 bg-white border border-gray-200 px-4 py-3">
+                      <Star size={14} className="text-[#C9A96E] mt-0.5 shrink-0" />
+                      <span className="font-sans text-sm text-gray-700">{item}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
             <TrailPlanner trail={trail} />
 
             {/* Upcoming departures */}
@@ -297,6 +312,9 @@ export default function HikeDetailPage() {
               <h3 className="font-display italic text-xl mb-4">Trail Info</h3>
               <div className="space-y-3 font-sans text-sm">
                 <div className="flex justify-between"><span className="text-gray-400">Region</span><span className="text-right ml-4">{trail.region}</span></div>
+                {trail.trail_type && (
+                  <div className="flex justify-between"><span className="text-gray-400">Route type</span><span>{trail.trail_type}</span></div>
+                )}
                 <div className="flex justify-between"><span className="text-gray-400">Distance</span><span>{trail.distance}</span></div>
                 <div className="flex justify-between"><span className="text-gray-400">Elevation</span><span>{trail.elevation}</span></div>
                 <div className="flex justify-between"><span className="text-gray-400">Duration</span><span>{trail.duration}</span></div>
