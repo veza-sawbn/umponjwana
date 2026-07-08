@@ -10,7 +10,7 @@ import {
 } from 'lucide-react'
 import { supabase } from '@/lib/auth'
 import { getTrails, type Trail } from '@/lib/trails'
-import { getTours } from '@/lib/tours'
+import { getTours, type Tour } from '@/lib/tours'
 import {
   getOperators, getGuidesByOperator, type OperatorProfile, type GuideProfile,
 } from '@/lib/operators'
@@ -84,19 +84,38 @@ function RequestContent() {
 
   // Platform search: operators that run tours on this trail, or operate in
   // the trail's region, with each operator's verified guide roster attached.
+  // Suppliers with an active tour on the trail but no published directory
+  // profile are still suggested, using a minimal card built from their tour.
   useEffect(() => {
     if (!trail) { setMatches([]); return }
     let cancelled = false
     async function match(selected: Trail) {
       const [operators, tours] = await Promise.all([getOperators(), getTours()])
-      const operatorIdsOnTrail = new Set(
-        tours.filter(t => t.trailId === selected.id && t.status === 'active').map(t => t.supplierId),
-      )
+      const trailTours = tours.filter(t => t.trailId === selected.id && t.status === 'active')
+      const operatorIdsOnTrail = new Set(trailTours.map(t => t.supplierId).filter(Boolean))
+      const profiledSupplierIds = new Set(operators.map(o => o.supplierId))
+      const unprofiled = new Map<string, Tour>()
+      for (const t of trailTours) {
+        if (t.supplierId && !profiledSupplierIds.has(t.supplierId)) unprofiled.set(t.supplierId, t)
+      }
+      const candidates: OperatorProfile[] = [
+        ...operators,
+        ...[...unprofiled.values()].map(t => ({
+          id: `opr-${t.supplierId}`,
+          supplierId: t.supplierId,
+          companyName: t.supplierName || t.name,
+          logo: '', location: '', yearsOperating: 0,
+          certifications: [], languages: [], activities: [], overview: '',
+          operatingRegions: [], licences: [], insurance: '', emergencyProcedures: '',
+          equipmentOwned: [], rating: t.rating ?? null, reviewCount: t.reviewCount ?? 0,
+          status: 'active' as const, createdAt: t.createdAt,
+        })),
+      ]
       const results: OperatorMatch[] = []
-      for (const op of operators) {
+      for (const op of candidates) {
         const runsTrail = op.supplierId !== '' && operatorIdsOnTrail.has(op.supplierId)
         const inRegion = op.operatingRegions.includes(selected.region)
-        if (!runsTrail && !inRegion && !op.showcase) continue
+        if (!runsTrail && !inRegion) continue
         const guides = await getGuidesByOperator(op)
         results.push({ operator: op, guides, runsTrail, inRegion })
       }
@@ -304,7 +323,10 @@ function RequestContent() {
                           <p className="font-display italic text-lg">{m.operator.companyName}</p>
                           {m.runsTrail && <span className="font-sans text-[10px] tracking-[0.08em] uppercase px-2 py-0.5 bg-[#2d6a4f]/10 text-[#2d6a4f]">Runs this trail</span>}
                         </div>
-                        <p className="font-sans text-xs text-gray-500 mt-0.5">{m.operator.location} · {m.operator.yearsOperating} years operating</p>
+                        <p className="font-sans text-xs text-gray-500 mt-0.5">
+                          {[m.operator.location, m.operator.yearsOperating > 0 ? `${m.operator.yearsOperating} years operating` : '']
+                            .filter(Boolean).join(' · ') || 'Marketplace tour operator'}
+                        </p>
                         <div className="flex items-center gap-3 mt-1 font-sans text-xs text-gray-400 flex-wrap">
                           {m.operator.certifications.slice(0, 3).map(c => <span key={c}>{c}</span>)}
                           {m.operator.rating !== null && (
