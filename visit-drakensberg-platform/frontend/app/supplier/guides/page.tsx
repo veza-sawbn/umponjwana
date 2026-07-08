@@ -37,7 +37,7 @@ export default function GuidesPage() {
   }, [])
 
   async function add() {
-    if (!form.name) return
+    if (!form.name.trim()) { toast.error('The guide\'s full name is required.'); return }
     try {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) throw new Error('no session')
@@ -73,8 +73,8 @@ export default function GuidesPage() {
   }
 
   return (
-    <div className="p-8 space-y-6">
-      <div className="flex items-center justify-between">
+    <div className="p-4 sm:p-8 space-y-6">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-3">
           <Users size={20} className="text-[#C9A96E]" />
           <h1 className="font-display italic text-2xl text-black/90">Guides</h1>
@@ -87,7 +87,7 @@ export default function GuidesPage() {
       {adding && (
         <div className="bg-white rounded-xl border border-black/8 p-6 space-y-4">
           <p className="font-sans font-semibold text-black/80">Register New Guide</p>
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <F label="Full Name" required><input value={form.name} onChange={e => set('name', e.target.value)} className={inp} /></F>
             <F label="FGASA / Cert Number"><input value={form.certs} onChange={e => set('certs', e.target.value)} className={inp} /></F>
             <F label="TBCSA Guide Number"><input value={form.guideNo} onChange={e => set('guideNo', e.target.value)} className={inp} /></F>
@@ -113,14 +113,14 @@ export default function GuidesPage() {
           const s = STATUS[g.status as Guide['status']] ?? STATUS.pending
           const Icon = s.Icon
           return (
-            <div key={g.id} className="bg-white rounded-xl border border-black/8 p-5 flex items-center gap-4">
+            <div key={g.id} className="bg-white rounded-xl border border-black/8 p-5 flex flex-wrap items-center gap-4">
               <div className="w-10 h-10 rounded-full bg-[#C9A96E]/10 flex items-center justify-center shrink-0">
                 <span className="font-sans text-sm font-semibold text-[#C9A96E]">{g.name.split(' ').map(n => n[0]).join('')}</span>
               </div>
               <div className="flex-1 min-w-0">
                 <p className="font-sans font-semibold text-black/90">{g.name}</p>
                 <p className="font-sans text-xs text-black/40 mt-0.5">{g.certs}</p>
-                <div className="flex items-center gap-4 mt-1">
+                <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-1">
                   {g.speciality && <span className="font-sans text-xs text-black/40 flex items-center gap-1"><Mountain size={11} /> {g.speciality}</span>}
                   {g.tours > 0 && <span className="font-sans text-xs text-black/40 flex items-center gap-1"><Star size={11} /> {g.rating} · {g.tours} tours</span>}
                   {g.languages && <span className="font-sans text-xs text-black/40">{g.languages}</span>}
