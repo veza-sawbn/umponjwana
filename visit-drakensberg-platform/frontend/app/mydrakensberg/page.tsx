@@ -3,6 +3,8 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import Footer from '@/components/layout/Footer'
+import Editable from '@/components/editor/Editable'
+import { useSiteSection } from '@/lib/use-site-section'
 import { Clock, ArrowRight } from 'lucide-react'
 
 const CATEGORIES = ['All', 'Culture', 'Heritage', 'Wildlife', 'Cuisine', 'Hiking Stories', 'History', 'Conservation']
@@ -78,6 +80,7 @@ const ARTICLES = [
 
 export default function MyDrakensbergPage() {
   const [activeCategory, setActiveCategory] = useState('All')
+  const c = useSiteSection('stories_page')
 
   const filtered = activeCategory === 'All' ? ARTICLES : ARTICLES.filter(a => a.category === activeCategory)
   const featured = ARTICLES.find(a => a.featured)
@@ -89,11 +92,17 @@ export default function MyDrakensbergPage() {
       {/* Hero */}
       <section className="bg-[#000000] text-white pt-32 pb-20 px-6 lg:px-12">
         <div className="max-w-[1440px] mx-auto">
-          <span className="font-sans text-[10px] tracking-[0.2em] uppercase text-[#C9A96E] mb-4 block">MyDrakensberg</span>
-          <h1 className="font-display italic text-6xl lg:text-8xl mb-6 max-w-3xl">Stories from the Berg</h1>
-          <p className="font-sans text-lg text-white/50 max-w-xl leading-relaxed">
-            In-depth writing on the culture, history, wildlife and landscapes of the Drakensberg — from guides, historians, naturalists and storytellers who know the Berg deeply.
-          </p>
+          <Editable section="stories_page" fieldKey="eyebrow" value={c.eyebrow} label="Eyebrow" type="text">
+            <span className="font-sans text-[10px] tracking-[0.2em] uppercase text-[#C9A96E] mb-4 block">{c.eyebrow}</span>
+          </Editable>
+          <Editable section="stories_page" fieldKey="heading" value={c.heading} label="Heading" type="text">
+            <h1 className="font-display italic text-6xl lg:text-8xl mb-6 max-w-3xl">{c.heading}</h1>
+          </Editable>
+          <Editable section="stories_page" fieldKey="subheading" value={c.subheading} label="Subheading" type="textarea">
+            <p className="font-sans text-lg text-white/50 max-w-xl leading-relaxed">
+              {c.subheading}
+            </p>
+          </Editable>
         </div>
       </section>
 

@@ -2,6 +2,7 @@
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import Footer from '@/components/layout/Footer'
+import EditablePageHeader from '@/components/editor/EditablePageHeader'
 import { getTrails, type Trail } from '@/lib/trails'
 import TrailExperiences from '@/components/experiences/TrailExperiences'
 import { getUpcomingExperiences, type TrekkingExperience } from '@/lib/experiences'
@@ -43,13 +44,7 @@ export default function HikesPage() {
   return (
     <main className="bg-mist min-h-screen pt-16">
       {/* Header */}
-      <section className="bg-forest text-white py-16 px-6 lg:px-12">
-        <div className="max-w-[1440px] mx-auto">
-          <p className="font-sans text-xs tracking-[0.2em] uppercase text-white/30 mb-3">On foot</p>
-          <h1 className="font-display text-5xl lg:text-6xl text-white leading-none mb-4">Hikes & Trails</h1>
-          <p className="font-sans text-sm text-white/50">From gentle valley walks to multi-day escarpment routes</p>
-        </div>
-      </section>
+      <EditablePageHeader section="hikes_page" />
 
       <div className="max-w-[1440px] mx-auto px-6 lg:px-12 py-10">
         {/* Filters */}

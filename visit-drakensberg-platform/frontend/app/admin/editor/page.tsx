@@ -1,7 +1,7 @@
 'use client'
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { X, Save, Check, Loader2, Monitor, ExternalLink, MousePointer2 } from 'lucide-react'
-import { setSiteContent } from '@/lib/site-content'
+import { getSiteContent, setSiteContent, type SiteContentKey } from '@/lib/site-content'
 import type { EditFieldConfig, FieldType } from '@/lib/edit-mode-context'
 
 const PAGES = [
@@ -65,11 +65,15 @@ export default function AdminEditorPage() {
   async function handleSaveAll() {
     if (saving || Object.keys(pending).length === 0) return
     setSaving(true)
+    // Merge into the currently stored section so fields edited in an earlier
+    // session aren't clobbered by a partial write.
     await Promise.all(
-      Object.entries(pending).map(([section, fields]) =>
-        setSiteContent(section as any, fields as any)
-      )
+      Object.entries(pending).map(async ([section, fields]) => {
+        const current = await getSiteContent(section as SiteContentKey)
+        await setSiteContent(section as SiteContentKey, { ...current, ...fields } as any)
+      })
     )
+    setPending({})
     setSaving(false)
     setSaved(true)
     setTimeout(() => setSaved(false), 2500)

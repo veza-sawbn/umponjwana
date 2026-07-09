@@ -2,6 +2,7 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import Footer from '@/components/layout/Footer'
+import EditablePageHeader from '@/components/editor/EditablePageHeader'
 import { getActivities, type Activity } from '@/lib/activities'
 
 const CATEGORIES = [
@@ -30,13 +31,7 @@ export default function ActivitiesPage() {
 
   return (
     <main className="bg-mist min-h-screen pt-16">
-      <section className="bg-forest text-white py-16 px-6 lg:px-12">
-        <div className="max-w-[1440px] mx-auto">
-          <p className="font-sans text-xs tracking-[0.2em] uppercase text-white/30 mb-3">Things to do</p>
-          <h1 className="font-display text-5xl lg:text-6xl text-white leading-none mb-4">Activities</h1>
-          <p className="font-sans text-sm text-white/50">Guided experiences, tours and adventures across the Drakensberg</p>
-        </div>
-      </section>
+      <EditablePageHeader section="activities_page" />
 
       <section className="bg-white border-b border-black/8 px-6 lg:px-12">
         <div className="max-w-[1440px] mx-auto flex gap-8 overflow-x-auto">
