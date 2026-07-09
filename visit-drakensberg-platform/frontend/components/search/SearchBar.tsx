@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { MapPin, Calendar, Users, Search } from 'lucide-react'
+import { MapPin, Calendar, Users, Search, ChevronDown } from 'lucide-react'
 import { useBooking } from '@/lib/booking-context'
 import { getRegionNames } from '@/lib/regions'
 
@@ -17,6 +17,7 @@ export default function SearchBar() {
   const [checkIn, setCheckIn] = useState(savedCheckIn || '')
   const [checkOut, setCheckOut] = useState(savedCheckOut || '')
   const [guests, setGuests] = useState(savedGuests || 2)
+  const [isMobileExpanded, setIsMobileExpanded] = useState(false)
 
   const today = new Date().toISOString().split('T')[0]
 
@@ -37,6 +38,21 @@ export default function SearchBar() {
 
   return (
     <div className="bg-white border border-white/20 shadow-2xl">
+      <button
+        type="button"
+        onClick={() => setIsMobileExpanded(open => !open)}
+        aria-expanded={isMobileExpanded}
+        aria-controls="home-search-availability-fields"
+        className="md:hidden w-full bg-[#2d6a4f] text-white px-5 py-4 flex items-center justify-between gap-3 font-sans text-sm tracking-[0.08em] uppercase"
+      >
+        <span className="flex items-center gap-2.5">
+          <Search size={15} />
+          Search Availability
+        </span>
+        <ChevronDown size={16} className={`transition-transform ${isMobileExpanded ? 'rotate-180' : ''}`} />
+      </button>
+
+      <div id="home-search-availability-fields" className={`${isMobileExpanded ? 'block' : 'hidden'} md:block`}>
       {/* Free-text query */}
       <div className="px-5 py-4 border-b border-black/10 flex items-center gap-3">
         <Search size={14} className="text-gray-400 shrink-0" />
@@ -127,6 +143,7 @@ export default function SearchBar() {
         <Search size={15} />
         Search Availability
       </button>
+      </div>
     </div>
   )
 }
