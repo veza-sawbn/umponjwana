@@ -132,13 +132,17 @@ function propToStay(prop: Property, rooms: Room[]) {
     images: prop.photos.length > 0 ? prop.photos : ['https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=1400&q=80'],
     checkIn: prop.checkIn,
     checkOut: prop.checkOut,
-    rooms: rooms.map(r => ({
+    rooms: rooms.filter(r => r.status === 'active').map(r => ({
       id: r.id,
       name: r.name,
       description: [r.bedConfig, r.enSuite ? 'En-suite' : '', r.sizeSqm ? `${r.sizeSqm}m²` : ''].filter(Boolean).join(' · '),
       max_guests: r.maxOccupancy,
       price_per_night: r.basePrice,
       amenities: [...(r.features ?? []), ...(r.inclusions ?? [])],
+      images: r.images ?? [],
+      units: r.units,
+      minNights: r.minNights,
+      cleaningFee: r.cleaningFee,
     })),
     reviews_list: [] as any[],
   }
@@ -154,6 +158,7 @@ export default function StayDetailPage() {
 
   const [selectedRoom, setSelectedRoom] = useState<any>(null)
   const [showRooms, setShowRooms] = useState(false)
+  const [roomImage, setRoomImage] = useState<string | null>(null)
   const [checkIn, setCheckIn] = useState(booking.checkIn || '')
   const [checkOut, setCheckOut] = useState(booking.checkOut || '')
   const [guests, setGuests] = useState(booking.guests || 2)
@@ -337,6 +342,36 @@ export default function StayDetailPage() {
                         </div>
                       )}
                       <div className="p-5 flex items-start justify-between gap-4">
+                        {room.images?.length > 0 && (
+                          <div className="hidden sm:block w-40 shrink-0">
+                            <button
+                              type="button"
+                              onClick={e => { e.stopPropagation(); setRoomImage(room.images[0]) }}
+                              className="block w-full aspect-[4/3] overflow-hidden bg-gray-100"
+                            >
+                              <img src={room.images[0]} alt={room.name} className="w-full h-full object-cover hover:opacity-90 transition-opacity" />
+                            </button>
+                            {room.images.length > 1 && (
+                              <div className="grid grid-cols-3 gap-1 mt-1">
+                                {room.images.slice(1, 4).map((url: string, i: number) => (
+                                  <button
+                                    key={i}
+                                    type="button"
+                                    onClick={e => { e.stopPropagation(); setRoomImage(url) }}
+                                    className="relative aspect-square overflow-hidden bg-gray-100"
+                                  >
+                                    <img src={url} alt="" className="w-full h-full object-cover hover:opacity-90 transition-opacity" />
+                                    {i === 2 && room.images.length > 4 && (
+                                      <span className="absolute inset-0 bg-black/50 flex items-center justify-center font-sans text-[10px] text-white">
+                                        +{room.images.length - 4}
+                                      </span>
+                                    )}
+                                  </button>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        )}
                         <div className="flex-1">
                           <div className="flex items-center gap-3 mb-1.5 flex-wrap">
                             <h3 className="font-display italic text-xl">{room.name}</h3>
@@ -354,7 +389,14 @@ export default function StayDetailPage() {
                               </span>
                             )}
                           </div>
-                          <p className="font-sans text-sm text-gray-600 leading-relaxed mb-3">{room.description}</p>
+                          <p className="font-sans text-sm text-gray-600 leading-relaxed mb-2">{room.description}</p>
+                          {(room.units > 0 || room.minNights > 1 || room.cleaningFee > 0) && (
+                            <div className="flex flex-wrap gap-x-4 gap-y-1 mb-3 font-sans text-xs text-gray-400">
+                              {room.units > 0 && <span>{room.units} unit{room.units !== 1 ? 's' : ''}</span>}
+                              {room.minNights > 1 && <span>Min {room.minNights} nights</span>}
+                              {room.cleaningFee > 0 && <span>R{room.cleaningFee} cleaning fee</span>}
+                            </div>
+                          )}
                           {room.amenities?.length > 0 && (
                             <div className="flex flex-wrap gap-1.5">
                               {room.amenities.map((a: string) => (
@@ -543,6 +585,16 @@ export default function StayDetailPage() {
           </div>
         </div>
       </main>
+
+      {/* Room image lightbox */}
+      {roomImage && (
+        <div className="fixed inset-0 bg-black/90 z-50 flex items-center justify-center" onClick={() => setRoomImage(null)}>
+          <button className="absolute top-4 right-4 text-white/60 hover:text-white font-sans text-2xl leading-none" onClick={() => setRoomImage(null)}>
+            ×
+          </button>
+          <img src={roomImage} alt="" className="max-h-[90vh] max-w-[90vw] object-contain" onClick={e => e.stopPropagation()} />
+        </div>
+      )}
 
       <Footer />
     </div>

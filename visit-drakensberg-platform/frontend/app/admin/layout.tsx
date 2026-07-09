@@ -5,7 +5,7 @@ import { usePathname } from 'next/navigation'
 import {
   LayoutDashboard, ListChecks, Users, CalendarDays,
   FileText, BarChart2, Search, Settings, LogOut, Mountain,
-  Globe, MapPin, Image, Store, Package,
+  Globe, MapPin, Image, Store, Package, ShieldCheck,
 } from 'lucide-react'
 import { signOut } from '@/lib/auth'
 import { useRouter } from 'next/navigation'
@@ -15,6 +15,7 @@ const NAV = [
   { href: '/admin', label: 'Overview', icon: LayoutDashboard, exact: true },
   { href: '/admin/listings', label: 'Listings', icon: ListChecks },
   { href: '/admin/suppliers', label: 'Suppliers', icon: Users },
+  { href: '/admin/verification', label: 'Verification', icon: ShieldCheck },
   { href: '/admin/bookings', label: 'Bookings', icon: CalendarDays },
   { href: '/admin/marketplace', label: 'Marketplace', icon: Store },
   { href: '/admin/packages', label: 'Package Builder', icon: Package },
