@@ -4,6 +4,7 @@ import Link from 'next/link'
 import Footer from '@/components/layout/Footer'
 import EditablePageHeader from '@/components/editor/EditablePageHeader'
 import { getActivities, type Activity } from '@/lib/activities'
+import { StayDistance } from '@/lib/stay-distance'
 
 const CATEGORIES = [
   { label: 'All', slug: '' },
@@ -89,6 +90,7 @@ export default function ActivitiesPage() {
                     <p className="font-sans text-[10px] tracking-[0.15em] uppercase text-gold mb-1">
                       {a.meetingPoint || 'Drakensberg'}{durationLabel ? ` · ${durationLabel}` : ''}
                     </p>
+                    <StayDistance lat={a.gpsLat} lng={a.gpsLng} className="mb-1" />
                     <h3 className="font-display text-lg text-forest leading-snug mb-2 group-hover:text-sage transition-colors">{a.name}</h3>
                     <div className="flex items-center justify-between">
                       <span className="font-sans text-xs text-forest/40">{a.difficulty}</span>
