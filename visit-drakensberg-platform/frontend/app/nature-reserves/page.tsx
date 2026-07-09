@@ -5,6 +5,7 @@ import { Info, ShieldCheck, Sunrise } from 'lucide-react'
 import PanoramaViewer from '@/components/panorama/PanoramaViewer'
 import TrailCard from '@/components/trails/TrailCard'
 import Footer from '@/components/layout/Footer'
+import EditablePageHeader from '@/components/editor/EditablePageHeader'
 import type { Trail } from '@/components/trails/TrailCard'
 
 /* ─── Reserve data ───────────────────────────────────────────────────────── */
@@ -302,15 +303,7 @@ export default function NatureReservesPage() {
     <main className="bg-mist min-h-screen pt-16">
 
       {/* ── Hero ─────────────────────────────────────────────────────────── */}
-      <section className="bg-forest text-white py-16 px-6 lg:px-12">
-        <div className="max-w-[1440px] mx-auto">
-          <p className="font-sans text-xs tracking-[0.2em] uppercase text-white/30 mb-3">Protected wilderness</p>
-          <h1 className="font-display text-5xl lg:text-6xl text-white leading-none mb-4">Nature Reserves</h1>
-          <p className="font-sans text-sm text-white/50 max-w-2xl">
-            Explore South Africa&apos;s most iconic mountain wilderness through interactive panoramas, named peaks, and curated trails.
-          </p>
-        </div>
-      </section>
+      <EditablePageHeader section="reserves_page" subClassName="max-w-2xl" />
 
       {/* ── Reserve selector ─────────────────────────────────────────────── */}
       <div className="sticky top-16 z-40 bg-white border-b border-black/8">

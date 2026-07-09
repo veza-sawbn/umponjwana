@@ -185,6 +185,14 @@ export const DEFAULT_TRAILS: Trail[] = [
   },
 ]
 
+/** Starting point of a trail: the GPX Start waypoint if present, otherwise the first track point. */
+export function trailStartPoint(trail: Trail): { lat: number; lng: number } | null {
+  const start = (trail.waypoints ?? trail.analytics?.waypoints)?.find(w => w.category === 'Start')
+  if (start && Number.isFinite(start.lat) && Number.isFinite(start.lon)) return { lat: start.lat, lng: start.lon }
+  const p = trail.analytics?.points?.[0]
+  return p && Number.isFinite(p.lat) && Number.isFinite(p.lon) ? { lat: p.lat, lng: p.lon } : null
+}
+
 export async function getTrails(): Promise<Trail[]> {
   try {
     const { data } = await supabase

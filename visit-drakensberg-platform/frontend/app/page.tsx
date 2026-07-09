@@ -9,19 +9,13 @@ import SearchBar from '@/components/search/SearchBar'
 import PanoramaViewer from '@/components/panorama/PanoramaViewer'
 import Footer from '@/components/layout/Footer'
 import { getAllSiteContent, SITE_CONTENT_DEFAULTS } from '@/lib/site-content'
+import { useSiteSection } from '@/lib/use-site-section'
 import { staggerContainer, staggerChild, fadeUp } from '@/lib/motion'
 import { useEditMode } from '@/lib/edit-mode-context'
 import Editable from '@/components/editor/Editable'
 import { getTrails, type Trail } from '@/lib/trails'
 
 /* ─── Data ─────────────────────────────────────────────────────────────────── */
-
-const STATS = [
-  { value: '3,482m', label: 'Highest Peak' },
-  { value: '243,000', label: 'Hectares Protected' },
-  { value: '500+', label: 'Bird Species' },
-  { value: '20,000+', label: 'San Rock Art Sites' },
-]
 
 const CATEGORIES = [
   { label: 'Stays', href: '/stays', img: 'https://images.unsplash.com/photo-1571896349842-33c89424de2d?w=600&q=80' },
@@ -150,6 +144,7 @@ function HeroSection({ hero }: { hero: typeof SITE_CONTENT_DEFAULTS.hero }) {
 export default function HomePage() {
   const [hero, setHero] = useState(SITE_CONTENT_DEFAULTS.hero)
   const [promos, setPromos] = useState(SITE_CONTENT_DEFAULTS.promotions)
+  const hs = useSiteSection('home_sections') as unknown as Record<string, string>
   const [promoBannerDismissed, setPromoBannerDismissed] = useState(false)
   const [trails, setTrails] = useState<Trail[]>([])
   const [newsletterEmail, setNewsletterEmail] = useState('')
@@ -210,10 +205,14 @@ export default function HomePage() {
           whileInView="show"
           viewport={{ once: true, margin: '-60px' }}
         >
-          {STATS.map((s) => (
-            <motion.div key={s.label} variants={staggerChild}>
-              <p className="font-display text-3xl text-gold">{s.value}</p>
-              <p className="font-sans text-xs text-white/40 mt-1 tracking-wide uppercase">{s.label}</p>
+          {[1, 2, 3, 4].map((i) => (
+            <motion.div key={i} variants={staggerChild}>
+              <Editable section="home_sections" fieldKey={`stat_${i}_value`} value={hs[`stat_${i}_value`]} label={`Stat ${i} Value`} type="text">
+                <p className="font-display text-3xl text-gold">{hs[`stat_${i}_value`]}</p>
+              </Editable>
+              <Editable section="home_sections" fieldKey={`stat_${i}_label`} value={hs[`stat_${i}_label`]} label={`Stat ${i} Label`} type="text">
+                <p className="font-sans text-xs text-white/40 mt-1 tracking-wide uppercase">{hs[`stat_${i}_label`]}</p>
+              </Editable>
             </motion.div>
           ))}
         </motion.div>
@@ -222,8 +221,12 @@ export default function HomePage() {
       {/* ── 3. Categories ── */}
       <section className="max-w-[1440px] mx-auto px-6 lg:px-12 py-20">
         <div className="mb-10">
-          <p className="font-sans text-xs tracking-[0.2em] uppercase text-forest/40 mb-2">What to do</p>
-          <h2 className="font-display text-4xl text-forest">Explore the Berg</h2>
+          <Editable section="home_sections" fieldKey="categories_eyebrow" value={hs.categories_eyebrow} label="Categories Eyebrow" type="text">
+            <p className="font-sans text-xs tracking-[0.2em] uppercase text-forest/40 mb-2">{hs.categories_eyebrow}</p>
+          </Editable>
+          <Editable section="home_sections" fieldKey="categories_heading" value={hs.categories_heading} label="Categories Heading" type="text">
+            <h2 className="font-display text-4xl text-forest">{hs.categories_heading}</h2>
+          </Editable>
         </div>
         <motion.div
           className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3"
@@ -254,8 +257,12 @@ export default function HomePage() {
         <div className="max-w-[1440px] mx-auto px-6 lg:px-12">
           <div className="flex items-end justify-between mb-10">
             <div>
-              <p className="font-sans text-xs tracking-[0.2em] uppercase text-forest/40 mb-2">By region</p>
-              <h2 className="font-display text-4xl text-forest">Choose your Berg</h2>
+              <Editable section="home_sections" fieldKey="regions_eyebrow" value={hs.regions_eyebrow} label="Regions Eyebrow" type="text">
+                <p className="font-sans text-xs tracking-[0.2em] uppercase text-forest/40 mb-2">{hs.regions_eyebrow}</p>
+              </Editable>
+              <Editable section="home_sections" fieldKey="regions_heading" value={hs.regions_heading} label="Regions Heading" type="text">
+                <h2 className="font-display text-4xl text-forest">{hs.regions_heading}</h2>
+              </Editable>
             </div>
             <Link href="/regions" className="hidden sm:flex items-center gap-2 font-sans text-sm text-forest/50 hover:text-forest transition-colors">
               All regions <ArrowRight className="w-4 h-4" />
@@ -295,14 +302,20 @@ export default function HomePage() {
         <div className="max-w-[1440px] mx-auto px-6 lg:px-12">
           <div className="grid lg:grid-cols-2 gap-10 items-center mb-10">
             <div>
-              <p className="font-sans text-xs tracking-[0.2em] uppercase text-forest/40 mb-3">Interactive panorama</p>
-              <h2 className="font-display text-4xl text-forest leading-tight">
-                See the peaks<br />before you go
-              </h2>
+              <Editable section="home_sections" fieldKey="panorama_eyebrow" value={hs.panorama_eyebrow} label="Panorama Eyebrow" type="text">
+                <p className="font-sans text-xs tracking-[0.2em] uppercase text-forest/40 mb-3">{hs.panorama_eyebrow}</p>
+              </Editable>
+              <Editable section="home_sections" fieldKey="panorama_heading" value={hs.panorama_heading} label="Panorama Heading" type="textarea">
+                <h2 className="font-display text-4xl text-forest leading-tight" style={{ whiteSpace: 'pre-line' }}>
+                  {hs.panorama_heading}
+                </h2>
+              </Editable>
             </div>
-            <p className="font-sans text-base text-forest/55 leading-relaxed">
-              Drag the panorama to identify the peaks surrounding the Amphitheatre viewpoint. Powered by PeakVisor satellite elevation data.
-            </p>
+            <Editable section="home_sections" fieldKey="panorama_body" value={hs.panorama_body} label="Panorama Body" type="textarea">
+              <p className="font-sans text-base text-forest/55 leading-relaxed">
+                {hs.panorama_body}
+              </p>
+            </Editable>
           </div>
           <PanoramaViewer />
           <div className="mt-6 text-right">
@@ -318,8 +331,12 @@ export default function HomePage() {
         <div className="max-w-[1440px] mx-auto px-6 lg:px-12">
           <div className="flex items-end justify-between mb-10">
             <div>
-              <p className="font-sans text-xs tracking-[0.2em] uppercase text-forest/40 mb-2">Journal</p>
-              <h2 className="font-display text-4xl text-forest">Stories from the Berg</h2>
+              <Editable section="home_sections" fieldKey="stories_eyebrow" value={hs.stories_eyebrow} label="Stories Eyebrow" type="text">
+                <p className="font-sans text-xs tracking-[0.2em] uppercase text-forest/40 mb-2">{hs.stories_eyebrow}</p>
+              </Editable>
+              <Editable section="home_sections" fieldKey="stories_heading" value={hs.stories_heading} label="Stories Heading" type="text">
+                <h2 className="font-display text-4xl text-forest">{hs.stories_heading}</h2>
+              </Editable>
             </div>
             <Link href="/mydrakensberg" className="hidden sm:flex items-center gap-2 font-sans text-sm text-forest/50 hover:text-forest transition-colors">
               All stories <ArrowRight className="w-4 h-4" />
@@ -353,8 +370,12 @@ export default function HomePage() {
         <div className="max-w-[1440px] mx-auto px-6 lg:px-12">
           <div className="flex items-end justify-between mb-10">
             <div>
-              <p className="font-sans text-xs tracking-[0.2em] uppercase text-white/30 mb-2">On foot</p>
-              <h2 className="font-display text-4xl text-white">Top trails</h2>
+              <Editable section="home_sections" fieldKey="trails_eyebrow" value={hs.trails_eyebrow} label="Trails Eyebrow" type="text">
+                <p className="font-sans text-xs tracking-[0.2em] uppercase text-white/30 mb-2">{hs.trails_eyebrow}</p>
+              </Editable>
+              <Editable section="home_sections" fieldKey="trails_heading" value={hs.trails_heading} label="Trails Heading" type="text">
+                <h2 className="font-display text-4xl text-white">{hs.trails_heading}</h2>
+              </Editable>
             </div>
             <Link href="/hikes" className="hidden sm:flex items-center gap-2 font-sans text-sm text-white/40 hover:text-white transition-colors">
               All hikes <ArrowRight className="w-4 h-4" />
@@ -394,11 +415,17 @@ export default function HomePage() {
       <section className="bg-mist py-20">
         <div className="max-w-[1440px] mx-auto px-6 lg:px-12">
           <div className="max-w-xl">
-            <p className="font-sans text-xs tracking-[0.2em] uppercase text-forest/40 mb-3">Stay informed</p>
-            <h2 className="font-display text-4xl text-forest mb-4">Berg dispatches</h2>
-            <p className="font-sans text-sm text-forest/55 mb-8 leading-relaxed">
-              Seasonal trail conditions, new accommodation, and stories from the escarpment — delivered monthly.
-            </p>
+            <Editable section="home_sections" fieldKey="newsletter_eyebrow" value={hs.newsletter_eyebrow} label="Newsletter Eyebrow" type="text">
+              <p className="font-sans text-xs tracking-[0.2em] uppercase text-forest/40 mb-3">{hs.newsletter_eyebrow}</p>
+            </Editable>
+            <Editable section="home_sections" fieldKey="newsletter_heading" value={hs.newsletter_heading} label="Newsletter Heading" type="text">
+              <h2 className="font-display text-4xl text-forest mb-4">{hs.newsletter_heading}</h2>
+            </Editable>
+            <Editable section="home_sections" fieldKey="newsletter_body" value={hs.newsletter_body} label="Newsletter Body" type="textarea">
+              <p className="font-sans text-sm text-forest/55 mb-8 leading-relaxed">
+                {hs.newsletter_body}
+              </p>
+            </Editable>
             <form className="flex gap-0 max-w-md" onSubmit={subscribeNewsletter}>
               <label htmlFor="newsletter-email" className="sr-only">Email address</label>
               <input

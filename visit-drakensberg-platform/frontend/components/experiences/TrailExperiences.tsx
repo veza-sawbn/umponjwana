@@ -8,6 +8,7 @@ import {
   CheckCircle, GitCompareArrows,
 } from 'lucide-react'
 import type { TrekkingExperience } from '@/lib/experiences'
+import { StayDistance } from '@/lib/stay-distance'
 
 // "Upcoming Trekking Experiences" — the marketplace extension of a hiking
 // trail page. The trail remains the primary content; these are the commercial
@@ -123,6 +124,7 @@ export default function TrailExperiences({
                       <span className="flex items-center gap-1"><Clock size={11} />{e.durationDays} day{e.durationDays !== 1 ? 's' : ''}</span>
                       {e.meetingPoint && <span className="flex items-center gap-1"><MapPin size={11} />{e.meetingPoint}</span>}
                       {e.region && <span>{e.region}</span>}
+                      <StayDistance lat={e.gpsLat} lng={e.gpsLng} />
                     </div>
                     {e.includedServices.length > 0 && (
                       <div className="flex flex-wrap gap-1.5 mt-2">

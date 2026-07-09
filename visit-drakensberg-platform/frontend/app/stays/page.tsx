@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { SlidersHorizontal, X } from 'lucide-react'
 import Footer from '@/components/layout/Footer'
+import EditablePageHeader from '@/components/editor/EditablePageHeader'
 import { getProperties, type Property } from '@/lib/properties'
 import { getRoomsByProperty } from '@/lib/rooms'
 
@@ -85,13 +86,7 @@ export default function StaysPage() {
   return (
     <main className="bg-mist min-h-screen pt-16">
       {/* Header */}
-      <section className="bg-forest text-white py-16 px-6 lg:px-12">
-        <div className="max-w-[1440px] mx-auto">
-          <p className="font-sans text-xs tracking-[0.2em] uppercase text-white/30 mb-3">Where to sleep</p>
-          <h1 className="font-display text-5xl lg:text-6xl text-white leading-none mb-4">Places to Stay</h1>
-          <p className="font-sans text-sm text-white/50">Lodges, resorts, camps and cabins across the Drakensberg</p>
-        </div>
-      </section>
+      <EditablePageHeader section="stays_page" />
 
       <div className="max-w-[1440px] mx-auto px-6 lg:px-12 py-10">
         {/* Toolbar */}

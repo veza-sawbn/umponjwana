@@ -2,13 +2,17 @@
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import Footer from '@/components/layout/Footer'
-import { getTrails, type Trail } from '@/lib/trails'
+import EditablePageHeader from '@/components/editor/EditablePageHeader'
+import { getTrails, trailStartPoint, type Trail } from '@/lib/trails'
 import TrailExperiences from '@/components/experiences/TrailExperiences'
 import { getUpcomingExperiences, type TrekkingExperience } from '@/lib/experiences'
 import RouteArtwork from '@/components/trails/RouteArtwork'
+import { StayDistance } from '@/lib/stay-distance'
+import { ROUTE_TYPES } from '@/lib/gpx'
 
 const DIFF_COLOR: Record<string, string> = { Easy: '#4A7251', Moderate: '#C9A96E', Strenuous: '#c0392b', Extreme: '#7f1d1d' }
 const DIFF_OPTS = ['All', 'Easy', 'Moderate', 'Strenuous', 'Extreme']
+const TYPE_OPTS = ['All', ...ROUTE_TYPES]
 
 function parseKm(distance: string): number {
   const m = distance.match(/[\d.]+/)
@@ -19,15 +23,25 @@ export default function HikesPage() {
   const [trails, setTrails] = useState<Trail[]>([])
   const [experiences, setExperiences] = useState<TrekkingExperience[]>([])
   const [diff, setDiff] = useState('All')
+  const [region, setRegion] = useState('All')
+  const [routeType, setRouteType] = useState('All')
   const [maxDist, setMaxDist] = useState(250)
 
   useEffect(() => {
     getTrails().then(all => setTrails(all.filter(t => t.status === 'published')))
     getUpcomingExperiences().then(setExperiences)
+    const regionParam = new URLSearchParams(window.location.search).get('region')
+    if (regionParam) setRegion(regionParam)
   }, [])
 
+  const regionOpts = ['All', ...Array.from(new Set(trails.map(t => t.region))).sort()]
+  if (region !== 'All' && !regionOpts.includes(region)) regionOpts.push(region)
+
   const filtered = trails.filter(t =>
-    (diff === 'All' || t.difficulty === diff) && parseKm(t.distance) <= maxDist
+    (diff === 'All' || t.difficulty === diff) &&
+    (region === 'All' || t.region === region) &&
+    (routeType === 'All' || (t.trail_type || '') === routeType) &&
+    parseKm(t.distance) <= maxDist
   )
 
   // Marketplace departures grouped per trail, following the active filters.
@@ -43,18 +57,12 @@ export default function HikesPage() {
   return (
     <main className="bg-mist min-h-screen pt-16">
       {/* Header */}
-      <section className="bg-forest text-white py-16 px-6 lg:px-12">
-        <div className="max-w-[1440px] mx-auto">
-          <p className="font-sans text-xs tracking-[0.2em] uppercase text-white/30 mb-3">On foot</p>
-          <h1 className="font-display text-5xl lg:text-6xl text-white leading-none mb-4">Hikes & Trails</h1>
-          <p className="font-sans text-sm text-white/50">From gentle valley walks to multi-day escarpment routes</p>
-        </div>
-      </section>
+      <EditablePageHeader section="hikes_page" />
 
       <div className="max-w-[1440px] mx-auto px-6 lg:px-12 py-10">
         {/* Filters */}
         <div className="flex flex-wrap items-center gap-4 mb-8">
-          <div className="flex gap-2">
+          <div className="flex gap-2 flex-wrap">
             {DIFF_OPTS.map((d) => (
               <button key={d} onClick={() => setDiff(d)}
                 className={`font-sans text-xs px-4 py-2 border transition-colors ${diff === d ? 'bg-forest border-forest text-white' : 'bg-white border-black/15 text-forest/60 hover:border-forest'}`}>
@@ -62,6 +70,22 @@ export default function HikesPage() {
               </button>
             ))}
           </div>
+          <select
+            value={region}
+            onChange={(e) => setRegion(e.target.value)}
+            className="font-sans text-xs border border-black/15 bg-white px-3 py-2 text-forest/70 focus:outline-none hover:border-forest transition-colors"
+            aria-label="Filter by region"
+          >
+            {regionOpts.map((r) => <option key={r} value={r}>{r === 'All' ? 'All regions' : r}</option>)}
+          </select>
+          <select
+            value={routeType}
+            onChange={(e) => setRouteType(e.target.value)}
+            className="font-sans text-xs border border-black/15 bg-white px-3 py-2 text-forest/70 focus:outline-none hover:border-forest transition-colors"
+            aria-label="Filter by route type"
+          >
+            {TYPE_OPTS.map((t) => <option key={t} value={t}>{t === 'All' ? 'All route types' : t}</option>)}
+          </select>
           <div className="flex items-center gap-3 ml-auto">
             <span className="font-sans text-xs text-forest/40">Max {maxDist} km</span>
             <input type="range" min={1} max={sliderMax} step={1} value={maxDist}
@@ -79,7 +103,9 @@ export default function HikesPage() {
           <>
             {/* Table-style list */}
             <div className="bg-white border border-black/8 divide-y divide-black/6 mb-10">
-              {filtered.map((t) => (
+              {filtered.map((t) => {
+                const start = trailStartPoint(t)
+                return (
                 <Link key={t.id} href={`/hikes/${t.id}`}
                   className="group flex items-center gap-6 px-6 py-5 hover:bg-mist transition-colors">
                   <div className="w-20 h-14 shrink-0 overflow-hidden hidden sm:block">
@@ -87,7 +113,8 @@ export default function HikesPage() {
                   </div>
                   <div className="flex-1 min-w-0">
                     <h3 className="font-display text-lg text-forest group-hover:text-sage transition-colors">{t.name}</h3>
-                    <p className="font-sans text-xs text-forest/40 mt-0.5">{t.region}</p>
+                    <p className="font-sans text-xs text-forest/40 mt-0.5">{t.region}{t.trail_type ? ` · ${t.trail_type}` : ''}</p>
+                    <StayDistance lat={start?.lat} lng={start?.lng} className="mt-0.5" />
                   </div>
                   <div className="hidden md:flex items-center gap-8 shrink-0">
                     <div className="text-center">
@@ -108,7 +135,8 @@ export default function HikesPage() {
                   </div>
                   <span className="text-forest/20 group-hover:text-gold transition-colors shrink-0">→</span>
                 </Link>
-              ))}
+                )
+              })}
               {filtered.length === 0 && (
                 <div className="px-6 py-12 text-center font-sans text-sm text-forest/30">No trails match your filters</div>
               )}
@@ -117,7 +145,9 @@ export default function HikesPage() {
             {/* Card grid */}
             <div className="h-px bg-black/8 mb-10" />
             <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-10">
-              {filtered.map((t) => (
+              {filtered.map((t) => {
+                const start = trailStartPoint(t)
+                return (
                 <Link key={t.id} href={`/hikes/${t.id}`} className="group block">
                   <div className="relative overflow-hidden aspect-[4/3] mb-4">
                     <img loading="lazy" decoding="async" src={t.image} alt={t.name}
@@ -138,8 +168,10 @@ export default function HikesPage() {
                   <p className="font-sans text-[10px] tracking-[0.15em] uppercase text-gold mb-1">{t.region}</p>
                   <h3 className="font-display text-xl text-forest leading-snug mb-2 group-hover:text-sage transition-colors">{t.name}</h3>
                   <p className="font-sans text-xs text-forest/40">{t.distance} · {t.elevation} · {t.duration}</p>
+                  <StayDistance lat={start?.lat} lng={start?.lng} className="mt-1" />
                 </Link>
-              ))}
+                )
+              })}
             </div>
 
             {/* Marketplace: upcoming trekking experiences across these trails */}

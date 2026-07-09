@@ -4,6 +4,8 @@ import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { ArrowRight } from 'lucide-react'
 import Footer from '@/components/layout/Footer'
+import Editable from '@/components/editor/Editable'
+import { useSiteSection } from '@/lib/use-site-section'
 import { DEFAULT_REGIONS, getRegions, type Region } from '@/lib/regions'
 
 const TOWNS = [
@@ -22,6 +24,7 @@ function regionImage(region: Region, index: number) {
 
 export default function RegionsPage() {
   const [regions, setRegions] = useState<Region[]>(DEFAULT_REGIONS)
+  const c = useSiteSection('regions_page')
 
   useEffect(() => {
     getRegions().then(setRegions)
@@ -31,11 +34,15 @@ export default function RegionsPage() {
     <main className="bg-mist pt-16">
       <section className="bg-forest text-white py-20 px-6 lg:px-12">
         <div className="max-w-[1440px] mx-auto">
-          <p className="font-sans text-xs tracking-[0.2em] uppercase text-white/30 mb-4">Where to go</p>
-          <h1 className="font-display text-5xl lg:text-7xl text-white leading-none mb-6">Choose your Berg</h1>
-          <p className="font-sans text-base text-white/50 max-w-xl leading-relaxed">
-            Regions are configured by the admin team and used as the source of truth for stays, hikes, activities, routes and customer journey tracking.
-          </p>
+          <Editable section="regions_page" fieldKey="eyebrow" value={c.eyebrow} label="Eyebrow" type="text">
+            <p className="font-sans text-xs tracking-[0.2em] uppercase text-white/30 mb-4">{c.eyebrow}</p>
+          </Editable>
+          <Editable section="regions_page" fieldKey="heading" value={c.heading} label="Heading" type="text">
+            <h1 className="font-display text-5xl lg:text-7xl text-white leading-none mb-6">{c.heading}</h1>
+          </Editable>
+          <Editable section="regions_page" fieldKey="subheading" value={c.subheading} label="Subheading" type="textarea">
+            <p className="font-sans text-base text-white/50 max-w-xl leading-relaxed">{c.subheading}</p>
+          </Editable>
         </div>
       </section>
 
@@ -66,7 +73,17 @@ export default function RegionsPage() {
 
       <section className="bg-forest py-20">
         <div className="max-w-[1440px] mx-auto px-6 lg:px-12">
-          <div className="mb-10"><p className="font-sans text-xs tracking-[0.2em] uppercase text-white/30 mb-3">Where to base yourself</p><h2 className="font-display text-4xl text-white">Surrounding Towns & Villages</h2><p className="font-sans text-sm text-white/50 mt-3 max-w-xl">Gateway towns, boutique villages and farm stops that frame the Drakensberg experience.</p></div>
+          <div className="mb-10">
+            <Editable section="regions_page" fieldKey="towns_eyebrow" value={c.towns_eyebrow} label="Towns Eyebrow" type="text">
+              <p className="font-sans text-xs tracking-[0.2em] uppercase text-white/30 mb-3">{c.towns_eyebrow}</p>
+            </Editable>
+            <Editable section="regions_page" fieldKey="towns_heading" value={c.towns_heading} label="Towns Heading" type="text">
+              <h2 className="font-display text-4xl text-white">{c.towns_heading}</h2>
+            </Editable>
+            <Editable section="regions_page" fieldKey="towns_subheading" value={c.towns_subheading} label="Towns Subheading" type="textarea">
+              <p className="font-sans text-sm text-white/50 mt-3 max-w-xl">{c.towns_subheading}</p>
+            </Editable>
+          </div>
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">{TOWNS.map(t => <div key={t.name} className="border border-white/10 p-5 hover:border-gold/40 transition-colors"><p className="font-sans text-[10px] tracking-[0.15em] uppercase text-gold mb-2">{t.region}</p><h3 className="font-display text-xl text-white mb-2">{t.name}</h3><p className="font-sans text-sm text-white/50 leading-relaxed">{t.desc}</p></div>)}</div>
         </div>
       </section>
