@@ -1,10 +1,14 @@
 'use client'
-import { Navigation } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import { Car, Navigation } from 'lucide-react'
 import { useBooking } from './booking-context'
+import { calculateDrivingDistance, type DistanceResult } from '@/components/maps/GoogleAddressField'
 
 // When the visitor has already chosen a stay (booking cart), cards for trails,
-// activities and trekking experiences show the straight-line distance between
-// the stay and the item's meeting/starting point.
+// activities and trekking experiences show the driving distance between the
+// stay and the item's meeting/starting point (Google Distance Matrix), with a
+// straight-line estimate shown until the driving result arrives and as the
+// fallback when Google Maps is unavailable.
 
 export type StayCoords = { title: string; lat: number; lng: number }
 
@@ -39,17 +43,57 @@ export function formatKm(km: number): string {
   return km < 10 ? `${km.toFixed(1)} km` : `${Math.round(km)} km`
 }
 
-/** Renders "~N km from your stay", or nothing when no stay is chosen or coordinates are missing. */
+// One Distance Matrix request per unique stay→point pair, shared across every
+// card and re-render (failures are cached too, so a missing API key can't
+// trigger a request per card).
+const drivingCache = new Map<string, Promise<DistanceResult | null>>()
+function cachedDrivingDistance(origin: StayCoords, lat: number, lng: number): Promise<DistanceResult | null> {
+  const key = `${origin.lat.toFixed(5)},${origin.lng.toFixed(5)}|${lat.toFixed(5)},${lng.toFixed(5)}`
+  let promise = drivingCache.get(key)
+  if (!promise) {
+    promise = calculateDrivingDistance({ lat: origin.lat, lng: origin.lng }, { lat, lng })
+    drivingCache.set(key, promise)
+  }
+  return promise
+}
+
+/** Renders the driving distance from the chosen stay ("N km drive from your stay"),
+ *  or nothing when no stay is chosen or coordinates are missing. Shows a
+ *  straight-line estimate while the driving distance loads / when Google Maps
+ *  is unavailable. */
 export function StayDistance({ lat, lng, className = '' }: { lat?: string | number; lng?: string | number; className?: string }) {
   const stay = useStayCoords()
-  const km = distanceFromStayKm(stay, lat, lng)
-  if (km === null) return null
+  const straightKm = distanceFromStayKm(stay, lat, lng)
+  const [driving, setDriving] = useState<DistanceResult | null>(null)
+
+  const targetLat = typeof lat === 'string' ? parseFloat(lat) : lat
+  const targetLng = typeof lng === 'string' ? parseFloat(lng) : lng
+
+  useEffect(() => {
+    setDriving(null)
+    if (!stay || straightKm === null || targetLat === undefined || targetLng === undefined) return
+    let cancelled = false
+    cachedDrivingDistance(stay, targetLat, targetLng).then(r => { if (!cancelled) setDriving(r) })
+    return () => { cancelled = true }
+  }, [stay?.lat, stay?.lng, targetLat, targetLng, straightKm]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  if (straightKm === null) return null
+  if (driving) {
+    return (
+      <span
+        className={`inline-flex items-center gap-1 font-sans text-[11px] text-[#2d6a4f] ${className}`}
+        title={`Driving distance from ${stay!.title}${driving.durationText ? ` · about ${driving.durationText}` : ''}`}
+      >
+        <Car size={10} /> {formatKm(driving.distanceKm)}{driving.durationText ? ` (${driving.durationText})` : ''} drive from your stay
+      </span>
+    )
+  }
   return (
     <span
       className={`inline-flex items-center gap-1 font-sans text-[11px] text-[#2d6a4f] ${className}`}
-      title={`Straight-line distance from ${stay!.title}`}
+      title={`Straight-line distance from ${stay!.title} — calculating driving distance…`}
     >
-      <Navigation size={10} /> ~{formatKm(km)} from your stay
+      <Navigation size={10} /> ~{formatKm(straightKm)} from your stay
     </span>
   )
 }
