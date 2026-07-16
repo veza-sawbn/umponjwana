@@ -6,6 +6,7 @@ import {
   LayoutDashboard, ListChecks, Users, CalendarDays,
   FileText, BarChart2, Search, Settings, LogOut, Mountain,
   Globe, MapPin, Image, Store, Package, ShieldCheck,
+  Receipt, Landmark, Banknote, ClipboardList,
 } from 'lucide-react'
 import { signOut } from '@/lib/auth'
 import { useRouter } from 'next/navigation'
@@ -17,6 +18,10 @@ const NAV = [
   { href: '/admin/suppliers', label: 'Suppliers', icon: Users },
   { href: '/admin/verification', label: 'Verification', icon: ShieldCheck },
   { href: '/admin/bookings', label: 'Bookings', icon: CalendarDays },
+  { href: '/admin/orders', label: 'Orders', icon: Receipt },
+  { href: '/admin/finance', label: 'Finance', icon: Landmark },
+  { href: '/admin/settlements', label: 'Settlements', icon: Banknote },
+  { href: '/admin/operations', label: 'Operations', icon: ClipboardList },
   { href: '/admin/marketplace', label: 'Marketplace', icon: Store },
   { href: '/admin/packages', label: 'Package Builder', icon: Package },
   { href: '/admin/blog', label: 'Blog & Content', icon: FileText },

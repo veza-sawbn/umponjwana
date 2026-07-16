@@ -1,7 +1,7 @@
 import {
   LayoutDashboard, List, Building2, BedDouble, Zap, Map, Users, Truck,
   Sparkles, CalendarDays, Tag, BarChart2, Image, MessageSquare, Star, Clock,
-  Calculator, CalendarPlus,
+  Calculator, CalendarPlus, Wallet,
   type LucideIcon,
 } from 'lucide-react'
 
@@ -22,6 +22,7 @@ export interface SupplierTypeConfig {
 
 const SHARED_NAV: NavItem[] = [
   { href: '/supplier/bookings',     label: 'Bookings',      icon: CalendarDays },
+  { href: '/supplier/earnings',     label: 'Earnings',      icon: Wallet },
   { href: '/supplier/availability', label: 'Availability',  icon: Clock },
   { href: '/supplier/discounts',    label: 'Discounts',     icon: Tag },
   { href: '/supplier/reviews',      label: 'Reviews',       icon: Star },
