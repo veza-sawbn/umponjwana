@@ -25,6 +25,19 @@ export type OrderPayment = {
 export const PAYMENT_TYPES = ['payment', 'deposit', 'installment', 'refund', 'credit', 'gift_card', 'voucher'] as const
 export const PAYMENT_METHODS = ['card', 'eft', 'cash', 'offline', 'online', 'gift_card', 'voucher', 'payment_plan'] as const
 
+/**
+ * Fire-and-forget: email the receipt for the latest payment on an order
+ * (and raise an in-app notification). Failures never block the payment.
+ */
+export function sendReceiptEmail(orderId: string, paymentId?: string): void {
+  if (typeof fetch !== 'function') return
+  fetch('/api/receipts/send', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ orderId, paymentId }),
+  }).catch(err => console.error('Receipt email failed:', err))
+}
+
 export async function recordOrderPayment(input: {
   orderId: string
   amount: number
@@ -42,7 +55,10 @@ export async function recordOrderPayment(input: {
     p_notes: input.notes ?? '',
   })
   if (error) throw new Error(error.message || 'Payment failed')
-  return data as string
+  const paymentId = data as string
+  // Receipt goes out automatically for every recorded payment or refund.
+  sendReceiptEmail(input.orderId, paymentId)
+  return paymentId
 }
 
 export async function getOrderPayments(orderId?: string): Promise<OrderPayment[]> {

@@ -47,7 +47,11 @@ function NewInvoiceModal({ customers, suppliers, onClose, onCreated }: {
   onClose: () => void
   onCreated: (invoiceId: string) => void
 }) {
+  const [customerMode, setCustomerMode] = useState<'registered' | 'guest'>('registered')
   const [customerId, setCustomerId] = useState('')
+  const [guestName, setGuestName] = useState('')
+  const [guestEmail, setGuestEmail] = useState('')
+  const [guestPhone, setGuestPhone] = useState('')
   const [tripName, setTripName] = useState('')
   const [travelStart, setTravelStart] = useState('')
   const [travelEnd, setTravelEnd] = useState('')
@@ -70,7 +74,13 @@ function NewInvoiceModal({ customers, suppliers, onClose, onCreated }: {
 
   async function submit() {
     const customer = customers.find(c => c.id === customerId)
-    if (!customer) { toast.error('Select a customer.'); return }
+    const isGuest = customerMode === 'guest'
+    if (isGuest) {
+      if (!guestName.trim()) { toast.error('Enter the customer name.'); return }
+      if (!guestEmail.trim() || !guestEmail.includes('@')) { toast.error('Enter a valid customer email.'); return }
+    } else if (!customer) {
+      toast.error('Select a customer.'); return
+    }
     const validLines = lines.filter(l => l.title.trim() && parseFloat(l.unitPrice) > 0)
     if (validLines.length === 0) { toast.error('Add at least one line with a title and price.'); return }
     setBusy(true)
@@ -91,8 +101,9 @@ function NewInvoiceModal({ customers, suppliers, onClose, onCreated }: {
       }))
       const res = await createOrder(
         {
-          customerName: customer.full_name || customer.email || '',
-          customerEmail: customer.email || '',
+          guest: isGuest || undefined,
+          customerName: isGuest ? guestName.trim() : (customer!.full_name || customer!.email || ''),
+          customerEmail: isGuest ? guestEmail.trim() : (customer!.email || ''),
           tripName: tripName.trim() || 'Manual invoice',
           travelStart: travelStart || undefined,
           travelEnd: travelEnd || undefined,
@@ -100,10 +111,10 @@ function NewInvoiceModal({ customers, suppliers, onClose, onCreated }: {
           serviceFee,
           taxAmount: tax,
           total,
-          value: { manual: true },
+          value: isGuest ? { manual: true, customerPhone: guestPhone.trim() } : { manual: true },
         },
         orderLines,
-        { userId: customer.id },
+        isGuest ? undefined : { userId: customer!.id },
       )
       toast.success(`Invoice ${res.invoiceNumber} created.`)
       onCreated(res.invoiceId)
@@ -127,14 +138,40 @@ function NewInvoiceModal({ customers, suppliers, onClose, onCreated }: {
           <button onClick={onClose} className="text-gray-400 hover:text-gray-700"><X size={18} /></button>
         </div>
 
+        <div className="flex gap-0 border border-gray-200 bg-white overflow-hidden w-fit mb-4">
+          {([['registered', 'Registered customer'], ['guest', 'Guest / manual details']] as const).map(([id, label]) => (
+            <button key={id} onClick={() => setCustomerMode(id)}
+              className={`px-4 py-2 font-sans text-xs transition-colors border-r border-gray-100 last:border-0 ${customerMode === id ? 'bg-[#2d6a4f] text-white' : 'text-gray-500 hover:bg-[#F7F5F2]'}`}>
+              {label}
+            </button>
+          ))}
+        </div>
+
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-5">
-          <div>
-            <label className="block font-sans text-[10px] tracking-[0.12em] uppercase text-gray-400 mb-1.5">Customer (registered account)</label>
-            <select value={customerId} onChange={e => setCustomerId(e.target.value)} className="w-full border border-gray-200 bg-white px-3 py-2.5 font-sans text-sm focus:outline-none">
-              <option value="">Select a customer…</option>
-              {customers.map(c => <option key={c.id} value={c.id}>{c.full_name || c.email} {c.email ? `(${c.email})` : ''}</option>)}
-            </select>
-          </div>
+          {customerMode === 'registered' ? (
+            <div>
+              <label className="block font-sans text-[10px] tracking-[0.12em] uppercase text-gray-400 mb-1.5">Customer (registered account)</label>
+              <select value={customerId} onChange={e => setCustomerId(e.target.value)} className="w-full border border-gray-200 bg-white px-3 py-2.5 font-sans text-sm focus:outline-none">
+                <option value="">Select a customer…</option>
+                {customers.map(c => <option key={c.id} value={c.id}>{c.full_name || c.email} {c.email ? `(${c.email})` : ''}</option>)}
+              </select>
+            </div>
+          ) : (
+            <div className="md:col-span-2 grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div>
+                <label className="block font-sans text-[10px] tracking-[0.12em] uppercase text-gray-400 mb-1.5">Customer Name</label>
+                <input value={guestName} onChange={e => setGuestName(e.target.value)} placeholder="Full name" className="w-full border border-gray-200 px-3 py-2.5 font-sans text-sm focus:outline-none" />
+              </div>
+              <div>
+                <label className="block font-sans text-[10px] tracking-[0.12em] uppercase text-gray-400 mb-1.5">Customer Email</label>
+                <input type="email" value={guestEmail} onChange={e => setGuestEmail(e.target.value)} placeholder="name@example.com" className="w-full border border-gray-200 px-3 py-2.5 font-sans text-sm focus:outline-none" />
+              </div>
+              <div>
+                <label className="block font-sans text-[10px] tracking-[0.12em] uppercase text-gray-400 mb-1.5">Customer Phone (optional)</label>
+                <input type="tel" value={guestPhone} onChange={e => setGuestPhone(e.target.value)} placeholder="+27 82 000 0000" className="w-full border border-gray-200 px-3 py-2.5 font-sans text-sm focus:outline-none" />
+              </div>
+            </div>
+          )}
           <div>
             <label className="block font-sans text-[10px] tracking-[0.12em] uppercase text-gray-400 mb-1.5">Trip Name</label>
             <input value={tripName} onChange={e => setTripName(e.target.value)} placeholder="e.g. Champagne Valley weekend" className="w-full border border-gray-200 px-3 py-2.5 font-sans text-sm focus:outline-none" />

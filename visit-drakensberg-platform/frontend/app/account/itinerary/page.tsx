@@ -84,7 +84,7 @@ function ShareButtons({ booking }: { booking: SavedBooking }) {
         { label: 'WhatsApp', icon: MessageCircle, cls: 'bg-[#25D366] hover:bg-[#1ebe57]', href: `https://wa.me/?text=${encodeURIComponent(text + '\n' + url)}` },
         { label: 'Facebook', icon: Facebook, cls: 'bg-[#1877F2] hover:bg-[#166ddb]', href: `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(url)}` },
         { label: 'Email', icon: Mail, cls: 'bg-gray-700 hover:bg-gray-800', href: `mailto:?subject=${encodeURIComponent('My Drakensberg Itinerary')}&body=${encodeURIComponent(text + '\n' + url)}` },
-        { label: 'Print', icon: Printer, cls: 'bg-[#2d6a4f] hover:bg-[#235a3f]', onClick: () => window.print() },
+        { label: 'Print', icon: Printer, cls: 'bg-[#2d6a4f] hover:bg-[#235a3f]', onClick: () => window.open(`/itinerary/${booking.id}/print`, '_blank') },
       ].map(c => {
         const Icon = c.icon
         return 'onClick' in c ? (
@@ -562,12 +562,12 @@ function ItineraryInner() {
           >
             <Download size={13} />Download PDF
           </Link>
-          <button
-            onClick={() => window.print()}
+          <Link
+            href={`/itinerary/${booking.id}/print`}
             className="flex items-center gap-2 border border-gray-300 text-gray-500 px-4 py-2.5 font-sans text-sm hover:bg-[#F7F5F2] transition-colors"
           >
-            <Printer size={13} />Print
-          </button>
+            <Printer size={13} />Print Itinerary
+          </Link>
         </div>
       </div>
 
