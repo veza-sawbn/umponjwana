@@ -3,6 +3,7 @@ import type { BookingAddon, BookingStay, ShuttleOption } from './booking-context
 import { getPropertyById } from './properties'
 import { notify } from './notifications'
 import { createOrdersForBooking, cancelOrdersForBooking } from './booking-orders'
+import { createOrderForBooking, cancelOrderForBooking } from './orders'
 
 export type SavedBooking = {
   id: string
@@ -122,6 +123,15 @@ export async function addBooking(booking: Omit<SavedBooking, 'id' | 'reference' 
     console.error('Order fan-out failed (booking saved):', err)
   }
 
+  // Master Order: the trip's single financial source of truth — line items
+  // with supplier allocations, the customer's single invoice, the checkout
+  // payment, receipt and balanced ledger entries.
+  try {
+    await createOrderForBooking(newBooking)
+  } catch (err) {
+    console.error('Master order creation failed (booking saved):', err)
+  }
+
   // Tell each involved supplier a new order arrived — no itinerary details
   // beyond their own service in the notification.
   await Promise.all(supplierIds.map(sid =>
@@ -170,6 +180,8 @@ export async function updateBookingStatus(
   if (status === 'cancelled') {
     // Keep the per-supplier orders in sync with the parent booking.
     await cancelOrdersForBooking(id)
+    // Reverse the Master Order's financials (refund liability, ledger).
+    await cancelOrderForBooking(id)
     if (opts?.notifyUser) {
       await notify(booking.userId, 'cancellation', `Booking ${booking.reference} cancelled`,
         'Your booking has been cancelled by the supplier. If you were charged, a refund will follow within 5 business days.',

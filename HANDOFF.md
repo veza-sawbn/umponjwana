@@ -294,3 +294,81 @@ everything below extends the platform.
 - `/admin/marketplace` — operations dashboard tabs: operators, guides,
   experiences, scheduled departures, custom trip requests, commissions;
   revenue/margin analytics strip.
+
+## UPDATE 4 — Multi-Supplier Order Management & Financial System (2026-07-16)
+
+**Branch:** `claude/drakensberg-order-management-l1zldp`
+Run `frontend/supabase/migrations/20260716_order_management.sql` after the
+previous migrations. It backfills Master Orders for all existing bookings
+(idempotent — skips bookings that already have an order).
+
+### Architecture
+Unified Order Management System between bookings and financial transactions:
+
+```
+Customer → Trip → Master Order (vd_orders) → Order Line Items (vd_order_lines)
+→ Supplier Allocation → Invoice (vd_invoices) → Payments (vd_order_payments)
+→ Supplier Settlements (vd_settlements) → Receipts (vd_receipts)
+→ Financial Reporting (vd_ledger_entries)
+```
+
+- The Master Order belongs to Visit Drakensberg — suppliers have **no**
+  access to `vd_orders`; RLS grants them only their own `vd_order_lines`.
+- Customers get ONE invoice per order (customer-safe line snapshot, no
+  payout data). Internal notes live in staff-only `vd_order_notes`.
+- Double-entry ledger: every order/payment/settlement RPC writes balanced
+  journals against the editable chart of accounts `vd_ledger_accounts`
+  (external_ref column ready for accounting integrations).
+- Nothing hardcoded: VAT / default commission / service-fee rates in
+  `vd_finance_settings`; per-supplier overrides in `vd_supplier_terms`.
+- Staff roles: `profiles.staff_role` (finance | operations) + helpers
+  `is_finance()` / `is_ops()`; assigned via `admin_set_staff_role()`.
+- Every financial action is appended to `vd_audit_log`.
+- Multi-destination/currency-ready (`destination`, `currency` columns).
+
+### RPCs (SECURITY DEFINER — the only write paths)
+`vd_create_order` (order+lines+invoice+opening journal+optional payment;
+allocation computed server-side), `vd_record_order_payment` (deposit /
+installment / partial / offline / refund / credit / gift_card / voucher —
+maintains balances, issues receipt, balanced journal),
+`vd_cancel_order` (reversal journal + refund liability),
+`vd_update_line_allocation` (admin edits commission/fees; adjustment journal),
+`vd_set_line_fulfilment` (supplier's only write), and the settlement
+lifecycle: `vd_create_settlement` / `vd_approve_settlement` /
+`vd_pay_settlement` / `vd_reverse_settlement`.
+
+### Lib files
+`lib/orders.ts` (Master Order + lines; `createOrderForBooking` runs in
+`addBooking` after the vd_booking_orders fan-out), `lib/allocation.ts`
+(preview math + `formatMoney`), `lib/invoices.ts`, `lib/order-payments.ts`,
+`lib/ledger.ts` (trial balance), `lib/settlements.ts` (engine + virtual
+supplier statements via `buildStatements`). `lib/package-bookings.ts` now
+also creates a Master Order: suppliers allocated at cost (commission 0),
+platform margin as a platform-owned "packaging & coordination" line, and the
+customer invoice shows a single package line at sell price.
+
+### UI
+- `/admin/orders` — order console: statuses, line items with editable
+  allocations, record payments/refunds, invoice, ledger, internal notes.
+- `/admin/finance` — revenue / cash / receivables / supplier liabilities /
+  platform & commission revenue / refund exposure / monthly sales / supplier
+  & destination performance / CLV / trial balance.
+- `/admin/settlements` — unsettled supplier balances → create (weekly /
+  monthly / manual / partial / bulk / scheduled) → approve → pay (payout
+  ref) → reverse.
+- `/admin/operations` — arrivals, departures, transfers, activities,
+  outstanding permits, unconfirmed supplier services, outstanding payments.
+- `/supplier/earnings` (in SHARED_NAV) — own lines only: net earnings,
+  commission, settlement status, fulfilment updates, monthly virtual
+  statements, settlement history.
+- `/account/orders` — customer orders, single invoice, payments, receipts.
+
+### Notes / still open
+- Events already flow through the trip cart as `event` addons → they become
+  order lines automatically; a dedicated QR-ticket step is not built yet.
+- Checkout still fakes card capture (unchanged, deliberate).
+- Master-order creation is fired from the client after booking save
+  (best-effort try/catch); a failed call logs to console — consider a
+  server-side trigger or retry queue later.
+- Equipment/permit/levy categories are supported end-to-end financially but
+  have no dedicated public product pages yet.
