@@ -16,7 +16,6 @@ declare global {
 }
 
 const GOOGLE_MAPS_API_KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY
-const DEFAULT_CENTER = { lat: -29.0, lng: 29.25 }
 
 function loadGoogleMaps() {
   if (typeof window === 'undefined') return Promise.resolve()
@@ -234,6 +233,47 @@ export function useAutoDrivingDistance(origin: DistancePlace, destination: Dista
   return { result, status }
 }
 
+// ── Places autocomplete (no map) ────────────────────────────────────────────
+// A plain type-and-select field: the user types a place name, we fetch
+// suggestions from Google Places and resolve the chosen one to an address +
+// coordinates. Works with both the current Places API (AutocompleteSuggestion
+// / Place) and the classic one (AutocompleteService / PlacesService),
+// whichever the key supports.
+
+type Suggestion = {
+  placeId: string
+  main: string
+  secondary: string
+  description: string
+  prediction?: any // new-API prediction, resolvable via toPlace()
+}
+
+async function getPlacesLibrary(): Promise<any | null> {
+  if (typeof window === 'undefined') return null
+  try {
+    await loadGoogleMaps()
+  } catch {
+    return null
+  }
+  if (!window.google?.maps) return null
+  const loaded = window.google.maps.places
+  if (loaded?.AutocompleteSuggestion || loaded?.AutocompleteService) return loaded
+  if (typeof window.google.maps.importLibrary === 'function') {
+    try {
+      return await window.google.maps.importLibrary('places')
+    } catch {
+      return null
+    }
+  }
+  return loaded ?? null
+}
+
+function latLngToString(value: any): string | undefined {
+  if (value === null || value === undefined) return undefined
+  const n = typeof value === 'function' ? value() : value
+  return Number.isFinite(Number(n)) ? String(n) : undefined
+}
+
 export function GoogleAddressField({
   label,
   value,
@@ -255,78 +295,188 @@ export function GoogleAddressField({
   labelClassName?: string
   onChange: (selection: GooglePlaceSelection) => void
 }) {
-  const inputRef = useRef<HTMLInputElement | null>(null)
-  const mapRef = useRef<HTMLDivElement | null>(null)
-  const map = useRef<any>(null)
-  const marker = useRef<any>(null)
   const id = useId()
-  const [status, setStatus] = useState<'ready' | 'missing-key' | 'loading' | 'error'>(GOOGLE_MAPS_API_KEY ? 'loading' : 'missing-key')
-
-  const numericLat = lat ? Number(lat) : undefined
-  const numericLng = lng ? Number(lng) : undefined
-  const hasCoordinates = Number.isFinite(numericLat) && Number.isFinite(numericLng)
-
-  useEffect(() => {
-    if (!GOOGLE_MAPS_API_KEY) return
-    let cancelled = false
-
-    loadGoogleMaps()
-      .then(() => {
-        if (cancelled || !inputRef.current || !window.google?.maps?.places) return
-        setStatus('ready')
-
-        const autocomplete = new window.google.maps.places.Autocomplete(inputRef.current, {
-          componentRestrictions: { country: 'za' },
-          fields: ['formatted_address', 'geometry', 'name'],
-          types: ['geocode', 'establishment'],
-        })
-
-        autocomplete.addListener('place_changed', () => {
-          const place = autocomplete.getPlace()
-          const location = place.geometry?.location
-          onChange({
-            address: place.formatted_address || place.name || inputRef.current?.value || '',
-            lat: location ? String(location.lat()) : undefined,
-            lng: location ? String(location.lng()) : undefined,
-          })
-        })
-      })
-      .catch(() => setStatus('error'))
-
-    return () => { cancelled = true }
-  }, [onChange])
+  const containerRef = useRef<HTMLDivElement | null>(null)
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const sessionTokenRef = useRef<any>(null)
+  const autocompleteServiceRef = useRef<any>(null)
+  const requestSeqRef = useRef(0)
+  const [suggestions, setSuggestions] = useState<Suggestion[]>([])
+  const [open, setOpen] = useState(false)
+  const [highlight, setHighlight] = useState(-1)
+  const [status, setStatus] = useState<'ready' | 'missing-key' | 'error'>(GOOGLE_MAPS_API_KEY ? 'ready' : 'missing-key')
 
   useEffect(() => {
-    if (status !== 'ready' || !mapRef.current || !window.google?.maps) return
-
-    const center = hasCoordinates ? { lat: numericLat!, lng: numericLng! } : DEFAULT_CENTER
-    if (!map.current) {
-      map.current = new window.google.maps.Map(mapRef.current, {
-        center,
-        zoom: hasCoordinates ? 14 : 9,
-        mapTypeControl: false,
-        streetViewControl: false,
-        fullscreenControl: false,
-      })
-      marker.current = new window.google.maps.Marker({ map: map.current })
+    const handler = (e: MouseEvent) => {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) setOpen(false)
     }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [])
 
-    map.current.setCenter(center)
-    map.current.setZoom(hasCoordinates ? 14 : 9)
-    marker.current.setPosition(hasCoordinates ? center : null)
-  }, [hasCoordinates, numericLat, numericLng, status])
+  useEffect(() => () => { if (debounceRef.current) clearTimeout(debounceRef.current) }, [])
+
+  async function fetchSuggestions(text: string) {
+    const seq = ++requestSeqRef.current
+    const places = await getPlacesLibrary()
+    if (!places) { setStatus('error'); return }
+
+    try {
+      if (places.AutocompleteSuggestion?.fetchAutocompleteSuggestions) {
+        if (!sessionTokenRef.current && places.AutocompleteSessionToken) {
+          sessionTokenRef.current = new places.AutocompleteSessionToken()
+        }
+        const { suggestions: fetched } = await places.AutocompleteSuggestion.fetchAutocompleteSuggestions({
+          input: text,
+          includedRegionCodes: ['za'],
+          sessionToken: sessionTokenRef.current ?? undefined,
+        })
+        if (seq !== requestSeqRef.current) return
+        const mapped: Suggestion[] = (fetched ?? [])
+          .filter((s: any) => s.placePrediction)
+          .map((s: any) => ({
+            placeId: s.placePrediction.placeId,
+            main: s.placePrediction.mainText?.text ?? s.placePrediction.text?.text ?? '',
+            secondary: s.placePrediction.secondaryText?.text ?? '',
+            description: s.placePrediction.text?.text ?? s.placePrediction.mainText?.text ?? '',
+            prediction: s.placePrediction,
+          }))
+        setSuggestions(mapped)
+        setOpen(mapped.length > 0)
+        setHighlight(-1)
+        return
+      }
+
+      if (places.AutocompleteService) {
+        if (!autocompleteServiceRef.current) autocompleteServiceRef.current = new places.AutocompleteService()
+        autocompleteServiceRef.current.getPlacePredictions(
+          { input: text, componentRestrictions: { country: 'za' } },
+          (predictions: any[] | null, predStatus: string) => {
+            if (seq !== requestSeqRef.current) return
+            if (predStatus !== 'OK' || !predictions) { setSuggestions([]); setOpen(false); return }
+            const mapped: Suggestion[] = predictions.map(p => ({
+              placeId: p.place_id,
+              main: p.structured_formatting?.main_text ?? p.description,
+              secondary: p.structured_formatting?.secondary_text ?? '',
+              description: p.description,
+            }))
+            setSuggestions(mapped)
+            setOpen(mapped.length > 0)
+            setHighlight(-1)
+          },
+        )
+        return
+      }
+
+      setStatus('error')
+    } catch {
+      if (seq === requestSeqRef.current) setStatus('error')
+    }
+  }
+
+  function handleInput(text: string) {
+    onChange({ address: text })
+    if (debounceRef.current) clearTimeout(debounceRef.current)
+    if (text.trim().length < 2) {
+      setSuggestions([])
+      setOpen(false)
+      return
+    }
+    debounceRef.current = setTimeout(() => fetchSuggestions(text), 250)
+  }
+
+  async function select(suggestion: Suggestion) {
+    setOpen(false)
+    setSuggestions([])
+    // Show the picked name immediately; coordinates follow once resolved.
+    onChange({ address: suggestion.description || suggestion.main })
+
+    const places = await getPlacesLibrary()
+    if (!places) return
+    try {
+      if (suggestion.prediction?.toPlace) {
+        const place = suggestion.prediction.toPlace()
+        await place.fetchFields({ fields: ['formattedAddress', 'location', 'displayName'] })
+        onChange({
+          address: place.formattedAddress || suggestion.description || suggestion.main,
+          lat: latLngToString(place.location?.lat),
+          lng: latLngToString(place.location?.lng),
+        })
+        sessionTokenRef.current = null
+        return
+      }
+      if (places.PlacesService) {
+        const service = new places.PlacesService(document.createElement('div'))
+        service.getDetails(
+          { placeId: suggestion.placeId, fields: ['formatted_address', 'geometry', 'name'] },
+          (place: any, detailStatus: string) => {
+            if (detailStatus !== 'OK' || !place) return
+            const location = place.geometry?.location
+            onChange({
+              address: place.formatted_address || place.name || suggestion.description,
+              lat: latLngToString(location?.lat),
+              lng: latLngToString(location?.lng),
+            })
+          },
+        )
+      }
+    } catch {}
+  }
+
+  function handleKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
+    if (!open || suggestions.length === 0) return
+    if (e.key === 'ArrowDown') {
+      e.preventDefault()
+      setHighlight(h => (h + 1) % suggestions.length)
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault()
+      setHighlight(h => (h <= 0 ? suggestions.length - 1 : h - 1))
+    } else if (e.key === 'Enter') {
+      e.preventDefault()
+      select(suggestions[highlight >= 0 ? highlight : 0])
+    } else if (e.key === 'Escape') {
+      setOpen(false)
+    }
+  }
 
   return (
-    <div className="space-y-3">
-      <div>
+    <div className="space-y-2" ref={containerRef}>
+      <div className="relative">
         <label htmlFor={id} className={labelClassName}>
           {label}{required && <span className="text-[#C9A96E] ml-0.5">*</span>}
         </label>
-        <input ref={inputRef} id={id} type="text" value={value} onChange={(e) => onChange({ address: e.target.value })} placeholder={placeholder} className={inputClassName} />
+        <input
+          id={id}
+          type="text"
+          value={value}
+          onChange={(e) => handleInput(e.target.value)}
+          onFocus={() => { if (suggestions.length > 0) setOpen(true) }}
+          onKeyDown={handleKeyDown}
+          placeholder={placeholder}
+          autoComplete="off"
+          className={inputClassName}
+        />
+        {open && suggestions.length > 0 && (
+          <ul className="absolute z-30 left-0 right-0 mt-1 max-h-64 overflow-y-auto bg-white border border-gray-200 rounded-lg shadow-lg">
+            {suggestions.map((s, i) => (
+              <li key={s.placeId}>
+                <button
+                  type="button"
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={() => select(s)}
+                  onMouseEnter={() => setHighlight(i)}
+                  className={`w-full text-left px-3 py-2.5 text-sm transition-colors ${i === highlight ? 'bg-[#F7F5F2]' : 'bg-white'}`}
+                >
+                  <span className="block font-medium text-gray-800">{s.main}</span>
+                  {s.secondary && <span className="block text-xs text-gray-400">{s.secondary}</span>}
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
       </div>
-      <div ref={mapRef} className="h-48 rounded-xl border border-gray-200 bg-gradient-to-br from-green-100 to-blue-100" />
-      {status === 'missing-key' && <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">Add NEXT_PUBLIC_GOOGLE_MAPS_API_KEY to enable Google address autocomplete and map previews.</p>}
-      {status === 'error' && <p className="text-xs text-red-600 bg-red-50 border border-red-100 rounded-lg px-3 py-2">Google Maps could not load. Check that the key allows Maps JavaScript API and Places API.</p>}
+      {status === 'missing-key' && <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">Add NEXT_PUBLIC_GOOGLE_MAPS_API_KEY to enable Google place search.</p>}
+      {status === 'error' && <p className="text-xs text-red-600 bg-red-50 border border-red-100 rounded-lg px-3 py-2">Google place search could not load. Check that the key allows the Places API.</p>}
     </div>
   )
 }
