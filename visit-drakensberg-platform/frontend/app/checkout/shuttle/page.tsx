@@ -2,137 +2,38 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import Link from 'next/link'
-import { ArrowLeft, Car, Bus, Check, MapPin, Clock, Users, ChevronRight, X } from 'lucide-react'
+import { ArrowLeft, Car, Bus, Check, Clock, ChevronRight, MapPin } from 'lucide-react'
 import { useBooking } from '@/lib/booking-context'
+import { GoogleAddressField, useAutoDrivingDistance, type GooglePlaceSelection } from '@/components/maps/GoogleAddressField'
+import { buildShuttleOption, estimateTransferPrice, suggestedVehicleType, SHUTTLE_TYPES, type ShuttleType } from '@/lib/shuttle-service'
 
-const SHUTTLE_OPTIONS_BY_REGION: Record<string, { id: string; label: string; description: string; pickup: string; price: number; duration: string; capacity: number }[]> = {
-  default: [
-    {
-      id: 'sh-jnb-shared',
-      label: 'Shared Shuttle from Johannesburg',
-      description: 'Daily departures from OR Tambo International Airport. Shared with up to 8 passengers. Drops at your lodge.',
-      pickup: 'OR Tambo International Airport, Johannesburg',
-      price: 650,
-      duration: '4–5 hours',
-      capacity: 8,
-    },
-    {
-      id: 'sh-jnb-private',
-      label: 'Private Transfer from Johannesburg',
-      description: 'Dedicated vehicle for your group. Door-to-door from any Johannesburg address.',
-      pickup: 'Any Johannesburg address',
-      price: 2800,
-      duration: '4–5 hours',
-      capacity: 8,
-    },
-    {
-      id: 'sh-dbn-shared',
-      label: 'Shared Shuttle from Durban',
-      description: 'Departs King Shaka International Airport daily at 08:00 and 13:00.',
-      pickup: "King Shaka International Airport, Durban",
-      price: 480,
-      duration: '2.5–3 hours',
-      capacity: 8,
-    },
-    {
-      id: 'sh-dbn-private',
-      label: 'Private Transfer from Durban',
-      description: 'Direct door-to-door transfer from any Durban address.',
-      pickup: 'Any Durban address',
-      price: 1800,
-      duration: '2.5–3 hours',
-      capacity: 8,
-    },
-  ],
-  'Northern Berg': [
-    {
-      id: 'sh-nb-jnb-shared',
-      label: 'Shared Shuttle · Johannesburg → Royal Natal',
-      description: 'Departs OR Tambo daily at 07:30. Arrives Sentinel Car Park and Tendele area by 12:30.',
-      pickup: 'OR Tambo International Airport',
-      price: 700,
-      duration: '5 hours',
-      capacity: 8,
-    },
-    {
-      id: 'sh-nb-jnb-private',
-      label: 'Private Transfer · Johannesburg → Northern Berg',
-      description: 'Private vehicle, any pickup point in Johannesburg or Pretoria.',
-      pickup: 'Any Joburg / Pretoria address',
-      price: 3200,
-      duration: '4.5–5 hours',
-      capacity: 6,
-    },
-    {
-      id: 'sh-nb-dbn-shared',
-      label: 'Shared Shuttle · Durban → Royal Natal',
-      description: 'Departs King Shaka Airport at 08:00 and 13:00. 3-hour scenic route.',
-      pickup: 'King Shaka International Airport',
-      price: 520,
-      duration: '3 hours',
-      capacity: 10,
-    },
-  ],
-  'Central Berg': [
-    {
-      id: 'sh-cb-jnb-shared',
-      label: 'Shared Shuttle · Johannesburg → Champagne Valley',
-      description: 'Daily departures from OR Tambo at 07:00. Via Harrismith N3.',
-      pickup: 'OR Tambo International Airport',
-      price: 680,
-      duration: '4.5 hours',
-      capacity: 8,
-    },
-    {
-      id: 'sh-cb-dbn-shared',
-      label: 'Shared Shuttle · Durban → Central Berg',
-      description: 'Departs King Shaka at 09:00 daily. Drops at Cathedral Peak, Champagne Valley and Giants Castle.',
-      pickup: 'King Shaka International Airport',
-      price: 460,
-      duration: '2.5 hours',
-      capacity: 10,
-    },
-    {
-      id: 'sh-cb-private',
-      label: 'Private Transfer · Any Origin → Central Berg',
-      description: 'Custom pickup location anywhere in KZN or Gauteng.',
-      pickup: 'Custom pickup point',
-      price: 2400,
-      duration: 'Varies',
-      capacity: 8,
-    },
-  ],
-  'Southern Berg': [
-    {
-      id: 'sh-sb-dbn-shared',
-      label: 'Shared Shuttle · Durban → Sani Pass',
-      description: 'Departs King Shaka Airport at 08:00. Arrives Sani Pass Lower Gate by 11:30.',
-      pickup: 'King Shaka International Airport',
-      price: 540,
-      duration: '3.5 hours',
-      capacity: 8,
-    },
-    {
-      id: 'sh-sb-4x4',
-      label: '4×4 Sani Pass Ascent Transfer',
-      description: 'Dedicated 4×4 shuttle up the Sani Pass to the Lesotho border. Departs 08:00 and 10:00.',
-      pickup: 'Sani Pass Lower Gate',
-      price: 450,
-      duration: '1.5 hours',
-      capacity: 6,
-    },
-  ],
-}
+// Transfers are quoted live from the Google Distance Matrix against the
+// guest's real pickup point and their actual stay — no fixed provider list.
+// The operating company is matched by the marketplace dispatch engine after
+// checkout.
 
 export default function ShuttlePage() {
   const router = useRouter()
   const booking = useBooking()
   const [needsShuttle, setNeedsShuttle] = useState<boolean | null>(null)
-  const [selected, setSelected] = useState<string | null>(booking.shuttle?.id || null)
+  const [pickup, setPickup] = useState<GooglePlaceSelection>({ address: '' })
+  const [shuttleType, setShuttleType] = useState<ShuttleType>('Private Shuttle')
+  const [date, setDate] = useState(booking.checkIn || '')
 
-  const region = booking.stay?.region || booking.region || 'default'
-  const shuttles = SHUTTLE_OPTIONS_BY_REGION[region] || SHUTTLE_OPTIONS_BY_REGION.default
+  const stay = booking.stay
+  const destination: GooglePlaceSelection = stay
+    ? { address: stay.address || `${stay.title}, ${stay.region}, South Africa`, lat: stay.lat, lng: stay.lng }
+    : { address: booking.region ? `${booking.region}, Drakensberg, South Africa` : '' }
+
+  const passengers = booking.guests || 2
+
+  const { result, status } = useAutoDrivingDistance(
+    { address: pickup.address, lat: pickup.lat, lng: pickup.lng },
+    destination,
+  )
+
+  const shuttlePrice = needsShuttle && result ? estimateTransferPrice(result.distanceKm, passengers, shuttleType) : 0
+  const canConfirm = needsShuttle === false || (needsShuttle === true && result && date)
 
   function confirm() {
     if (needsShuttle === false) {
@@ -140,19 +41,23 @@ export default function ShuttlePage() {
       router.push('/checkout')
       return
     }
-    if (!selected) return
-    const opt = shuttles.find(s => s.id === selected)
-    if (opt) {
-      booking.setShuttle({ id: opt.id, label: opt.label, price: opt.price, description: opt.description })
-    }
+    if (!result || !date) return
+    booking.setShuttle(buildShuttleOption({
+      id: `shuttle-${Date.now()}`,
+      pickup: { address: pickup.address, lat: pickup.lat, lng: pickup.lng },
+      destination: { address: destination.address, lat: destination.lat, lng: destination.lng },
+      date,
+      passengers,
+      shuttleType,
+      result,
+    }))
     router.push('/checkout')
   }
 
   const nights = booking.nights
-  const stayTotal = booking.stay ? booking.stay.price_per_night * nights : 0
+  const stayTotal = stay ? stay.price_per_night * nights : 0
   const addonTotal = booking.addons.reduce((s, a) => s + a.price_per_person * a.guests, 0)
-  const selectedShuttlePrice = needsShuttle && selected ? (shuttles.find(s => s.id === selected)?.price ?? 0) : 0
-  const grandTotal = stayTotal + addonTotal + selectedShuttlePrice
+  const grandTotal = stayTotal + addonTotal + shuttlePrice
 
   return (
     <div className="min-h-screen bg-[#F7F5F2]">
@@ -165,8 +70,8 @@ export default function ShuttlePage() {
           <p className="font-sans text-[10px] tracking-[0.2em] uppercase text-[#C9A96E] mb-2">Almost there</p>
           <h1 className="font-display italic text-4xl lg:text-5xl mb-2">Getting to the Berg</h1>
           <p className="font-sans text-sm text-white/50">
-            {booking.stay?.region || booking.region
-              ? `Getting to ${booking.stay?.region || booking.region}`
+            {stay?.region || booking.region
+              ? `Getting to ${stay?.region || booking.region}`
               : 'Will you need a shuttle to your accommodation?'}
           </p>
         </div>
@@ -175,7 +80,7 @@ export default function ShuttlePage() {
       <main className="max-w-[1440px] mx-auto px-6 lg:px-12 py-12">
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-10">
 
-          {/* Left: shuttle question + options */}
+          {/* Left: shuttle question + live quote */}
           <div className="lg:col-span-2 space-y-8">
 
             {/* Self-drive vs shuttle */}
@@ -208,57 +113,82 @@ export default function ShuttlePage() {
                   </div>
                   <div>
                     <p className="font-display italic text-lg mb-1">I need a shuttle</p>
-                    <p className="font-sans text-xs text-gray-500">Show me transfer options from major airports and cities.</p>
+                    <p className="font-sans text-xs text-gray-500">Quote a door-to-door transfer from any pickup point.</p>
                     {needsShuttle === true && <p className="font-sans text-xs text-[#2d6a4f] mt-2 flex items-center gap-1"><Check size={11} /> Selected</p>}
                   </div>
                 </button>
               </div>
             </div>
 
-            {/* Shuttle options */}
+            {/* Live transfer quote */}
             {needsShuttle === true && (
-              <div>
-                <h2 className="font-display italic text-2xl text-[#000000] mb-2">
-                  Shuttles to {booking.stay?.region || booking.region || 'the Berg'}
-                </h2>
-                <p className="font-sans text-xs text-gray-400 mb-5">Per vehicle (not per person) unless noted</p>
-                <div className="space-y-4">
-                  {shuttles.map(opt => (
-                    <button
-                      key={opt.id}
-                      onClick={() => setSelected(opt.id)}
-                      className={`w-full text-left p-5 border transition-colors ${
-                        selected === opt.id ? 'border-[#2d6a4f] bg-[#2d6a4f]/5' : 'border-gray-200 bg-white hover:border-gray-400'
-                      }`}
-                    >
-                      <div className="flex items-start justify-between gap-4">
-                        <div className="flex items-start gap-3 flex-1">
-                          <div className={`w-5 h-5 border-2 shrink-0 mt-0.5 flex items-center justify-center ${selected === opt.id ? 'border-[#2d6a4f] bg-[#2d6a4f]' : 'border-gray-300'}`}>
-                            {selected === opt.id && <Check size={11} className="text-white" />}
-                          </div>
-                          <div>
-                            <p className="font-display italic text-lg mb-1">{opt.label}</p>
-                            <p className="font-sans text-sm text-gray-600 mb-3">{opt.description}</p>
-                            <div className="flex flex-wrap gap-4 font-sans text-xs text-gray-400">
-                              <span className="flex items-center gap-1"><MapPin size={11} />{opt.pickup}</span>
-                              <span className="flex items-center gap-1"><Clock size={11} />{opt.duration}</span>
-                              <span className="flex items-center gap-1"><Users size={11} />Up to {opt.capacity} passengers</span>
-                            </div>
-                          </div>
-                        </div>
-                        <div className="text-right shrink-0">
-                          <p className="font-display italic text-2xl text-[#2d6a4f]">R {opt.price.toLocaleString()}</p>
-                          <p className="font-sans text-[10px] text-gray-400">per vehicle</p>
-                        </div>
+              <div className="space-y-6">
+                <div>
+                  <h2 className="font-display italic text-2xl text-[#000000] mb-2">
+                    Your transfer to {stay?.title || stay?.region || booking.region || 'the Berg'}
+                  </h2>
+                  <p className="font-sans text-xs text-gray-400 mb-5">
+                    Priced per vehicle from live driving distance · operated by a matched transport partner
+                  </p>
+
+                  <div className="bg-white border border-gray-200 p-5 space-y-5">
+                    <GoogleAddressField
+                      label="Pickup location"
+                      value={pickup.address}
+                      lat={pickup.lat}
+                      lng={pickup.lng}
+                      required
+                      placeholder="Airport, hotel, home address…"
+                      inputClassName="w-full border border-gray-200 px-4 py-3 font-sans text-sm focus:outline-none focus:border-[#2d6a4f] transition-colors"
+                      labelClassName="font-sans text-xs text-gray-500 mb-2 block"
+                      onChange={setPickup}
+                    />
+
+                    <div className="flex items-start gap-2 font-sans text-xs text-gray-500">
+                      <MapPin size={13} className="shrink-0 mt-0.5 text-[#C9A96E]" />
+                      <span>Drop-off: {destination.address || 'your accommodation'}</span>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div>
+                        <label className="font-sans text-xs text-gray-500 mb-2 block">Transfer date</label>
+                        <input type="date" value={date} onChange={e => setDate(e.target.value)}
+                          className="w-full border border-gray-200 px-4 py-3 font-sans text-sm focus:outline-none focus:border-[#2d6a4f]" />
                       </div>
-                    </button>
-                  ))}
+                      <div>
+                        <label className="font-sans text-xs text-gray-500 mb-2 block">Shuttle type</label>
+                        <select value={shuttleType} onChange={e => setShuttleType(e.target.value as ShuttleType)}
+                          className="w-full border border-gray-200 px-4 py-3 font-sans text-sm focus:outline-none focus:border-[#2d6a4f]">
+                          {SHUTTLE_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+                        </select>
+                      </div>
+                    </div>
+
+                    <div className="border-t border-gray-100 pt-4">
+                      {status === 'idle' && <p className="font-sans text-sm text-gray-400">Enter a pickup point to quote your transfer.</p>}
+                      {status === 'calculating' && <p className="font-sans text-sm text-gray-400">Calculating driving distance…</p>}
+                      {status === 'error' && <p className="font-sans text-sm text-red-500">We could not find a driving route from that pickup point. Try a more specific address.</p>}
+                      {status === 'done' && result && (
+                        <div className="flex items-start justify-between gap-4">
+                          <div className="flex flex-wrap gap-4 font-sans text-xs text-gray-500">
+                            <span className="flex items-center gap-1"><MapPin size={11} />{result.distanceKm} km</span>
+                            <span className="flex items-center gap-1"><Clock size={11} />~{result.durationText}</span>
+                            <span className="flex items-center gap-1"><Bus size={11} />{suggestedVehicleType(passengers)} · {passengers} passenger{passengers !== 1 ? 's' : ''}</span>
+                          </div>
+                          <div className="text-right shrink-0">
+                            <p className="font-display italic text-2xl text-[#2d6a4f]">R {estimateTransferPrice(result.distanceKm, passengers, shuttleType).toLocaleString()}</p>
+                            <p className="font-sans text-[10px] text-gray-400">per vehicle</p>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
                 </div>
               </div>
             )}
 
             {/* Confirm */}
-            {needsShuttle !== null && (needsShuttle === false || selected) && (
+            {canConfirm && (
               <button
                 onClick={confirm}
                 className="w-full bg-[#C9A96E] hover:bg-[#b8935e] text-[#1a1a1a] font-sans text-sm font-medium py-4 flex items-center justify-center gap-2 transition-colors"
@@ -277,13 +207,13 @@ export default function ShuttlePage() {
             <div className="bg-[#000000] text-white p-6 sticky top-24">
               <p className="font-sans text-[10px] tracking-[0.2em] uppercase text-[#C9A96E] mb-4">Your Booking</p>
 
-              {booking.stay && (
+              {stay && (
                 <div className="mb-4 pb-4 border-b border-white/10">
                   <p className="font-sans text-[10px] uppercase text-white/30 mb-1">Accommodation</p>
-                  <p className="font-display italic text-lg">{booking.stay.title}</p>
-                  <p className="font-sans text-xs text-white/40 mt-0.5">{booking.stay.region}</p>
+                  <p className="font-display italic text-lg">{stay.title}</p>
+                  <p className="font-sans text-xs text-white/40 mt-0.5">{stay.region}</p>
                   <p className="font-sans text-xs text-white/40 mt-1">
-                    R {booking.stay.price_per_night.toLocaleString()} × {nights} night{nights !== 1 ? 's' : ''} = R {stayTotal.toLocaleString()}
+                    R {stay.price_per_night.toLocaleString()} × {nights} night{nights !== 1 ? 's' : ''} = R {stayTotal.toLocaleString()}
                   </p>
                 </div>
               )}
@@ -300,12 +230,12 @@ export default function ShuttlePage() {
                 </div>
               )}
 
-              {needsShuttle && selected && (
+              {needsShuttle && result && (
                 <div className="mb-4 pb-4 border-b border-white/10">
                   <p className="font-sans text-[10px] uppercase text-white/30 mb-1">Shuttle</p>
                   <div className="flex justify-between font-sans text-xs text-white/60">
-                    <span className="truncate mr-2">{shuttles.find(s => s.id === selected)?.label}</span>
-                    <span>R {selectedShuttlePrice.toLocaleString()}</span>
+                    <span className="truncate mr-2">{pickup.address || 'Transfer'} → {stay?.title || 'accommodation'}</span>
+                    <span>R {shuttlePrice.toLocaleString()}</span>
                   </div>
                 </div>
               )}

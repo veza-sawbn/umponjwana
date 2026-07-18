@@ -16,6 +16,7 @@ const NAV_LINKS = [
   { label: 'Stays', href: '/stays' },
   { label: 'Hikes', href: '/hikes' },
   { label: 'Activities', href: '/activities' },
+  { label: 'Shuttles', href: '/shuttles' },
   { label: 'Reserves', href: '/nature-reserves' },
   { label: 'Regions', href: '/regions' },
   { label: 'Stories', href: '/mydrakensberg' },

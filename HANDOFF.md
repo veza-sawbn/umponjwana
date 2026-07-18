@@ -420,3 +420,71 @@ trip from the itinerary view, not just tour/activity operators:
   desk, showcase stays) can ONLY be answered here; replies send as
   "Visit Drakensberg" and notify the guest in-app. Supplier-owned threads
   remain answerable from /supplier/messages as before (RLS unchanged).
+
+## UPDATE 5 — Transport Supplier Marketplace & Google-only shuttles (2026-07-18)
+
+**Branch:** `claude/supplier-marketplace-booking-1z27tv`
+Run `frontend/supabase/migrations/20260718_transport_marketplace.sql` (adds
+`vd_transport_requests` with customer/offered-supplier/admin RLS).
+
+### Shuttles are Google-API-only now
+- `/shuttles` added to the main nav. The page (and `/checkout/shuttle`) was
+  rebuilt on `GoogleAddressField` autocomplete + the Distance Matrix: any
+  pickup → any destination, live km/duration, distance-based fare estimate.
+- ALL hardcoded shuttle provider logic is gone: `SHUTTLE_LOCATIONS`,
+  `SHUTTLE_ROUTES`, `SHUTTLE_OPTIONS_BY_REGION` and the mock fallback
+  recommendations were deleted. `lib/shuttle-service.ts` now only quotes from
+  live Google results (`estimateTransferPrice`, `buildShuttleOption`,
+  `useShuttleRecommendations`); addons without location data get no
+  recommendation instead of a mock one. `ShuttleOption` gained pickup/
+  destination lat/lng so coordinates survive into checkout.
+
+### Supplier marketplace (`lib/transport.ts`)
+- Transport companies register at `/supplier/transport` (Shuttle-supplier nav)
+  as `transport_company` entities: category **gateway | regional | local**
+  (`SUPPLIER_CATEGORIES`), Google-picked home base, service areas
+  (`TRANSPORT_AREAS` — cities/regions/valleys with centroid+radius), operating
+  radius, R/km + minimum fare, rolling stats (reliability, response time,
+  rating), and an `openJobs` board used for load/follow-on scoring.
+- Category gates eligibility per trip class (`classifyTrip` +
+  `eligibleCategories`): gateway trips → gateway (regional as backup);
+  regional → regional first; local (≤25 km / in-valley) → local first.
+
+### Automatic fleet lifecycle — no manual calendars
+- Vehicles carry `fleetStatus`: available → reserved (accept) → on_trip
+  (start) → available again at the **drop-off location** (complete). Drivers
+  carry `dutyStatus` (assigned/freed automatically). Maintenance toggle and
+  manual date blocks live on `/supplier/vehicles`; entity `status` stays
+  `active` so the scorer can read fleets. Vehicle new/edit pages persist real
+  data incl. a Google-picked current location (edit page was a mock before).
+
+### Dispatch engine (`lib/transport-dispatch.ts`)
+- Every checkout with a shuttle fires `createTransportRequestForBooking`
+  (hooked in `addBooking`) → a scored `vd_transport_requests` row. Factors:
+  region coverage, category fit, vehicle capacity/suitability, home-base
+  distance, current vehicle location, vehicle+driver availability, same-day
+  load, reliability, response time, rating, price vs median, plus a
+  follow-on bonus (≤15) when an open job ends near the pickup that day.
+- Top 3 eligible suppliers are offered simultaneously (notified, ranked);
+  `/supplier/jobs` is the acceptance workflow (accept w/ vehicle → assign
+  driver → start → complete; decline cascades to the next-ranked supplier).
+  Declined-by-all → `unassigned` for admin attention.
+
+### Admin dispatch console + optimiser
+- `/admin/transport` (admin nav → Transport): request queues with full
+  per-supplier score breakdowns, **Auto-assign top supplier**, re-run
+  dispatch, cancel; registered-company directory with live fleet counts.
+- `lib/transport-optimizer.ts` background service (runs on an interval while
+  the console is open): clusters upcoming journeys by destination area/date,
+  detects follow-on matches (supplier already travelling within 60 km of a
+  pending pickup) and persists rank boosts + notifications; learns region-
+  pair demand corridors from completed-trip history into the
+  `transport_insights` entity.
+
+### Notes / still open
+- `/supplier/routes` pages still exist but left the Shuttle nav (fixed routes
+  are superseded by dispatch); `/supplier/estimator` unchanged.
+- Customer-side rating capture for transport partners not built (stats
+  fields ready, neutral 4.0 prior).
+- Shuttle money still flows through the existing booking/master-order path;
+  transport requests reference the booking but carry no separate settlement.
