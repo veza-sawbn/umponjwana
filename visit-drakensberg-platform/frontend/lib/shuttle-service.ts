@@ -1,166 +1,126 @@
 import { useAutoDrivingDistances, type DistancePlace, type DistanceResult } from '@/components/maps/GoogleAddressField'
-import type { BookingAddon, BookingState, ShuttleOption } from './booking-context'
+import type { BookingState, ShuttleOption } from './booking-context'
 
-export type LocationType = 'Accommodation' | 'Airport' | 'Hiking trail' | 'Town' | 'Attraction' | 'Landmark' | 'GPS location'
-export type ShuttleType = 'Shared Shuttle' | 'Private Shuttle' | 'Premium Shuttle'
+// ============================================================================
+// Shuttle quoting — Google APIs only.
+//
+// Locations come from Google Places autocomplete and distances/durations from
+// the Google Distance Matrix. There is no static provider, location or route
+// table anywhere: fares are estimated from live driving distance, and the
+// actual operator is chosen after checkout by the marketplace dispatch
+// engine (lib/transport-dispatch.ts), which scores real registered transport
+// suppliers for every request.
+// ============================================================================
 
-export type ShuttleLocation = {
-  id: string
-  name: string
-  type: LocationType
-  region: string
-}
+export type ShuttleType = 'Shared Shuttle' | 'Private Shuttle'
+export const SHUTTLE_TYPES: ShuttleType[] = ['Shared Shuttle', 'Private Shuttle']
 
-export type ShuttleRoute = {
-  id: string
-  pickupId: string
-  destinationId: string
-  durationMinutes: number
-  vehicleType: string
-  capacity: number
-  shuttleTypes: ShuttleType[]
-  schedules: string[]
-  pricing: {
-    sharedPerPerson: number
-    privateBase: number
-    privatePerPassenger: number
+// Marketplace guide rates used for the customer-facing estimate. Long
+// transfers price at a lower per-km rate than short local hops.
+const LONG_HAUL_RATE_PER_KM = 9
+const LONG_HAUL_MIN_FARE = 650
+const LONG_HAUL_PER_PASSENGER_KM = 1
+
+const LOCAL_RATE_PER_KM = 12
+const LOCAL_MIN_FARE = 350
+const LOCAL_PER_PASSENGER_KM = 1.2
+
+const LOCAL_TRIP_THRESHOLD_KM = 80
+const SHARED_SHUTTLE_FACTOR = 0.45 // per-vehicle → per-seat-pool discount
+
+/** Estimate a private-transfer fare from live driving distance. */
+export function estimateTransferPrice(distanceKm: number, passengers: number, shuttleType: ShuttleType = 'Private Shuttle'): number {
+  const local = distanceKm <= LOCAL_TRIP_THRESHOLD_KM
+  const ratePerKm = local ? LOCAL_RATE_PER_KM : LONG_HAUL_RATE_PER_KM
+  const minFare = local ? LOCAL_MIN_FARE : LONG_HAUL_MIN_FARE
+  const perPassengerKm = local ? LOCAL_PER_PASSENGER_KM : LONG_HAUL_PER_PASSENGER_KM
+
+  const basePrice = Math.max(minFare, Math.round(distanceKm * ratePerKm))
+  const extraPassengerFee = Math.round(distanceKm * perPassengerKm) * Math.max(0, passengers - 1)
+  const privateFare = basePrice + extraPassengerFee
+  if (shuttleType === 'Shared Shuttle') {
+    return Math.max(Math.round(minFare * 0.4), Math.round(privateFare * SHARED_SHUTTLE_FACTOR))
   }
+  return privateFare
 }
 
-export type ShuttleSearch = {
-  pickupId: string
-  destinationId: string
+export function suggestedVehicleType(passengers: number): string {
+  if (passengers <= 3) return 'Sedan / SUV'
+  if (passengers <= 8) return 'Minibus / SUV'
+  if (passengers <= 14) return 'Minibus'
+  return 'Coach'
+}
+
+/** Build a cart-ready shuttle option from a live Google Distance Matrix result. */
+export function buildShuttleOption(params: {
+  id: string
+  pickup: DistancePlace
+  destination: DistancePlace
   date: string
   passengers: number
   shuttleType: ShuttleType
-}
-
-export const SHUTTLE_LOCATIONS: ShuttleLocation[] = [
-  { id: 'jnb-or-tambo', name: 'Johannesburg OR Tambo', type: 'Airport', region: 'Gauteng' },
-  { id: 'dur-king-shaka', name: 'Durban King Shaka Airport', type: 'Airport', region: 'KwaZulu-Natal' },
-  { id: 'champagne-valley', name: 'Champagne Valley accommodation', type: 'Accommodation', region: 'Central Berg' },
-  { id: 'cathedral-peak-hotel', name: 'Cathedral Peak Hotel', type: 'Accommodation', region: 'Northern Berg' },
-  { id: 'cathedral-peak-trailhead', name: 'Cathedral Peak Trailhead', type: 'Hiking trail', region: 'Northern Berg' },
-  { id: 'horse-riding-centre', name: 'Horse Riding Centre', type: 'Attraction', region: 'Central Berg' },
-  { id: 'underberg-town', name: 'Underberg', type: 'Town', region: 'Southern Berg' },
-  { id: 'royal-natal', name: 'Royal Natal National Park', type: 'Landmark', region: 'Northern Berg' },
-]
-
-export const SHUTTLE_ROUTES: ShuttleRoute[] = [
-  { id: 'r-jnb-cathedral', pickupId: 'jnb-or-tambo', destinationId: 'cathedral-peak-hotel', durationMinutes: 300, vehicleType: 'Minibus / SUV', capacity: 7, shuttleTypes: ['Private Shuttle', 'Shared Shuttle'], schedules: ['07:30', '12:00', '16:30'], pricing: { sharedPerPerson: 1100, privateBase: 3200, privatePerPassenger: 350 } },
-  { id: 'r-jnb-champagne', pickupId: 'jnb-or-tambo', destinationId: 'champagne-valley', durationMinutes: 270, vehicleType: 'Minibus / SUV', capacity: 7, shuttleTypes: ['Private Shuttle', 'Shared Shuttle'], schedules: ['08:00', '13:00', '17:00'], pricing: { sharedPerPerson: 1050, privateBase: 3000, privatePerPassenger: 320 } },
-  { id: 'r-dur-champagne', pickupId: 'dur-king-shaka', destinationId: 'champagne-valley', durationMinutes: 210, vehicleType: 'Minibus', capacity: 10, shuttleTypes: ['Private Shuttle', 'Shared Shuttle'], schedules: ['09:00', '14:00'], pricing: { sharedPerPerson: 850, privateBase: 2400, privatePerPassenger: 260 } },
-  { id: 'r-accom-cathedral', pickupId: 'champagne-valley', destinationId: 'cathedral-peak-trailhead', durationMinutes: 55, vehicleType: 'Touring van', capacity: 8, shuttleTypes: ['Private Shuttle', 'Shared Shuttle'], schedules: ['05:30', '06:30', '07:30'], pricing: { sharedPerPerson: 280, privateBase: 900, privatePerPassenger: 90 } },
-  { id: 'r-accom-horse', pickupId: 'champagne-valley', destinationId: 'horse-riding-centre', durationMinutes: 25, vehicleType: 'Touring van', capacity: 8, shuttleTypes: ['Private Shuttle', 'Shared Shuttle'], schedules: ['08:30', '10:30', '14:00'], pricing: { sharedPerPerson: 160, privateBase: 520, privatePerPassenger: 60 } },
-  { id: 'r-dur-underberg', pickupId: 'dur-king-shaka', destinationId: 'underberg-town', durationMinutes: 150, vehicleType: 'Minibus', capacity: 10, shuttleTypes: ['Private Shuttle', 'Shared Shuttle'], schedules: ['09:30', '15:00'], pricing: { sharedPerPerson: 720, privateBase: 2100, privatePerPassenger: 220 } },
-]
-
-export function calculateShuttlePrice(route: ShuttleRoute, shuttleType: ShuttleType, passengers: number) {
-  if (shuttleType === 'Shared Shuttle') return route.pricing.sharedPerPerson * passengers
-  return route.pricing.privateBase + route.pricing.privatePerPassenger * passengers
-}
-
-export function findAvailableRoutes(search: ShuttleSearch) {
-  return SHUTTLE_ROUTES.filter(route => route.pickupId === search.pickupId && route.destinationId === search.destinationId && route.shuttleTypes.includes(search.shuttleType) && search.passengers <= route.capacity)
-    .map(route => ({ route, price: calculateShuttlePrice(route, search.shuttleType, search.passengers) }))
-}
-
-export function toShuttleOption(route: ShuttleRoute, search: ShuttleSearch): ShuttleOption {
-  const pickup = SHUTTLE_LOCATIONS.find(l => l.id === route.pickupId)!
-  const destination = SHUTTLE_LOCATIONS.find(l => l.id === route.destinationId)!
-  const price = calculateShuttlePrice(route, search.shuttleType, search.passengers)
+  result: DistanceResult
+}): ShuttleOption {
+  const { id, pickup, destination, date, passengers, shuttleType, result } = params
+  const price = estimateTransferPrice(result.distanceKm, passengers, shuttleType)
   return {
-    id: `${route.id}-${search.date}-${search.shuttleType}`,
-    label: `${pickup.name} → ${destination.name}`,
+    id,
+    label: `${pickup.address} → ${destination.address}`,
     price,
-    description: `${search.shuttleType} on ${search.date}. ${Math.round(route.durationMinutes / 60 * 10) / 10}h estimated travel time · ${route.vehicleType} · ${search.passengers} passenger${search.passengers !== 1 ? 's' : ''}.`,
-    pickup: pickup.name,
-    destination: destination.name,
-    date: search.date,
-    passengers: search.passengers,
-    shuttleType: search.shuttleType,
-    durationMinutes: route.durationMinutes,
-    vehicleType: route.vehicleType,
+    description: `${shuttleType} on ${date}. ${result.distanceKm} km · ~${result.durationText} drive · ${passengers} passenger${passengers !== 1 ? 's' : ''}. Estimated fare based on live driving distance; operated by a matched local transport partner.`,
+    pickup: pickup.address,
+    destination: destination.address,
+    pickupLat: pickup.lat,
+    pickupLng: pickup.lng,
+    destinationLat: destination.lat,
+    destinationLng: destination.lng,
+    date,
+    passengers,
+    shuttleType,
+    durationMinutes: result.durationMinutes,
+    vehicleType: suggestedVehicleType(passengers),
+    distanceKm: result.distanceKm,
+    durationText: result.durationText,
   }
 }
 
-function locationForAddon(addon: BookingAddon) {
-  const text = `${addon.title} ${addon.type}`.toLowerCase()
-  if (text.includes('cathedral') || addon.type === 'hike') return 'cathedral-peak-trailhead'
-  if (text.includes('horse')) return 'horse-riding-centre'
-  return 'cathedral-peak-trailhead'
-}
-
-/** Addon-to-accommodation shuttle guesses from the static mock route table (used only when no real stay address is available). */
-function buildAddonShuttleRecommendations(booking: BookingState): ShuttleOption[] {
-  const recommendations: ShuttleOption[] = []
-  const passengers = booking.guests || 2
-  const accommodationId = booking.stay?.title.toLowerCase().includes('cathedral') ? 'cathedral-peak-hotel' : 'champagne-valley'
-
-  booking.addons.forEach(addon => {
-    const date = addon.date || booking.checkIn
-    const destinationId = locationForAddon(addon)
-    if (!date) return
-    const route = SHUTTLE_ROUTES.find(r => r.pickupId === accommodationId && r.destinationId === destinationId)
-    if (route && passengers <= route.capacity) recommendations.push(toShuttleOption(route, { pickupId: route.pickupId, destinationId, date, passengers, shuttleType: 'Private Shuttle' }))
-  })
-
-  return recommendations
-}
-
-/** Kept for backwards compatibility with any remaining direct callers; prefer useShuttleRecommendations(). */
-export function buildContextualShuttleRecommendations(booking: BookingState): ShuttleOption[] {
-  return buildAddonShuttleRecommendations(booking).filter(rec => rec.id !== booking.shuttle?.id)
-}
-
+// The two long-haul anchors most guests arrive through. Used only as Distance
+// Matrix *queries* (Google resolves them) — never as a route table.
 const MAJOR_HUBS = [
   { id: 'jnb-or-tambo', name: 'OR Tambo International Airport, Johannesburg' },
   { id: 'dur-king-shaka', name: 'King Shaka International Airport, Durban' },
 ]
 
-const AIRPORT_TRANSFER_RATE_PER_KM = 9
-const AIRPORT_TRANSFER_MIN_FARE = 650
-const AIRPORT_TRANSFER_PER_PASSENGER_KM = 1
-
-// Local transfers (stay to activity meeting point) cost more per km than long airport runs, with a lower minimum.
-const LOCAL_TRANSFER_RATE_PER_KM = 12
-const LOCAL_TRANSFER_MIN_FARE = 350
-const LOCAL_TRANSFER_PER_PASSENGER_KM = 1.2
-
-function priceForDistance(distanceKm: number, passengers: number, ratePerKm: number, minFare: number, perPassengerKm: number) {
-  const basePrice = Math.max(minFare, Math.round(distanceKm * ratePerKm))
-  const extraPassengerFee = Math.round(distanceKm * perPassengerKm) * Math.max(0, passengers - 1)
-  return basePrice + extraPassengerFee
-}
-
-function hasLocation(addon: BookingAddon) {
-  return Boolean(addon.location || (addon.lat && addon.lng))
+function addonPlace(addon: BookingState['addons'][number]): DistancePlace | null {
+  if (!addon.location && !(addon.lat && addon.lng)) return null
+  return { address: `${addon.location || addon.title}, South Africa`, lat: addon.lat, lng: addon.lng }
 }
 
 /**
- * Combines a live airport-transfer suggestion and live stay-to-activity transfer suggestions
- * (calculated from real driving distance to the guest's actual selected stay and each addon's
- * real location, in one batched Distance Matrix request) with mock route-table guesses for any
- * addon that has no location data on record. Ready-to-render, capped at `limit`.
+ * Live shuttle recommendations for the trip cart: the nearest major airport →
+ * stay transfer, plus stay → activity transfers, all quoted from one batched
+ * Google Distance Matrix request against the guest's actual locations.
+ * Addons without any location data are simply skipped — there is no static
+ * fallback table.
  */
 export function useShuttleRecommendations(booking: BookingState, limit = 2): ShuttleOption[] {
   const stay = booking.stay
   const passengers = booking.guests || 2
-  const addonsWithLocation = booking.addons.filter(hasLocation)
-  const addonsWithoutLocation = booking.addons.filter(a => !hasLocation(a))
+  const addonsWithLocation = booking.addons.filter(a => addonPlace(a) !== null)
 
   const origin: DistancePlace | null = stay
     ? { address: stay.address || `${stay.title}, ${stay.region}, South Africa`, lat: stay.lat, lng: stay.lng }
     : null
   const destinations: DistancePlace[] = [
     ...MAJOR_HUBS.map(hub => ({ address: hub.name })),
-    ...addonsWithLocation.map(addon => ({ address: `${addon.location || addon.title}, South Africa`, lat: addon.lat, lng: addon.lng })),
+    ...addonsWithLocation.map(addon => addonPlace(addon)!),
   ]
   const { results, status } = useAutoDrivingDistances(origin, destinations)
 
-  const liveRecommendations: ShuttleOption[] = []
+  const recommendations: ShuttleOption[] = []
+  if (!stay || status !== 'done') return recommendations
 
-  if (stay && booking.checkIn && status === 'done') {
+  if (booking.checkIn) {
     type HubDistance = { hub: typeof MAJOR_HUBS[number]; result: DistanceResult }
     const best = results.slice(0, MAJOR_HUBS.length).reduce<HubDistance | null>((closest, result, i) => {
       if (!result) return closest
@@ -169,53 +129,34 @@ export function useShuttleRecommendations(booking: BookingState, limit = 2): Shu
     }, null)
 
     if (best) {
-      const price = priceForDistance(best.result.distanceKm, passengers, AIRPORT_TRANSFER_RATE_PER_KM, AIRPORT_TRANSFER_MIN_FARE, AIRPORT_TRANSFER_PER_PASSENGER_KM)
-      liveRecommendations.push({
+      recommendations.push(buildShuttleOption({
         id: `airport-transfer-${best.hub.id}-${booking.checkIn}`,
-        label: `${best.hub.name} → ${stay.title}`,
-        price,
-        description: `Private transfer on ${booking.checkIn}. ${best.result.distanceKm} km · ~${best.result.durationText} drive · ${passengers} passenger${passengers !== 1 ? 's' : ''}. Estimated fare based on live driving distance.`,
-        pickup: best.hub.name,
-        destination: stay.title,
+        pickup: { address: best.hub.name },
+        destination: { address: stay.title, lat: stay.lat, lng: stay.lng },
         date: booking.checkIn,
         passengers,
         shuttleType: 'Private Shuttle',
-        durationMinutes: best.result.durationMinutes,
-        vehicleType: 'Minibus / SUV',
-        distanceKm: best.result.distanceKm,
-        durationText: best.result.durationText,
-      })
+        result: best.result,
+      }))
     }
   }
 
-  if (stay && status === 'done') {
-    addonsWithLocation.forEach((addon, i) => {
-      const result = results[MAJOR_HUBS.length + i]
-      const date = addon.date || booking.checkIn
-      if (!result || !date) return
-      const addonPassengers = addon.guests || passengers
-      const price = priceForDistance(result.distanceKm, addonPassengers, LOCAL_TRANSFER_RATE_PER_KM, LOCAL_TRANSFER_MIN_FARE, LOCAL_TRANSFER_PER_PASSENGER_KM)
-      liveRecommendations.push({
-        id: `addon-transfer-${addon.id}`,
-        label: `${stay.title} → ${addon.title}`,
-        price,
-        description: `Private transfer on ${date}. ${result.distanceKm} km · ~${result.durationText} drive · ${addonPassengers} passenger${addonPassengers !== 1 ? 's' : ''}. Estimated fare based on live driving distance.`,
-        pickup: stay.title,
-        destination: addon.title,
-        date,
-        passengers: addonPassengers,
-        shuttleType: 'Private Shuttle',
-        durationMinutes: result.durationMinutes,
-        vehicleType: 'Touring van',
-        distanceKm: result.distanceKm,
-        durationText: result.durationText,
-      })
-    })
-  }
+  addonsWithLocation.forEach((addon, i) => {
+    const result = results[MAJOR_HUBS.length + i]
+    const date = addon.date || booking.checkIn
+    if (!result || !date) return
+    recommendations.push(buildShuttleOption({
+      id: `addon-transfer-${addon.id}`,
+      pickup: { address: stay.title, lat: stay.lat, lng: stay.lng },
+      destination: { address: addon.title, lat: addon.lat, lng: addon.lng },
+      date,
+      passengers: addon.guests || passengers,
+      shuttleType: 'Private Shuttle',
+      result,
+    }))
+  })
 
-  const fallbackRecommendations = buildAddonShuttleRecommendations({ ...booking, addons: addonsWithoutLocation })
-
-  return [...liveRecommendations, ...fallbackRecommendations]
+  return recommendations
     .filter(rec => rec.id !== booking.shuttle?.id)
     .slice(0, limit)
 }

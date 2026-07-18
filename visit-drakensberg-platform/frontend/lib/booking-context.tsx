@@ -36,6 +36,10 @@ export type ShuttleOption = {
   description: string
   pickup?: string
   destination?: string
+  pickupLat?: string
+  pickupLng?: string
+  destinationLat?: string
+  destinationLng?: string
   date?: string
   passengers?: number
   shuttleType?: string

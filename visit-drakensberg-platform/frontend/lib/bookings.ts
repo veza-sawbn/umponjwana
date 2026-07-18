@@ -4,6 +4,7 @@ import { getPropertyById } from './properties'
 import { notify } from './notifications'
 import { createOrdersForBooking, cancelOrdersForBooking } from './booking-orders'
 import { createOrderForBooking, cancelOrderForBooking } from './orders'
+import { createTransportRequestForBooking } from './transport-dispatch'
 
 export type SavedBooking = {
   id: string
@@ -130,6 +131,15 @@ export async function addBooking(booking: Omit<SavedBooking, 'id' | 'reference' 
     await createOrderForBooking(newBooking)
   } catch (err) {
     console.error('Master order creation failed (booking saved):', err)
+  }
+
+  // Shuttle on the itinerary → transport request into the supplier
+  // marketplace, so the transfer ultimately belongs to a real transport
+  // company (dispatch scores and offers it to the best-ranked suppliers).
+  try {
+    await createTransportRequestForBooking(newBooking)
+  } catch (err) {
+    console.error('Transport request creation failed (booking saved):', err)
   }
 
   // Tell each involved supplier a new order arrived — no itinerary details

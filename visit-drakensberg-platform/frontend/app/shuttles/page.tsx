@@ -1,105 +1,200 @@
 'use client'
 
-import { useMemo, useState } from 'react'
-import { ArrowRight, Bus, Calendar, MapPin, Users } from 'lucide-react'
+import { useState } from 'react'
+import { useRouter } from 'next/navigation'
+import { ArrowRight, Bus, Calendar, Check, MapPin, Users } from 'lucide-react'
 import Footer from '@/components/layout/Footer'
 import { useBooking } from '@/lib/booking-context'
-import {
-  SHUTTLE_LOCATIONS, findAvailableRoutes, toShuttleOption,
-  type LocationType, type ShuttleType,
-} from '@/lib/shuttle-service'
+import { GoogleAddressField, hasGoogleMapsKey, useAutoDrivingDistance, type GooglePlaceSelection } from '@/components/maps/GoogleAddressField'
+import { buildShuttleOption, estimateTransferPrice, suggestedVehicleType, SHUTTLE_TYPES, type ShuttleType } from '@/lib/shuttle-service'
+import { SUPPLIER_CATEGORIES } from '@/lib/transport'
 
-const LOCATION_TYPES: LocationType[] = ['Accommodation', 'Airport', 'Hiking trail', 'Town', 'Attraction', 'Landmark', 'GPS location']
-const SHUTTLE_TYPES: ShuttleType[] = ['Shared Shuttle', 'Private Shuttle', 'Premium Shuttle']
+const EMPTY_PLACE: GooglePlaceSelection = { address: '' }
+
+const fieldInput = 'w-full border border-gray-200 px-4 py-3 font-sans text-sm focus:outline-none focus:border-forest transition-colors'
+const fieldLabel = 'font-sans text-[10px] tracking-[0.16em] uppercase text-gold mb-3 block'
 
 function fmtMinutes(minutes: number) {
   const h = Math.floor(minutes / 60)
   const m = minutes % 60
+  if (!h) return `${m}m`
   return m ? `${h}h ${m}m` : `${h}h`
 }
 
 export default function ShuttlesPage() {
+  const router = useRouter()
   const booking = useBooking()
-  const [pickupType, setPickupType] = useState<LocationType>('Airport')
-  const [destinationType, setDestinationType] = useState<LocationType>('Accommodation')
-  const [pickupId, setPickupId] = useState('jnb-or-tambo')
-  const [destinationId, setDestinationId] = useState(booking.stay?.title.toLowerCase().includes('cathedral') ? 'cathedral-peak-hotel' : 'champagne-valley')
+  const [pickup, setPickup] = useState<GooglePlaceSelection>(EMPTY_PLACE)
+  const [destination, setDestination] = useState<GooglePlaceSelection>(
+    booking.stay?.address || booking.stay?.lat
+      ? { address: booking.stay.address || booking.stay.title, lat: booking.stay.lat, lng: booking.stay.lng }
+      : EMPTY_PLACE
+  )
   const [date, setDate] = useState(booking.checkIn || '')
   const [passengers, setPassengers] = useState(booking.guests || 2)
   const [shuttleType, setShuttleType] = useState<ShuttleType>('Private Shuttle')
+  const [added, setAdded] = useState(false)
 
-  const pickupOptions = SHUTTLE_LOCATIONS.filter(l => l.type === pickupType)
-  const destinationOptions = SHUTTLE_LOCATIONS.filter(l => l.type === destinationType)
-  const available = useMemo(() => date ? findAvailableRoutes({ pickupId, destinationId, date, passengers, shuttleType }) : [], [pickupId, destinationId, date, passengers, shuttleType])
-  const routeForCapacity = findAvailableRoutes({ pickupId, destinationId, date: date || 'pending', passengers: 1, shuttleType }).at(0)?.route
-  const capacityError = routeForCapacity && passengers > routeForCapacity.capacity
+  // Live driving distance & duration straight from the Google Distance
+  // Matrix — the only source of route data on this page.
+  const { result, status } = useAutoDrivingDistance(
+    { address: pickup.address, lat: pickup.lat, lng: pickup.lng },
+    { address: destination.address, lat: destination.lat, lng: destination.lng },
+  )
 
-  function chooseLocation(type: LocationType, kind: 'pickup' | 'destination') {
-    if (kind === 'pickup') {
-      setPickupType(type)
-      setPickupId(SHUTTLE_LOCATIONS.find(l => l.type === type)?.id || '')
-    } else {
-      setDestinationType(type)
-      setDestinationId(SHUTTLE_LOCATIONS.find(l => l.type === type)?.id || '')
-    }
+  const price = result ? estimateTransferPrice(result.distanceKm, passengers, shuttleType) : null
+  const ready = Boolean(result && date && pickup.address && destination.address)
+
+  function addToTrip() {
+    if (!result || !date) return
+    booking.setShuttle(buildShuttleOption({
+      id: `shuttle-${Date.now()}`,
+      pickup: { address: pickup.address, lat: pickup.lat, lng: pickup.lng },
+      destination: { address: destination.address, lat: destination.lat, lng: destination.lng },
+      date,
+      passengers,
+      shuttleType,
+      result,
+    }))
+    setAdded(true)
   }
 
   return (
     <main className="bg-mist min-h-screen pt-16">
       <section className="bg-forest text-white py-16 px-6 lg:px-12">
         <div className="max-w-[1440px] mx-auto">
-          <p className="font-sans text-xs tracking-[0.2em] uppercase text-white/30 mb-3">Ride-style booking</p>
+          <p className="font-sans text-xs tracking-[0.2em] uppercase text-white/30 mb-3">Door-to-door transfers</p>
           <h1 className="font-display text-5xl lg:text-6xl text-white leading-none mb-4">Shuttles & Transfers</h1>
-          <p className="font-sans text-sm text-white/50">Choose pickup, destination, travel date, passengers and shuttle type.</p>
+          <p className="font-sans text-sm text-white/50 max-w-xl">
+            Pick up anywhere, drop off anywhere. Your transfer is quoted from live driving distance and
+            operated by the best-matched company in our transport partner marketplace.
+          </p>
         </div>
       </section>
 
       <div className="max-w-[1440px] mx-auto px-6 lg:px-12 py-12 grid grid-cols-1 lg:grid-cols-3 gap-8">
         <div className="lg:col-span-2 bg-white border border-black/8 p-6 space-y-8">
+          {!hasGoogleMapsKey() && (
+            <p className="font-sans text-xs text-amber-700 bg-amber-50 border border-amber-200 px-4 py-3">
+              Location search requires the Google Maps API key (NEXT_PUBLIC_GOOGLE_MAPS_API_KEY). You can still type addresses manually.
+            </p>
+          )}
+
           <section>
-            <p className="font-sans text-[10px] tracking-[0.16em] uppercase text-gold mb-3">Step 1 · Choose Pickup Location</p>
-            <div className="flex flex-wrap gap-2 mb-4">{LOCATION_TYPES.map(type => <button key={type} disabled={type === 'GPS location'} onClick={() => chooseLocation(type, 'pickup')} className={`px-3 py-2 font-sans text-xs border ${pickupType === type ? 'bg-forest text-white border-forest' : 'border-gray-200 text-forest/70'} disabled:opacity-40`}>{type}</button>)}</div>
-            <select value={pickupId} onChange={e => setPickupId(e.target.value)} className="w-full border border-gray-200 px-4 py-3 font-sans text-sm">{pickupOptions.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}</select>
+            <p className={fieldLabel}>Step 1 · Pickup location</p>
+            <GoogleAddressField
+              label="Search any address, airport, lodge, trailhead or town"
+              value={pickup.address}
+              lat={pickup.lat}
+              lng={pickup.lng}
+              placeholder="e.g. OR Tambo International Airport"
+              inputClassName={fieldInput}
+              labelClassName="font-sans text-xs text-forest/50 mb-2 block"
+              onChange={setPickup}
+            />
           </section>
 
           <section>
-            <p className="font-sans text-[10px] tracking-[0.16em] uppercase text-gold mb-3">Step 2 · Choose Destination</p>
-            <div className="flex flex-wrap gap-2 mb-4">{LOCATION_TYPES.filter(t => t !== 'GPS location').map(type => <button key={type} onClick={() => chooseLocation(type, 'destination')} className={`px-3 py-2 font-sans text-xs border ${destinationType === type ? 'bg-forest text-white border-forest' : 'border-gray-200 text-forest/70'}`}>{type}</button>)}</div>
-            <select value={destinationId} onChange={e => setDestinationId(e.target.value)} className="w-full border border-gray-200 px-4 py-3 font-sans text-sm">{destinationOptions.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}</select>
+            <p className={fieldLabel}>Step 2 · Destination</p>
+            <GoogleAddressField
+              label="Where are we taking you?"
+              value={destination.address}
+              lat={destination.lat}
+              lng={destination.lng}
+              placeholder="e.g. your lodge, a trailhead, an attraction"
+              inputClassName={fieldInput}
+              labelClassName="font-sans text-xs text-forest/50 mb-2 block"
+              onChange={setDestination}
+            />
           </section>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-            <section><p className="font-sans text-[10px] tracking-[0.16em] uppercase text-gold mb-3">Step 3 · Date</p><input type="date" value={date} onChange={e => setDate(e.target.value)} className="w-full border border-gray-200 px-4 py-3 font-sans text-sm" /></section>
-            <section><p className="font-sans text-[10px] tracking-[0.16em] uppercase text-gold mb-3">Step 4 · Passengers</p><input type="number" min={1} max={20} value={passengers} onChange={e => setPassengers(parseInt(e.target.value) || 1)} className="w-full border border-gray-200 px-4 py-3 font-sans text-sm" />{capacityError && <p className="font-sans text-xs text-red-500 mt-2">Passenger count exceeds vehicle capacity of {routeForCapacity.capacity}.</p>}</section>
-            <section><p className="font-sans text-[10px] tracking-[0.16em] uppercase text-gold mb-3">Step 5 · Shuttle Type</p><select value={shuttleType} onChange={e => setShuttleType(e.target.value as ShuttleType)} className="w-full border border-gray-200 px-4 py-3 font-sans text-sm">{SHUTTLE_TYPES.map(t => <option key={t} value={t} disabled={t === 'Premium Shuttle'}>{t}{t === 'Premium Shuttle' ? ' (future)' : ''}</option>)}</select></section>
+            <section>
+              <p className={fieldLabel}>Step 3 · Date</p>
+              <input type="date" value={date} onChange={e => setDate(e.target.value)} className={fieldInput} />
+            </section>
+            <section>
+              <p className={fieldLabel}>Step 4 · Passengers</p>
+              <input type="number" min={1} max={20} value={passengers} onChange={e => setPassengers(Math.max(1, parseInt(e.target.value) || 1))} className={fieldInput} />
+            </section>
+            <section>
+              <p className={fieldLabel}>Step 5 · Shuttle type</p>
+              <select value={shuttleType} onChange={e => setShuttleType(e.target.value as ShuttleType)} className={fieldInput}>
+                {SHUTTLE_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+              </select>
+            </section>
           </div>
 
           <section>
-            <p className="font-sans text-[10px] tracking-[0.16em] uppercase text-gold mb-3">Available shuttle schedules</p>
-            <div className="divide-y divide-gray-100 border border-gray-100">
-              {!date && <p className="p-5 font-sans text-sm text-gray-400">Select a travel date to view schedules.</p>}
-              {date && available.length === 0 && <p className="p-5 font-sans text-sm text-gray-400">No available route matches these details. Try a private transfer, fewer passengers, or another pickup/destination.</p>}
-              {available.map(({ route, price }) => (
-                <button key={route.id} onClick={() => booking.setShuttle(toShuttleOption(route, { pickupId, destinationId, date, passengers, shuttleType }))} className="w-full flex items-center gap-4 p-5 text-left hover:bg-mist transition-colors">
-                  <Bus className="text-forest" size={20} /><div className="flex-1"><p className="font-display text-lg text-forest">{route.schedules.join(' · ')}</p><p className="font-sans text-xs text-forest/40">{fmtMinutes(route.durationMinutes)} · {route.vehicleType} · capacity {route.capacity}</p></div><p className="font-display text-xl text-forest">R{price.toLocaleString()}</p><ArrowRight className="text-gold" size={16} />
-                </button>
+            <p className={fieldLabel}>Live route estimate</p>
+            <div className="border border-gray-100">
+              {status === 'idle' && <p className="p-5 font-sans text-sm text-gray-400">Choose a pickup and destination to see distance, travel time and fare.</p>}
+              {status === 'calculating' && <p className="p-5 font-sans text-sm text-gray-400">Calculating driving distance…</p>}
+              {status === 'error' && <p className="p-5 font-sans text-sm text-red-500">We could not calculate a driving route between these points. Try more specific locations.</p>}
+              {status === 'done' && result && (
+                <div className="flex items-center gap-4 p-5">
+                  <Bus className="text-forest shrink-0" size={20} />
+                  <div className="flex-1">
+                    <p className="font-display text-lg text-forest">{result.distanceKm} km · {fmtMinutes(result.durationMinutes)} drive</p>
+                    <p className="font-sans text-xs text-forest/40">{suggestedVehicleType(passengers)} · {passengers} passenger{passengers !== 1 ? 's' : ''} · {shuttleType}</p>
+                  </div>
+                  {price !== null && <p className="font-display text-xl text-forest">R{price.toLocaleString()}</p>}
+                </div>
+              )}
+            </div>
+          </section>
+
+          <section className="border-t border-gray-100 pt-6">
+            <p className="font-sans text-[10px] tracking-[0.16em] uppercase text-forest/30 mb-4">Who drives you</p>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              {Object.entries(SUPPLIER_CATEGORIES).map(([key, cat]) => (
+                <div key={key} className="border border-gray-100 p-4">
+                  <p className="font-display text-base text-forest mb-1">{cat.label}s</p>
+                  <p className="font-sans text-xs text-forest/50 leading-relaxed">{cat.description}</p>
+                </div>
               ))}
             </div>
+            <p className="font-sans text-xs text-forest/40 mt-4">
+              Every transfer is matched to the most suitable registered operator — by region, vehicle,
+              availability, reliability and price — the moment your booking is confirmed.
+            </p>
           </section>
         </div>
 
         <aside className="bg-forest text-white p-8 h-fit sticky top-24">
-          <p className="font-sans text-[10px] tracking-[0.16em] uppercase text-white/40 mb-3">Step 6 · Review Booking</p>
+          <p className="font-sans text-[10px] tracking-[0.16em] uppercase text-white/40 mb-3">Step 6 · Review & add to trip</p>
           <div className="space-y-4 font-sans text-sm text-white/70">
-            <p className="flex gap-2"><MapPin size={14} />Pickup: {SHUTTLE_LOCATIONS.find(l => l.id === pickupId)?.name || '—'}</p>
-            <p className="flex gap-2"><MapPin size={14} />Destination: {SHUTTLE_LOCATIONS.find(l => l.id === destinationId)?.name || '—'}</p>
+            <p className="flex gap-2"><MapPin size={14} className="shrink-0 mt-0.5" />Pickup: {pickup.address || '—'}</p>
+            <p className="flex gap-2"><MapPin size={14} className="shrink-0 mt-0.5" />Destination: {destination.address || '—'}</p>
             <p className="flex gap-2"><Calendar size={14} />Date: {date || 'Select date'}</p>
             <p className="flex gap-2"><Users size={14} />Passengers: {passengers}</p>
-            <p>Vehicle type: {available[0]?.route.vehicleType || '—'}</p>
-            <p>Estimated duration: {available[0] ? fmtMinutes(available[0].route.durationMinutes) : '—'}</p>
+            <p>Vehicle type: {suggestedVehicleType(passengers)}</p>
+            <p>Estimated duration: {result ? fmtMinutes(result.durationMinutes) : '—'}</p>
           </div>
-          <div className="border-t border-white/10 mt-6 pt-6 flex items-end justify-between"><span className="font-sans text-xs text-white/40">Price</span><span className="font-display text-3xl text-gold">{available[0] ? `R${available[0].price.toLocaleString()}` : '—'}</span></div>
-          <p className="font-sans text-xs text-white/40 mt-4">Selecting a schedule adds the shuttle directly to your itinerary and checkout.</p>
+          <div className="border-t border-white/10 mt-6 pt-6 flex items-end justify-between">
+            <span className="font-sans text-xs text-white/40">Estimated fare</span>
+            <span className="font-display text-3xl text-gold">{price !== null ? `R${price.toLocaleString()}` : '—'}</span>
+          </div>
+
+          {added ? (
+            <div className="mt-6 space-y-3">
+              <p className="font-sans text-xs text-emerald-300 flex items-center gap-2"><Check size={14} /> Shuttle added to your trip.</p>
+              <button onClick={() => router.push('/trip')} className="w-full bg-gold text-forest font-sans text-sm py-3 flex items-center justify-center gap-2 hover:bg-white transition-colors">
+                View trip & checkout <ArrowRight size={14} />
+              </button>
+            </div>
+          ) : (
+            <button
+              onClick={addToTrip}
+              disabled={!ready}
+              className="w-full mt-6 bg-gold text-forest font-sans text-sm py-3 flex items-center justify-center gap-2 hover:bg-white transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              Add shuttle to trip <ArrowRight size={14} />
+            </button>
+          )}
+          <p className="font-sans text-xs text-white/40 mt-4">
+            Your transfer is confirmed at checkout and dispatched to our highest-ranked transport partner for this route.
+          </p>
         </aside>
       </div>
       <Footer />
