@@ -60,6 +60,20 @@ export async function getThreadsByBooking(bookingId: string): Promise<MessageThr
   return []
 }
 
+/** Admin console: every thread (RLS grants admins full read). Threads with
+ *  no supplier account — shuttle desk, showcase stays, platform services —
+ *  can only be answered here. */
+export async function getAllThreads(): Promise<MessageThread[]> {
+  try {
+    const { data } = await supabase
+      .from('vd_message_threads')
+      .select('*')
+      .order('updated_at', { ascending: false })
+    if (Array.isArray(data)) return (data as Row[]).map(rowToThread)
+  } catch {}
+  return []
+}
+
 export async function getThreadsBySupplier(supplierId: string, _fallbackNames?: string[]): Promise<MessageThread[]> {
   try {
     const { data } = await supabase

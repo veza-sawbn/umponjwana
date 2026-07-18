@@ -14,11 +14,13 @@ import { getBookingById, type SavedBooking } from '@/lib/bookings'
 import { getTours, type Tour } from '@/lib/tours'
 import { getDepartures, type Departure } from '@/lib/departures'
 import { getTrails, type Trail } from '@/lib/trails'
+import { getPropertyById } from '@/lib/properties'
 import { supabase } from '@/lib/auth'
 import {
   getOrCreateThread, sendMessage, getThreadsByBooking,
   type MessageThread,
 } from '@/lib/messages'
+import SupplierMessageBlock from '@/components/messaging/SupplierMessageBlock'
 
 /* ── helpers ────────────────────────────────────────────── */
 function fmtLong(iso: string) {
@@ -197,10 +199,11 @@ function ExperienceSection({
   const [thread, setThread] = useState<MessageThread | null>(null)
   const [threadLoading, setThreadLoading] = useState(false)
 
-  // Resolve supplier identity: departure.supplierId is most reliable,
-  // tour.supplierId is fallback, then empty string (matched by name on supplier side)
-  const resolvedSupplierId = departure?.supplierId || tour?.supplierId || ''
-  const resolvedSupplierName = tour?.supplierName || departure?.supplierName || addon.operator || ''
+  // Resolve supplier identity: the addon carries the supplier it was booked
+  // with; departure/tour are fallbacks for legacy bookings. Empty string =
+  // platform-arranged (thread lands in the Visit Drakensberg admin inbox).
+  const resolvedSupplierId = addon.supplierId || departure?.supplierId || tour?.supplierId || ''
+  const resolvedSupplierName = addon.operator || tour?.supplierName || departure?.supplierName || 'Visit Drakensberg'
 
   async function openMessages() {
     if (!currentUser) return
@@ -435,7 +438,7 @@ function ExperienceSection({
                   </p>
                 )}
               </div>
-              {currentUser && resolvedSupplierName && (
+              {currentUser && (
                 <button
                   onClick={openMessages}
                   className="shrink-0 inline-flex items-center gap-2 bg-[#C9A96E] text-[#1a1a1a] px-4 py-2 font-sans text-sm font-medium hover:bg-[#b8935e] transition-colors"
@@ -482,6 +485,7 @@ function ItineraryInner() {
   const [departures, setDepartures] = useState<Departure[]>([])
   const [trails, setTrails] = useState<Trail[]>([])
   const [currentUser, setCurrentUser] = useState<{ id: string; name: string; email: string } | null>(null)
+  const [staySupplierId, setStaySupplierId] = useState('')
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -492,7 +496,7 @@ function ItineraryInner() {
       getDepartures(),
       getTrails(),
       supabase.auth.getUser(),
-    ]).then(([b, t, d, tr, { data: { user } }]) => {
+    ]).then(async ([b, t, d, tr, { data: { user } }]) => {
       setBooking(b)
       setTours(t)
       setDepartures(d)
@@ -503,6 +507,15 @@ function ItineraryInner() {
           name: user.user_metadata?.full_name || user.email?.split('@')[0] || 'Visitor',
           email: user.email || '',
         })
+      }
+      // The stay's supplier account, so "Message Property" reaches the real
+      // property owner. Showcase stays have none — those threads go to the
+      // Visit Drakensberg team instead.
+      if (b?.stay?.id?.startsWith('prop-')) {
+        try {
+          const prop = await getPropertyById(b.stay.id)
+          if (prop?.supplierId) setStaySupplierId(prop.supplierId)
+        } catch {}
       }
       setLoading(false)
     })
@@ -616,7 +629,15 @@ function ItineraryInner() {
                 <div className="bg-[#000000] text-white p-5">
                   <p className="font-sans text-[10px] uppercase tracking-wider text-[#C9A96E] mb-3">Property Contact</p>
                   <p className="font-display italic text-xl mb-3">{booking.stay.title}</p>
-                  <p className="font-sans text-xs text-white/40 leading-relaxed">Contact the property directly with any special requests or questions about your stay.</p>
+                  <p className="font-sans text-xs text-white/40 leading-relaxed mb-4">Contact the property directly with any special requests or questions about your stay.</p>
+                  <SupplierMessageBlock
+                    booking={booking}
+                    currentUser={currentUser}
+                    supplierId={staySupplierId}
+                    supplierName={booking.stay.title}
+                    serviceTitle={`Stay — ${booking.stay.title}`}
+                    buttonLabel="Message Property"
+                  />
                 </div>
                 <div className="border border-amber-200 bg-amber-50 p-4">
                   <p className="font-sans text-[10px] uppercase tracking-wider text-amber-700 mb-2 flex items-center gap-1.5">
@@ -663,6 +684,16 @@ function ItineraryInner() {
                 <p className="font-sans text-xs text-gray-400 mt-3">Your shuttle operator will confirm pickup time and exact location 24 hours before departure.</p>
               </div>
               <p className="font-display italic text-2xl text-[#2d6a4f] shrink-0">R {booking.shuttle.price.toLocaleString()}</p>
+            </div>
+            <div className="mt-4 pt-4 border-t border-gray-100">
+              <SupplierMessageBlock
+                booking={booking}
+                currentUser={currentUser}
+                supplierId=""
+                supplierName="Visit Drakensberg Shuttle Desk"
+                serviceTitle={`Shuttle — ${booking.shuttle.label}`}
+                buttonLabel="Message Shuttle Desk"
+              />
             </div>
           </Section>
         )}
