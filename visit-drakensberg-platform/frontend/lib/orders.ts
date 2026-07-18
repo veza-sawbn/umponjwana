@@ -1,6 +1,7 @@
 import { supabase } from './auth'
 import type { SavedBooking } from './bookings'
 import { getPropertyById } from './properties'
+import { sendReceiptEmail } from './order-payments'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Master Orders — the single source of truth for a trip's finances.
@@ -114,6 +115,8 @@ export type OrderNote = {
 
 export type CreateOrderInput = {
   bookingId?: string
+  /** Staff-only: order for a walk-in/phone customer with no account. */
+  guest?: boolean
   customerName: string
   customerEmail: string
   tripName: string
@@ -154,7 +157,11 @@ export async function createOrder(
     p_user_id: opts?.userId ?? null,
   })
   if (error) throw new Error(error.message || 'Order creation failed')
-  return data as CreateOrderResult
+  const result = data as CreateOrderResult
+  // Orders created with an initial payment (checkout, packages) get their
+  // receipt emailed straight away.
+  if (opts?.payment && opts.payment.amount > 0) sendReceiptEmail(result.orderId)
+  return result
 }
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i

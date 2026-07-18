@@ -82,11 +82,11 @@ function SuccessInner() {
                   </p>
                 </div>
                 <button
-                  onClick={() => window.print()}
+                  onClick={() => window.open(`/itinerary/${booking.id}/print`, '_blank')}
                   className="print:hidden shrink-0 flex items-center gap-2 border border-[#2d6a4f] text-[#2d6a4f] px-4 py-2.5 font-sans text-sm hover:bg-[#2d6a4f] hover:text-white transition-colors"
                 >
                   <Printer size={13} />
-                  Download / Print PDF
+                  Print Itinerary / PDF
                 </button>
               </div>
             </div>

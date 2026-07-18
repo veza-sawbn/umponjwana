@@ -372,3 +372,29 @@ customer invoice shows a single package line at sell price.
   server-side trigger or retry queue later.
 - Equipment/permit/levy categories are supported end-to-end financially but
   have no dedicated public product pages yet.
+
+### UPDATE 4b — Guest invoicing, receipt emails, printable documents (2026-07-18)
+
+Run `frontend/supabase/migrations/20260718_guest_orders.sql` after the
+order-management migration.
+
+- **Guest invoices** — `/admin/invoices` New Invoice now has a
+  "Guest / manual details" mode (name, email, phone) for walk-in/phone
+  customers with no account. `user_id` is nullable across the financial
+  tables; guest orders are staff-managed only (`vd_create_order` accepts
+  `p_order.guest = true`, admin-only; ownership checks in the payment and
+  cancel RPCs now use IS DISTINCT FROM so NULL user_id cannot bypass them).
+- **Receipt emails** — every recorded payment/refund fires
+  `POST /api/receipts/send` (from `recordOrderPayment` and from
+  `createOrder` when an initial payment is attached). The route runs under
+  the caller's session (RLS applies), composes a branded receipt email and
+  sends it via Resend when `RESEND_API_KEY` is set (`RECEIPTS_FROM_EMAIL`
+  overrides the sender; `NEXT_PUBLIC_SITE_URL` sets the invoice link
+  origin). Without a key it degrades gracefully; an in-app notification
+  with the receipt link is always created for account holders.
+- **Printable documents** — `/invoices/[id]` (branded tax invoice) and
+  `/itinerary/[id]/print` (trip summary, accommodation, day-by-day
+  schedule, transfers, payment summary, emergency numbers). All former
+  whole-page `window.print()` buttons (account itinerary ×2, checkout
+  success, account orders, admin order console) now open these documents;
+  print CSS isolates the document itself.
