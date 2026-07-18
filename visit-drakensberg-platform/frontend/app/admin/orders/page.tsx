@@ -267,7 +267,13 @@ function OrderDetail({ order, onChanged }: { order: MasterOrder; onChanged: () =
                 <h3 className="font-display italic text-2xl">{invoice.invoice_number}</h3>
                 <p className="font-sans text-xs text-gray-400 mt-1">{order.customer_name} · Issued {fmt(invoice.issued_at)}</p>
               </div>
-              <Badge v={invoice.status} />
+              <div className="flex items-center gap-3">
+                <a href={`/invoices/${invoice.id}`} target="_blank" rel="noreferrer"
+                  className="inline-flex items-center gap-1.5 font-sans text-xs text-[#2d6a4f] hover:underline">
+                  Open printable invoice
+                </a>
+                <Badge v={invoice.status} />
+              </div>
             </div>
             <table className="w-full mb-4">
               <tbody className="divide-y divide-gray-100">
