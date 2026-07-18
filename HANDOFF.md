@@ -398,3 +398,25 @@ order-management migration.
   whole-page `window.print()` buttons (account itinerary ×2, checkout
   success, account orders, admin order console) now open these documents;
   print CSS isolates the document itself.
+
+### UPDATE 4c — Itinerary messaging for every supplier type (2026-07-18)
+
+No new migration. Guests can now message every supplier involved in their
+trip from the itinerary view, not just tour/activity operators:
+
+- `components/messaging/SupplierMessageBlock.tsx` — reusable button +
+  inline thread (5s polling while open) on `vd_message_threads`, keyed by
+  booking × service title.
+- Accommodation: "Message Property" in the Property Contact card — routes
+  to the property owner's supplier account (looked up via
+  `getPropertyById`); showcase stays (no supplier) route to the platform.
+- Shuttle: "Message Shuttle Desk" — platform-addressed thread (shuttles
+  are platform-arranged and carry no supplier account).
+- Experiences: supplier resolution fixed to prefer `addon.supplierId`
+  (the supplier actually booked), falling back to departure/tour; the
+  Message Operator button no longer disappears when only a name is known.
+- `/admin/messages` (new admin nav item) — console for ALL threads with a
+  "Visit Drakensberg inbox" filter: platform-addressed threads (shuttle
+  desk, showcase stays) can ONLY be answered here; replies send as
+  "Visit Drakensberg" and notify the guest in-app. Supplier-owned threads
+  remain answerable from /supplier/messages as before (RLS unchanged).

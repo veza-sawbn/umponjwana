@@ -6,7 +6,7 @@ import {
   LayoutDashboard, ListChecks, Users, CalendarDays,
   FileText, BarChart2, Search, Settings, LogOut, Mountain,
   Globe, MapPin, Image, Store, Package, ShieldCheck,
-  Receipt, Landmark, Banknote, ClipboardList,
+  Receipt, Landmark, Banknote, ClipboardList, MessageSquare,
 } from 'lucide-react'
 import { signOut } from '@/lib/auth'
 import { useRouter } from 'next/navigation'
@@ -23,6 +23,7 @@ const NAV = [
   { href: '/admin/finance', label: 'Finance', icon: Landmark },
   { href: '/admin/settlements', label: 'Settlements', icon: Banknote },
   { href: '/admin/operations', label: 'Operations', icon: ClipboardList },
+  { href: '/admin/messages', label: 'Messages', icon: MessageSquare },
   { href: '/admin/marketplace', label: 'Marketplace', icon: Store },
   { href: '/admin/packages', label: 'Package Builder', icon: Package },
   { href: '/admin/blog', label: 'Blog & Content', icon: FileText },
