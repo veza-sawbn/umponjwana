@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import Link from 'next/link'
 import { Receipt, FileText, ChevronDown, ChevronUp, Printer } from 'lucide-react'
 import { getOrders, type MasterOrder } from '@/lib/orders'
 import { getInvoiceByOrder, getReceipts, type Invoice, type Receipt as ReceiptDoc } from '@/lib/invoices'
@@ -78,7 +79,7 @@ function OrderCard({ order }: { order: MasterOrder }) {
             <div>
               <div className="flex items-center justify-between mb-3">
                 <h3 className="font-display italic text-lg flex items-center gap-2"><FileText size={15} className="text-[#2d6a4f]" />Invoice {invoice.invoice_number}</h3>
-                <button onClick={() => window.print()} className="inline-flex items-center gap-1.5 font-sans text-xs text-gray-500 hover:text-[#2d6a4f]"><Printer size={12} /> Print</button>
+                <Link href={`/invoices/${invoice.id}`} className="inline-flex items-center gap-1.5 font-sans text-xs text-gray-500 hover:text-[#2d6a4f]"><Printer size={12} /> View / Print invoice</Link>
               </div>
               <div className="border border-gray-100">
                 {invoice.lines.map((l, i) => (

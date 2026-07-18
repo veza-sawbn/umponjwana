@@ -62,6 +62,34 @@ export async function getInvoiceByOrder(orderId: string): Promise<Invoice | null
   return null
 }
 
+/** Look an invoice up by its id, invoice number, or its order's id. */
+export async function getInvoiceById(id: string): Promise<Invoice | null> {
+  try {
+    const { data } = await supabase.from('vd_invoices').select('*').eq('id', id).maybeSingle()
+    if (data) return data as Invoice
+  } catch {}
+  try {
+    const { data } = await supabase.from('vd_invoices').select('*').eq('invoice_number', id).maybeSingle()
+    if (data) return data as Invoice
+  } catch {}
+  return getInvoiceByOrder(id)
+}
+
+/** Editable finance defaults (vd_finance_settings) with sensible fallbacks. */
+export async function getFinanceSettings(): Promise<{ serviceFeeRate: number; vatRate: number; currency: string }> {
+  const out = { serviceFeeRate: 0.12, vatRate: 0.15, currency: 'ZAR' }
+  try {
+    const { data } = await supabase.from('vd_finance_settings').select('key, value')
+    for (const row of data ?? []) {
+      const r = row as { key: string; value: unknown }
+      if (r.key === 'service_fee_rate') out.serviceFeeRate = Number(r.value) || out.serviceFeeRate
+      if (r.key === 'vat_rate') out.vatRate = Number(r.value) || out.vatRate
+      if (r.key === 'default_currency' && typeof r.value === 'string') out.currency = r.value
+    }
+  } catch {}
+  return out
+}
+
 export async function getReceipts(orderId?: string): Promise<Receipt[]> {
   try {
     let q = supabase.from('vd_receipts').select('*').order('created_at', { ascending: false })

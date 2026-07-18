@@ -19,6 +19,7 @@ const NAV = [
   { href: '/admin/verification', label: 'Verification', icon: ShieldCheck },
   { href: '/admin/bookings', label: 'Bookings', icon: CalendarDays },
   { href: '/admin/orders', label: 'Orders', icon: Receipt },
+  { href: '/admin/invoices', label: 'Invoices', icon: FileText },
   { href: '/admin/finance', label: 'Finance', icon: Landmark },
   { href: '/admin/settlements', label: 'Settlements', icon: Banknote },
   { href: '/admin/operations', label: 'Operations', icon: ClipboardList },
