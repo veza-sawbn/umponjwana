@@ -83,7 +83,8 @@ export default function Navbar() {
   }
 
   const transparent = !scrolled && !mobileOpen
-  const textColor = transparent ? 'text-white' : 'text-forest'
+  // Menu items stay black at all times so they remain visible on light backgrounds
+  const textColor = 'text-black'
   const logoColor = transparent ? 'text-gold' : 'text-forest'
 
   const userName = user?.user_metadata?.full_name ?? user?.email?.split('@')[0] ?? 'My Account'
@@ -120,14 +121,6 @@ export default function Navbar() {
 
           {/* Desktop right */}
           <div className="hidden lg:flex items-center gap-5">
-            <Link
-              href="/supplier"
-              prefetch={false}
-              className={`font-sans text-sm tracking-wide transition-colors duration-200 ${textColor} hover:text-gold`}
-            >
-              List Property
-            </Link>
-
             {user ? (
               <div className="relative" ref={dropdownRef}>
                 <button
@@ -199,11 +192,7 @@ export default function Navbar() {
             ) : (
               <Link
                 href="/auth/login"
-                className={`font-sans text-sm px-5 py-2 border transition-all duration-200 ${
-                  transparent
-                    ? 'border-white/60 text-white hover:bg-white hover:text-forest'
-                    : 'border-forest text-forest hover:bg-forest hover:text-white'
-                }`}
+                className="font-sans text-sm px-5 py-2 border border-forest text-forest hover:bg-forest hover:text-white transition-all duration-200"
               >
                 Sign In
               </Link>
@@ -386,14 +375,6 @@ export default function Navbar() {
                 animate="show"
                 className="mt-6 flex flex-col gap-3"
               >
-                <Link
-                  href="/supplier"
-                  prefetch={false}
-                  className="font-sans text-sm tracking-widest uppercase text-forest/40 hover:text-gold transition-colors"
-                >
-                  List your property →
-                </Link>
-
                 {!user && (
                   <Link
                     href="/auth/login"

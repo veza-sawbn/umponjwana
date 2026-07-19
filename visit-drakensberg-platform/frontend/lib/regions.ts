@@ -99,10 +99,11 @@ function normalizeRegion(region: Partial<Region> & { name: string; id?: string }
 }
 
 async function saveRegions(regions: Region[]) {
-  await supabase.from('site_content').upsert(
+  const { error } = await supabase.from('site_content').upsert(
     { key: 'admin_regions', value: { items: regions }, updated_at: new Date().toISOString() },
     { onConflict: 'key' },
   )
+  if (error) throw error
 }
 
 export async function getRegions(): Promise<Region[]> {

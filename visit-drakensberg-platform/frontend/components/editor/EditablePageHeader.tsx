@@ -1,5 +1,6 @@
 'use client'
 import Editable from './Editable'
+import EditableSection from './EditableSection'
 import { useSiteSection } from '@/lib/use-site-section'
 import type { SiteContentKey } from '@/lib/site-content'
 
@@ -8,7 +9,7 @@ import type { SiteContentKey } from '@/lib/site-content'
 export default function EditablePageHeader({ section, subClassName = '' }: { section: SiteContentKey; subClassName?: string }) {
   const c = useSiteSection(section) as unknown as Record<string, string>
   return (
-    <section className="bg-forest text-white py-16 px-6 lg:px-12">
+    <EditableSection id={section} label="Page Header" className="bg-forest text-white py-16 px-6 lg:px-12">
       <div className="max-w-[1440px] mx-auto">
         <Editable section={section} fieldKey="eyebrow" value={c.eyebrow} label="Eyebrow" type="text">
           <p className="font-sans text-xs tracking-[0.2em] uppercase text-white/30 mb-3">{c.eyebrow}</p>
@@ -20,6 +21,6 @@ export default function EditablePageHeader({ section, subClassName = '' }: { sec
           <p className={`font-sans text-sm text-white/50 ${subClassName}`}>{c.subheading}</p>
         </Editable>
       </div>
-    </section>
+    </EditableSection>
   )
 }

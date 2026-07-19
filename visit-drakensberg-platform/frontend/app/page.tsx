@@ -6,78 +6,32 @@ import { ArrowRight, ChevronDown, X } from 'lucide-react'
 import { supabase } from '@/lib/auth'
 import { motion } from 'framer-motion'
 import SearchBar from '@/components/search/SearchBar'
-import PanoramaViewer from '@/components/panorama/PanoramaViewer'
 import Footer from '@/components/layout/Footer'
-import { getAllSiteContent, SITE_CONTENT_DEFAULTS } from '@/lib/site-content'
+import { getAllSiteContent, SITE_CONTENT_DEFAULTS, type HomeCard } from '@/lib/site-content'
 import { useSiteSection } from '@/lib/use-site-section'
 import { staggerContainer, staggerChild, fadeUp } from '@/lib/motion'
 import { useEditMode } from '@/lib/edit-mode-context'
 import Editable from '@/components/editor/Editable'
+import EditableSection from '@/components/editor/EditableSection'
+import EditableCard from '@/components/editor/EditableCard'
 import { getTrails, type Trail } from '@/lib/trails'
 
 /* ─── Data ─────────────────────────────────────────────────────────────────── */
-
-const CATEGORIES = [
-  { label: 'Stays', href: '/stays', img: 'https://images.unsplash.com/photo-1571896349842-33c89424de2d?w=600&q=80' },
-  { label: 'Hikes', href: '/hikes', img: 'https://images.unsplash.com/photo-1551632811-561732d1e306?w=600&q=80' },
-  { label: 'Activities', href: '/activities', img: 'https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?w=600&q=80' },
-  { label: 'Reserves', href: '/nature-reserves', img: 'https://images.unsplash.com/photo-1516426122078-c23e76319801?w=600&q=80' },
-  { label: 'Packages', href: '/packages', img: 'https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=600&q=80' },
-]
-
-const REGIONS = [
-  {
-    name: 'North Berg',
-    subtitle: 'Royal Natal · Bergville · Amphitheatre',
-    desc: 'Home to the iconic Amphitheatre and Tugela Falls — the second highest waterfall in the world. Gateway town: Bergville.',
-    img: 'https://images.unsplash.com/photo-1590098563548-8f14eed3a47f?w=900&q=80',
-    href: '/regions#northern',
-  },
-  {
-    name: 'Central Berg',
-    subtitle: 'Cathedral Peak · Winterton · Champagne Valley',
-    desc: 'Alpine meadows, the richest San rock art in the world and dramatic escarpment views stretching to Lesotho. Gateway town: Winterton.',
-    img: 'https://images.unsplash.com/photo-1542587222-e14b891ee40b?w=900&q=80',
-    href: '/regions#central',
-  },
-  {
-    name: 'South Berg',
-    subtitle: 'Sani Pass · Underberg · Himeville',
-    desc: 'The legendary Sani Pass climbs to Lesotho through a raw mountain landscape. Boutique villages Himeville and Underberg sit at its foot.',
-    img: 'https://images.unsplash.com/photo-1503614472-8c93d56e92ce?w=900&q=80',
-    href: '/regions#southern',
-  },
-]
-
-const STORIES = [
-  {
-    tag: 'Wildlife',
-    title: "Africa's rarest raptor: the bearded vulture of the Berg",
-    img: 'https://images.unsplash.com/photo-1508739773434-c26b3d09e071?w=800&q=80',
-    href: '/mydrakensberg/bearded-vulture-lammergeier',
-    date: 'March 2025',
-  },
-  {
-    tag: 'Heritage',
-    title: "The ancient language of the San: rock art at Giant's Castle",
-    img: 'https://images.unsplash.com/photo-1529946179074-1f3cf40c0a0e?w=800&q=80',
-    href: '/mydrakensberg/san-bushmen-rock-art-giants-castle',
-    date: 'January 2025',
-  },
-  {
-    tag: 'Adventure',
-    title: 'Climbing the Chain Ladder: what nobody tells you',
-    img: 'https://images.unsplash.com/photo-1551632811-561732d1e306?w=800&q=80',
-    href: '/mydrakensberg/tugela-falls-chain-ladder-guide',
-    date: 'November 2024',
-  },
-]
 
 const DIFF_COLOR: Record<string, string> = {
   Easy: '#4A7251',
   Moderate: '#C9A96E',
   Strenuous: '#c0392b',
   Hard: '#c0392b',
+}
+
+/** Hidden cards render dimmed inside the editor and not at all on the live site. */
+function useVisibleCards(cards: HomeCard[], inEditor: boolean) {
+  return inEditor ? cards : cards.filter(c => c.visible !== false)
+}
+
+function cardDimClass(card: HomeCard, inEditor: boolean) {
+  return inEditor && card.visible === false ? 'opacity-35' : ''
 }
 
 /* ─── Edit-mode hero ─────────────────────────────────────────────────────────── */
@@ -91,7 +45,7 @@ function HeroSection({ hero }: { hero: typeof SITE_CONTENT_DEFAULTS.hero }) {
   const overlayOpacity = Number(editMode?.getValue('hero', 'overlay_opacity', hero.overlay_opacity) ?? hero.overlay_opacity)
 
   return (
-    <section className="relative h-screen min-h-[600px] flex flex-col">
+    <EditableSection id="hero" label="Hero" className="relative h-screen min-h-[600px] flex flex-col">
       <div className="absolute inset-0">
         {hero.video_url ? (
           <video src={hero.video_url} autoPlay muted loop playsInline className="w-full h-full object-cover" />
@@ -135,7 +89,7 @@ function HeroSection({ hero }: { hero: typeof SITE_CONTENT_DEFAULTS.hero }) {
       <div className="absolute bottom-6 left-1/2 -translate-x-1/2 flex flex-col items-center gap-1 text-white/40">
         <ChevronDown className="w-5 h-5 animate-bounce-slow" />
       </div>
-    </section>
+    </EditableSection>
   )
 }
 
@@ -145,10 +99,18 @@ export default function HomePage() {
   const [hero, setHero] = useState(SITE_CONTENT_DEFAULTS.hero)
   const [promos, setPromos] = useState(SITE_CONTENT_DEFAULTS.promotions)
   const hs = useSiteSection('home_sections') as unknown as Record<string, string>
+  const cards = useSiteSection('home_cards')
+  const layout = useSiteSection('home_layout')
+  const editMode = useEditMode()
+  const inEditor = Boolean(editMode)
   const [promoBannerDismissed, setPromoBannerDismissed] = useState(false)
   const [trails, setTrails] = useState<Trail[]>([])
   const [newsletterEmail, setNewsletterEmail] = useState('')
   const [subscribing, setSubscribing] = useState(false)
+
+  const categories = useVisibleCards(cards.categories ?? [], inEditor)
+  const regions = useVisibleCards(cards.regions ?? [], inEditor)
+  const stories = useVisibleCards(cards.stories ?? [], inEditor)
 
   async function subscribeNewsletter(e: React.FormEvent) {
     e.preventDefault()
@@ -179,47 +141,34 @@ export default function HomePage() {
     getTrails().then(all => setTrails(all.filter(t => t.status === 'published').slice(0, 4)))
   }, [])
 
-  return (
-    <main className="bg-mist min-h-screen">
+  /* ── Reorderable sections ── */
 
-      {/* ── 0. Promo Banner (admin-controlled) ── */}
-      {promos.enabled && !promoBannerDismissed && (
-        <div className="fixed top-0 inset-x-0 z-50 flex items-center justify-between px-6 py-2.5 font-sans text-sm text-white" style={{ backgroundColor: promos.banner_color }}>
-          <span />
-          <Link href={promos.banner_link} className="hover:underline">{promos.banner_text}</Link>
-          <button onClick={() => setPromoBannerDismissed(true)} className="text-white/60 hover:text-white">
-            <X size={14} />
-          </button>
-        </div>
-      )}
+  const statsSection = (
+    <EditableSection key="stats" id="stats" label="Stats Strip" className="bg-forest text-white">
+      <motion.div
+        className="max-w-[1440px] mx-auto px-6 lg:px-12 py-10 grid grid-cols-2 md:grid-cols-4 gap-8"
+        variants={staggerContainer(0.07)}
+        initial="hidden"
+        whileInView="show"
+        viewport={{ once: true, margin: '-60px' }}
+      >
+        {[1, 2, 3, 4].map((i) => (
+          <motion.div key={i} variants={staggerChild}>
+            <Editable section="home_sections" fieldKey={`stat_${i}_value`} value={hs[`stat_${i}_value`]} label={`Stat ${i} Value`} type="text">
+              <p className="font-display text-3xl text-gold">{hs[`stat_${i}_value`]}</p>
+            </Editable>
+            <Editable section="home_sections" fieldKey={`stat_${i}_label`} value={hs[`stat_${i}_label`]} label={`Stat ${i} Label`} type="text">
+              <p className="font-sans text-xs text-white/40 mt-1 tracking-wide uppercase">{hs[`stat_${i}_label`]}</p>
+            </Editable>
+          </motion.div>
+        ))}
+      </motion.div>
+    </EditableSection>
+  )
 
-      {/* ── 1. Hero ── */}
-      <HeroSection hero={hero} />
-
-      {/* ── 2. Stats strip ── */}
-      <section className="bg-forest text-white">
-        <motion.div
-          className="max-w-[1440px] mx-auto px-6 lg:px-12 py-10 grid grid-cols-2 md:grid-cols-4 gap-8"
-          variants={staggerContainer(0.07)}
-          initial="hidden"
-          whileInView="show"
-          viewport={{ once: true, margin: '-60px' }}
-        >
-          {[1, 2, 3, 4].map((i) => (
-            <motion.div key={i} variants={staggerChild}>
-              <Editable section="home_sections" fieldKey={`stat_${i}_value`} value={hs[`stat_${i}_value`]} label={`Stat ${i} Value`} type="text">
-                <p className="font-display text-3xl text-gold">{hs[`stat_${i}_value`]}</p>
-              </Editable>
-              <Editable section="home_sections" fieldKey={`stat_${i}_label`} value={hs[`stat_${i}_label`]} label={`Stat ${i} Label`} type="text">
-                <p className="font-sans text-xs text-white/40 mt-1 tracking-wide uppercase">{hs[`stat_${i}_label`]}</p>
-              </Editable>
-            </motion.div>
-          ))}
-        </motion.div>
-      </section>
-
-      {/* ── 3. Categories ── */}
-      <section className="max-w-[1440px] mx-auto px-6 lg:px-12 py-20">
+  const categoriesSection = (
+    <EditableSection key="categories" id="categories" label="Categories" className="bg-mist">
+      <div className="max-w-[1440px] mx-auto px-6 lg:px-12 py-20">
         <div className="mb-10">
           <Editable section="home_sections" fieldKey="categories_eyebrow" value={hs.categories_eyebrow} label="Categories Eyebrow" type="text">
             <p className="font-sans text-xs tracking-[0.2em] uppercase text-forest/40 mb-2">{hs.categories_eyebrow}</p>
@@ -235,54 +184,59 @@ export default function HomePage() {
           whileInView="show"
           viewport={{ once: true, margin: '-80px' }}
         >
-          {CATEGORIES.map((cat) => (
-            <motion.div key={cat.href} variants={staggerChild} whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }} transition={{ duration: 0.2, ease: [0, 0, 0.2, 1] }}>
-              <Link href={cat.href} className="group relative overflow-hidden aspect-[3/4] block">
-                <img loading="lazy" decoding="async"
-                  src={cat.img}
-                  alt={cat.label}
-                  className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
-                  style={{ willChange: 'transform' }}
-                />
-                <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/10 to-transparent" />
-                <span className="absolute bottom-4 left-4 font-display text-xl text-white">{cat.label}</span>
-              </Link>
+          {categories.map((cat, index) => (
+            <motion.div key={cat.id} variants={staggerChild} whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }} transition={{ duration: 0.2, ease: [0, 0, 0.2, 1] }} className={cardDimClass(cat, inEditor)}>
+              <EditableCard contentKey="home_cards" fieldKey="categories" index={index} label={String(cat.label ?? 'Category Card')}>
+                <Link href={String(cat.href || '/')} className="group relative overflow-hidden aspect-[3/4] block">
+                  <img loading="lazy" decoding="async"
+                    src={String(cat.img)}
+                    alt={String(cat.label)}
+                    className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                    style={{ willChange: 'transform' }}
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/10 to-transparent" />
+                  <span className="absolute bottom-4 left-4 font-display text-xl text-white">{cat.label}</span>
+                </Link>
+              </EditableCard>
             </motion.div>
           ))}
         </motion.div>
-      </section>
+      </div>
+    </EditableSection>
+  )
 
-      {/* ── 4. Regions ── */}
-      <section className="bg-white py-20">
-        <div className="max-w-[1440px] mx-auto px-6 lg:px-12">
-          <div className="flex items-end justify-between mb-10">
-            <div>
-              <Editable section="home_sections" fieldKey="regions_eyebrow" value={hs.regions_eyebrow} label="Regions Eyebrow" type="text">
-                <p className="font-sans text-xs tracking-[0.2em] uppercase text-forest/40 mb-2">{hs.regions_eyebrow}</p>
-              </Editable>
-              <Editable section="home_sections" fieldKey="regions_heading" value={hs.regions_heading} label="Regions Heading" type="text">
-                <h2 className="font-display text-4xl text-forest">{hs.regions_heading}</h2>
-              </Editable>
-            </div>
-            <Link href="/regions" className="hidden sm:flex items-center gap-2 font-sans text-sm text-forest/50 hover:text-forest transition-colors">
-              All regions <ArrowRight className="w-4 h-4" />
-            </Link>
+  const regionsSection = (
+    <EditableSection key="regions" id="regions" label="Regions" className="bg-white">
+      <div className="max-w-[1440px] mx-auto px-6 lg:px-12 py-20">
+        <div className="flex items-end justify-between mb-10">
+          <div>
+            <Editable section="home_sections" fieldKey="regions_eyebrow" value={hs.regions_eyebrow} label="Regions Eyebrow" type="text">
+              <p className="font-sans text-xs tracking-[0.2em] uppercase text-forest/40 mb-2">{hs.regions_eyebrow}</p>
+            </Editable>
+            <Editable section="home_sections" fieldKey="regions_heading" value={hs.regions_heading} label="Regions Heading" type="text">
+              <h2 className="font-display text-4xl text-forest">{hs.regions_heading}</h2>
+            </Editable>
           </div>
+          <Link href="/regions" className="hidden sm:flex items-center gap-2 font-sans text-sm text-forest/50 hover:text-forest transition-colors">
+            All regions <ArrowRight className="w-4 h-4" />
+          </Link>
+        </div>
 
-          <motion.div
-            className="grid md:grid-cols-3 gap-6"
-            variants={staggerContainer(0.08)}
-            initial="hidden"
-            whileInView="show"
-            viewport={{ once: true, margin: '-80px' }}
-          >
-            {REGIONS.map((r) => (
-              <motion.div key={r.href} variants={staggerChild}>
-                <Link href={r.href} className="group block">
+        <motion.div
+          className="grid md:grid-cols-3 gap-6"
+          variants={staggerContainer(0.08)}
+          initial="hidden"
+          whileInView="show"
+          viewport={{ once: true, margin: '-80px' }}
+        >
+          {regions.map((r, index) => (
+            <motion.div key={r.id} variants={staggerChild} className={cardDimClass(r, inEditor)}>
+              <EditableCard contentKey="home_cards" fieldKey="regions" index={index} label={String(r.name ?? 'Region Card')}>
+                <Link href={String(r.href || '/regions')} className="group block">
                   <div className="relative overflow-hidden aspect-[4/3] mb-4">
                     <img loading="lazy" decoding="async"
-                      src={r.img}
-                      alt={r.name}
+                      src={String(r.img)}
+                      alt={String(r.name)}
                       className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
                       style={{ willChange: 'transform' }}
                     />
@@ -291,166 +245,181 @@ export default function HomePage() {
                   <h3 className="font-display text-2xl text-forest mb-2">{r.name}</h3>
                   <p className="font-sans text-sm text-forest/55 leading-relaxed">{r.desc}</p>
                 </Link>
-              </motion.div>
-            ))}
-          </motion.div>
-        </div>
-      </section>
+              </EditableCard>
+            </motion.div>
+          ))}
+        </motion.div>
+      </div>
+    </EditableSection>
+  )
 
-      {/* ── 5. Panorama feature ── */}
-      <section className="py-20 bg-mist">
-        <div className="max-w-[1440px] mx-auto px-6 lg:px-12">
-          <div className="grid lg:grid-cols-2 gap-10 items-center mb-10">
-            <div>
-              <Editable section="home_sections" fieldKey="panorama_eyebrow" value={hs.panorama_eyebrow} label="Panorama Eyebrow" type="text">
-                <p className="font-sans text-xs tracking-[0.2em] uppercase text-forest/40 mb-3">{hs.panorama_eyebrow}</p>
-              </Editable>
-              <Editable section="home_sections" fieldKey="panorama_heading" value={hs.panorama_heading} label="Panorama Heading" type="textarea">
-                <h2 className="font-display text-4xl text-forest leading-tight" style={{ whiteSpace: 'pre-line' }}>
-                  {hs.panorama_heading}
-                </h2>
-              </Editable>
-            </div>
-            <Editable section="home_sections" fieldKey="panorama_body" value={hs.panorama_body} label="Panorama Body" type="textarea">
-              <p className="font-sans text-base text-forest/55 leading-relaxed">
-                {hs.panorama_body}
-              </p>
+  const storiesSection = (
+    <EditableSection key="stories" id="stories" label="Stories" className="bg-white">
+      <div className="max-w-[1440px] mx-auto px-6 lg:px-12 py-20">
+        <div className="flex items-end justify-between mb-10">
+          <div>
+            <Editable section="home_sections" fieldKey="stories_eyebrow" value={hs.stories_eyebrow} label="Stories Eyebrow" type="text">
+              <p className="font-sans text-xs tracking-[0.2em] uppercase text-forest/40 mb-2">{hs.stories_eyebrow}</p>
+            </Editable>
+            <Editable section="home_sections" fieldKey="stories_heading" value={hs.stories_heading} label="Stories Heading" type="text">
+              <h2 className="font-display text-4xl text-forest">{hs.stories_heading}</h2>
             </Editable>
           </div>
-          <PanoramaViewer />
-          <div className="mt-6 text-right">
-            <Link href="/nature-reserves" className="font-sans text-sm text-forest/50 hover:text-forest inline-flex items-center gap-1.5 transition-colors">
-              Explore all reserves <ArrowRight className="w-3.5 h-3.5" />
-            </Link>
-          </div>
+          <Link href="/mydrakensberg" className="hidden sm:flex items-center gap-2 font-sans text-sm text-forest/50 hover:text-forest transition-colors">
+            All stories <ArrowRight className="w-4 h-4" />
+          </Link>
         </div>
-      </section>
 
-      {/* ── 6. Stories ── */}
-      <section className="bg-white py-20">
-        <div className="max-w-[1440px] mx-auto px-6 lg:px-12">
-          <div className="flex items-end justify-between mb-10">
-            <div>
-              <Editable section="home_sections" fieldKey="stories_eyebrow" value={hs.stories_eyebrow} label="Stories Eyebrow" type="text">
-                <p className="font-sans text-xs tracking-[0.2em] uppercase text-forest/40 mb-2">{hs.stories_eyebrow}</p>
-              </Editable>
-              <Editable section="home_sections" fieldKey="stories_heading" value={hs.stories_heading} label="Stories Heading" type="text">
-                <h2 className="font-display text-4xl text-forest">{hs.stories_heading}</h2>
-              </Editable>
-            </div>
-            <Link href="/mydrakensberg" className="hidden sm:flex items-center gap-2 font-sans text-sm text-forest/50 hover:text-forest transition-colors">
-              All stories <ArrowRight className="w-4 h-4" />
-            </Link>
-          </div>
-
-          <motion.div
-            className="grid md:grid-cols-3 gap-8"
-            variants={staggerContainer(0.08)}
-            initial="hidden"
-            whileInView="show"
-            viewport={{ once: true, margin: '-80px' }}
-          >
-            {STORIES.map((s) => (
-              <motion.div key={s.href} variants={staggerChild} whileHover={{ y: -3 }} transition={{ duration: 0.2, ease: [0, 0, 0.2, 1] }}>
-                <Link href={s.href} className="group block">
+        <motion.div
+          className="grid md:grid-cols-3 gap-8"
+          variants={staggerContainer(0.08)}
+          initial="hidden"
+          whileInView="show"
+          viewport={{ once: true, margin: '-80px' }}
+        >
+          {stories.map((s, index) => (
+            <motion.div key={s.id} variants={staggerChild} whileHover={{ y: -3 }} transition={{ duration: 0.2, ease: [0, 0, 0.2, 1] }} className={cardDimClass(s, inEditor)}>
+              <EditableCard contentKey="home_cards" fieldKey="stories" index={index} label={String(s.title ?? 'Story Card')}>
+                <Link href={String(s.href || '/mydrakensberg')} className="group block">
                   <div className="relative overflow-hidden aspect-[3/2] mb-4">
-                    <img loading="lazy" decoding="async" src={s.img} alt={s.title} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" style={{ willChange: 'transform' }} />
+                    <img loading="lazy" decoding="async" src={String(s.img)} alt={String(s.title)} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" style={{ willChange: 'transform' }} />
                   </div>
                   <p className="font-sans text-[10px] tracking-[0.15em] uppercase text-gold mb-2">{s.tag} · {s.date}</p>
                   <h3 className="font-display text-xl text-forest leading-snug group-hover:text-sage transition-colors">{s.title}</h3>
                 </Link>
-              </motion.div>
+              </EditableCard>
+            </motion.div>
+          ))}
+        </motion.div>
+      </div>
+    </EditableSection>
+  )
+
+  const trailsSection = (
+    <EditableSection key="trails" id="trails" label="Top Trails" className="bg-forest">
+      <div className="max-w-[1440px] mx-auto px-6 lg:px-12 py-20">
+        <div className="flex items-end justify-between mb-10">
+          <div>
+            <Editable section="home_sections" fieldKey="trails_eyebrow" value={hs.trails_eyebrow} label="Trails Eyebrow" type="text">
+              <p className="font-sans text-xs tracking-[0.2em] uppercase text-white/30 mb-2">{hs.trails_eyebrow}</p>
+            </Editable>
+            <Editable section="home_sections" fieldKey="trails_heading" value={hs.trails_heading} label="Trails Heading" type="text">
+              <h2 className="font-display text-4xl text-white">{hs.trails_heading}</h2>
+            </Editable>
+          </div>
+          <Link href="/hikes" className="hidden sm:flex items-center gap-2 font-sans text-sm text-white/40 hover:text-white transition-colors">
+            All hikes <ArrowRight className="w-4 h-4" />
+          </Link>
+        </div>
+
+        {trails.length === 0 ? (
+          <p className="font-sans text-sm text-white/30 py-8">Trails will appear here once published.</p>
+        ) : (
+          <div className="divide-y divide-white/10">
+            {trails.map((t, i) => (
+              <Link key={t.id} href={`/hikes/${t.id}`} className="group flex items-center justify-between py-5 hover:pl-2 transition-all duration-200">
+                <div className="flex items-center gap-6">
+                  <span className="font-sans text-2xl text-white/15 font-light tabular-nums w-8">{String(i + 1).padStart(2, '0')}</span>
+                  <div>
+                    <h3 className="font-display text-lg text-white group-hover:text-gold transition-colors">{t.name}</h3>
+                    <p className="font-sans text-xs text-white/35 mt-0.5">{t.distance} · {t.elevation} · {t.duration}</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-4">
+                  <span
+                    className="font-sans text-xs px-2.5 py-1"
+                    style={{ color: DIFF_COLOR[t.difficulty], background: DIFF_COLOR[t.difficulty] + '22' }}
+                  >
+                    {t.difficulty}
+                  </span>
+                  <ArrowRight className="w-4 h-4 text-white/20 group-hover:text-gold transition-colors" />
+                </div>
+              </Link>
             ))}
-          </motion.div>
-        </div>
-      </section>
-
-      {/* ── 7. Trails ── */}
-      <section className="bg-forest py-20">
-        <div className="max-w-[1440px] mx-auto px-6 lg:px-12">
-          <div className="flex items-end justify-between mb-10">
-            <div>
-              <Editable section="home_sections" fieldKey="trails_eyebrow" value={hs.trails_eyebrow} label="Trails Eyebrow" type="text">
-                <p className="font-sans text-xs tracking-[0.2em] uppercase text-white/30 mb-2">{hs.trails_eyebrow}</p>
-              </Editable>
-              <Editable section="home_sections" fieldKey="trails_heading" value={hs.trails_heading} label="Trails Heading" type="text">
-                <h2 className="font-display text-4xl text-white">{hs.trails_heading}</h2>
-              </Editable>
-            </div>
-            <Link href="/hikes" className="hidden sm:flex items-center gap-2 font-sans text-sm text-white/40 hover:text-white transition-colors">
-              All hikes <ArrowRight className="w-4 h-4" />
-            </Link>
           </div>
+        )}
+      </div>
+    </EditableSection>
+  )
 
-          {trails.length === 0 ? (
-            <p className="font-sans text-sm text-white/30 py-8">Trails will appear here once published.</p>
-          ) : (
-            <div className="divide-y divide-white/10">
-              {trails.map((t, i) => (
-                <Link key={t.id} href={`/hikes/${t.id}`} className="group flex items-center justify-between py-5 hover:pl-2 transition-all duration-200">
-                  <div className="flex items-center gap-6">
-                    <span className="font-sans text-2xl text-white/15 font-light tabular-nums w-8">{String(i + 1).padStart(2, '0')}</span>
-                    <div>
-                      <h3 className="font-display text-lg text-white group-hover:text-gold transition-colors">{t.name}</h3>
-                      <p className="font-sans text-xs text-white/35 mt-0.5">{t.distance} · {t.elevation} · {t.duration}</p>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-4">
-                    <span
-                      className="font-sans text-xs px-2.5 py-1"
-                      style={{ color: DIFF_COLOR[t.difficulty], background: DIFF_COLOR[t.difficulty] + '22' }}
-                    >
-                      {t.difficulty}
-                    </span>
-                    <ArrowRight className="w-4 h-4 text-white/20 group-hover:text-gold transition-colors" />
-                  </div>
-                </Link>
-              ))}
-            </div>
-          )}
+  const newsletterSection = (
+    <EditableSection key="newsletter" id="newsletter" label="Newsletter" className="bg-mist">
+      <div className="max-w-[1440px] mx-auto px-6 lg:px-12 py-20">
+        <div className="max-w-xl">
+          <Editable section="home_sections" fieldKey="newsletter_eyebrow" value={hs.newsletter_eyebrow} label="Newsletter Eyebrow" type="text">
+            <p className="font-sans text-xs tracking-[0.2em] uppercase text-forest/40 mb-3">{hs.newsletter_eyebrow}</p>
+          </Editable>
+          <Editable section="home_sections" fieldKey="newsletter_heading" value={hs.newsletter_heading} label="Newsletter Heading" type="text">
+            <h2 className="font-display text-4xl text-forest mb-4">{hs.newsletter_heading}</h2>
+          </Editable>
+          <Editable section="home_sections" fieldKey="newsletter_body" value={hs.newsletter_body} label="Newsletter Body" type="textarea">
+            <p className="font-sans text-sm text-forest/55 mb-8 leading-relaxed">
+              {hs.newsletter_body}
+            </p>
+          </Editable>
+          <form className="flex gap-0 max-w-md" onSubmit={subscribeNewsletter}>
+            <label htmlFor="newsletter-email" className="sr-only">Email address</label>
+            <input
+              id="newsletter-email"
+              type="email"
+              required
+              value={newsletterEmail}
+              onChange={(e) => setNewsletterEmail(e.target.value)}
+              placeholder="Your email address"
+              className="flex-1 px-4 py-3 bg-white border border-black/10 font-sans text-sm text-forest placeholder:text-forest/30 focus:outline-none focus:border-forest transition-colors"
+            />
+            <button
+              type="submit"
+              disabled={subscribing}
+              className="px-6 py-3 bg-forest text-white font-sans text-sm hover:bg-sage transition-colors whitespace-nowrap disabled:opacity-60"
+            >
+              {subscribing ? 'Subscribing…' : 'Subscribe'}
+            </button>
+          </form>
         </div>
-      </section>
+      </div>
+    </EditableSection>
+  )
 
-      {/* ── 8. Newsletter ── */}
-      <section className="bg-mist py-20">
-        <div className="max-w-[1440px] mx-auto px-6 lg:px-12">
-          <div className="max-w-xl">
-            <Editable section="home_sections" fieldKey="newsletter_eyebrow" value={hs.newsletter_eyebrow} label="Newsletter Eyebrow" type="text">
-              <p className="font-sans text-xs tracking-[0.2em] uppercase text-forest/40 mb-3">{hs.newsletter_eyebrow}</p>
-            </Editable>
-            <Editable section="home_sections" fieldKey="newsletter_heading" value={hs.newsletter_heading} label="Newsletter Heading" type="text">
-              <h2 className="font-display text-4xl text-forest mb-4">{hs.newsletter_heading}</h2>
-            </Editable>
-            <Editable section="home_sections" fieldKey="newsletter_body" value={hs.newsletter_body} label="Newsletter Body" type="textarea">
-              <p className="font-sans text-sm text-forest/55 mb-8 leading-relaxed">
-                {hs.newsletter_body}
-              </p>
-            </Editable>
-            <form className="flex gap-0 max-w-md" onSubmit={subscribeNewsletter}>
-              <label htmlFor="newsletter-email" className="sr-only">Email address</label>
-              <input
-                id="newsletter-email"
-                type="email"
-                required
-                value={newsletterEmail}
-                onChange={(e) => setNewsletterEmail(e.target.value)}
-                placeholder="Your email address"
-                className="flex-1 px-4 py-3 bg-white border border-black/10 font-sans text-sm text-forest placeholder:text-forest/30 focus:outline-none focus:border-forest transition-colors"
-              />
-              <button
-                type="submit"
-                disabled={subscribing}
-                className="px-6 py-3 bg-forest text-white font-sans text-sm hover:bg-sage transition-colors whitespace-nowrap disabled:opacity-60"
-              >
-                {subscribing ? 'Subscribing…' : 'Subscribe'}
-              </button>
-            </form>
-          </div>
+  const reorderable: Record<string, React.ReactNode> = {
+    stats: statsSection,
+    categories: categoriesSection,
+    regions: regionsSection,
+    stories: storiesSection,
+    trails: trailsSection,
+    newsletter: newsletterSection,
+  }
+
+  // Render in the admin-configured order; unknown/missing ids fall back to the
+  // default order so newly added sections always appear.
+  const configured = (layout.section_order ?? []).filter(id => id in reorderable)
+  const missing = Object.keys(reorderable).filter(id => !configured.includes(id))
+  const orderedSections = [...configured, ...missing].map(id => reorderable[id])
+
+  return (
+    <main className="bg-mist min-h-screen">
+
+      {/* ── Promo Banner (admin-controlled) ── */}
+      {promos.enabled && !promoBannerDismissed && (
+        <div className="fixed top-0 inset-x-0 z-50 flex items-center justify-between px-6 py-2.5 font-sans text-sm text-white" style={{ backgroundColor: promos.banner_color }}>
+          <span />
+          <Link href={promos.banner_link} className="hover:underline">{promos.banner_text}</Link>
+          <button onClick={() => setPromoBannerDismissed(true)} className="text-white/60 hover:text-white">
+            <X size={14} />
+          </button>
         </div>
-      </section>
+      )}
+
+      {/* ── Hero (fixed at the top) ── */}
+      <HeroSection hero={hero} />
+
+      {/* ── Reorderable sections ── */}
+      {orderedSections}
 
       {/* ── Footer ── */}
-      <Footer />
+      <EditableSection id="footer" label="Footer">
+        <Footer />
+      </EditableSection>
     </main>
   )
 }

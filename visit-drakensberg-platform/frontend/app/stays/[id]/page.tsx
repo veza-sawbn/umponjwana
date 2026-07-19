@@ -6,6 +6,7 @@ import Link from 'next/link'
 import Footer from '@/components/layout/Footer'
 import { MapPin, Star, Users, Wifi, Flame, Utensils, Car, ArrowLeft, Calendar, Coffee, Waves, TreePine, ShieldCheck, BedDouble } from 'lucide-react'
 import SmartRecommendations from '@/components/booking/SmartRecommendations'
+import RoomDetailModal, { type RoomDetail } from '@/components/listings/RoomDetailModal'
 import { useBooking } from '@/lib/booking-context'
 import { Check } from 'lucide-react'
 import { getPropertyById, type Property } from '@/lib/properties'
@@ -159,6 +160,7 @@ export default function StayDetailPage() {
   const [selectedRoom, setSelectedRoom] = useState<any>(null)
   const [showRooms, setShowRooms] = useState(false)
   const [roomImage, setRoomImage] = useState<string | null>(null)
+  const [detailRoom, setDetailRoom] = useState<RoomDetail | null>(null)
   const [checkIn, setCheckIn] = useState(booking.checkIn || '')
   const [checkOut, setCheckOut] = useState(booking.checkOut || '')
   const [guests, setGuests] = useState(booking.guests || 2)
@@ -346,7 +348,7 @@ export default function StayDetailPage() {
                           <div className="hidden sm:block w-40 shrink-0">
                             <button
                               type="button"
-                              onClick={e => { e.stopPropagation(); setRoomImage(room.images[0]) }}
+                              onClick={e => { e.stopPropagation(); setDetailRoom(room) }}
                               className="block w-full aspect-[4/3] overflow-hidden bg-gray-100"
                             >
                               <img src={room.images[0]} alt={room.name} className="w-full h-full object-cover hover:opacity-90 transition-opacity" />
@@ -357,7 +359,7 @@ export default function StayDetailPage() {
                                   <button
                                     key={i}
                                     type="button"
-                                    onClick={e => { e.stopPropagation(); setRoomImage(url) }}
+                                    onClick={e => { e.stopPropagation(); setDetailRoom(room) }}
                                     className="relative aspect-square overflow-hidden bg-gray-100"
                                   >
                                     <img src={url} alt="" className="w-full h-full object-cover hover:opacity-90 transition-opacity" />
@@ -408,6 +410,12 @@ export default function StayDetailPage() {
                         <div className="text-right shrink-0 pl-4">
                           <p className="font-display italic text-2xl text-[#2d6a4f]">R {room.price_per_night.toLocaleString()}</p>
                           <p className="font-sans text-xs text-gray-400">/night</p>
+                          <button
+                            onClick={e => { e.stopPropagation(); setDetailRoom(room) }}
+                            className="mt-3 block w-full px-4 py-2 font-sans text-xs text-gray-500 border border-gray-200 hover:border-gray-400 hover:text-gray-700 transition-colors"
+                          >
+                            View Details
+                          </button>
                           <button
                             onClick={e => { e.stopPropagation(); if (!soldOut(room.id)) setSelectedRoom(room) }}
                             disabled={soldOut(room.id)}
@@ -586,9 +594,22 @@ export default function StayDetailPage() {
         </div>
       </main>
 
-      {/* Room image lightbox */}
+      {/* Room detail modal */}
+      {detailRoom && (
+        <RoomDetailModal
+          room={detailRoom}
+          soldOut={soldOut(detailRoom.id)}
+          unitsLeft={unitsLeft[detailRoom.id] ?? null}
+          selected={selectedRoom?.id === detailRoom.id}
+          onSelect={() => setSelectedRoom(stay.rooms.find((r: any) => r.id === detailRoom.id) ?? null)}
+          onClose={() => setDetailRoom(null)}
+          onZoom={url => setRoomImage(url)}
+        />
+      )}
+
+      {/* Room image lightbox (zoom layer above the detail modal) */}
       {roomImage && (
-        <div className="fixed inset-0 bg-black/90 z-50 flex items-center justify-center" onClick={() => setRoomImage(null)}>
+        <div className="fixed inset-0 bg-black/90 z-[60] flex items-center justify-center" onClick={() => setRoomImage(null)}>
           <button className="absolute top-4 right-4 text-white/60 hover:text-white font-sans text-2xl leading-none" onClick={() => setRoomImage(null)}>
             ×
           </button>

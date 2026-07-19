@@ -98,3 +98,17 @@ body {
     margin-bottom: 16px;
   }
 }
+
+/* ── Visual editor chrome (only active inside the admin editor iframe) ── */
+.vd-flash {
+  animation: vd-flash-anim 1.6s ease-out;
+}
+@keyframes vd-flash-anim {
+  0% { outline: 3px solid rgba(201, 169, 110, 0.9); outline-offset: -3px; }
+  100% { outline: 3px solid rgba(201, 169, 110, 0); outline-offset: -3px; }
+}
+[contenteditable='true']:focus {
+  outline: 2px dashed #C9A96E;
+  outline-offset: 2px;
+  cursor: text;
+}
