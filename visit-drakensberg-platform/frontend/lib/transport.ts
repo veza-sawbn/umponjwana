@@ -367,6 +367,10 @@ export type TransportRequest = {
   durationMinutes?: number
   tripClass: TripClass
   quotedPrice: number
+  /** Vehicle the customer picked at booking time — preselected in the
+   *  supplier's accept flow. */
+  requestedVehicleId?: string
+  requestedVehicleName?: string
   offers: TransportOffer[]
   assignment?: TransportAssignment
   createdAt: string
@@ -623,6 +627,24 @@ export async function cancelTransportRequest(request: TransportRequest, company?
 }
 
 // ── Derived company metrics used by scoring and dashboards ──────────────────
+
+/** What this company charges for a trip, from its own rate card. */
+export function companyTransferPrice(
+  company: TransportCompany,
+  distanceKm: number,
+  passengers: number,
+  shuttleType?: string,
+): number {
+  const ratePerKm = company.ratePerKm || 10
+  const minimumFare = company.minimumFare || 350
+  const base = Math.max(minimumFare, Math.round(distanceKm * ratePerKm))
+  const extraPassengerFee = Math.round(distanceKm) * Math.max(0, passengers - 1)
+  const privateFare = base + extraPassengerFee
+  if (shuttleType === 'Shared Shuttle') {
+    return Math.max(Math.round(minimumFare * 0.4), Math.round(privateFare * 0.45))
+  }
+  return privateFare
+}
 
 export function companyReliability(c: TransportCompany): number {
   const total = (c.stats?.completedTrips ?? 0) + (c.stats?.cancelledTrips ?? 0)

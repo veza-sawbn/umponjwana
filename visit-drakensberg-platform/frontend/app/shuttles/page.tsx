@@ -5,9 +5,10 @@ import { useRouter } from 'next/navigation'
 import { ArrowRight, Bus, Calendar, Check, MapPin, Users } from 'lucide-react'
 import Footer from '@/components/layout/Footer'
 import { useBooking } from '@/lib/booking-context'
-import { GoogleAddressField, hasGoogleMapsKey, useAutoDrivingDistance, type GooglePlaceSelection } from '@/components/maps/GoogleAddressField'
-import { buildShuttleOption, estimateTransferPrice, suggestedVehicleType, SHUTTLE_TYPES, type ShuttleType } from '@/lib/shuttle-service'
+import { GoogleAddressField, useAutoDrivingDistance, type GooglePlaceSelection } from '@/components/maps/GoogleAddressField'
+import { buildShuttleOption, estimateTransferPrice, suggestedVehicleType, SHUTTLE_TYPES, type ShuttleSupplierChoice, type ShuttleType } from '@/lib/shuttle-service'
 import { SUPPLIER_CATEGORIES } from '@/lib/transport'
+import { TransportSupplierPicker } from '@/components/booking/TransportSupplierPicker'
 
 const EMPTY_PLACE: GooglePlaceSelection = { address: '' }
 
@@ -34,6 +35,8 @@ export default function ShuttlesPage() {
   const [passengers, setPassengers] = useState(booking.guests || 2)
   const [shuttleType, setShuttleType] = useState<ShuttleType>('Private Shuttle')
   const [added, setAdded] = useState(false)
+  const [supplierChoice, setSupplierChoice] = useState<ShuttleSupplierChoice | null>(null)
+  const [eligibleCount, setEligibleCount] = useState<number | null>(null)
 
   // Live driving distance & duration straight from the Google Distance
   // Matrix — the only source of route data on this page.
@@ -42,8 +45,12 @@ export default function ShuttlesPage() {
     { address: destination.address, lat: destination.lat, lng: destination.lng },
   )
 
-  const price = result ? estimateTransferPrice(result.distanceKm, passengers, shuttleType) : null
-  const ready = Boolean(result && date && pickup.address && destination.address)
+  const price = supplierChoice
+    ? supplierChoice.price
+    : result ? estimateTransferPrice(result.distanceKm, passengers, shuttleType) : null
+  // A transport partner + vehicle must be chosen before booking; only when no
+  // registered partner covers the route does the platform estimate stand in.
+  const ready = Boolean(result && date && pickup.address && destination.address && (supplierChoice || eligibleCount === 0))
 
   function addToTrip() {
     if (!result || !date) return
@@ -55,6 +62,7 @@ export default function ShuttlesPage() {
       passengers,
       shuttleType,
       result,
+      supplier: supplierChoice ?? undefined,
     }))
     setAdded(true)
   }
@@ -74,12 +82,6 @@ export default function ShuttlesPage() {
 
       <div className="max-w-[1440px] mx-auto px-6 lg:px-12 py-12 grid grid-cols-1 lg:grid-cols-3 gap-8">
         <div className="lg:col-span-2 bg-white border border-black/8 p-6 space-y-8">
-          {!hasGoogleMapsKey() && (
-            <p className="font-sans text-xs text-amber-700 bg-amber-50 border border-amber-200 px-4 py-3">
-              Location search requires the Google Maps API key (NEXT_PUBLIC_GOOGLE_MAPS_API_KEY). You can still type addresses manually.
-            </p>
-          )}
-
           <section>
             <p className={fieldLabel}>Step 1 · Pickup location</p>
             <GoogleAddressField
@@ -144,6 +146,27 @@ export default function ShuttlesPage() {
             </div>
           </section>
 
+          <section>
+            <p className={fieldLabel}>Step 6 · Choose your transport partner & vehicle</p>
+            <div className="border border-gray-100">
+              {!result || !date
+                ? <p className="p-5 font-sans text-sm text-gray-400">Complete the route and date above to see available transport partners.</p>
+                : (
+                  <TransportSupplierPicker
+                    pickup={{ address: pickup.address, lat: pickup.lat, lng: pickup.lng }}
+                    dropoff={{ address: destination.address, lat: destination.lat, lng: destination.lng }}
+                    date={date}
+                    passengers={passengers}
+                    shuttleType={shuttleType}
+                    distanceKm={result.distanceKm}
+                    selected={supplierChoice}
+                    onSelect={setSupplierChoice}
+                    onCandidates={setEligibleCount}
+                  />
+                )}
+            </div>
+          </section>
+
           <section className="border-t border-gray-100 pt-6">
             <p className="font-sans text-[10px] tracking-[0.16em] uppercase text-forest/30 mb-4">Who drives you</p>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -162,17 +185,18 @@ export default function ShuttlesPage() {
         </div>
 
         <aside className="bg-forest text-white p-8 h-fit sticky top-24">
-          <p className="font-sans text-[10px] tracking-[0.16em] uppercase text-white/40 mb-3">Step 6 · Review & add to trip</p>
+          <p className="font-sans text-[10px] tracking-[0.16em] uppercase text-white/40 mb-3">Step 7 · Review & add to trip</p>
           <div className="space-y-4 font-sans text-sm text-white/70">
             <p className="flex gap-2"><MapPin size={14} className="shrink-0 mt-0.5" />Pickup: {pickup.address || '—'}</p>
             <p className="flex gap-2"><MapPin size={14} className="shrink-0 mt-0.5" />Destination: {destination.address || '—'}</p>
             <p className="flex gap-2"><Calendar size={14} />Date: {date || 'Select date'}</p>
             <p className="flex gap-2"><Users size={14} />Passengers: {passengers}</p>
-            <p>Vehicle type: {suggestedVehicleType(passengers)}</p>
+            <p>Transport partner: {supplierChoice ? supplierChoice.companyName : eligibleCount === 0 ? 'Assigned after checkout' : 'Select below'}</p>
+            <p>Vehicle: {supplierChoice ? supplierChoice.vehicleName : suggestedVehicleType(passengers)}</p>
             <p>Estimated duration: {result ? fmtMinutes(result.durationMinutes) : '—'}</p>
           </div>
           <div className="border-t border-white/10 mt-6 pt-6 flex items-end justify-between">
-            <span className="font-sans text-xs text-white/40">Estimated fare</span>
+            <span className="font-sans text-xs text-white/40">{supplierChoice ? `${supplierChoice.companyName} fare` : 'Estimated fare'}</span>
             <span className="font-display text-3xl text-gold">{price !== null ? `R${price.toLocaleString()}` : '—'}</span>
           </div>
 
@@ -193,7 +217,11 @@ export default function ShuttlesPage() {
             </button>
           )}
           <p className="font-sans text-xs text-white/40 mt-4">
-            Your transfer is confirmed at checkout and dispatched to our highest-ranked transport partner for this route.
+            {supplierChoice
+              ? `${supplierChoice.companyName} (${supplierChoice.vehicleName}) will be booked for this transfer when you complete checkout.`
+              : eligibleCount === 0
+                ? 'No registered partner covers this route yet — our team will place the transfer with the best available operator after checkout.'
+                : 'Choose a transport partner and vehicle to continue.'}
           </p>
         </aside>
       </div>

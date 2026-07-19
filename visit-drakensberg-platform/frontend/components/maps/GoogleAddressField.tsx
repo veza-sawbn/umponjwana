@@ -304,7 +304,6 @@ export function GoogleAddressField({
   const [suggestions, setSuggestions] = useState<Suggestion[]>([])
   const [open, setOpen] = useState(false)
   const [highlight, setHighlight] = useState(-1)
-  const [status, setStatus] = useState<'ready' | 'missing-key' | 'error'>(GOOGLE_MAPS_API_KEY ? 'ready' : 'missing-key')
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
@@ -319,7 +318,7 @@ export function GoogleAddressField({
   async function fetchSuggestions(text: string) {
     const seq = ++requestSeqRef.current
     const places = await getPlacesLibrary()
-    if (!places) { setStatus('error'); return }
+    if (!places) return
 
     try {
       if (places.AutocompleteSuggestion?.fetchAutocompleteSuggestions) {
@@ -367,11 +366,7 @@ export function GoogleAddressField({
         )
         return
       }
-
-      setStatus('error')
-    } catch {
-      if (seq === requestSeqRef.current) setStatus('error')
-    }
+    } catch {}
   }
 
   function handleInput(text: string) {
@@ -440,7 +435,7 @@ export function GoogleAddressField({
   }
 
   return (
-    <div className="space-y-2" ref={containerRef}>
+    <div ref={containerRef}>
       <div className="relative">
         <label htmlFor={id} className={labelClassName}>
           {label}{required && <span className="text-[#C9A96E] ml-0.5">*</span>}
@@ -475,8 +470,6 @@ export function GoogleAddressField({
           </ul>
         )}
       </div>
-      {status === 'missing-key' && <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">Add NEXT_PUBLIC_GOOGLE_MAPS_API_KEY to enable Google place search.</p>}
-      {status === 'error' && <p className="text-xs text-red-600 bg-red-50 border border-red-100 rounded-lg px-3 py-2">Google place search could not load. Check that the key allows the Places API.</p>}
     </div>
   )
 }
