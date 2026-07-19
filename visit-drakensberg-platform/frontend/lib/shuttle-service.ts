@@ -104,10 +104,12 @@ export function buildShuttleOption(params: {
 }
 
 // The two long-haul anchors most guests arrive through. Used only as Distance
-// Matrix *queries* (Google resolves them) — never as a route table.
+// Matrix *queries* (Google resolves them) — never as a route table. The
+// coordinates let the dispatch engine rank transport partners for the
+// suggested airport transfer.
 const MAJOR_HUBS = [
-  { id: 'jnb-or-tambo', name: 'OR Tambo International Airport, Johannesburg' },
-  { id: 'dur-king-shaka', name: 'King Shaka International Airport, Durban' },
+  { id: 'jnb-or-tambo', name: 'OR Tambo International Airport, Johannesburg', lat: '-26.1367', lng: '28.2411' },
+  { id: 'dur-king-shaka', name: 'King Shaka International Airport, Durban', lat: '-29.6144', lng: '31.1197' },
 ]
 
 function addonPlace(addon: BookingState['addons'][number]): DistancePlace | null {
@@ -150,7 +152,7 @@ export function useShuttleRecommendations(booking: BookingState, limit = 2): Shu
     if (best) {
       recommendations.push(buildShuttleOption({
         id: `airport-transfer-${best.hub.id}-${booking.checkIn}`,
-        pickup: { address: best.hub.name },
+        pickup: { address: best.hub.name, lat: best.hub.lat, lng: best.hub.lng },
         destination: { address: stay.title, lat: stay.lat, lng: stay.lng },
         date: booking.checkIn,
         passengers,

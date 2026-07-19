@@ -5,9 +5,9 @@ import {
   areaForPoint, classifyTrip, companyAvgResponseMinutes, companyRating, companyReliability,
   driverAvailable, eligibleCategories, getFleet, getTransportCompanies, haversineKm,
   insertTransportRequest, pointCoords, vehicleAvailableOn, vehicleSeats,
-  type GeoPoint, type OfferBreakdownLine, type SupplierCategory, type TransportCompany,
-  type TransportDriver, type TransportOffer, type TransportRequest, type TransportVehicle,
-  type TripClass,
+  type GeoPoint, type MeetAndGreetDetails, type OfferBreakdownLine, type SupplierCategory,
+  type TransportCompany, type TransportDriver, type TransportOffer, type TransportRequest,
+  type TransportVehicle, type TripClass,
 } from './transport'
 
 // ============================================================================
@@ -254,6 +254,7 @@ export async function createTransportRequest(params: {
   durationMinutes?: number
   quotedPrice: number
   preselected?: PreselectedSupplier
+  meetAndGreet?: MeetAndGreetDetails
 }): Promise<TransportRequest> {
   const input: DispatchInput = {
     pickup: params.pickup, dropoff: params.dropoff, date: params.date, time: params.time,
@@ -311,6 +312,7 @@ export async function createTransportRequest(params: {
     quotedPrice: params.quotedPrice,
     requestedVehicleId: params.preselected?.vehicleId,
     requestedVehicleName: params.preselected?.vehicleName,
+    meetAndGreet: params.meetAndGreet,
     offers,
     createdAt: now,
   }
@@ -367,6 +369,8 @@ export async function createTransportRequestForBooking(booking: SavedBooking): P
     pickup: { address: shuttle.pickup ?? shuttle.label, lat: shuttle.pickupLat, lng: shuttle.pickupLng },
     dropoff: { address: shuttle.destination ?? booking.stay?.title ?? booking.region, lat: shuttle.destinationLat, lng: shuttle.destinationLng },
     date: shuttle.date || booking.checkIn,
+    time: shuttle.meetAndGreet?.arrivalTime,
+    meetAndGreet: shuttle.meetAndGreet,
     passengers: shuttle.passengers ?? booking.guests,
     shuttleType: shuttle.shuttleType,
     distanceKm: shuttle.distanceKm,

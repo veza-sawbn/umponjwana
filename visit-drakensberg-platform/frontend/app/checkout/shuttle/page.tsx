@@ -1,12 +1,14 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { ArrowLeft, Car, Bus, Check, Clock, ChevronRight, MapPin } from 'lucide-react'
 import { useBooking } from '@/lib/booking-context'
 import { GoogleAddressField, useAutoDrivingDistance, type GooglePlaceSelection } from '@/components/maps/GoogleAddressField'
 import { buildShuttleOption, estimateTransferPrice, suggestedVehicleType, SHUTTLE_TYPES, type ShuttleSupplierChoice, type ShuttleType } from '@/lib/shuttle-service'
 import { TransportSupplierPicker } from '@/components/booking/TransportSupplierPicker'
+import { MeetAndGreetForm } from '@/components/booking/MeetAndGreetForm'
+import type { MeetAndGreetDetails } from '@/lib/transport'
 
 // Transfers are quoted live from the Google Distance Matrix against the
 // guest's real pickup point and their actual stay — no fixed provider list.
@@ -22,6 +24,33 @@ export default function ShuttlePage() {
   const [date, setDate] = useState(booking.checkIn || '')
   const [supplierChoice, setSupplierChoice] = useState<ShuttleSupplierChoice | null>(null)
   const [eligibleCount, setEligibleCount] = useState<number | null>(null)
+  const [meetAndGreet, setMeetAndGreet] = useState<MeetAndGreetDetails>({})
+  const prefilled = useRef(false)
+
+  // A suggested transfer already in the cart (from the trip banner) lands
+  // here for configuration: restore its route, partner and arrival details.
+  useEffect(() => {
+    if (!booking.hydrated || prefilled.current) return
+    prefilled.current = true
+    const existing = booking.shuttle
+    if (!existing) return
+    setNeedsShuttle(true)
+    setPickup({ address: existing.pickup ?? '', lat: existing.pickupLat, lng: existing.pickupLng })
+    if (existing.date) setDate(existing.date)
+    if (existing.shuttleType === 'Shared Shuttle' || existing.shuttleType === 'Private Shuttle') setShuttleType(existing.shuttleType)
+    if (existing.meetAndGreet) setMeetAndGreet(existing.meetAndGreet)
+    if (existing.supplierId && existing.companyId && existing.companyName && existing.vehicleId && existing.vehicleName) {
+      setSupplierChoice({
+        supplierId: existing.supplierId,
+        companyId: existing.companyId,
+        companyName: existing.companyName,
+        vehicleId: existing.vehicleId,
+        vehicleName: existing.vehicleName,
+        price: existing.price,
+      })
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [booking.hydrated])
 
   const stay = booking.stay
   const destination: GooglePlaceSelection = stay
@@ -50,16 +79,19 @@ export default function ShuttlePage() {
       return
     }
     if (!result || !date) return
-    booking.setShuttle(buildShuttleOption({
-      id: `shuttle-${Date.now()}`,
-      pickup: { address: pickup.address, lat: pickup.lat, lng: pickup.lng },
-      destination: { address: destination.address, lat: destination.lat, lng: destination.lng },
-      date,
-      passengers,
-      shuttleType,
-      result,
-      supplier: supplierChoice ?? undefined,
-    }))
+    booking.setShuttle({
+      ...buildShuttleOption({
+        id: `shuttle-${Date.now()}`,
+        pickup: { address: pickup.address, lat: pickup.lat, lng: pickup.lng },
+        destination: { address: destination.address, lat: destination.lat, lng: destination.lng },
+        date,
+        passengers,
+        shuttleType,
+        result,
+        supplier: supplierChoice ?? undefined,
+      }),
+      meetAndGreet,
+    })
     router.push('/checkout')
   }
 
@@ -212,6 +244,23 @@ export default function ShuttlePage() {
                         selected={supplierChoice}
                         onSelect={setSupplierChoice}
                         onCandidates={setEligibleCount}
+                      />
+                    </div>
+                  </div>
+                )}
+
+                {/* Arrival details for the partner's meet & greet */}
+                {result && date && (
+                  <div>
+                    <h2 className="font-display italic text-2xl text-[#000000] mb-2">Help your driver find you</h2>
+                    <p className="font-sans text-xs text-gray-400 mb-5">
+                      Flight and contact details are shared with your transport partner so they can track your arrival and meet you with a name board.
+                    </p>
+                    <div className="bg-white border border-gray-200 p-5">
+                      <MeetAndGreetForm
+                        value={meetAndGreet}
+                        onChange={setMeetAndGreet}
+                        showAirportFields={/airport/i.test(pickup.address)}
                       />
                     </div>
                   </div>

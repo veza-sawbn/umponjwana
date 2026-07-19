@@ -26,7 +26,10 @@ export default function BookingBar() {
   const visible = !hidden && (booking.hasActiveSearch || itemCount > 0)
 
   function handleCheckout() {
-    if (!booking.shuttle) {
+    // No shuttle yet, or a suggested shuttle without a chosen transport
+    // partner: go through the transfer step so the customer picks the
+    // company/vehicle and leaves arrival details before paying.
+    if (!booking.shuttle || !booking.shuttle.supplierId) {
       router.push('/checkout/shuttle')
     } else {
       router.push('/checkout')
@@ -156,9 +159,10 @@ export default function BookingBar() {
                               <div>
                                 <p className="font-sans text-sm font-medium">Private Transfer Available</p>
                                 <p className="font-sans text-xs text-gray-400">{shuttle.label} · {shuttle.date}</p>
-                                {shuttle.distanceKm != null && (
-                                  <p className="font-sans text-[10px] text-[#2d6a4f]/70 mt-0.5">{shuttle.distanceKm} km · ~{shuttle.durationText} drive</p>
-                                )}
+                                <p className="font-sans text-[10px] text-[#2d6a4f]/70 mt-0.5">
+                                  {shuttle.distanceKm != null && `${shuttle.distanceKm} km · ~${shuttle.durationText} drive · `}
+                                  Operated by our registered transport partners
+                                </p>
                               </div>
                             </div>
                             <div className="text-right">
@@ -184,16 +188,24 @@ export default function BookingBar() {
                             <span className="font-sans text-[10px] tracking-[0.1em] uppercase px-2 py-0.5 bg-[#2d6a4f]/10 text-[#2d6a4f]">Shuttle</span>
                             <div>
                               <p className="font-sans text-sm font-medium">{booking.shuttle.label}</p>
-                              <p className="font-sans text-xs text-gray-400">R {booking.shuttle.price.toLocaleString()}</p>
+                              <p className="font-sans text-xs text-gray-400">
+                                R {booking.shuttle.price.toLocaleString()}
+                                {booking.shuttle.companyName && ` · ${booking.shuttle.companyName}`}
+                              </p>
                             </div>
                           </div>
-                          <motion.button
-                            onClick={() => booking.setShuttle(null)}
-                            className="text-gray-300 hover:text-red-400 transition-colors ml-3"
-                            whileTap={{ scale: 0.85 }}
-                          >
-                            <Trash2 size={13} />
-                          </motion.button>
+                          <div className="flex items-center gap-3 ml-3 shrink-0">
+                            <Link href="/trip" className="font-sans text-xs text-[#2d6a4f] hover:underline">
+                              {booking.shuttle.supplierId ? 'Configure' : 'Choose partner & flight details'}
+                            </Link>
+                            <motion.button
+                              onClick={() => booking.setShuttle(null)}
+                              className="text-gray-300 hover:text-red-400 transition-colors"
+                              whileTap={{ scale: 0.85 }}
+                            >
+                              <Trash2 size={13} />
+                            </motion.button>
+                          </div>
                         </motion.div>
                       )}
                     </AnimatePresence>

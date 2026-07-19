@@ -24,6 +24,19 @@ export type TripClass = 'gateway' | 'regional' | 'local'
 
 export type GeoPoint = { address: string; lat?: string; lng?: string }
 
+/** Arrival details the guest provides so the transport partner can track the
+ *  flight and meet the passengers at the pickup point. */
+export type MeetAndGreetDetails = {
+  flightNumber?: string
+  airline?: string
+  arrivalTime?: string
+  nameBoard?: string
+  contactPhone?: string
+  luggage?: string
+  childSeats?: string
+  notes?: string
+}
+
 export const SUPPLIER_CATEGORIES: Record<SupplierCategory, {
   label: string
   description: string
@@ -371,6 +384,8 @@ export type TransportRequest = {
    *  supplier's accept flow. */
   requestedVehicleId?: string
   requestedVehicleName?: string
+  /** Flight / arrival details for the partner's meet & greet. */
+  meetAndGreet?: MeetAndGreetDetails
   offers: TransportOffer[]
   assignment?: TransportAssignment
   createdAt: string
