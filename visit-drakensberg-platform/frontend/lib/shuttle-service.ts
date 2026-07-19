@@ -51,6 +51,16 @@ export function suggestedVehicleType(passengers: number): string {
   return 'Coach'
 }
 
+/** The transport partner + vehicle the customer picked for this transfer. */
+export type ShuttleSupplierChoice = {
+  supplierId: string
+  companyId: string
+  companyName: string
+  vehicleId: string
+  vehicleName: string
+  price: number
+}
+
 /** Build a cart-ready shuttle option from a live Google Distance Matrix result. */
 export function buildShuttleOption(params: {
   id: string
@@ -60,25 +70,34 @@ export function buildShuttleOption(params: {
   passengers: number
   shuttleType: ShuttleType
   result: DistanceResult
+  supplier?: ShuttleSupplierChoice
 }): ShuttleOption {
-  const { id, pickup, destination, date, passengers, shuttleType, result } = params
-  const price = estimateTransferPrice(result.distanceKm, passengers, shuttleType)
+  const { id, pickup, destination, date, passengers, shuttleType, result, supplier } = params
+  const price = supplier?.price ?? estimateTransferPrice(result.distanceKm, passengers, shuttleType)
+  const operatedBy = supplier
+    ? `Operated by ${supplier.companyName} (${supplier.vehicleName}).`
+    : 'Operated by a matched local transport partner.'
   return {
     id,
     label: `${pickup.address} → ${destination.address}`,
     price,
-    description: `${shuttleType} on ${date}. ${result.distanceKm} km · ~${result.durationText} drive · ${passengers} passenger${passengers !== 1 ? 's' : ''}. Estimated fare based on live driving distance; operated by a matched local transport partner.`,
+    description: `${shuttleType} on ${date}. ${result.distanceKm} km · ~${result.durationText} drive · ${passengers} passenger${passengers !== 1 ? 's' : ''}. ${operatedBy}`,
     pickup: pickup.address,
     destination: destination.address,
     pickupLat: pickup.lat,
     pickupLng: pickup.lng,
     destinationLat: destination.lat,
     destinationLng: destination.lng,
+    supplierId: supplier?.supplierId,
+    companyId: supplier?.companyId,
+    companyName: supplier?.companyName,
+    vehicleId: supplier?.vehicleId,
+    vehicleName: supplier?.vehicleName,
     date,
     passengers,
     shuttleType,
     durationMinutes: result.durationMinutes,
-    vehicleType: suggestedVehicleType(passengers),
+    vehicleType: supplier?.vehicleName ?? suggestedVehicleType(passengers),
     distanceKm: result.distanceKm,
     durationText: result.durationText,
   }

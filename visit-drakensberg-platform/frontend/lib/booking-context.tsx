@@ -40,6 +40,12 @@ export type ShuttleOption = {
   pickupLng?: string
   destinationLat?: string
   destinationLng?: string
+  /** Transport partner chosen by the customer before checkout. */
+  supplierId?: string
+  companyId?: string
+  companyName?: string
+  vehicleId?: string
+  vehicleName?: string
   date?: string
   passengers?: number
   shuttleType?: string

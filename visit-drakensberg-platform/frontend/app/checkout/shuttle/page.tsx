@@ -5,7 +5,8 @@ import { useRouter } from 'next/navigation'
 import { ArrowLeft, Car, Bus, Check, Clock, ChevronRight, MapPin } from 'lucide-react'
 import { useBooking } from '@/lib/booking-context'
 import { GoogleAddressField, useAutoDrivingDistance, type GooglePlaceSelection } from '@/components/maps/GoogleAddressField'
-import { buildShuttleOption, estimateTransferPrice, suggestedVehicleType, SHUTTLE_TYPES, type ShuttleType } from '@/lib/shuttle-service'
+import { buildShuttleOption, estimateTransferPrice, suggestedVehicleType, SHUTTLE_TYPES, type ShuttleSupplierChoice, type ShuttleType } from '@/lib/shuttle-service'
+import { TransportSupplierPicker } from '@/components/booking/TransportSupplierPicker'
 
 // Transfers are quoted live from the Google Distance Matrix against the
 // guest's real pickup point and their actual stay — no fixed provider list.
@@ -19,6 +20,8 @@ export default function ShuttlePage() {
   const [pickup, setPickup] = useState<GooglePlaceSelection>({ address: '' })
   const [shuttleType, setShuttleType] = useState<ShuttleType>('Private Shuttle')
   const [date, setDate] = useState(booking.checkIn || '')
+  const [supplierChoice, setSupplierChoice] = useState<ShuttleSupplierChoice | null>(null)
+  const [eligibleCount, setEligibleCount] = useState<number | null>(null)
 
   const stay = booking.stay
   const destination: GooglePlaceSelection = stay
@@ -32,8 +35,13 @@ export default function ShuttlePage() {
     destination,
   )
 
-  const shuttlePrice = needsShuttle && result ? estimateTransferPrice(result.distanceKm, passengers, shuttleType) : 0
-  const canConfirm = needsShuttle === false || (needsShuttle === true && result && date)
+  const shuttlePrice = needsShuttle && result
+    ? (supplierChoice?.price ?? estimateTransferPrice(result.distanceKm, passengers, shuttleType))
+    : 0
+  // The transfer needs a chosen transport partner + vehicle unless no
+  // registered partner covers the route (then dispatch places it later).
+  const canConfirm = needsShuttle === false
+    || (needsShuttle === true && result && date && (supplierChoice || eligibleCount === 0))
 
   function confirm() {
     if (needsShuttle === false) {
@@ -50,6 +58,7 @@ export default function ShuttlePage() {
       passengers,
       shuttleType,
       result,
+      supplier: supplierChoice ?? undefined,
     }))
     router.push('/checkout')
   }
@@ -173,17 +182,40 @@ export default function ShuttlePage() {
                           <div className="flex flex-wrap gap-4 font-sans text-xs text-gray-500">
                             <span className="flex items-center gap-1"><MapPin size={11} />{result.distanceKm} km</span>
                             <span className="flex items-center gap-1"><Clock size={11} />~{result.durationText}</span>
-                            <span className="flex items-center gap-1"><Bus size={11} />{suggestedVehicleType(passengers)} · {passengers} passenger{passengers !== 1 ? 's' : ''}</span>
+                            <span className="flex items-center gap-1"><Bus size={11} />{supplierChoice ? supplierChoice.vehicleName : suggestedVehicleType(passengers)} · {passengers} passenger{passengers !== 1 ? 's' : ''}</span>
                           </div>
                           <div className="text-right shrink-0">
-                            <p className="font-display italic text-2xl text-[#2d6a4f]">R {estimateTransferPrice(result.distanceKm, passengers, shuttleType).toLocaleString()}</p>
-                            <p className="font-sans text-[10px] text-gray-400">per vehicle</p>
+                            <p className="font-display italic text-2xl text-[#2d6a4f]">R {shuttlePrice.toLocaleString()}</p>
+                            <p className="font-sans text-[10px] text-gray-400">per vehicle{supplierChoice ? ` · ${supplierChoice.companyName}` : ''}</p>
                           </div>
                         </div>
                       )}
                     </div>
                   </div>
                 </div>
+
+                {/* Choose the transport partner + vehicle for this transfer */}
+                {result && date && (
+                  <div>
+                    <h2 className="font-display italic text-2xl text-[#000000] mb-2">Choose your transport partner</h2>
+                    <p className="font-sans text-xs text-gray-400 mb-5">
+                      Registered operators are ranked by suitability for this route. Pick the company and vehicle that will drive you.
+                    </p>
+                    <div className="bg-white border border-gray-200">
+                      <TransportSupplierPicker
+                        pickup={{ address: pickup.address, lat: pickup.lat, lng: pickup.lng }}
+                        dropoff={{ address: destination.address, lat: destination.lat, lng: destination.lng }}
+                        date={date}
+                        passengers={passengers}
+                        shuttleType={shuttleType}
+                        distanceKm={result.distanceKm}
+                        selected={supplierChoice}
+                        onSelect={setSupplierChoice}
+                        onCandidates={setEligibleCount}
+                      />
+                    </div>
+                  </div>
+                )}
               </div>
             )}
 
@@ -237,6 +269,9 @@ export default function ShuttlePage() {
                     <span className="truncate mr-2">{pickup.address || 'Transfer'} → {stay?.title || 'accommodation'}</span>
                     <span>R {shuttlePrice.toLocaleString()}</span>
                   </div>
+                  {supplierChoice && (
+                    <p className="font-sans text-[11px] text-white/40 mt-1">{supplierChoice.companyName} · {supplierChoice.vehicleName}</p>
+                  )}
                 </div>
               )}
 

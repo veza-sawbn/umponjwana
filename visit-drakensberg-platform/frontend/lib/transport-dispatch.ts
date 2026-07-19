@@ -5,8 +5,9 @@ import {
   areaForPoint, classifyTrip, companyAvgResponseMinutes, companyRating, companyReliability,
   driverAvailable, eligibleCategories, getFleet, getTransportCompanies, haversineKm,
   insertTransportRequest, pointCoords, vehicleAvailableOn, vehicleSeats,
-  type GeoPoint, type OfferBreakdownLine, type TransportCompany, type TransportDriver,
-  type TransportOffer, type TransportRequest, type TransportVehicle, type TripClass,
+  type GeoPoint, type OfferBreakdownLine, type SupplierCategory, type TransportCompany,
+  type TransportDriver, type TransportOffer, type TransportRequest, type TransportVehicle,
+  type TripClass,
 } from './transport'
 
 // ============================================================================
@@ -26,6 +27,7 @@ export type ScoredCandidate = {
   reasons: string[]           // why a company was excluded
   score: number
   breakdown: OfferBreakdownLine[]
+  vehicles: TransportVehicle[]
   bestVehicle: TransportVehicle | null
   availableDrivers: number
 }
@@ -197,6 +199,7 @@ export function scoreCompany(
     reasons,
     score: Math.round(score * 10) / 10,
     breakdown,
+    vehicles,
     bestVehicle: bestVehicle?.v ?? null,
     availableDrivers,
   }
@@ -218,10 +221,23 @@ export async function rankSuppliers(input: DispatchInput): Promise<{ tripClass: 
   return { tripClass, candidates }
 }
 
+/** Customer's chosen transport partner + vehicle, made at booking time. */
+export type PreselectedSupplier = {
+  supplierId: string
+  companyId: string
+  companyName: string
+  category: SupplierCategory
+  vehicleId?: string
+  vehicleName?: string
+}
+
 /**
- * Create a transport request, rank all suppliers, and offer the job to the
- * top of the ranking. Returns the stored request (status `offered`, or
- * `unassigned` when no eligible supplier exists yet — admins see those).
+ * Create a transport request. When the customer preselected a supplier (the
+ * normal booking journey), the job goes directly and only to that company —
+ * with the chosen vehicle noted — and it just has to accept. Otherwise the
+ * engine ranks all suppliers and offers the job to the top of the ranking.
+ * Returns the stored request (status `offered`, or `unassigned` when no
+ * eligible supplier exists yet — admins see those).
  */
 export async function createTransportRequest(params: {
   userId: string
@@ -237,6 +253,7 @@ export async function createTransportRequest(params: {
   distanceKm?: number
   durationMinutes?: number
   quotedPrice: number
+  preselected?: PreselectedSupplier
 }): Promise<TransportRequest> {
   const input: DispatchInput = {
     pickup: params.pickup, dropoff: params.dropoff, date: params.date, time: params.time,
@@ -245,18 +262,33 @@ export async function createTransportRequest(params: {
   const { tripClass, candidates } = await rankSuppliers(input)
   const now = new Date().toISOString()
 
-  const offers: TransportOffer[] = candidates
-    .filter(c => c.eligible)
-    .map((c, i) => ({
-      supplierId: c.company.supplierId,
-      companyId: c.company.id,
-      companyName: c.company.companyName,
-      category: c.company.category,
-      score: c.score,
-      rank: i + 1,
-      breakdown: c.breakdown,
-      offeredAt: i < OFFER_SHORTLIST_SIZE ? now : undefined,
-    }))
+  let offers: TransportOffer[]
+  if (params.preselected) {
+    const scored = candidates.find(c => c.company.supplierId === params.preselected!.supplierId)
+    offers = [{
+      supplierId: params.preselected.supplierId,
+      companyId: params.preselected.companyId,
+      companyName: params.preselected.companyName,
+      category: params.preselected.category,
+      score: scored?.score ?? 0,
+      rank: 1,
+      breakdown: scored?.breakdown ?? [],
+      offeredAt: now,
+    }]
+  } else {
+    offers = candidates
+      .filter(c => c.eligible)
+      .map((c, i) => ({
+        supplierId: c.company.supplierId,
+        companyId: c.company.id,
+        companyName: c.company.companyName,
+        category: c.company.category,
+        score: c.score,
+        rank: i + 1,
+        breakdown: c.breakdown,
+        offeredAt: i < OFFER_SHORTLIST_SIZE ? now : undefined,
+      }))
+  }
 
   const notified = offers.filter(o => o.offeredAt)
 
@@ -277,18 +309,27 @@ export async function createTransportRequest(params: {
     durationMinutes: params.durationMinutes,
     tripClass,
     quotedPrice: params.quotedPrice,
+    requestedVehicleId: params.preselected?.vehicleId,
+    requestedVehicleName: params.preselected?.vehicleName,
     offers,
     createdAt: now,
   }
 
   await insertTransportRequest(request, notified.map(o => o.supplierId))
 
-  await Promise.all(notified.map(o =>
-    notify(o.supplierId, 'booking',
-      'New transfer opportunity',
-      `${params.pickup.address} → ${params.dropoff.address} on ${params.date} · ${params.passengers} pax · R${params.quotedPrice.toLocaleString()}. You ranked #${o.rank} of ${offers.length} for this trip.`,
+  if (params.preselected) {
+    await notify(params.preselected.supplierId, 'booking',
+      'You were booked for a transfer',
+      `${params.customerName ?? 'A guest'} chose ${params.preselected.companyName}${params.preselected.vehicleName ? ` (${params.preselected.vehicleName})` : ''} for ${params.pickup.address} → ${params.dropoff.address} on ${params.date} · ${params.passengers} pax · R${params.quotedPrice.toLocaleString()}. Accept the job to reserve the vehicle.`,
       '/supplier/jobs')
-  ))
+  } else {
+    await Promise.all(notified.map(o =>
+      notify(o.supplierId, 'booking',
+        'New transfer opportunity',
+        `${params.pickup.address} → ${params.dropoff.address} on ${params.date} · ${params.passengers} pax · R${params.quotedPrice.toLocaleString()}. You ranked #${o.rank} of ${offers.length} for this trip.`,
+        '/supplier/jobs')
+    ))
+  }
 
   return request
 }
@@ -300,7 +341,25 @@ export async function createTransportRequest(params: {
 export async function createTransportRequestForBooking(booking: SavedBooking): Promise<TransportRequest | null> {
   const shuttle = booking.shuttle
   if (!shuttle) return null
+
+  // The customer picked a supplier + vehicle during the booking journey —
+  // route the job straight to them.
+  let preselected: PreselectedSupplier | undefined
+  if (shuttle.supplierId && shuttle.companyId && shuttle.companyName) {
+    const companies = await getTransportCompanies()
+    const company = companies.find(c => c.id === shuttle.companyId)
+    preselected = {
+      supplierId: shuttle.supplierId,
+      companyId: shuttle.companyId,
+      companyName: shuttle.companyName,
+      category: company?.category ?? 'regional',
+      vehicleId: shuttle.vehicleId,
+      vehicleName: shuttle.vehicleName,
+    }
+  }
+
   return createTransportRequest({
+    preselected,
     userId: booking.userId,
     customerName: booking.customerName,
     bookingId: booking.id,

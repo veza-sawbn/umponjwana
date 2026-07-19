@@ -123,11 +123,19 @@ export default function TransportJobsPage() {
         {mine.open.map(request => {
           const myOffer = request.offers.find(o => o.supplierId === userId)
           const usable = vehicles.filter(v => vehicleAvailableOn(v, request.date) && vehicleSeats(v) >= request.passengers)
-          const picked = vehiclePick[request.id] ?? usable[0]?.id ?? ''
+          const requestedUsable = request.requestedVehicleId && usable.some(v => v.id === request.requestedVehicleId)
+            ? request.requestedVehicleId
+            : undefined
+          const picked = vehiclePick[request.id] ?? requestedUsable ?? usable[0]?.id ?? ''
           const vehicle = usable.find(v => v.id === picked)
           return (
             <JobCard key={request.id} request={request}>
-              {myOffer && (
+              {request.requestedVehicleName ? (
+                <p className="font-sans text-xs text-black/45">
+                  The customer chose <span className="font-semibold text-[#C9A96E]">{request.requestedVehicleName}</span> for this trip
+                  {!requestedUsable && ' — it is no longer available on that date, pick a substitute'}.
+                </p>
+              ) : myOffer && (
                 <p className="font-sans text-xs text-black/45">
                   You ranked <span className="font-semibold text-[#C9A96E]">#{myOffer.rank}</span> for this trip
                   (suitability {myOffer.score}/115).
