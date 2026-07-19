@@ -44,18 +44,20 @@ export type AdminSupplier = {
 }
 
 async function getCollection<T>(key: string): Promise<T[]> {
-  try {
-    const { data } = await supabase.from('site_content').select('value').eq('key', key).maybeSingle()
-    if (Array.isArray(data?.value?.items)) return data.value.items as T[]
-  } catch {}
+  const { data, error } = await supabase.from('site_content').select('value').eq('key', key).maybeSingle()
+  if (error) throw error
+  if (Array.isArray(data?.value?.items)) return data.value.items as T[]
   return []
 }
 
 async function saveCollection<T>(key: string, items: T[]): Promise<void> {
-  await supabase.from('site_content').upsert(
+  const { error } = await supabase.from('site_content').upsert(
     { key, value: { items }, updated_at: new Date().toISOString() },
     { onConflict: 'key' },
   )
+  // Surface RLS/auth/network failures — swallowing them made the UI report
+  // "Saved" while nothing was persisted.
+  if (error) throw error
 }
 
 export async function getAdminRegions(): Promise<AdminRegion[]> {
@@ -81,8 +83,17 @@ export async function updateAdminRegion(id: string, data: Omit<AdminRegion, 'id'
   const all = await getAdminRegions()
   const previous = all.find(item => item.id === id)
   const updated: AdminRegion = { ...data, id, createdAt: previous?.createdAt, updatedAt: new Date().toISOString() }
-  await saveCollection('admin_regions', all.map(item => item.id === id ? updated : item))
+  // Upsert semantics: a region edited in the console but missing from the
+  // stored list (e.g. seeded defaults) must be appended, not silently dropped.
+  const next = previous ? all.map(item => item.id === id ? updated : item) : [...all, updated]
+  await saveCollection('admin_regions', next)
   return updated
+}
+
+/** Persist the full region list exactly as shown in the admin console. */
+export async function saveAdminRegions(items: AdminRegion[]): Promise<void> {
+  const now = new Date().toISOString()
+  await saveCollection('admin_regions', items.map(item => ({ ...item, updatedAt: item.updatedAt ?? now })))
 }
 
 export async function deleteAdminRegion(id: string): Promise<void> {
@@ -101,25 +112,52 @@ export async function createAdminMedia(data: Omit<AdminMedia, 'id' | 'uploaded' 
   return item
 }
 
+function imageDimensions(file: File): Promise<string> {
+  if (!file.type.startsWith('image/')) return Promise.resolve('—')
+  return new Promise(resolve => {
+    const url = URL.createObjectURL(file)
+    const img = new Image()
+    img.onload = () => { resolve(`${img.naturalWidth}×${img.naturalHeight}`); URL.revokeObjectURL(url) }
+    img.onerror = () => { resolve('—'); URL.revokeObjectURL(url) }
+    img.src = url
+  })
+}
+
 export async function uploadAdminMedia(file: File): Promise<AdminMedia> {
-  const ext = file.name.split('.').pop() || 'bin'
+  const ext = (file.name.split('.').pop() || 'bin').toLowerCase().replace(/[^a-z0-9]/g, '') || 'bin'
   const path = `admin/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`
-  const { error } = await supabase.storage.from('media').upload(path, file, { contentType: file.type || undefined })
-  if (error) throw error
+  const { error } = await supabase.storage.from('media').upload(path, file, {
+    contentType: file.type || undefined,
+    cacheControl: '31536000',
+  })
+  if (error) {
+    const message = String((error as any)?.message || '')
+    if (/bucket.*not.*found/i.test(message)) {
+      throw new Error('Storage bucket "media" does not exist. Run supabase/migrations/20260719_media_storage.sql in the Supabase SQL editor.')
+    }
+    throw new Error(message || 'Upload failed')
+  }
   const { data } = supabase.storage.from('media').getPublicUrl(path)
   return createAdminMedia({
     type: file.type.startsWith('video/') ? 'video' : 'image',
     name: file.name,
     url: data.publicUrl,
     size: file.size > 1024 * 1024 ? `${(file.size / 1024 / 1024).toFixed(1)} MB` : `${Math.max(1, Math.round(file.size / 1024))} KB`,
-    dimensions: 'Unknown',
+    dimensions: await imageDimensions(file),
     used_in: [],
   })
 }
 
 export async function deleteAdminMedia(id: string): Promise<void> {
   const all = await getAdminMedia()
-  await saveCollection('admin_media', all.filter(item => item.id !== id))
+  const item = all.find(m => m.id === id)
+  await saveCollection('admin_media', all.filter(m => m.id !== id))
+  // Best-effort removal of the underlying storage object for our own uploads.
+  const marker = '/storage/v1/object/public/media/'
+  if (item?.url.includes(marker)) {
+    const path = decodeURIComponent(item.url.split(marker)[1] ?? '')
+    if (path) await supabase.storage.from('media').remove([path]).catch(() => {})
+  }
 }
 
 export async function getAdminSuppliers(): Promise<AdminSupplier[]> {

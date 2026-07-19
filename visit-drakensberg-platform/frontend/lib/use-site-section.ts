@@ -3,6 +3,20 @@ import { useEffect, useMemo, useState } from 'react'
 import { getSiteContent, SITE_CONTENT_DEFAULTS, type SiteContent, type SiteContentKey } from './site-content'
 import { useEditMode } from './edit-mode-context'
 
+// Many components on a page can request the same section (every
+// EditableSection reads `home_layout`); share one in-flight/recent fetch per
+// key instead of hitting Supabase once per component.
+const cache = new Map<SiteContentKey, { at: number; promise: Promise<any> }>()
+const CACHE_TTL = 30_000
+
+function fetchSectionShared<K extends SiteContentKey>(key: K): Promise<SiteContent[K]> {
+  const hit = cache.get(key)
+  if (hit && Date.now() - hit.at < CACHE_TTL) return hit.promise
+  const promise = getSiteContent(key)
+  cache.set(key, { at: Date.now(), promise })
+  return promise
+}
+
 // Loads one site-content section and, inside the visual editor, overlays any
 // pending (unsaved) values so the iframe preview updates live as the admin types.
 export function useSiteSection<K extends SiteContentKey>(key: K): SiteContent[K] {
@@ -12,7 +26,7 @@ export function useSiteSection<K extends SiteContentKey>(key: K): SiteContent[K]
 
   useEffect(() => {
     let cancelled = false
-    getSiteContent(key).then(c => { if (!cancelled) setContent(c) })
+    fetchSectionShared(key).then(c => { if (!cancelled) setContent(c) })
     return () => { cancelled = true }
   }, [key])
 

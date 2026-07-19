@@ -35,7 +35,7 @@ export default function AdminMediaPage() {
   async function uploadFile(file?: File) {
     if (!file) return
     setBusy(true); setError('')
-    try { const created = await uploadAdminMedia(file); setMedia(m => [...m, created]); setShowUpload(false) } catch { setError('Upload failed. Check Supabase Storage bucket configuration.') } finally { setBusy(false) }
+    try { const created = await uploadAdminMedia(file); setMedia(m => [...m, created]); setShowUpload(false) } catch (e: any) { setError(e?.message || 'Upload failed. Check Supabase Storage bucket configuration.') } finally { setBusy(false) }
   }
 
   return <div className="p-8">

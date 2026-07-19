@@ -2,7 +2,8 @@
 
 import { useEffect, useState } from 'react'
 import { Plus, Trash2, Check } from 'lucide-react'
-import { createAdminRegion, deleteAdminRegion, getAdminRegions, updateAdminRegion } from '@/lib/admin-supabase'
+import { getAdminRegions, saveAdminRegions } from '@/lib/admin-supabase'
+import { DEFAULT_REGIONS } from '@/lib/regions'
 
 type KeyAttraction = { id: string; name: string; description: string }
 type Subregion = { id: string; name: string; description: string }
@@ -18,15 +19,53 @@ export default function AdminRegionsPage() {
   const data = regions.find(r => r.id === selectedId) || regions[0]
 
   async function loadRegions() {
-    try { const items = await getAdminRegions(); setRegions(items); setSelectedId(items[0]?.id ?? null) } catch { setError('Could not load regions from Supabase.') }
+    try {
+      const stored = await getAdminRegions()
+      // Nothing saved yet: seed the editor with the regions the public site
+      // renders by default, so edits update what visitors actually see.
+      const items = stored.length > 0 ? stored : DEFAULT_REGIONS.map(({ slug: _slug, ...r }) => r as RegionData & { id: string })
+      setRegions(items)
+      setSelectedId(items[0]?.id ?? null)
+    } catch { setError('Could not load regions from Supabase.') }
   }
   useEffect(() => { loadRegions() }, [])
 
   function replaceCurrent(next: RegionData) { setRegions(rs => rs.map(r => r.id === data.id ? next : r)) }
   function update(field: keyof RegionData, value: unknown) { if (data) replaceCurrent({ ...data, [field]: value }) }
-  async function save() { if (!data) return; const result = data.id ? await updateAdminRegion(data.id, data as any) : await createAdminRegion(data as any); replaceCurrent(result); setSelectedId(result.id); setSaved(true); setTimeout(() => setSaved(false), 2000) }
-  async function addRegion() { const created = await createAdminRegion(blankRegion() as any); setRegions(rs => [...rs, created]); setSelectedId(created.id) }
-  async function deleteRegion() { if (!data?.id) return; await deleteAdminRegion(data.id); const next = regions.filter(r => r.id !== data.id); setRegions(next); setSelectedId(next[0]?.id ?? null) }
+
+  // The list shown in the console is authoritative: every save persists the
+  // whole list, so seeded defaults and sibling regions are never dropped.
+  async function persist(next: RegionData[]): Promise<boolean> {
+    setError('')
+    try { await saveAdminRegions(next as any); return true }
+    catch (e: any) {
+      setSaved(false)
+      setError(`Save failed: ${e?.message || 'unknown error'}. Check that you are signed in as an admin and try again.`)
+      return false
+    }
+  }
+  async function save() {
+    if (!data) return
+    const now = new Date().toISOString()
+    const updated = { ...data, id: data.id || `region-${Date.now()}`, updatedAt: now } as RegionData & { updatedAt: string }
+    const next = regions.map(r => r.id === data.id ? updated : r)
+    if (await persist(next)) {
+      setRegions(next)
+      setSelectedId(updated.id!)
+      setSaved(true)
+      setTimeout(() => setSaved(false), 2000)
+    }
+  }
+  async function addRegion() {
+    const created = { ...blankRegion(), id: `region-${Date.now()}` }
+    const next = [...regions, created]
+    if (await persist(next)) { setRegions(next); setSelectedId(created.id) }
+  }
+  async function deleteRegion() {
+    if (!data?.id) return
+    const next = regions.filter(r => r.id !== data.id)
+    if (await persist(next)) { setRegions(next); setSelectedId(next[0]?.id ?? null) }
+  }
 
   const inputCls = 'w-full border border-gray-200 px-3 py-2.5 font-sans text-sm focus:outline-none focus:border-[#2d6a4f] bg-[#F7F5F2]'
   const labelCls = 'block font-sans text-[10px] tracking-[0.12em] uppercase text-gray-400 mb-1.5'

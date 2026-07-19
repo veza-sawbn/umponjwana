@@ -2,7 +2,6 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { Info, ShieldCheck, Sunrise } from 'lucide-react'
-import PanoramaViewer from '@/components/panorama/PanoramaViewer'
 import TrailCard from '@/components/trails/TrailCard'
 import Footer from '@/components/layout/Footer'
 import EditablePageHeader from '@/components/editor/EditablePageHeader'
@@ -338,15 +337,6 @@ export default function NatureReservesPage() {
           <p className="font-sans text-forest/60 font-light leading-relaxed text-lg max-w-3xl">
             {reserve.description}
           </p>
-        </div>
-
-        {/* Panorama viewer */}
-        <div className="rounded-3xl overflow-hidden shadow-card-hover mb-16">
-          <PanoramaViewer
-            spotName={reserve.viewpointName}
-            latitude={reserve.latitude}
-            longitude={reserve.longitude}
-          />
         </div>
 
         {/* Peaks grid */}

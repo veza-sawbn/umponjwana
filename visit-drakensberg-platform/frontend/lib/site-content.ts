@@ -1,5 +1,13 @@
 import { supabase } from './auth'
 
+// Per-section presentation overrides applied by the visual editor.
+export type SectionStyle = {
+  background?: string   // CSS colour; overrides the section's default background
+  paddingY?: number     // vertical padding in px; overrides the default
+}
+
+export type HomeCard = Record<string, string | boolean> & { id: string; visible?: boolean }
+
 // Default values mirror exactly what the live site renders.
 // The admin website editor reads these as initial state; Supabase overrides them when saved.
 export const SITE_CONTENT_DEFAULTS = {
@@ -42,6 +50,58 @@ export const SITE_CONTENT_DEFAULTS = {
     regions: ['All'],
     types: ['Accommodation', 'Hiking', 'Activities', 'Experiences'],
   },
+  // Repeating card collections on the homepage — fully editable in the visual
+  // editor (add / duplicate / reorder / hide / delete).
+  home_cards: {
+    categories: [
+      { id: 'cat-stays', label: 'Stays', href: '/stays', img: 'https://images.unsplash.com/photo-1571896349842-33c89424de2d?w=600&q=80', visible: true },
+      { id: 'cat-hikes', label: 'Hikes', href: '/hikes', img: 'https://images.unsplash.com/photo-1551632811-561732d1e306?w=600&q=80', visible: true },
+      { id: 'cat-activities', label: 'Activities', href: '/activities', img: 'https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?w=600&q=80', visible: true },
+      { id: 'cat-reserves', label: 'Reserves', href: '/nature-reserves', img: 'https://images.unsplash.com/photo-1516426122078-c23e76319801?w=600&q=80', visible: true },
+      { id: 'cat-packages', label: 'Packages', href: '/packages', img: 'https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=600&q=80', visible: true },
+    ] as HomeCard[],
+    regions: [
+      {
+        id: 'reg-north', name: 'North Berg', subtitle: 'Royal Natal · Bergville · Amphitheatre',
+        desc: 'Home to the iconic Amphitheatre and Tugela Falls — the second highest waterfall in the world. Gateway town: Bergville.',
+        img: 'https://images.unsplash.com/photo-1590098563548-8f14eed3a47f?w=900&q=80', href: '/regions#northern', visible: true,
+      },
+      {
+        id: 'reg-central', name: 'Central Berg', subtitle: 'Cathedral Peak · Winterton · Champagne Valley',
+        desc: 'Alpine meadows, the richest San rock art in the world and dramatic escarpment views stretching to Lesotho. Gateway town: Winterton.',
+        img: 'https://images.unsplash.com/photo-1542587222-e14b891ee40b?w=900&q=80', href: '/regions#central', visible: true,
+      },
+      {
+        id: 'reg-south', name: 'South Berg', subtitle: 'Sani Pass · Underberg · Himeville',
+        desc: 'The legendary Sani Pass climbs to Lesotho through a raw mountain landscape. Boutique villages Himeville and Underberg sit at its foot.',
+        img: 'https://images.unsplash.com/photo-1503614472-8c93d56e92ce?w=900&q=80', href: '/regions#southern', visible: true,
+      },
+    ] as HomeCard[],
+    stories: [
+      {
+        id: 'story-vulture', tag: 'Wildlife', title: "Africa's rarest raptor: the bearded vulture of the Berg",
+        img: 'https://images.unsplash.com/photo-1508739773434-c26b3d09e071?w=800&q=80',
+        href: '/mydrakensberg/bearded-vulture-lammergeier', date: 'March 2025', visible: true,
+      },
+      {
+        id: 'story-rock-art', tag: 'Heritage', title: "The ancient language of the San: rock art at Giant's Castle",
+        img: 'https://images.unsplash.com/photo-1529946179074-1f3cf40c0a0e?w=800&q=80',
+        href: '/mydrakensberg/san-bushmen-rock-art-giants-castle', date: 'January 2025', visible: true,
+      },
+      {
+        id: 'story-chain-ladder', tag: 'Adventure', title: 'Climbing the Chain Ladder: what nobody tells you',
+        img: 'https://images.unsplash.com/photo-1551632811-561732d1e306?w=800&q=80',
+        href: '/mydrakensberg/tugela-falls-chain-ladder-guide', date: 'November 2024', visible: true,
+      },
+    ] as HomeCard[],
+  },
+  // Section layout for the homepage: render order, hidden sections, and
+  // per-section style overrides (keyed by section id, shared by all pages).
+  home_layout: {
+    section_order: ['stats', 'categories', 'regions', 'stories', 'trails', 'newsletter'] as string[],
+    hidden: [] as string[],
+    styles: {} as Record<string, SectionStyle>,
+  },
   home_sections: {
     stat_1_value: '3,482m', stat_1_label: 'Highest Peak',
     stat_2_value: '243,000', stat_2_label: 'Hectares Protected',
@@ -49,8 +109,6 @@ export const SITE_CONTENT_DEFAULTS = {
     stat_4_value: '20,000+', stat_4_label: 'San Rock Art Sites',
     categories_eyebrow: 'What to do', categories_heading: 'Explore the Berg',
     regions_eyebrow: 'By region', regions_heading: 'Choose your Berg',
-    panorama_eyebrow: 'Interactive panorama', panorama_heading: 'See the peaks\nbefore you go',
-    panorama_body: 'Drag the panorama to identify the peaks surrounding the Amphitheatre viewpoint. Powered by PeakVisor satellite elevation data.',
     stories_eyebrow: 'Journal', stories_heading: 'Stories from the Berg',
     trails_eyebrow: 'On foot', trails_heading: 'Top trails',
     newsletter_eyebrow: 'Stay informed', newsletter_heading: 'Berg dispatches',
@@ -74,7 +132,7 @@ export const SITE_CONTENT_DEFAULTS = {
   reserves_page: {
     eyebrow: 'Protected wilderness',
     heading: 'Nature Reserves',
-    subheading: "Explore South Africa's most iconic mountain wilderness through interactive panoramas, named peaks, and curated trails.",
+    subheading: "Explore South Africa's most iconic mountain wilderness through named peaks and curated trails.",
   },
   regions_page: {
     eyebrow: 'Where to go',
@@ -161,8 +219,82 @@ export async function getAllSiteContent(): Promise<SiteContent> {
 }
 
 export async function setSiteContent<K extends SiteContentKey>(key: K, value: SiteContent[K]): Promise<void> {
-  await supabase.from('site_content').upsert(
+  const { error } = await supabase.from('site_content').upsert(
     { key, value, updated_at: new Date().toISOString() },
     { onConflict: 'key' }
   )
+  if (error) throw error
+}
+
+/* ── Visual editor: drafts, publishing, rollback ─────────────────────────────
+ * Draft changes live in the `site_editor_draft` row of site_content as
+ * { sections: { [sectionKey]: { [fieldKey]: value } } } and never affect the
+ * live site until published. Publishing snapshots the previous live values
+ * into `site_editor_backup` so the last publish can be rolled back.
+ */
+
+export type EditorPending = Record<string, Record<string, any>>
+
+async function getRawRow(key: string): Promise<any | null> {
+  const { data, error } = await supabase.from('site_content').select('value').eq('key', key).maybeSingle()
+  if (error) throw error
+  return data?.value ?? null
+}
+
+async function setRawRow(key: string, value: any): Promise<void> {
+  const { error } = await supabase.from('site_content').upsert(
+    { key, value, updated_at: new Date().toISOString() },
+    { onConflict: 'key' }
+  )
+  if (error) throw error
+}
+
+export async function getEditorDraft(): Promise<{ sections: EditorPending; updatedAt?: string } | null> {
+  const value = await getRawRow('site_editor_draft')
+  if (value && typeof value.sections === 'object' && Object.keys(value.sections).length > 0) return value
+  return null
+}
+
+export async function saveEditorDraft(sections: EditorPending): Promise<void> {
+  await setRawRow('site_editor_draft', { sections, updatedAt: new Date().toISOString() })
+}
+
+export async function clearEditorDraft(): Promise<void> {
+  await setRawRow('site_editor_draft', { sections: {} })
+}
+
+/** Publish draft changes: back up current live values, then merge each
+ *  changed field into its live section. */
+export async function publishEditorSections(sections: EditorPending): Promise<void> {
+  const keys = Object.keys(sections) as SiteContentKey[]
+  if (keys.length === 0) return
+  const backup: Record<string, any> = {}
+  const merged: Record<string, any> = {}
+  for (const key of keys) {
+    const current = await getSiteContent(key)
+    backup[key] = current
+    merged[key] = { ...current, ...sections[key] }
+  }
+  await setRawRow('site_editor_backup', { sections: backup, publishedAt: new Date().toISOString() })
+  for (const key of keys) {
+    await setSiteContent(key, merged[key])
+  }
+  await clearEditorDraft()
+}
+
+export async function getEditorBackup(): Promise<{ sections: Record<string, any>; publishedAt?: string } | null> {
+  const value = await getRawRow('site_editor_backup')
+  if (value && typeof value.sections === 'object' && Object.keys(value.sections).length > 0) return value
+  return null
+}
+
+/** Restore the live values captured at the last publish. */
+export async function rollbackLastPublish(): Promise<boolean> {
+  const backup = await getEditorBackup()
+  if (!backup) return false
+  for (const key of Object.keys(backup.sections)) {
+    await setSiteContent(key as SiteContentKey, backup.sections[key])
+  }
+  await setRawRow('site_editor_backup', { sections: {} })
+  return true
 }
