@@ -296,6 +296,7 @@ function RequestGroup({ title, requests, emptyText, busy, expanded, ranking, onT
                     <span className="flex items-center gap-1"><Users size={11} /> {request.passengers} pax</span>
                     {request.distanceKm !== undefined && <span>{request.distanceKm} km</span>}
                     <span className="capitalize">{request.tripClass} trip</span>
+                    {request.meetAndGreet?.flightNumber && <span>✈ {request.meetAndGreet.flightNumber}{request.meetAndGreet.arrivalTime ? ` · ${request.meetAndGreet.arrivalTime}` : ''}</span>}
                     {request.customerName && <span>{request.customerName}</span>}
                     {request.bookingReference && <span>Ref {request.bookingReference}</span>}
                     {request.assignment && <span className="flex items-center gap-1"><Truck size={11} /> {request.assignment.companyName}{request.assignment.driverName ? ` · ${request.assignment.driverName}` : ''}</span>}

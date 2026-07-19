@@ -1,6 +1,7 @@
 'use client'
 
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react'
+import type { MeetAndGreetDetails } from './transport'
 
 export type BookingAddon = {
   id: string
@@ -46,6 +47,8 @@ export type ShuttleOption = {
   companyName?: string
   vehicleId?: string
   vehicleName?: string
+  /** Flight / arrival details for the partner's meet & greet. */
+  meetAndGreet?: MeetAndGreetDetails
   date?: string
   passengers?: number
   shuttleType?: string

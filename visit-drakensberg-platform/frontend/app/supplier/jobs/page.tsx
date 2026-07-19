@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
-import { ArrowRight, Bus, Calendar, Check, Clock, MapPin, Play, Route, Truck, Users, X } from 'lucide-react'
+import { ArrowRight, Bus, Calendar, Check, Clock, MapPin, Phone, Plane, Play, Route, Truck, Users, X } from 'lucide-react'
 import { supabase } from '@/lib/auth'
 import {
   acceptTransportRequest, assignDriverToRequest, completeTrip, declineTransportRequest,
@@ -256,7 +256,33 @@ function JobCard({ request, children }: { request: TransportRequest; children?: 
           </span>
         </div>
       </div>
+      <MeetAndGreetSummary request={request} />
       {children}
+    </div>
+  )
+}
+
+/** Passenger-tracking details the guest supplied for the meet & greet. */
+function MeetAndGreetSummary({ request }: { request: TransportRequest }) {
+  const details = request.meetAndGreet
+  if (!details || Object.values(details).every(v => !v)) return null
+  return (
+    <div className="rounded-lg bg-[#F7F5F2] px-4 py-3">
+      <p className="font-sans text-[11px] uppercase tracking-wide text-black/35 mb-1.5">Meet & greet — passenger tracking</p>
+      <div className="flex flex-wrap gap-x-5 gap-y-1 font-sans text-xs text-black/60">
+        {details.flightNumber && (
+          <span className="flex items-center gap-1">
+            <Plane size={11} className="text-[#C9A96E]" />
+            {details.flightNumber}{details.airline ? ` (${details.airline})` : ''}
+          </span>
+        )}
+        {details.arrivalTime && <span className="flex items-center gap-1"><Clock size={11} className="text-[#C9A96E]" /> Arrives {details.arrivalTime}</span>}
+        {details.nameBoard && <span>Name board: <span className="font-medium">{details.nameBoard}</span></span>}
+        {details.contactPhone && <span className="flex items-center gap-1"><Phone size={11} className="text-[#C9A96E]" /> {details.contactPhone}</span>}
+        {details.luggage && <span>Luggage: {details.luggage}</span>}
+        {details.childSeats && <span>Child seats: {details.childSeats}</span>}
+      </div>
+      {details.notes && <p className="font-sans text-xs text-black/45 mt-1.5">“{details.notes}”</p>}
     </div>
   )
 }

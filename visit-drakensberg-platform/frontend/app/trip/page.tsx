@@ -6,6 +6,7 @@ import Footer from '@/components/layout/Footer'
 import { Mountain, Bed, Car, Compass, ChevronRight, Trash2, Users, Calendar, ArrowLeft, Pencil } from 'lucide-react'
 import { useBooking } from '@/lib/booking-context'
 import { getRecommendations, type Recommendation } from '@/lib/recommendations'
+import { ShuttleTripCard } from '@/components/booking/ShuttleTripCard'
 import { useState, useEffect } from 'react'
 
 function formatDate(iso: string) {
@@ -22,7 +23,7 @@ export default function TripPage() {
   const hikeAddons = booking.addons.filter(a => a.type === 'hike' || a.type === 'tour' || a.type === 'activity')
   const hasStay = !!booking.stay
   const hasShuttle = !!booking.shuttle
-  const isEmpty = booking.addons.length === 0 && !booking.stay
+  const isEmpty = booking.addons.length === 0 && !booking.stay && !hasShuttle
 
   const checkIn = booking.checkIn
   const checkOut = booking.checkOut
@@ -145,6 +146,9 @@ export default function TripPage() {
                       </div>
                     </div>
                   )}
+
+                  {/* Shuttle: partner selection + meet & greet configuration */}
+                  <ShuttleTripCard />
                 </div>
               )}
             </section>
@@ -230,7 +234,7 @@ export default function TripPage() {
                   <h2 className="font-display italic text-2xl">Getting there</h2>
                 </div>
                 <p className="font-sans text-xs text-black/40 mb-4">
-                  Shuttle transfers from Johannesburg and Durban to the Berg
+                  Door-to-door transfers by our registered transport partners
                 </p>
                 <Link
                   href="/checkout/shuttle"
@@ -239,7 +243,7 @@ export default function TripPage() {
                   <div>
                     <p className="font-sans font-medium text-sm text-black/80 mb-1">Add a shuttle transfer</p>
                     <p className="font-sans text-xs text-black/40">
-                      From R460 · Shared and private options from OR Tambo and King Shaka
+                      Pick up anywhere — choose your transport partner and vehicle
                     </p>
                   </div>
                   <ChevronRight size={16} className="text-black/20 group-hover:text-[#C9A96E] transition-colors shrink-0 ml-4" />
@@ -302,7 +306,9 @@ export default function TripPage() {
                   )}
                   {booking.shuttle && (
                     <div className="flex justify-between gap-2 font-sans text-sm">
-                      <span className="text-black/50 truncate">Shuttle</span>
+                      <span className="text-black/50 truncate">
+                        Shuttle{booking.shuttle.companyName ? ` · ${booking.shuttle.companyName}` : ''}
+                      </span>
                       <span className="text-black/80 shrink-0 font-medium">R {booking.shuttle.price.toLocaleString()}</span>
                     </div>
                   )}
