@@ -12,13 +12,23 @@ import { AnimatePresence, motion } from 'framer-motion'
 import { scaleFade, fade, staggerContainer, staggerChild } from '@/lib/motion'
 import Logo from '@/components/Logo'
 
-const NAV_LINKS = [
+type NavChild = { label: string; href: string }
+type NavLink = { label: string; href: string; children?: NavChild[] }
+
+const NAV_LINKS: NavLink[] = [
   { label: 'Stays', href: '/stays' },
   { label: 'Hikes', href: '/hikes' },
   { label: 'Activities', href: '/activities' },
   { label: 'Shuttles', href: '/shuttles' },
-  { label: 'Reserves', href: '/nature-reserves' },
-  { label: 'Regions', href: '/regions' },
+  {
+    label: 'Regions',
+    href: '/regions',
+    children: [
+      { label: 'All Regions', href: '/regions' },
+      { label: 'Nature Reserves', href: '/nature-reserves' },
+      { label: 'Towns & Cities', href: '/towns' },
+    ],
+  },
   { label: 'Stories', href: '/mydrakensberg' },
   { label: 'Plan', href: '/plan' },
 ]
@@ -109,13 +119,39 @@ export default function Navbar() {
           {/* Desktop nav */}
           <nav className="hidden lg:flex items-center gap-7">
             {NAV_LINKS.map((link) => (
-              <Link
-                key={link.href}
-                href={link.href}
-                className={`font-sans text-sm tracking-wide transition-colors duration-200 ${textColor} hover:text-gold`}
-              >
-                {link.label}
-              </Link>
+              link.children ? (
+                <div key={link.href} className="relative group">
+                  <Link
+                    href={link.href}
+                    className={`flex items-center gap-1 font-sans text-sm tracking-wide transition-colors duration-200 ${textColor} hover:text-gold`}
+                  >
+                    {link.label}
+                    <ChevronDown className="w-3.5 h-3.5" />
+                  </Link>
+                  {/* Hover dropdown — pt-3 keeps the trigger and menu hover-contiguous */}
+                  <div className="absolute left-1/2 -translate-x-1/2 top-full pt-3 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-150">
+                    <div className="bg-white border border-black/8 shadow-card py-1 min-w-[190px]">
+                      {link.children.map((child) => (
+                        <Link
+                          key={child.href}
+                          href={child.href}
+                          className="block px-4 py-2.5 font-sans text-sm text-forest hover:bg-mist hover:text-gold transition-colors whitespace-nowrap"
+                        >
+                          {child.label}
+                        </Link>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <Link
+                  key={link.href}
+                  href={link.href}
+                  className={`font-sans text-sm tracking-wide transition-colors duration-200 ${textColor} hover:text-gold`}
+                >
+                  {link.label}
+                </Link>
+              )
             ))}
           </nav>
 
@@ -364,6 +400,20 @@ export default function Navbar() {
                       {link.label}
                       <ChevronRight size={18} className="text-gray-200" />
                     </Link>
+                    {link.children && (
+                      <div className="flex flex-col border-b border-black/6">
+                        {link.children.filter(c => c.href !== link.href).map((child) => (
+                          <Link
+                            key={child.href}
+                            href={child.href}
+                            className="flex items-center justify-between py-2.5 pl-4 font-sans text-base text-forest/60 hover:text-gold transition-colors"
+                          >
+                            {child.label}
+                            <ChevronRight size={15} className="text-gray-200" />
+                          </Link>
+                        ))}
+                      </div>
+                    )}
                   </motion.div>
                 ))}
               </motion.nav>

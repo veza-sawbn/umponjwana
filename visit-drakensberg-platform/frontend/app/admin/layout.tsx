@@ -7,6 +7,7 @@ import {
   FileText, BarChart2, Search, Settings, LogOut, Mountain,
   Globe, MapPin, Image, Store, Package, ShieldCheck,
   Receipt, Landmark, Banknote, ClipboardList, MessageSquare, Bus,
+  TreePine, Building2,
 } from 'lucide-react'
 import { signOut } from '@/lib/auth'
 import { useRouter } from 'next/navigation'
@@ -32,6 +33,8 @@ const NAV = [
   { href: '/admin/website', label: 'Website Settings', icon: Settings },
   { href: '/admin/trails', label: 'Hiking Trails', icon: Mountain },
   { href: '/admin/regions', label: 'Regions', icon: MapPin },
+  { href: '/admin/reserves', label: 'Nature Reserves', icon: TreePine },
+  { href: '/admin/towns', label: 'Towns & Cities', icon: Building2 },
   { href: '/admin/media', label: 'Media Library', icon: Image },
   { href: '/admin/analytics', label: 'Analytics', icon: BarChart2 },
   { href: '/admin/seo', label: 'SEO', icon: Search },
