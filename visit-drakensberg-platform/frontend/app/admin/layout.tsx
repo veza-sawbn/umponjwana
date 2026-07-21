@@ -25,7 +25,7 @@ const NAV = [
   { href: '/admin/settlements', label: 'Settlements', icon: Banknote },
   { href: '/admin/operations', label: 'Operations', icon: ClipboardList },
   { href: '/admin/transport', label: 'Transport', icon: Bus },
-  { href: '/admin/messages', label: 'Messages', icon: MessageSquare },
+  { href: '/admin/messages', label: 'Communications', icon: MessageSquare },
   { href: '/admin/marketplace', label: 'Marketplace', icon: Store },
   { href: '/admin/packages', label: 'Package Builder', icon: Package },
   { href: '/admin/blog', label: 'Blog & Content', icon: FileText },
