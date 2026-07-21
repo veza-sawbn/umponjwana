@@ -142,6 +142,11 @@ export const SITE_CONTENT_DEFAULTS = {
     towns_heading: 'Surrounding Towns & Villages',
     towns_subheading: 'Gateway towns, boutique villages and farm stops that frame the Drakensberg experience.',
   },
+  towns_page: {
+    eyebrow: 'Where to base yourself',
+    heading: 'Towns & Cities',
+    subheading: 'Gateway towns, boutique villages and farm stops that frame the Drakensberg experience — grouped by the region they serve.',
+  },
   stories_page: {
     eyebrow: 'MyDrakensberg',
     heading: 'Stories from the Berg',

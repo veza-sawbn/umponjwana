@@ -238,7 +238,16 @@ export const EDITOR_PAGES: EditorPage[] = [
     path: '/nature-reserves',
     sections: [
       pageHeader('reserves_page', 'reserves_page'),
-      { id: 'reserves-content', label: 'Reserve Guide', note: 'Reserve peaks, trails and facts are curated data.' },
+      { id: 'reserves-content', label: 'Reserve Guide', note: 'Reserves are managed under Admin → Regions → Nature Reserves, filed by region.' },
+      FOOTER_SECTION,
+    ],
+  },
+  {
+    label: 'Towns',
+    path: '/towns',
+    sections: [
+      pageHeader('towns_page', 'towns_page'),
+      { id: 'towns-content', label: 'Towns & Cities', note: 'Towns are managed under Admin → Regions → Towns & Cities, filed by region.' },
       FOOTER_SECTION,
     ],
   },
