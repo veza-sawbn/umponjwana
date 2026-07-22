@@ -6,7 +6,7 @@ import {
   RefreshCw, MessageSquare, Send, Inbox, Search, Plus, X, Sparkles, StickyNote,
   User, ListChecks, Clock, Zap, CircleDollarSign, Archive, Check, Loader2,
   Phone, Mail, MapPin, ChevronDown, AlertTriangle, FileText, Receipt,
-  Package, CreditCard, MessageCircle, Facebook, Instagram, Music2, Smartphone, UserPlus,
+  Package, CreditCard, MessageCircle, Facebook, Instagram, Music2, Smartphone, UserPlus, Plug,
 } from 'lucide-react'
 import { supabase } from '@/lib/auth'
 import {
@@ -15,6 +15,7 @@ import {
   LEAD_STAGES, stageMeta, type Conversation, type LeadStage,
 } from '@/lib/conversations'
 import { CHANNEL_LIST, getChannel, type ChannelId } from '@/lib/channels'
+import { getConnectionStatuses } from '@/lib/channel-connections'
 import { getMessageTemplates, applyTemplate, type MessageTemplate } from '@/lib/message-templates'
 import { buildCustomerProfile, type CustomerProfile } from '@/lib/crm'
 import { assist, type AssistResult } from '@/lib/hub-assistant'
@@ -65,6 +66,9 @@ export default function AdminMessagesHub() {
 
   const [me, setMe] = useState<{ id: string; name: string; role?: string; staffRole?: string } | null>(null)
   const [staff, setStaff] = useState<{ id: string; name: string }[]>([])
+  const [connStatuses, setConnStatuses] = useState<Record<string, boolean>>({})
+  // A channel can be used when it's a built-in adapter or has been connected in settings.
+  const channelConnected = useCallback((id: ChannelId) => getChannel(id).connected || Boolean(connStatuses[id]), [connStatuses])
 
   const [body, setBody] = useState('')
   const [noteMode, setNoteMode] = useState(false)
@@ -107,6 +111,7 @@ export default function AdminMessagesHub() {
       const { data: admins } = await supabase.from('profiles').select('id, full_name, email').eq('role', 'admin')
       setStaff((admins ?? []).map((a: any) => ({ id: a.id, name: a.full_name || a.email || 'Staff' })))
     })
+    getConnectionStatuses().then(setConnStatuses).catch(() => {})
     load()
     const iv = setInterval(load, 10000)
     return () => clearInterval(iv)
@@ -353,13 +358,15 @@ export default function AdminMessagesHub() {
               <button onClick={() => setChannelFilter('all')} className={`px-2 py-1 font-sans text-[10px] whitespace-nowrap ${channelFilter === 'all' ? 'bg-white/10 text-white' : 'text-white/40'}`}>All channels</button>
               {CHANNEL_LIST.map(ch => {
                 const Icon = CHANNEL_ICONS[ch.icon] ?? MessageSquare
+                const on = channelConnected(ch.id)
                 return (
-                  <button key={ch.id} onClick={() => setChannelFilter(ch.id)} title={ch.label}
-                    className={`px-1.5 py-1 ${channelFilter === ch.id ? 'bg-white/10' : ''}`} style={{ color: channelFilter === ch.id ? ch.color : 'rgba(255,255,255,0.35)' }}>
+                  <button key={ch.id} onClick={() => setChannelFilter(ch.id)} title={`${ch.label}${on ? '' : ' — not connected'}`}
+                    className={`relative px-1.5 py-1 ${channelFilter === ch.id ? 'bg-white/10' : ''} ${on ? '' : 'opacity-45'}`} style={{ color: channelFilter === ch.id ? ch.color : 'rgba(255,255,255,0.35)' }}>
                     <Icon size={13} />
                   </button>
                 )
               })}
+              <Link href="/admin/settings/channels" title="Manage channels" className="ml-auto shrink-0 px-1.5 py-1 text-white/40 hover:text-[#C9A96E]"><Plug size={13} /></Link>
             </div>
           </div>
           {/* Conversation list */}
@@ -453,7 +460,7 @@ export default function AdminMessagesHub() {
                   {!noteMode && (
                     <select value={replyChannel ?? selected.hub.channel} onChange={e => { setReplyChannel(e.target.value as ChannelId); setChannel(selected.id, e.target.value as ChannelId).then(patchLocal) }}
                       className="font-sans text-xs border border-gray-200 px-2 py-1 bg-white focus:outline-none">
-                      {CHANNEL_LIST.map(ch => <option key={ch.id} value={ch.id} disabled={!ch.connected}>{ch.label}{ch.connected ? '' : ' (not connected)'}</option>)}
+                      {CHANNEL_LIST.map(ch => <option key={ch.id} value={ch.id} disabled={!channelConnected(ch.id)}>{ch.label}{channelConnected(ch.id) ? '' : ' (connect in settings)'}</option>)}
                     </select>
                   )}
                   <div className="relative">
