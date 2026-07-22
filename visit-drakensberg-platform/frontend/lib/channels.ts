@@ -60,8 +60,18 @@ function internalAdapter(id: ChannelId, label: string, icon: string, color: stri
 function externalAdapter(id: ChannelId, label: string, icon: string, color: string, note: string): ChannelAdapter {
   return {
     id, label, icon, color, connected: false, note,
-    async send() {
-      throw new Error(`The ${label} channel is not connected yet. ${note}`)
+    // Delivery is attempted server-side (/api/channels/send), which reads the
+    // admin-only stored credentials and calls the provider API. If the channel
+    // isn't connected the route returns 409 and this throws a clear message.
+    async send(msg: OutboundMessage) {
+      const res = await fetch('/api/channels/send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ channel: id, to: msg.to, body: msg.body }),
+      })
+      const json = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(json?.error || `The ${label} channel could not deliver this message.`)
+      return { delivered: true, providerRef: json?.providerRef }
     },
   }
 }

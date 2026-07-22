@@ -1,7 +1,8 @@
 'use client'
 
 import { useState } from 'react'
-import { Save, CheckCircle } from 'lucide-react'
+import Link from 'next/link'
+import { Save, CheckCircle, MessageCircle, ChevronRight } from 'lucide-react'
 
 export default function AdminSettingsPage() {
   const [saved, setSaved] = useState(false)
@@ -39,6 +40,22 @@ export default function AdminSettingsPage() {
       </div>
 
       <div className="max-w-2xl space-y-8">
+        {/* Integrations */}
+        <Link href="/admin/settings/channels" className="block bg-white border border-gray-200 p-6 hover:border-[#2d6a4f] transition-colors group">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-[#2d6a4f]/10 flex items-center justify-center shrink-0">
+                <MessageCircle size={18} className="text-[#2d6a4f]" />
+              </div>
+              <div>
+                <h2 className="font-display italic text-xl">Channel Connections</h2>
+                <p className="font-sans text-xs text-gray-400 mt-0.5">Connect WhatsApp Business, Messenger, Instagram, TikTok, email & SMS to the Communications Hub.</p>
+              </div>
+            </div>
+            <ChevronRight size={18} className="text-gray-300 group-hover:text-[#2d6a4f] transition-colors" />
+          </div>
+        </Link>
+
         <div className="bg-white border border-gray-200 p-6">
           <h2 className="font-display italic text-xl mb-5">Site Identity</h2>
           <div className="space-y-4">
