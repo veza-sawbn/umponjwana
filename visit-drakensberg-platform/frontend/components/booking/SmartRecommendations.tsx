@@ -1,58 +1,41 @@
 'use client'
 
+import { useEffect, useState } from 'react'
 import Link from 'next/link'
-import { MapPin, Star, Mountain, Zap, Calendar, Bus, Plus, Navigation } from 'lucide-react'
+import { MapPin, Star, Mountain, Zap, Compass, Bus, Plus, Navigation } from 'lucide-react'
 import { useBooking } from '@/lib/booking-context'
 import { useShuttleRecommendations } from '@/lib/shuttle-service'
 import { useAutoDrivingDistances, type DistancePlace } from '@/components/maps/GoogleAddressField'
+import { getTrails, trailStartPoint, type Trail } from '@/lib/trails'
+import { getActivities, type Activity } from '@/lib/activities'
+import { getUpcomingExperiences, type TrekkingExperience } from '@/lib/experiences'
+import { regionsMatch } from '@/lib/regions'
 
 interface SmartRecommendation {
   title: string
-  type: 'Trail' | 'Activity' | 'Experience' | 'Event'
+  type: 'Trail' | 'Activity' | 'Experience'
   location: string
-  rating?: number
+  rating?: number | null
   price?: number | null
   image: string
   href: string
-  distance?: string
-}
-
-const REGION_DATA: Record<string, SmartRecommendation[]> = {
-  'Northern Berg': [
-    { title: 'Cathedral Peak Summit', type: 'Trail', location: 'Cathedral Peak', rating: 4.7, price: null, image: 'https://images.unsplash.com/photo-1486870591958-9b9d0d1dda99?w=400&q=80', href: '/hikes/cathedral-peak', distance: '~12km' },
-    { title: 'Tugela Falls Circuit', type: 'Trail', location: 'Royal Natal National Park', rating: 4.9, price: null, image: 'https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?w=400&q=80', href: '/hikes/tugela-falls', distance: '~14km' },
-    { title: 'Berg Photography Tour', type: 'Activity', location: 'Northern Berg', rating: 4.8, price: 950, image: 'https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=400&q=80', href: '/activities/a1' },
-    { title: 'Guided Rock Climbing', type: 'Activity', location: 'Amphitheatre', rating: 4.9, price: 750, image: 'https://images.unsplash.com/photo-1504280390367-361c6d9f38f4?w=400&q=80', href: '/activities/a1' },
-    { title: 'Drakensberg Boys Choir', type: 'Event', location: 'Drakensberg Boys Choir School', image: 'https://images.unsplash.com/photo-1441974231531-c6227db76b6e?w=400&q=80', href: '/events/boys-choir' },
-  ],
-  'Central Berg': [
-    { title: "Giant's Castle via Meander", type: 'Trail', location: "Giant's Castle", rating: 4.6, price: null, image: 'https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=400&q=80', href: '/hikes/giants-castle', distance: '~18km' },
-    { title: 'Fairy Glen Waterfall Walk', type: 'Trail', location: 'Central Berg', rating: 4.6, price: null, image: 'https://images.unsplash.com/photo-1441974231531-c6227db76b6e?w=400&q=80', href: '/hikes/fairy-glen', distance: '~7km' },
-    { title: 'San Rock Art Full-Day Tour', type: 'Experience', location: "Giant's Castle", rating: 4.9, price: 620, image: 'https://images.unsplash.com/photo-1501854140801-50d01698950b?w=400&q=80', href: '/activities/a2' },
-    { title: 'Bearded Vulture Hide', type: 'Experience', location: "Giant's Castle", rating: 4.8, price: 480, image: 'https://images.unsplash.com/photo-1441974231531-c6227db76b6e?w=400&q=80', href: '/activities/a3' },
-    { title: 'Midlands Meander Art Route', type: 'Event', location: 'Midlands', image: 'https://images.unsplash.com/photo-1504280390367-361c6d9f38f4?w=400&q=80', href: '/events/midlands-meander' },
-  ],
-  'Southern Berg': [
-    { title: 'Sani Pass to Lesotho', type: 'Trail', location: 'Sani Pass', rating: 4.9, price: null, image: 'https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?w=400&q=80', href: '/hikes/sani-pass', distance: '~8km' },
-    { title: "Bushman's Nek Loop", type: 'Trail', location: 'Southern Berg', rating: 4.5, price: null, image: 'https://images.unsplash.com/photo-1486870591958-9b9d0d1dda99?w=400&q=80', href: '/hikes/bushmans-nek', distance: '~10km' },
-    { title: 'Sani Pass 4WD Tour', type: 'Activity', location: 'Sani Pass', rating: 4.8, price: 850, image: 'https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=400&q=80', href: '/activities/sani-4wd' },
-    { title: 'Zulu Cultural Village', type: 'Experience', location: 'Southern Foothills', rating: 4.7, price: 350, image: 'https://images.unsplash.com/photo-1501854140801-50d01698950b?w=400&q=80', href: '/activities/zulu-village' },
-  ],
+  lat?: string
+  lng?: string
 }
 
 const TYPE_ICON: Record<string, React.ReactNode> = {
   Trail: <Mountain size={10} />,
   Activity: <Zap size={10} />,
-  Experience: <Star size={10} />,
-  Event: <Calendar size={10} />,
+  Experience: <Compass size={10} />,
 }
 
 const TYPE_COLOR: Record<string, string> = {
   Trail: 'text-[#2d6a4f]',
   Activity: 'text-[#C9A96E]',
   Experience: 'text-[#C9A96E]',
-  Event: 'text-blue-400',
 }
+
+const FALLBACK_IMAGE = 'https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=400&q=80'
 
 interface Props {
   region: string
@@ -60,6 +43,10 @@ interface Props {
   originLocation?: string
   originLat?: string
   originLng?: string
+  /** Visitor's stay dates — narrows guided-experience departures to ones that
+   *  actually fall inside the trip, instead of just "upcoming in this region". */
+  checkIn?: string
+  checkOut?: string
 }
 
 function formatDistance(result: { distanceKm: number; durationText: string } | null | undefined) {
@@ -67,28 +54,103 @@ function formatDistance(result: { distanceKm: number; durationText: string } | n
   return `${result.distanceKm} km · ~${result.durationText} away`
 }
 
-export default function SmartRecommendations({ region, excludeListingId, originLocation, originLat, originLng }: Props) {
+/**
+ * "While you're in {region}" panel on the stay booking sidebar. Pulls real
+ * published trails, active activities and upcoming guided-trekking
+ * departures from Supabase — filtered to the same region as the selected
+ * accommodation (and, for dated departures, to the visitor's actual stay
+ * dates when known) — no mock/hardcoded listings.
+ */
+export default function SmartRecommendations({ region, excludeListingId, originLocation, originLat, originLng, checkIn, checkOut }: Props) {
   const booking = useBooking()
-  const recommendations = (REGION_DATA[region] || REGION_DATA['Central Berg']).slice(0, 4)
+  const [loading, setLoading] = useState(true)
+  const [recommendations, setRecommendations] = useState<SmartRecommendation[]>([])
   const shuttleRecommendations = useShuttleRecommendations(booking)
+
+  useEffect(() => {
+    if (!region) { setRecommendations([]); setLoading(false); return }
+    let cancelled = false
+    setLoading(true)
+
+    Promise.all([
+      getTrails().catch(() => [] as Trail[]),
+      getActivities().catch(() => [] as Activity[]),
+      getUpcomingExperiences().catch(() => [] as TrekkingExperience[]),
+    ]).then(([trails, activities, experiences]) => {
+      if (cancelled) return
+
+      const trailItems: SmartRecommendation[] = trails
+        .filter(t => t.status === 'published' && t.id !== excludeListingId && regionsMatch(t.region, region))
+        .map(t => {
+          const start = trailStartPoint(t)
+          return {
+            title: t.name,
+            type: 'Trail' as const,
+            location: t.region,
+            price: null,
+            image: t.image || FALLBACK_IMAGE,
+            href: `/hikes/${t.id}`,
+            lat: start ? String(start.lat) : undefined,
+            lng: start ? String(start.lng) : undefined,
+          }
+        })
+
+      const activityItems: SmartRecommendation[] = activities
+        .filter(a => a.status === 'active' && a.id !== excludeListingId && regionsMatch(a.region, region))
+        .map(a => ({
+          title: a.name,
+          type: 'Activity' as const,
+          location: a.region,
+          price: a.pricePerPerson || null,
+          image: a.photos?.[0] || FALLBACK_IMAGE,
+          href: `/activities/${a.id}`,
+          lat: a.gpsLat || undefined,
+          lng: a.gpsLng || undefined,
+        }))
+
+      // Scheduled departures that fall inside the visitor's actual stay dates
+      // once known; otherwise just the soonest upcoming ones in the region.
+      const experienceItems: SmartRecommendation[] = experiences
+        .filter(e => regionsMatch(e.region, region))
+        .filter(e => (!checkIn || !checkOut) ? true : (e.departureDate >= checkIn && e.departureDate <= checkOut))
+        .map(e => ({
+          title: e.title,
+          type: 'Experience' as const,
+          location: e.trailName || e.region,
+          rating: e.rating,
+          price: e.pricePerPerson || null,
+          image: FALLBACK_IMAGE,
+          href: `/experiences/${e.id}`,
+          lat: e.gpsLat || undefined,
+          lng: e.gpsLng || undefined,
+        }))
+
+      // Dated experiences first (most relevant once a stay is booked), then
+      // trails, then general activities — capped to a tidy sidebar panel.
+      setRecommendations([...experienceItems, ...trailItems, ...activityItems].slice(0, 4))
+      setLoading(false)
+    })
+
+    return () => { cancelled = true }
+  }, [region, excludeListingId, checkIn, checkOut])
 
   const origin: DistancePlace | null = originLocation ? { address: `${originLocation}, South Africa`, lat: originLat, lng: originLng } : null
   const destinations: DistancePlace[] = [
-    ...recommendations.map(item => ({ address: `${item.location}, South Africa` })),
+    ...recommendations.map(item => ({ address: `${item.location}, South Africa`, lat: item.lat, lng: item.lng })),
     ...shuttleRecommendations.map(shuttle => ({ address: `${shuttle.destination || shuttle.label}, South Africa` })),
   ]
   const { results: distances, status: distanceStatus } = useAutoDrivingDistances(origin, destinations)
   const recommendationDistances = distances.slice(0, recommendations.length)
   const shuttleDistances = distances.slice(recommendations.length)
 
-  if (recommendations.length === 0) return null
+  if (!loading && recommendations.length === 0 && shuttleRecommendations.length === 0) return null
 
   return (
     <div className="bg-[#F7F5F2] border border-gray-200 p-5">
       <div className="mb-4">
         <span className="font-sans text-[10px] tracking-[0.2em] uppercase text-[#C9A96E] block mb-1">Smart Booking</span>
         <h3 className="font-display italic text-xl text-[#000000]">While You're in {region}</h3>
-        <p className="font-sans text-xs text-gray-400 mt-1">Trails, activities and events near your stay</p>
+        <p className="font-sans text-xs text-gray-400 mt-1">Trails, activities and guided experiences near your stay</p>
       </div>
 
       {shuttleRecommendations.length > 0 && (
@@ -125,59 +187,66 @@ export default function SmartRecommendations({ region, excludeListingId, originL
         </div>
       )}
 
-      <div className="space-y-3">
-        {recommendations.map((item, i) => {
-          const liveDistance = formatDistance(recommendationDistances[i])
-          const distanceLabel = liveDistance || (distanceStatus === 'calculating' && origin ? 'Calculating…' : item.distance)
-          return (
-          <Link
-            key={item.href}
-            href={item.href}
-            className="group flex gap-3 bg-white border border-gray-200 hover:border-[#2d6a4f] transition-colors p-3"
-          >
-            <div className="w-14 h-14 shrink-0 overflow-hidden">
-              <img src={item.image} alt={item.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
-            </div>
-            <div className="min-w-0 flex-1">
-              <div className="flex items-center gap-2 mb-0.5">
-                <span className={`inline-flex items-center gap-1 font-sans text-[9px] tracking-[0.12em] uppercase ${TYPE_COLOR[item.type]}`}>
-                  {TYPE_ICON[item.type]}
-                  {item.type}
-                </span>
-                {distanceLabel && (
-                  <span className="font-sans text-[9px] text-gray-300">{distanceLabel}</span>
-                )}
-              </div>
-              <p className="font-display italic text-sm text-[#000000] leading-tight group-hover:text-[#2d6a4f] transition-colors">{item.title}</p>
-              <div className="flex items-center justify-between mt-1">
-                <p className="font-sans text-[10px] text-gray-400 flex items-center gap-0.5">
-                  <MapPin size={8} />{item.location}
-                </p>
-                {item.rating && (
-                  <span className="font-sans text-[10px] text-gray-400 flex items-center gap-0.5">
-                    <Star size={8} className="text-[#C9A96E] fill-[#C9A96E]" />
-                    {item.rating}
-                  </span>
-                )}
-              </div>
-            </div>
-            {item.price && (
-              <div className="shrink-0 text-right">
-                <p className="font-display italic text-sm text-[#2d6a4f]">R{item.price.toLocaleString()}</p>
-                <p className="font-sans text-[9px] text-gray-400">pp</p>
-              </div>
-            )}
-          </Link>
-          )
-        })}
-      </div>
+      {loading ? (
+        <p className="font-sans text-xs text-gray-400 text-center py-4">Finding things nearby…</p>
+      ) : recommendations.length > 0 ? (
+        <div className="space-y-3">
+          {recommendations.map((item, i) => {
+            const distanceLabel = formatDistance(recommendationDistances[i]) || (distanceStatus === 'calculating' && origin ? 'Calculating…' : null)
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                className="group flex gap-3 bg-white border border-gray-200 hover:border-[#2d6a4f] transition-colors p-3"
+              >
+                <div className="w-14 h-14 shrink-0 overflow-hidden">
+                  <img src={item.image} alt={item.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2 mb-0.5">
+                    <span className={`inline-flex items-center gap-1 font-sans text-[9px] tracking-[0.12em] uppercase ${TYPE_COLOR[item.type]}`}>
+                      {TYPE_ICON[item.type]}
+                      {item.type}
+                    </span>
+                    {distanceLabel && (
+                      <span className="font-sans text-[9px] text-gray-300">{distanceLabel}</span>
+                    )}
+                  </div>
+                  <p className="font-display italic text-sm text-[#000000] leading-tight group-hover:text-[#2d6a4f] transition-colors">{item.title}</p>
+                  <div className="flex items-center justify-between mt-1">
+                    <p className="font-sans text-[10px] text-gray-400 flex items-center gap-0.5">
+                      <MapPin size={8} />{item.location}
+                    </p>
+                    {item.rating ? (
+                      <span className="font-sans text-[10px] text-gray-400 flex items-center gap-0.5">
+                        <Star size={8} className="text-[#C9A96E] fill-[#C9A96E]" />
+                        {item.rating}
+                      </span>
+                    ) : null}
+                  </div>
+                </div>
+                {item.price ? (
+                  <div className="shrink-0 text-right">
+                    <p className="font-display italic text-sm text-[#2d6a4f]">R{item.price.toLocaleString()}</p>
+                    <p className="font-sans text-[9px] text-gray-400">pp</p>
+                  </div>
+                ) : null}
+              </Link>
+            )
+          })}
+        </div>
+      ) : (
+        <p className="font-sans text-xs text-gray-400 text-center py-4">No trails or activities published for {region} yet.</p>
+      )}
 
-      <Link
-        href={`/hikes?region=${encodeURIComponent(region)}`}
-        className="mt-4 block text-center font-sans text-xs text-[#2d6a4f] hover:underline"
-      >
-        Explore all {region} listings →
-      </Link>
+      {recommendations.length > 0 && (
+        <Link
+          href={`/hikes?region=${encodeURIComponent(region)}`}
+          className="mt-4 block text-center font-sans text-xs text-[#2d6a4f] hover:underline"
+        >
+          Explore all {region} listings →
+        </Link>
+      )}
     </div>
   )
 }

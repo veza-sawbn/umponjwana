@@ -146,7 +146,9 @@ export default function BookingBar() {
                       ))}
                     </AnimatePresence>
 
-                    {!booking.shuttle && shuttleRecommendations.length > 0 && (
+                    {/* Every leg (airport→stay, plus one per activity/hike/tour) is quoted
+                        independently — picking one must never hide the rest. */}
+                    {shuttleRecommendations.length > 0 && (
                       <div className="space-y-2">
                         {shuttleRecommendations.map(shuttle => (
                           <button

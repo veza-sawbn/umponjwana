@@ -7,10 +7,11 @@ import Footer from '@/components/layout/Footer'
 import { Calendar, Users, MapPin, ArrowRight, Search, SlidersHorizontal, X, Check, Bed } from 'lucide-react'
 import { useBooking } from '@/lib/booking-context'
 import { fuzzyFilter } from '@/lib/fuzzy'
-import { getRegionNames, DEFAULT_REGIONS } from '@/lib/regions'
+import { getRegionNames, DEFAULT_REGIONS, regionsMatch } from '@/lib/regions'
 import { getProperties, type Property } from '@/lib/properties'
 import { getRoomsByProperty } from '@/lib/rooms'
 import { getActivities, type Activity } from '@/lib/activities'
+import { StayDistance } from '@/lib/stay-distance'
 
 /* ── Mock data ─────────────────────────────────────────────────────────────── */
 
@@ -75,6 +76,8 @@ type LiveActivity = {
   price: number
   category: string
   img?: string
+  gpsLat?: string
+  gpsLng?: string
 }
 
 function propertyToLiveStay(p: Property, minPrice: number): LiveStay {
@@ -100,17 +103,14 @@ function activityToLiveActivity(a: Activity): LiveActivity {
     price: a.pricePerPerson,
     category: a.category,
     img: a.photos?.[0] || undefined,
+    gpsLat: a.gpsLat || undefined,
+    gpsLng: a.gpsLng || undefined,
   }
 }
 
 /* ── Helpers ───────────────────────────────────────────────────────────────── */
 
 const DIFF_COLOR: Record<string, string> = { Easy: '#4A7251', Moderate: '#C9A96E', Hard: '#c0392b', Strenuous: '#c0392b' }
-
-// "North Berg" (canonical region name) and "Northern Berg" (used by showcase content) refer to the same region.
-function normalizeRegionName(region: string | undefined | null) {
-  return (region || '').toLowerCase().trim().replace(/\bnorthern\b/, 'north').replace(/\bsouthern\b/, 'south')
-}
 
 function nights(checkIn: string, checkOut: string) {
   if (!checkIn || !checkOut) return null
@@ -210,28 +210,31 @@ function SearchResults() {
     router.push(`/search?${p.toString()}`)
   }
 
-  // Filter by region when one is selected — normalized so "North Berg" (canonical) and
-  // "Northern Berg" (showcase content / URL params) are treated as the same region.
+  // Once a stay is selected, every suggestion below is scoped to ITS region
+  // (not whatever is still typed into the region field) — that's the region
+  // the visitor is actually going to be in.
+  const effectiveRegion = booking.stay?.region || region
+
   function matchRegion(r: string) {
-    if (!region) return true
-    const a = normalizeRegionName(r)
-    const b = normalizeRegionName(region)
-    return a.includes(b) || b.includes(a)
+    if (!effectiveRegion) return true
+    return regionsMatch(r, effectiveRegion)
   }
 
   // Region narrows first; the free-text query then fuzzy-matches (typo- and
   // partial-match tolerant) across titles, regions and categories.
   const q = query.trim()
-  const stays = fuzzyFilter(
-    [...ALL_STAYS, ...liveStays].filter(s => matchRegion(s.region) && (!availableOnly || s.available)),
-    q, s => `${s.title} ${s.region}`,
-  )
+  const allStays = [...ALL_STAYS, ...liveStays]
+  // A stay is already selected: this is no longer an accommodation search,
+  // so don't suggest alternatives — show only the one the visitor picked.
+  const stays = booking.stay
+    ? allStays.filter(s => s.id === booking.stay!.id)
+    : fuzzyFilter(allStays.filter(s => matchRegion(s.region) && (!availableOnly || s.available)), q, s => `${s.title} ${s.region}`)
   const hikes = fuzzyFilter(
     ALL_HIKES.filter(h => matchRegion(h.region)),
     q, h => `${h.title} ${h.region} ${h.difficulty} hike trail`,
   )
   const activities = fuzzyFilter(
-    [...ALL_ACTIVITIES, ...liveActivities].filter(a => matchRegion(a.region)),
+    ([...ALL_ACTIVITIES, ...liveActivities] as LiveActivity[]).filter(a => matchRegion(a.region)),
     q, a => `${a.title} ${a.region} ${a.category}`,
   )
   const events = fuzzyFilter(
@@ -248,8 +251,11 @@ function SearchResults() {
   return (
     <div className="min-h-screen bg-[#F7F5F2]">
 
-      {/* Sticky search refinement bar */}
-      <div className="bg-white border-b border-gray-200 mt-16 sticky top-16 z-30">
+      {/* Sticky search refinement bar — once a stay is picked the page below
+          becomes trip suggestions rather than a search, so on mobile (where
+          screen space is tight) the search controls get out of the way;
+          desktop keeps it visible so the search can still be refined. */}
+      <div className={`bg-white border-b border-gray-200 mt-16 sticky top-16 z-30 ${booking.stay ? 'hidden md:block' : ''}`}>
         <div className="max-w-[1440px] mx-auto px-6 lg:px-12 py-4">
           <div className="flex items-center gap-3 flex-wrap">
             {/* Free-text query */}
@@ -331,10 +337,13 @@ function SearchResults() {
       <div className="max-w-[1440px] mx-auto px-6 lg:px-12 pt-10 pb-4">
         <div className="flex items-baseline gap-3 flex-wrap">
           <h1 className="font-display italic text-3xl text-[#000000]">
-            {queryParam ? `“${queryParam}”` : (region || 'All Drakensberg')}
+            {queryParam ? `“${queryParam}”` : (effectiveRegion || 'All Drakensberg')}
           </h1>
           {queryParam && (
-            <span className="font-sans text-sm text-gray-500">in {region || 'All Drakensberg'}</span>
+            <span className="font-sans text-sm text-gray-500">in {effectiveRegion || 'All Drakensberg'}</span>
+          )}
+          {booking.stay && (
+            <span className="font-sans text-sm text-[#2d6a4f]">· suggestions for your stay at {booking.stay.title}</span>
           )}
           {(checkIn || checkOut) && (
             <span className="font-sans text-sm text-gray-500">
@@ -356,7 +365,11 @@ function SearchResults() {
         {/* ── Accommodation ── */}
         {stays.length > 0 && (
           <section>
-            <SectionHeader label="Where to sleep" heading="Accommodation" count={stays.length} href="/stays" />
+            {booking.stay ? (
+              <SectionHeader label="Your stay" heading="Selected Accommodation" count={stays.length} />
+            ) : (
+              <SectionHeader label="Where to sleep" heading="Accommodation" count={stays.length} href="/stays" />
+            )}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
               {stays.map(stay => {
                 const isSelected = booking.stay?.id === stay.id
@@ -477,6 +490,7 @@ function SearchResults() {
                   <div className="p-4">
                     <span className="font-sans text-[10px] tracking-[0.12em] uppercase text-gray-400">{a.region}</span>
                     <h3 className="font-display italic text-lg mt-1 mb-2">{a.title}</h3>
+                    <StayDistance lat={a.gpsLat} lng={a.gpsLng} className="mb-2" />
                     {a.price > 0 ? (
                       <p className="font-display italic text-xl text-[#2d6a4f]">R {a.price.toLocaleString()} <span className="font-sans text-xs text-gray-400">pp</span></p>
                     ) : (

@@ -117,14 +117,30 @@ function addonPlace(addon: BookingState['addons'][number]): DistancePlace | null
   return { address: `${addon.location || addon.title}, South Africa`, lat: addon.lat, lng: addon.lng }
 }
 
+/** True when the guest already has a shuttle that delivers them to the stay
+ *  (picked from this recommendation, or arranged manually via /checkout/shuttle
+ *  — which stores a longer `stay.address`-based destination string rather
+ *  than the bare `stay.title` this hook generates), so the airport-transfer
+ *  suggestion shouldn't be repeated. */
+function airportLegCovered(shuttle: ShuttleOption | null, stay: NonNullable<BookingState['stay']>): boolean {
+  if (!shuttle) return false
+  if (shuttle.destination === stay.title) return true
+  if (shuttle.destination?.includes(stay.title)) return true
+  if (stay.lat && stay.lng && shuttle.destinationLat === stay.lat && shuttle.destinationLng === stay.lng) return true
+  return false
+}
+
 /**
  * Live shuttle recommendations for the trip cart: the nearest major airport →
- * stay transfer, plus stay → activity transfers, all quoted from one batched
- * Google Distance Matrix request against the guest's actual locations.
- * Addons without any location data are simply skipped — there is no static
- * fallback table.
+ * stay transfer, plus one stay → activity transfer per addon that has
+ * location data, all quoted from one batched Google Distance Matrix request
+ * against the guest's actual locations. Addons without any location data are
+ * simply skipped — there is no static fallback table. The airport leg drops
+ * out once it's already covered by a chosen shuttle, but every local
+ * (stay → activity) leg keeps being suggested independently — selecting an
+ * airport transfer must never hide the rest.
  */
-export function useShuttleRecommendations(booking: BookingState, limit = 2): ShuttleOption[] {
+export function useShuttleRecommendations(booking: BookingState, limit = 8): ShuttleOption[] {
   const stay = booking.stay
   const passengers = booking.guests || 2
   const addonsWithLocation = booking.addons.filter(a => addonPlace(a) !== null)
@@ -141,7 +157,7 @@ export function useShuttleRecommendations(booking: BookingState, limit = 2): Shu
   const recommendations: ShuttleOption[] = []
   if (!stay || status !== 'done') return recommendations
 
-  if (booking.checkIn) {
+  if (booking.checkIn && !airportLegCovered(booking.shuttle, stay)) {
     type HubDistance = { hub: typeof MAJOR_HUBS[number]; result: DistanceResult }
     const best = results.slice(0, MAJOR_HUBS.length).reduce<HubDistance | null>((closest, result, i) => {
       if (!result) return closest
@@ -162,6 +178,8 @@ export function useShuttleRecommendations(booking: BookingState, limit = 2): Shu
     }
   }
 
+  // One recommendation per activity/hike/tour/event the guest has added —
+  // every addon with a location gets its own stay → activity transfer quote.
   addonsWithLocation.forEach((addon, i) => {
     const result = results[MAJOR_HUBS.length + i]
     const date = addon.date || booking.checkIn

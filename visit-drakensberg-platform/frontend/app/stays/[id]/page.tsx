@@ -579,6 +579,8 @@ export default function StayDetailPage() {
                   originLocation={stay.address || stay.location}
                   originLat={stay.gpsLat}
                   originLng={stay.gpsLng}
+                  checkIn={checkIn}
+                  checkOut={checkOut}
                 />
               </div>
 
