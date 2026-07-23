@@ -76,6 +76,24 @@ export function slugifyRegion(name: string) {
   return name.toLowerCase().trim().replace(/&/g, 'and').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
 }
 
+// Region names are entered freely in a few places (trail regions, showcase
+// content) and canonically elsewhere (property/activity region dropdowns),
+// so "North Berg", "Northern Berg" and "Royal Natal National Park" all need
+// to be treated as compatible. Normalize the Northern/Southern adjective
+// forms and fall back to substring matching (either name containing the
+// other) so "Royal Natal" matches "Royal Natal National Park", etc.
+export function normalizeRegionName(region: string | undefined | null): string {
+  return (region || '').toLowerCase().trim().replace(/\bnorthern\b/, 'north').replace(/\bsouthern\b/, 'south')
+}
+
+export function regionsMatch(a: string | undefined | null, b: string | undefined | null): boolean {
+  if (!a || !b) return false
+  const na = normalizeRegionName(a)
+  const nb = normalizeRegionName(b)
+  if (!na || !nb) return false
+  return na.includes(nb) || nb.includes(na)
+}
+
 function normalizeRegion(region: Partial<Region> & { name: string; id?: string }): Region {
   const slug = region.slug || slugifyRegion(region.name)
   return {
