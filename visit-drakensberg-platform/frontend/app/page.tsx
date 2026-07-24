@@ -1,5 +1,5 @@
 'use client'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import Link from 'next/link'
 import toast from 'react-hot-toast'
 import { ArrowRight, ChevronDown, X } from 'lucide-react'
@@ -15,6 +15,9 @@ import Editable from '@/components/editor/Editable'
 import EditableSection from '@/components/editor/EditableSection'
 import EditableCard from '@/components/editor/EditableCard'
 import { getTrails, type Trail } from '@/lib/trails'
+import { getUpcomingExperiences, type TrekkingExperience } from '@/lib/experiences'
+import { getSupplierEntities } from '@/lib/supplier-entities'
+import { getActivities, type Activity } from '@/lib/activities'
 
 /* ─── Data ─────────────────────────────────────────────────────────────────── */
 
@@ -23,6 +26,39 @@ const DIFF_COLOR: Record<string, string> = {
   Moderate: '#C9A96E',
   Strenuous: '#c0392b',
   Hard: '#c0392b',
+}
+
+type PublicEvent = {
+  id: string
+  supplierId: string
+  title: string
+  event_type: 'event' | 'special'
+  location: string
+  starts_at: string
+  ends_at?: string
+  ticket_price: number
+  is_published: boolean
+}
+
+// No image field exists on the real supplier event record — a colour stands
+// in for a fake photo, same treatment as the full /events listing.
+const EVENT_TYPE_BG: Record<PublicEvent['event_type'], string> = {
+  event: '#1a1a2e',
+  special: '#2d6a4f',
+}
+
+type MiniListItemData = {
+  id: string
+  href: string
+  title: string
+  meta: string
+  badgeLabel: string
+  badgeColor: string
+  img?: string
+}
+
+function fmtShortDate(iso: string) {
+  return new Date(iso).toLocaleDateString('en-ZA', { day: 'numeric', month: 'short' })
 }
 
 /** Hidden cards render dimmed inside the editor and not at all on the live site. */
@@ -93,6 +129,46 @@ function HeroSection({ hero }: { hero: typeof SITE_CONTENT_DEFAULTS.hero }) {
   )
 }
 
+/* ─── Events & Experiences columns ──────────────────────────────────────────── */
+
+function MiniListItem({ item }: { item: MiniListItemData }) {
+  return (
+    <Link href={item.href} className="group flex items-center gap-4 py-4 border-b border-black/6 last:border-0">
+      <div className="w-16 h-16 shrink-0 overflow-hidden bg-mist">
+        {item.img ? (
+          <img loading="lazy" decoding="async" src={item.img} alt={item.title}
+            className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" />
+        ) : (
+          <div className="w-full h-full" style={{ background: item.badgeColor }} />
+        )}
+      </div>
+      <div className="min-w-0 flex-1">
+        <p className="font-sans text-[10px] tracking-[0.12em] uppercase mb-0.5" style={{ color: item.badgeColor }}>{item.badgeLabel}</p>
+        <h4 className="font-display text-lg text-forest leading-snug truncate group-hover:text-sage transition-colors">{item.title}</h4>
+        <p className="font-sans text-xs text-forest/40 mt-0.5">{item.meta}</p>
+      </div>
+    </Link>
+  )
+}
+
+function ExperienceColumn({ title, viewAllHref, items, emptyText }: { title: string; viewAllHref: string; items: MiniListItemData[]; emptyText: string }) {
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-2">
+        <h3 className="font-display text-xl text-forest">{title}</h3>
+        <Link href={viewAllHref} className="font-sans text-xs text-forest/40 hover:text-forest transition-colors flex items-center gap-1 whitespace-nowrap">
+          View all <ArrowRight className="w-3 h-3" />
+        </Link>
+      </div>
+      {items.length === 0 ? (
+        <p className="font-sans text-sm text-forest/35 py-6">{emptyText}</p>
+      ) : (
+        <div>{items.map(item => <MiniListItem key={item.id} item={item} />)}</div>
+      )}
+    </div>
+  )
+}
+
 /* ─── Component ─────────────────────────────────────────────────────────────── */
 
 export default function HomePage() {
@@ -105,8 +181,13 @@ export default function HomePage() {
   const inEditor = Boolean(editMode)
   const [promoBannerDismissed, setPromoBannerDismissed] = useState(false)
   const [trails, setTrails] = useState<Trail[]>([])
+  const [scheduledHikes, setScheduledHikes] = useState<TrekkingExperience[]>([])
+  const [upcomingEvents, setUpcomingEvents] = useState<PublicEvent[]>([])
+  const [featuredActivities, setFeaturedActivities] = useState<Activity[]>([])
   const [newsletterEmail, setNewsletterEmail] = useState('')
   const [subscribing, setSubscribing] = useState(false)
+
+  const trailImageById = useMemo(() => new Map(trails.map(t => [t.id, t.image])), [trails])
 
   const categories = useVisibleCards(cards.categories ?? [], inEditor)
   const regions = useVisibleCards(cards.regions ?? [], inEditor)
@@ -138,7 +219,22 @@ export default function HomePage() {
       setHero(content.hero)
       setPromos(content.promotions)
     })
-    getTrails().then(all => setTrails(all.filter(t => t.status === 'published').slice(0, 4)))
+    getTrails().then(all => setTrails(all.filter(t => t.status === 'published')))
+    getUpcomingExperiences().then(exps => setScheduledHikes(exps.slice(0, 3)))
+    getSupplierEntities<any>('events')
+      .then((all: PublicEvent[]) => {
+        const now = new Date().toISOString()
+        setUpcomingEvents(
+          all
+            .filter(e => e.is_published && (e.ends_at || e.starts_at) >= now)
+            .sort((a, b) => a.starts_at.localeCompare(b.starts_at))
+            .slice(0, 3),
+        )
+      })
+      .catch(() => setUpcomingEvents([]))
+    getActivities()
+      .then(all => setFeaturedActivities(all.filter(a => a.status === 'active').slice(0, 3)))
+      .catch(() => setFeaturedActivities([]))
   }, [])
 
   /* ── Reorderable sections ── */
@@ -316,7 +412,7 @@ export default function HomePage() {
           <p className="font-sans text-sm text-white/30 py-8">Trails will appear here once published.</p>
         ) : (
           <div className="divide-y divide-white/10">
-            {trails.map((t, i) => (
+            {trails.slice(0, 4).map((t, i) => (
               <Link key={t.id} href={`/hikes/${t.id}`} className="group flex items-center justify-between py-5 hover:pl-2 transition-all duration-200">
                 <div className="flex items-center gap-6">
                   <span className="font-sans text-2xl text-white/15 font-light tabular-nums w-8">{String(i + 1).padStart(2, '0')}</span>
@@ -338,6 +434,83 @@ export default function HomePage() {
             ))}
           </div>
         )}
+      </div>
+    </EditableSection>
+  )
+
+  const scheduledHikeItems: MiniListItemData[] = scheduledHikes.map(e => ({
+    id: e.id,
+    href: `/experiences/${e.id}`,
+    title: e.title,
+    meta: `${fmtShortDate(e.departureDate)} · ${e.durationDays} day${e.durationDays !== 1 ? 's' : ''}`,
+    badgeLabel: e.difficulty || 'Hike',
+    badgeColor: DIFF_COLOR[e.difficulty] || '#4A7251',
+    img: trailImageById.get(e.trailId),
+  }))
+
+  const eventItems: MiniListItemData[] = upcomingEvents.map(ev => ({
+    id: ev.id,
+    href: '/events',
+    title: ev.title,
+    meta: `${fmtShortDate(ev.starts_at)}${ev.location ? ' · ' + ev.location : ''}`,
+    badgeLabel: ev.event_type === 'special' ? 'Special' : 'Event',
+    badgeColor: EVENT_TYPE_BG[ev.event_type],
+  }))
+
+  const activityItems: MiniListItemData[] = featuredActivities.map(a => ({
+    id: a.id,
+    href: `/activities/${a.id}`,
+    title: a.name,
+    meta: `${a.category}${a.pricePerPerson ? ' · R' + a.pricePerPerson.toLocaleString() : ''}`,
+    badgeLabel: a.category || 'Experience',
+    badgeColor: '#C9A96E',
+    img: a.photos?.[0],
+  }))
+
+  const experiencesSection = (
+    <EditableSection key="experiences" id="experiences" label="Events & Experiences" className="bg-white">
+      <div className="max-w-[1440px] mx-auto px-6 lg:px-12 py-20">
+        <div className="mb-10">
+          <Editable section="home_sections" fieldKey="experiences_eyebrow" value={hs.experiences_eyebrow} label="Experiences Eyebrow" type="text">
+            <p className="font-sans text-xs tracking-[0.2em] uppercase text-forest/40 mb-2">{hs.experiences_eyebrow}</p>
+          </Editable>
+          <Editable section="home_sections" fieldKey="experiences_heading" value={hs.experiences_heading} label="Experiences Heading" type="text">
+            <h2 className="font-display text-4xl text-forest">{hs.experiences_heading}</h2>
+          </Editable>
+        </div>
+
+        <motion.div
+          className="grid md:grid-cols-3 gap-10"
+          variants={staggerContainer(0.08)}
+          initial="hidden"
+          whileInView="show"
+          viewport={{ once: true, margin: '-80px' }}
+        >
+          <motion.div variants={staggerChild}>
+            <ExperienceColumn
+              title="Scheduled Hikes"
+              viewAllHref="/hikes"
+              items={scheduledHikeItems}
+              emptyText="New guided departures will appear here once suppliers schedule them."
+            />
+          </motion.div>
+          <motion.div variants={staggerChild}>
+            <ExperienceColumn
+              title="Events & Specials"
+              viewAllHref="/events"
+              items={eventItems}
+              emptyText="No upcoming events right now — check back soon."
+            />
+          </motion.div>
+          <motion.div variants={staggerChild}>
+            <ExperienceColumn
+              title="Experiences"
+              viewAllHref="/activities"
+              items={activityItems}
+              emptyText="Guided activities and adventures will appear here soon."
+            />
+          </motion.div>
+        </motion.div>
       </div>
     </EditableSection>
   )
@@ -387,6 +560,7 @@ export default function HomePage() {
     regions: regionsSection,
     stories: storiesSection,
     trails: trailsSection,
+    experiences: experiencesSection,
     newsletter: newsletterSection,
   }
 
