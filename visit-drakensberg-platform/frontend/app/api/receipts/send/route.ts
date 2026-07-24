@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { cookies } from 'next/headers'
 import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs'
+import { supabaseAdmin } from '@/lib/supabase-admin'
 
 export const dynamic = 'force-dynamic'
 
@@ -89,11 +90,20 @@ export async function POST(req: Request) {
   }
   if (!body.orderId) return NextResponse.json({ error: 'orderId required' }, { status: 400 })
 
-  const supabase = createRouteHandlerClient({ cookies })
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return NextResponse.json({ error: 'unauthorized' }, { status: 401 })
+  // Server-to-server callers (e.g. the iKhokha webhook, which has no browser
+  // session to authenticate with) prove themselves with the service role key
+  // and read via the admin client instead of an RLS-scoped session.
+  const bearer = req.headers.get('authorization')?.replace(/^Bearer\s+/i, '')
+  const isInternal = !!bearer && !!process.env.SUPABASE_SERVICE_ROLE_KEY && bearer === process.env.SUPABASE_SERVICE_ROLE_KEY
 
-  // RLS scopes these reads to the caller (own order, or staff).
+  const supabase = isInternal ? supabaseAdmin() : createRouteHandlerClient({ cookies })
+  if (!isInternal) {
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return NextResponse.json({ error: 'unauthorized' }, { status: 401 })
+  }
+
+  // RLS scopes these reads to the caller (own order, or staff) — or, for the
+  // internal admin client above, everything (already access-checked by the caller).
   const { data: order } = await supabase
     .from('vd_orders').select('*').eq('id', body.orderId).maybeSingle()
   if (!order) return NextResponse.json({ error: 'order not found' }, { status: 404 })

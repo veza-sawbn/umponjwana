@@ -1,8 +1,8 @@
 'use client'
 
-import { useEffect, useState } from 'react'
-import { useParams, useRouter } from 'next/navigation'
-import { Printer, ArrowLeft } from 'lucide-react'
+import { useEffect, useState, useCallback, Suspense } from 'react'
+import { useParams, useRouter, useSearchParams } from 'next/navigation'
+import { Printer, ArrowLeft, CreditCard, Loader2 } from 'lucide-react'
 import { getInvoiceById, getReceipts, type Invoice, type Receipt } from '@/lib/invoices'
 import { getOrderById, type MasterOrder } from '@/lib/orders'
 import { formatMoney } from '@/lib/allocation'
@@ -16,25 +16,66 @@ function fmt(d?: string | null) {
   return d ? new Date(d).toLocaleDateString('en-ZA', { day: 'numeric', month: 'long', year: 'numeric' }) : '—'
 }
 
-export default function PrintableInvoicePage() {
+function PrintableInvoiceInner() {
   const params = useParams<{ id: string }>()
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const paymentResult = searchParams.get('payment') // success|failed|cancelled
   const [invoice, setInvoice] = useState<Invoice | null>(null)
   const [order, setOrder] = useState<MasterOrder | null>(null)
   const [receipts, setReceipts] = useState<Receipt[]>([])
   const [loading, setLoading] = useState(true)
+  const [paying, setPaying] = useState(false)
+  const [payError, setPayError] = useState('')
 
-  useEffect(() => {
-    if (!params?.id) return
-    getInvoiceById(decodeURIComponent(params.id)).then(async inv => {
+  const load = useCallback((id: string) => {
+    return getInvoiceById(decodeURIComponent(id)).then(async inv => {
       setInvoice(inv)
       if (inv) {
         const [o, r] = await Promise.all([getOrderById(inv.order_id), getReceipts(inv.order_id)])
         setOrder(o); setReceipts(r)
       }
-      setLoading(false)
+      return inv
     })
-  }, [params?.id])
+  }, [])
+
+  useEffect(() => {
+    if (!params?.id) return
+    load(params.id).finally(() => setLoading(false))
+  }, [params?.id, load])
+
+  // A successful gateway redirect can arrive slightly before the webhook has
+  // reconciled the payment — poll briefly so the balance updates without a
+  // manual refresh, instead of just trusting the redirect itself.
+  useEffect(() => {
+    if (paymentResult !== 'success' || !params?.id) return
+    let attempts = 0
+    const interval = setInterval(async () => {
+      attempts += 1
+      const inv = await load(params.id)
+      if ((inv && inv.status === 'paid') || attempts >= 6) clearInterval(interval)
+    }, 2500)
+    return () => clearInterval(interval)
+  }, [paymentResult, params?.id, load])
+
+  async function payNow() {
+    if (!invoice) return
+    setPaying(true)
+    setPayError('')
+    try {
+      const res = await fetch('/api/payments/ikhokha/create', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ invoiceId: invoice.id }),
+      })
+      const json = await res.json()
+      if (!res.ok || !json.paylinkUrl) throw new Error(json.error || 'Could not start payment')
+      window.location.href = json.paylinkUrl
+    } catch (e) {
+      setPayError(e instanceof Error ? e.message : 'Could not start payment')
+      setPaying(false)
+    }
+  }
 
   if (loading) {
     return <div className="min-h-screen bg-[#F7F5F2] flex items-center justify-center pt-24 font-sans text-sm text-gray-400">Loading invoice…</div>
@@ -61,14 +102,43 @@ export default function PrintableInvoicePage() {
       `}</style>
 
       <div className="max-w-[820px] mx-auto">
+        {paymentResult === 'success' && (
+          <div className="mb-4 print:hidden bg-[#2d6a4f]/10 border border-[#2d6a4f]/30 text-[#2d6a4f] font-sans text-sm px-4 py-3 flex items-center gap-2">
+            {invoice.status !== 'paid' && <Loader2 size={14} className="animate-spin shrink-0" />}
+            {invoice.status === 'paid' ? 'Payment received — thank you!' : 'Payment received — confirming with the bank, this page will update automatically…'}
+          </div>
+        )}
+        {paymentResult === 'failed' && (
+          <div className="mb-4 print:hidden bg-red-50 border border-red-200 text-red-600 font-sans text-sm px-4 py-3">
+            The payment didn't go through. You can try again below.
+          </div>
+        )}
+        {paymentResult === 'cancelled' && (
+          <div className="mb-4 print:hidden bg-amber-50 border border-amber-200 text-amber-700 font-sans text-sm px-4 py-3">
+            Payment cancelled — your invoice balance is unchanged.
+          </div>
+        )}
+
         <div className="flex items-center justify-between mb-4 print:hidden">
           <button onClick={() => router.back()} className="inline-flex items-center gap-2 font-sans text-sm text-gray-500 hover:text-[#2d6a4f] transition-colors">
             <ArrowLeft size={14} /> Back
           </button>
-          <button onClick={() => window.print()} className="inline-flex items-center gap-2 bg-[#2d6a4f] text-white px-5 py-2.5 font-sans text-sm hover:bg-[#245741] transition-colors">
-            <Printer size={14} /> Print / Save as PDF
-          </button>
+          <div className="flex items-center gap-3">
+            {Number(invoice.balance) > 0 && invoice.status !== 'void' && (
+              <button
+                onClick={payNow}
+                disabled={paying}
+                className="inline-flex items-center gap-2 bg-[#C9A96E] text-[#2d2d2d] px-5 py-2.5 font-sans text-sm font-medium hover:bg-[#b8935e] transition-colors disabled:opacity-60"
+              >
+                <CreditCard size={14} /> {paying ? 'Redirecting…' : `Pay Now — ${formatMoney(Number(invoice.balance), invoice.currency)}`}
+              </button>
+            )}
+            <button onClick={() => window.print()} className="inline-flex items-center gap-2 bg-[#2d6a4f] text-white px-5 py-2.5 font-sans text-sm hover:bg-[#245741] transition-colors">
+              <Printer size={14} /> Print / Save as PDF
+            </button>
+          </div>
         </div>
+        {payError && <p className="font-sans text-xs text-red-600 mb-4 print:hidden text-right">{payError}</p>}
 
         <div id="invoice-doc" className="bg-white border border-gray-200 p-10">
           {/* Header */}
@@ -174,5 +244,13 @@ export default function PrintableInvoicePage() {
         </div>
       </div>
     </div>
+  )
+}
+
+export default function PrintableInvoicePage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-[#F7F5F2] flex items-center justify-center pt-24 font-sans text-sm text-gray-400">Loading invoice…</div>}>
+      <PrintableInvoiceInner />
+    </Suspense>
   )
 }
