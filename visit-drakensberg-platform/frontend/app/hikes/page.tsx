@@ -3,7 +3,7 @@ import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import Footer from '@/components/layout/Footer'
 import EditablePageHeader from '@/components/editor/EditablePageHeader'
-import { getTrails, trailStartPoint, type Trail } from '@/lib/trails'
+import { getTrails, trailStartPoint, trailCategory, type Trail, type TrailCategory } from '@/lib/trails'
 import TrailExperiences from '@/components/experiences/TrailExperiences'
 import { getUpcomingExperiences, type TrekkingExperience } from '@/lib/experiences'
 import RouteArtwork from '@/components/trails/RouteArtwork'
@@ -13,6 +13,13 @@ import { ROUTE_TYPES } from '@/lib/gpx'
 const DIFF_COLOR: Record<string, string> = { Easy: '#4A7251', Moderate: '#C9A96E', Strenuous: '#c0392b', Extreme: '#7f1d1d' }
 const DIFF_OPTS = ['All', 'Easy', 'Moderate', 'Strenuous', 'Extreme']
 const TYPE_OPTS = ['All', ...ROUTE_TYPES]
+
+const CATEGORY_TABS: { value: 'All' | TrailCategory; label: string }[] = [
+  { value: 'All', label: 'All Hikes' },
+  { value: 'day_hike', label: 'Day Hikes' },
+  { value: 'multi_day_hike', label: 'Multi-Day Hikes' },
+  { value: 'speciality_walk', label: 'Speciality Walks' },
+]
 
 function parseKm(distance: string): number {
   const m = distance.match(/[\d.]+/)
@@ -26,6 +33,8 @@ export default function HikesPage() {
   const [region, setRegion] = useState('All')
   const [routeType, setRouteType] = useState('All')
   const [maxDist, setMaxDist] = useState(250)
+  const [category, setCategory] = useState<'All' | TrailCategory>('All')
+  const [specialityType, setSpecialityType] = useState('All')
 
   useEffect(() => {
     getTrails().then(all => setTrails(all.filter(t => t.status === 'published')))
@@ -37,7 +46,12 @@ export default function HikesPage() {
   const regionOpts = ['All', ...Array.from(new Set(trails.map(t => t.region))).sort()]
   if (region !== 'All' && !regionOpts.includes(region)) regionOpts.push(region)
 
+  const specialityWalks = trails.filter(t => trailCategory(t) === 'speciality_walk')
+  const specialityTypeOpts = ['All', ...Array.from(new Set(specialityWalks.map(t => t.speciality_type).filter(Boolean))).sort() as string[]]
+
   const filtered = trails.filter(t =>
+    (category === 'All' || trailCategory(t) === category) &&
+    (category !== 'speciality_walk' || specialityType === 'All' || t.speciality_type === specialityType) &&
     (diff === 'All' || t.difficulty === diff) &&
     (region === 'All' || t.region === region) &&
     (routeType === 'All' || (t.trail_type || '') === routeType) &&
@@ -60,6 +74,32 @@ export default function HikesPage() {
       <EditablePageHeader section="hikes_page" />
 
       <div className="max-w-[1440px] mx-auto px-6 lg:px-12 py-10">
+        {/* Category tabs */}
+        <div className="flex flex-wrap gap-2 mb-4 border-b border-black/8">
+          {CATEGORY_TABS.map((c) => (
+            <button
+              key={c.value}
+              onClick={() => { setCategory(c.value); setSpecialityType('All') }}
+              className={`font-sans text-sm px-4 py-3 -mb-px border-b-2 transition-colors ${
+                category === c.value ? 'border-forest text-forest' : 'border-transparent text-forest/40 hover:text-forest'
+              }`}
+            >
+              {c.label}
+            </button>
+          ))}
+        </div>
+
+        {category === 'speciality_walk' && specialityTypeOpts.length > 2 && (
+          <div className="flex flex-wrap gap-2 mb-6">
+            {specialityTypeOpts.map((s) => (
+              <button key={s} onClick={() => setSpecialityType(s)}
+                className={`font-sans text-xs px-3 py-1.5 border transition-colors ${specialityType === s ? 'bg-gold border-gold text-forest' : 'bg-white border-black/15 text-forest/50 hover:border-gold'}`}>
+                {s === 'All' ? 'All types' : s}
+              </button>
+            ))}
+          </div>
+        )}
+
         {/* Filters */}
         <div className="flex flex-wrap items-center gap-4 mb-8">
           <div className="flex gap-2 flex-wrap">
@@ -113,7 +153,11 @@ export default function HikesPage() {
                   </div>
                   <div className="flex-1 min-w-0">
                     <h3 className="font-display text-lg text-forest group-hover:text-sage transition-colors">{t.name}</h3>
-                    <p className="font-sans text-xs text-forest/40 mt-0.5">{t.region}{t.trail_type ? ` · ${t.trail_type}` : ''}</p>
+                    <p className="font-sans text-xs text-forest/40 mt-0.5">
+                      {t.region}{t.trail_type ? ` · ${t.trail_type}` : ''}
+                      {trailCategory(t) === 'speciality_walk' && t.speciality_type ? ` · ${t.speciality_type}` : ''}
+                      {trailCategory(t) === 'multi_day_hike' ? ' · Multi-day' : ''}
+                    </p>
                     <StayDistance lat={start?.lat} lng={start?.lng} className="mt-0.5" />
                   </div>
                   <div className="hidden md:flex items-center gap-8 shrink-0">
@@ -164,6 +208,11 @@ export default function HikesPage() {
                     >
                       {t.difficulty}
                     </span>
+                    {trailCategory(t) === 'speciality_walk' && t.speciality_type && (
+                      <span className="absolute bottom-3 right-3 font-sans text-[10px] px-2.5 py-1 uppercase tracking-wide bg-gold/90 text-forest">
+                        {t.speciality_type}
+                      </span>
+                    )}
                   </div>
                   <p className="font-sans text-[10px] tracking-[0.15em] uppercase text-gold mb-1">{t.region}</p>
                   <h3 className="font-display text-xl text-forest leading-snug mb-2 group-hover:text-sage transition-colors">{t.name}</h3>
