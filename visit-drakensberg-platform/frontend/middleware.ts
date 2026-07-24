@@ -34,17 +34,23 @@ export async function middleware(req: NextRequest) {
     // user_metadata.role, which a user can edit on their own account via
     // supabase.auth.updateUser. Roles should be assigned in app_metadata.
     let role = session.user.app_metadata?.role ?? session.user.user_metadata?.role
+    let staffRole = session.user.app_metadata?.staff_role ?? session.user.user_metadata?.staff_role
     if (!role) {
       // Accounts created outside the signup form may have no role in auth
       // metadata at all — fall back to the profiles table (RLS: own row).
       const { data: profile } = await supabase
         .from('profiles')
-        .select('role')
+        .select('role, staff_role')
         .eq('id', session.user.id)
         .maybeSingle()
       role = profile?.role ?? 'visitor'
+      staffRole = staffRole ?? profile?.staff_role
     }
-    if (ADMIN_ROUTES.some(r => pathname.startsWith(r)) && role !== 'admin') {
+    // Finance/operations collaborators (role stays 'visitor', staff_role set)
+    // get into the console too — individual pages and RLS scope what they
+    // can actually see, same as is_finance()/is_ops() do at the DB level.
+    const isStaff = role === 'admin' || staffRole === 'finance' || staffRole === 'operations'
+    if (ADMIN_ROUTES.some(r => pathname.startsWith(r)) && !isStaff) {
       return NextResponse.redirect(new URL('/account', req.url))
     }
     if (SUPPLIER_ROUTES.some(r => pathname.startsWith(r)) && !['supplier', 'admin'].includes(role)) {
