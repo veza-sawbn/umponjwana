@@ -59,8 +59,8 @@ function CompareContent() {
     { label: 'Difficulty', render: e => e.difficulty },
     { label: 'Group Size', render: e => `Max ${e.maxGroup}` },
     { label: 'Available Spaces', render: e => e.spacesAvailable === 0 ? 'Fully booked' : `${e.spacesAvailable} of ${e.spacesTotal}` },
-    { label: 'Accommodation Style', render: e => e.accommodationStyle || (e.includedServices.includes('Accommodation') ? 'Included' : '—') },
-    { label: 'Meals Included', render: e => e.mealsIncluded || (e.includedServices.includes('Meals') ? 'Yes' : '—') },
+    { label: 'Accommodation Style', render: e => e.accommodationStyle || (e.inclusions.includes('Accommodation') ? 'Included' : '—') },
+    { label: 'Meals Included', render: e => e.mealsIncluded || (e.inclusions.includes('Meals') ? 'Yes' : '—') },
     { label: 'Transport Included', render: e => yesNo(e.transportIncluded) },
     { label: 'Equipment Included', render: e => yesNo(e.equipmentIncluded) },
     { label: 'Cancellation Policy', render: e => e.cancellation ? `${e.cancellation} notice` : '—' },
@@ -72,7 +72,7 @@ function CompareContent() {
     },
     { label: 'Guide Experience', render: e => e.guideExperienceYears ? `${e.guideExperienceYears} years` : '—' },
     { label: 'Meeting Point', render: e => e.meetingPoint || '—' },
-    { label: 'Included Services', render: e => e.includedServices.length ? e.includedServices.join(', ') : '—' },
+    { label: 'Included Services', render: e => e.inclusions.length ? e.inclusions.join(', ') : '—' },
   ]
 
   return (

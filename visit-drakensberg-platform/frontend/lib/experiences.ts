@@ -1,6 +1,8 @@
 import { getTours, type Tour } from './tours'
-import { getDepartures, type Departure } from './departures'
+import { getDepartures, type Departure, type DeparturePackage } from './departures'
 import { getTrails, type Trail } from './trails'
+
+export type { DeparturePackage }
 
 // A "Trekking Experience" is the marketplace view of one scheduled departure
 // joined with its parent tour product. Suppliers keep creating Tours and
@@ -25,7 +27,6 @@ export type TrekkingExperience = {
   spacesAvailable: number
   pricePerPerson: number
   difficulty: string
-  includedServices: string[]
   meetingPoint: string
   gpsLat: string
   gpsLng: string
@@ -44,6 +45,14 @@ export type TrekkingExperience = {
   equipmentIncluded: boolean
   guideExperienceYears: number | null
   status: Departure['status']
+  // Baseline inclusions shared by every rate package on this departure,
+  // falling back to the tour's default inclusions when the supplier hasn't
+  // set departure-specific ones.
+  inclusions: string[]
+  // Rate variants for this one departure (e.g. Self-Sufficient vs Portered).
+  // Always has at least one entry — a single "Standard" package synthesized
+  // from pricePerPerson when the supplier hasn't configured packages.
+  packages: DeparturePackage[]
 }
 
 function addDays(iso: string, days: number): string {
@@ -52,8 +61,20 @@ function addDays(iso: string, days: number): string {
   return d.toISOString().slice(0, 10)
 }
 
+function composePackages(dep: Departure, tour: Tour): DeparturePackage[] {
+  if (dep.packages && dep.packages.length > 0) return dep.packages
+  return [{
+    id: 'standard',
+    name: 'Standard',
+    pricePerPerson: dep.pricePerPerson || tour.pricePerPerson,
+    inclusions: [],
+  }]
+}
+
 function compose(dep: Departure, tour: Tour, trail?: Trail): TrekkingExperience {
   const days = dep.tourDays || tour.days || 1
+  const packages = composePackages(dep, tour)
+  const cheapest = Math.min(...packages.map(p => p.pricePerPerson))
   return {
     id: dep.id,
     tourId: tour.id,
@@ -68,9 +89,10 @@ function compose(dep: Departure, tour: Tour, trail?: Trail): TrekkingExperience 
     durationDays: days,
     spacesTotal: dep.maxSeats,
     spacesAvailable: Math.max(0, dep.maxSeats - dep.bookedSeats),
-    pricePerPerson: dep.pricePerPerson || tour.pricePerPerson,
+    pricePerPerson: cheapest,
     difficulty: tour.difficulty,
-    includedServices: tour.included ?? [],
+    inclusions: dep.inclusions && dep.inclusions.length > 0 ? dep.inclusions : (tour.included ?? []),
+    packages,
     meetingPoint: tour.meetingPoint,
     gpsLat: tour.gpsLat,
     gpsLng: tour.gpsLng,

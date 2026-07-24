@@ -126,9 +126,9 @@ export default function TrailExperiences({
                       {e.region && <span>{e.region}</span>}
                       <StayDistance lat={e.gpsLat} lng={e.gpsLng} />
                     </div>
-                    {e.includedServices.length > 0 && (
+                    {e.inclusions.length > 0 && (
                       <div className="flex flex-wrap gap-1.5 mt-2">
-                        {e.includedServices.map(s => (
+                        {e.inclusions.map(s => (
                           <span key={s} className="inline-flex items-center gap-1 font-sans text-[10px] text-[#2d6a4f] bg-[#2d6a4f]/8 px-2 py-0.5">
                             <CheckCircle size={9} /> {s}
                           </span>
@@ -140,8 +140,13 @@ export default function TrailExperiences({
 
                 <div className="flex flex-col items-end gap-2 shrink-0">
                   <div className="text-right">
-                    <p className="font-display italic text-xl text-[#2d6a4f]">R {e.pricePerPerson.toLocaleString()}</p>
-                    <p className="font-sans text-[10px] text-gray-400">per person</p>
+                    <p className="font-display italic text-xl text-[#2d6a4f]">
+                      {e.packages.length > 1 && <span className="font-sans text-xs text-gray-400 mr-1">from</span>}
+                      R {e.pricePerPerson.toLocaleString()}
+                    </p>
+                    <p className="font-sans text-[10px] text-gray-400">
+                      per person{e.packages.length > 1 ? ` · ${e.packages.length} rate options` : ''}
+                    </p>
                   </div>
                   <div className="flex items-center gap-2 font-sans text-[11px]">
                     {e.rating !== null ? (

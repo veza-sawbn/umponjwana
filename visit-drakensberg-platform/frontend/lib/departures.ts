@@ -1,6 +1,17 @@
 import { supabase } from './auth'
 import { listEntities, insertEntity, updateEntity, deleteEntity, newEntityId } from './entities'
 
+// A rate package is one way to buy a seat on a departure — e.g. "Self-Sufficient"
+// vs "Portered" on the same scheduled hike, each with its own price and its own
+// extra inclusions on top of the departure's baseline inclusions.
+export type DeparturePackage = {
+  id: string
+  name: string
+  pricePerPerson: number
+  inclusions: string[]
+  description?: string
+}
+
 export type Departure = {
   id: string
   tourId: string
@@ -15,10 +26,22 @@ export type Departure = {
   bookedSeats: number
   status: 'open' | 'confirmed' | 'full'
   pricePerPerson: number
+  // Baseline inclusions covered by every rate package on this departure
+  // (e.g. guide, permits). Falls back to the parent tour's `included` list
+  // when empty. Older departures won't carry this field.
+  inclusions?: string[]
+  // Optional rate variants for this departure. When present, `pricePerPerson`
+  // above is kept in sync with the cheapest package so existing "from" price
+  // displays keep working without changes.
+  packages?: DeparturePackage[]
   createdAt: string
 }
 
 const KIND = 'departure'
+
+export function newDeparturePackageId(): string {
+  return newEntityId('pkg')
+}
 
 export async function getDepartures(): Promise<Departure[]> {
   return listEntities<Departure>(KIND)

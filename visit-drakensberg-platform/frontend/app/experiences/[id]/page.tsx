@@ -37,12 +37,14 @@ export default function ExperiencePage() {
   const [loaded, setLoaded] = useState(false)
   const [siblings, setSiblings] = useState<TrekkingExperience[]>([])
   const [guests, setGuests] = useState(1)
+  const [packageId, setPackageId] = useState<string | null>(null)
 
   useEffect(() => {
     getExperienceById(id).then(async e => {
       setExp(e)
       setLoaded(true)
       if (e) {
+        setPackageId(e.packages[0]?.id ?? null)
         const same = await getExperiencesByTrail(e.trailId)
         setSiblings(same.filter(s => s.id !== e.id))
       }
@@ -83,9 +85,12 @@ export default function ExperiencePage() {
   const full = exp.spacesAvailable === 0
   const isAdded = booking.addons.some(a => a.id === exp.id)
   const clampedGuests = Math.min(guests, Math.max(1, exp.spacesAvailable))
+  const selectedPackage = exp.packages.find(p => p.id === packageId) ?? exp.packages[0]
+  const hasMultiplePackages = exp.packages.length > 1
+  const combinedInclusions = Array.from(new Set([...exp.inclusions, ...(selectedPackage?.inclusions ?? [])]))
 
   function handleBook() {
-    if (!exp || full || isAdded) return
+    if (!exp || full || isAdded || !selectedPackage) return
     booking.setSearch(
       exp.region || booking.region,
       addDays(exp.departureDate, -1),
@@ -95,10 +100,10 @@ export default function ExperiencePage() {
     booking.addAddon({
       id: exp.id,
       type: 'hike',
-      title: `${exp.title} — ${exp.operator}${exp.leadGuide ? ` · ${exp.leadGuide}` : ''}`,
+      title: `${exp.title} — ${exp.operator}${exp.leadGuide ? ` · ${exp.leadGuide}` : ''}${hasMultiplePackages ? ` (${selectedPackage.name})` : ''}`,
       supplierId: exp.operatorId,
       date: exp.departureDate,
-      price_per_person: exp.pricePerPerson,
+      price_per_person: selectedPackage.pricePerPerson,
       guests: clampedGuests,
     })
     router.push('/trip')
@@ -176,11 +181,13 @@ export default function ExperiencePage() {
             </div>
 
             {/* Included services */}
-            {exp.includedServices.length > 0 && (
+            {combinedInclusions.length > 0 && (
               <div>
-                <h2 className="font-display italic text-2xl text-[#000000] mb-4">Included Services</h2>
+                <h2 className="font-display italic text-2xl text-[#000000] mb-4">
+                  Included{hasMultiplePackages && selectedPackage ? ` in ${selectedPackage.name}` : ''}
+                </h2>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                  {exp.includedServices.map(s => (
+                  {combinedInclusions.map(s => (
                     <div key={s} className="flex items-start gap-2.5 bg-white border border-gray-200 px-4 py-3">
                       <CheckCircle size={14} className="text-[#2d6a4f] mt-0.5 shrink-0" />
                       <span className="font-sans text-sm text-gray-700">{s}</span>
@@ -243,13 +250,35 @@ export default function ExperiencePage() {
           <div className="space-y-6">
             <div className="bg-white border border-gray-200 p-6">
               <div className="flex items-baseline justify-between mb-1">
-                <p className="font-display italic text-3xl text-[#2d6a4f]">R {exp.pricePerPerson.toLocaleString()}</p>
+                <p className="font-display italic text-3xl text-[#2d6a4f]">R {(selectedPackage?.pricePerPerson ?? exp.pricePerPerson).toLocaleString()}</p>
                 <p className="font-sans text-xs text-gray-400">per person</p>
               </div>
               <p className={`font-sans text-xs mb-5 ${full ? 'text-gray-400' : exp.spacesAvailable <= 2 ? 'text-red-600' : 'text-[#2d6a4f]'}`}>
                 <Users size={11} className="inline mr-1 -mt-0.5" />
                 {full ? 'Fully booked' : `${exp.spacesAvailable} of ${exp.spacesTotal} spaces available`}
               </p>
+
+              {hasMultiplePackages && (
+                <div className="mb-5">
+                  <p className="font-sans text-xs text-gray-500 mb-2">Choose a rate</p>
+                  <div className="space-y-2">
+                    {exp.packages.map(pkg => (
+                      <button
+                        key={pkg.id}
+                        type="button"
+                        onClick={() => setPackageId(pkg.id)}
+                        disabled={isAdded}
+                        className={`w-full flex items-center justify-between gap-3 px-3.5 py-2.5 border text-left transition-colors disabled:opacity-60 ${
+                          pkg.id === selectedPackage?.id ? 'border-[#2d6a4f] bg-[#2d6a4f]/5' : 'border-gray-200 hover:border-[#2d6a4f]/40'
+                        }`}
+                      >
+                        <span className="font-sans text-sm text-gray-700">{pkg.name}</span>
+                        <span className="font-display italic text-sm text-[#2d6a4f] shrink-0">R {pkg.pricePerPerson.toLocaleString()}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
 
               {!full && !isAdded && (
                 <div className="flex items-center justify-between mb-4">
@@ -293,7 +322,7 @@ export default function ExperiencePage() {
                   </button>
                   {clampedGuests > 1 && (
                     <p className="font-sans text-xs text-gray-400 text-center mt-2">
-                      Total: R {(exp.pricePerPerson * clampedGuests).toLocaleString()}
+                      Total: R {((selectedPackage?.pricePerPerson ?? exp.pricePerPerson) * clampedGuests).toLocaleString()}
                     </p>
                   )}
                 </>
