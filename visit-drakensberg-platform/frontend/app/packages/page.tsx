@@ -19,65 +19,13 @@ type PackageCard = {
   reviews?: number
 }
 
-const PACKAGES: PackageCard[] = [
-  {
-    id: 'p1',
-    title: 'Amphitheatre Weekend Escape',
-    duration: '3 nights',
-    price: 4200,
-    originalPrice: 5100,
-    location: 'Royal Natal',
-    img: 'https://images.unsplash.com/photo-1590098563548-8f14eed3a47f?w=900&q=80',
-    includes: ['3 nights accommodation', 'Daily breakfast', 'Tugela Falls guided hike', 'San rock art tour'],
-    tag: 'Best Seller',
-    rating: 4.9,
-    reviews: 54,
-  },
-  {
-    id: 'p2',
-    title: 'Central Berg Family Adventure',
-    duration: '5 nights',
-    price: 8900,
-    location: 'Cathedral Peak',
-    img: 'https://images.unsplash.com/photo-1503614472-8c93d56e92ce?w=900&q=80',
-    includes: ['5 nights family cottage', 'All meals', 'Horse riding', 'Nature walks', 'Rock art excursion'],
-    rating: 4.7,
-    reviews: 28,
-  },
-  {
-    id: 'p3',
-    title: 'Sani Pass & Southern Berg Explorer',
-    duration: '4 nights',
-    price: 6600,
-    location: 'Underberg',
-    img: 'https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?w=900&q=80',
-    includes: ['4 nights lodge', 'Sani Pass 4x4 tour', 'Mountain bike day', 'Fly-fishing half day'],
-    tag: 'New',
-    rating: 4.8,
-    reviews: 16,
-  },
-  {
-    id: 'p4',
-    title: 'Grand Berg Traverse — 7 Days',
-    duration: '7 nights',
-    price: 18500,
-    location: 'Northern to Southern Berg',
-    img: 'https://images.unsplash.com/photo-1551632811-561732d1e306?w=900&q=80',
-    includes: ['7 nights premium accommodation', 'All meals', 'Private guide', 'All park fees', 'Transfers'],
-    tag: 'Premium',
-    rating: 5.0,
-    reviews: 9,
-  },
-]
-
 export default function PackagesPage() {
-  const [cards, setCards] = useState<PackageCard[]>(PACKAGES)
+  const [cards, setCards] = useState<PackageCard[]>([])
+  const [loading, setLoading] = useState(true)
 
-  // Live admin-curated marketplace packages appear ahead of the showcase set.
   useEffect(() => {
     getPublishedPackages().then(live => {
-      if (live.length === 0) return
-      const liveCards: PackageCard[] = live.map(p => ({
+      setCards(live.map(p => ({
         id: p.id,
         title: p.title,
         duration: `${p.durationNights} night${p.durationNights !== 1 ? 's' : ''}`,
@@ -87,9 +35,9 @@ export default function PackagesPage() {
         img: p.image || 'https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?w=900&q=80',
         includes: p.components.map(c => c.title).filter(Boolean).slice(0, 5),
         tag: p.featured ? (p.tag || 'Featured') : p.tag || undefined,
-      }))
-      setCards([...liveCards, ...PACKAGES])
-    })
+      })))
+      setLoading(false)
+    }).catch(() => setLoading(false))
   }, [])
 
   return (
@@ -104,6 +52,9 @@ export default function PackagesPage() {
       </section>
 
       <div className="max-w-[1440px] mx-auto px-6 lg:px-12 py-12">
+        {!loading && cards.length === 0 && (
+          <p className="font-sans text-sm text-forest/40 py-16 text-center">No packages published yet — check back soon.</p>
+        )}
         <div className="grid lg:grid-cols-2 gap-8">
           {cards.map((p) => (
             <Link key={p.id} href={`/packages/${p.id}`} className="group bg-white border border-black/8 block hover:border-forest/30 transition-colors">

@@ -4,19 +4,26 @@ import { useState } from 'react'
 import Link from 'next/link'
 import { Heart, MapPin, Star, X } from 'lucide-react'
 
-const SAVED = [
-  { id: 's1', title: 'Tendele Tented Camp', type: 'accommodation', location: 'Royal Natal National Park', rating: 4.8, price: 2400, image: 'https://images.unsplash.com/photo-1533873984035-25970ab07461?w=600&q=80', href: '/stays/s2' },
-  { id: 'a1', title: 'Guided Rock Climbing Experience', type: 'activity', location: 'Amphitheatre, Royal Natal', rating: 4.9, price: 750, image: 'https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?w=600&q=80', href: '/activities/a1' },
-  { id: 'h1', title: 'Cathedral Peak Summit', type: 'hike', location: 'Central Berg, Northern', rating: 4.7, price: null, image: 'https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=600&q=80', href: '/hikes/cathedral-peak' },
-  { id: 's3', title: "Giant's Castle Restcamp", type: 'accommodation', location: "Giant's Castle, Central Berg", rating: 4.5, price: 680, image: 'https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?w=600&q=80', href: '/stays/s3' },
-]
+type SavedListing = {
+  id: string
+  title: string
+  type: 'accommodation' | 'activity' | 'hike' | 'experience'
+  location: string
+  rating: number
+  price: number | null
+  image: string
+  href: string
+}
 
 const TYPE_LABEL: Record<string, string> = {
   accommodation: 'Stay', activity: 'Activity', hike: 'Hike', experience: 'Experience',
 }
 
+// No favourites/saved-listings persistence layer exists yet — this page is
+// wired for it (add/remove UI, empty state) but starts empty rather than
+// showing fake saved items.
 export default function SavedListingsPage() {
-  const [saved, setSaved] = useState(SAVED)
+  const [saved, setSaved] = useState<SavedListing[]>([])
 
   function remove(id: string) {
     setSaved(p => p.filter(s => s.id !== id))

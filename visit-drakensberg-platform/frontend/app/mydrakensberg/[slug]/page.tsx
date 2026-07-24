@@ -39,8 +39,8 @@ const ARTICLES: Record<string, {
       { text: "Go in the morning. The low angle of light reveals detail invisible at midday. The guides at Giant's Castle are, without exception, extraordinarily knowledgeable, and a slow walk through the site with one of them will reshape your understanding of what it means to be human in southern Africa." },
     ],
     relatedListings: [
-      { title: "Giant's Castle Rest Camp", type: 'Stay', href: '/stays/s3', image: 'https://images.unsplash.com/photo-1478131143081-80f7f84ca84d?w=400&q=80', location: "Giant's Castle, Central Berg" },
-      { title: 'San Rock Art Full-Day Tour', type: 'Activity', href: '/activities/a2', image: 'https://images.unsplash.com/photo-1501854140801-50d01698950b?w=400&q=80', location: "Giant's Castle" },
+      { title: "Giant's Castle Rest Camp", type: 'Stay', href: '/stays', image: 'https://images.unsplash.com/photo-1478131143081-80f7f84ca84d?w=400&q=80', location: "Giant's Castle, Central Berg" },
+      { title: 'San Rock Art Full-Day Tour', type: 'Activity', href: '/activities', image: 'https://images.unsplash.com/photo-1501854140801-50d01698950b?w=400&q=80', location: "Giant's Castle" },
     ],
     relatedArticles: [
       { slug: 'battle-of-isandlwana-history', title: "Shadow of the Berg: The Anglo-Zulu War's Hidden History", category: 'History', image: 'https://images.unsplash.com/photo-1486870591958-9b9d0d1dda99?w=400&q=80' },
@@ -66,8 +66,8 @@ const ARTICLES: Record<string, {
       { heading: 'Start at 05:00', text: "The Sentinel car park fills by 08:00 on weekends. The Chain Ladder bottlenecks badly when both ascending and descending hikers meet on the rungs. Start before dawn, use a headlamp for the first section, and you will have the ladders to yourself. The sunrise from the Amphitheatre rim, looking east over KwaZulu-Natal, is among the finest views in Africa." },
     ],
     relatedListings: [
-      { title: 'Tendele Tented Camp', type: 'Stay', href: '/stays/s2', image: 'https://images.unsplash.com/photo-1533873984035-25970ab07461?w=400&q=80', location: 'Royal Natal National Park' },
-      { title: 'Guided Rock Climbing', type: 'Activity', href: '/activities/a1', image: 'https://images.unsplash.com/photo-1504280390367-361c6d9f38f4?w=400&q=80', location: 'Amphitheatre' },
+      { title: 'Tendele Tented Camp', type: 'Stay', href: '/stays', image: 'https://images.unsplash.com/photo-1533873984035-25970ab07461?w=400&q=80', location: 'Royal Natal National Park' },
+      { title: 'Guided Rock Climbing', type: 'Activity', href: '/activities', image: 'https://images.unsplash.com/photo-1504280390367-361c6d9f38f4?w=400&q=80', location: 'Amphitheatre' },
     ],
     relatedArticles: [
       { slug: 'bearded-vulture-lammergeier', title: "Africa's Rarest Raptor: The Bearded Vulture of the Berg", category: 'Wildlife', image: 'https://images.unsplash.com/photo-1441974231531-c6227db76b6e?w=400&q=80' },
@@ -92,8 +92,8 @@ const ARTICLES: Record<string, {
       { text: "In the breeding season (May–August), pairs display together over the escarpment ridge — long, slow, parallel soaring flights that can last hours. Nest sites are on inaccessible cliff ledges; if you see a large bird repeatedly visiting a particular section of cliff between May and August, watch from a distance and do not approach." },
     ],
     relatedListings: [
-      { title: "Giant's Castle Rest Camp", type: 'Stay', href: '/stays/s3', image: 'https://images.unsplash.com/photo-1478131143081-80f7f84ca84d?w=400&q=80', location: "Giant's Castle, Central Berg" },
-      { title: 'Berg Photography Tour', type: 'Activity', href: '/activities/a1', image: 'https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?w=400&q=80', location: 'Northern Berg' },
+      { title: "Giant's Castle Rest Camp", type: 'Stay', href: '/stays', image: 'https://images.unsplash.com/photo-1478131143081-80f7f84ca84d?w=400&q=80', location: "Giant's Castle, Central Berg" },
+      { title: 'Berg Photography Tour', type: 'Activity', href: '/activities', image: 'https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?w=400&q=80', location: 'Northern Berg' },
     ],
     relatedArticles: [
       { slug: 'conservation-umdoni-wetlands', title: 'Saving the Umdoni Wetlands: Conservation at the Edge', category: 'Conservation', image: 'https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=400&q=80' },

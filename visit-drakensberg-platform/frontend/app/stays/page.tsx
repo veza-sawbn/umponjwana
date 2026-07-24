@@ -7,15 +7,6 @@ import EditablePageHeader from '@/components/editor/EditablePageHeader'
 import { getProperties, type Property } from '@/lib/properties'
 import { getRoomsByProperty } from '@/lib/rooms'
 
-const HARDCODED_STAYS = [
-  { id: 's1', title: 'Cathedral Peak Mountain Lodge', location: 'Cathedral Peak, Northern Berg', price: 1850, rating: 4.9, reviews: 124, img: 'https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=800&q=80', category: 'Lodge', amenities: ['pool', 'wifi', 'braai', 'hiking'], guests: 4, discount: 15 },
-  { id: 's2', title: 'Drakensberg Sun Resort', location: 'Central Berg, KZN', price: 2400, rating: 4.7, reviews: 89, img: 'https://images.unsplash.com/photo-1571003123894-1f0594d2b5d9?w=800&q=80', category: 'Resort', amenities: ['pool', 'wifi', 'braai'], guests: 6 },
-  { id: 's3', title: 'Berg Valley Guesthouse', location: 'Champagne Valley', price: 980, rating: 4.5, reviews: 56, img: 'https://images.unsplash.com/photo-1520250497591-112f2f40a3f4?w=800&q=80', category: 'Guesthouse', amenities: ['wifi', 'braai', 'hiking'], guests: 2 },
-  { id: 's4', title: 'Royal Natal Eco Cabin', location: 'Royal Natal Park', price: 650, rating: 4.6, reviews: 41, img: 'https://images.unsplash.com/photo-1470770841072-f978cf4d019e?w=800&q=80', category: 'Cabin', amenities: ['braai', 'hiking'], guests: 3 },
-  { id: 's5', title: 'Sani Pass Adventure Camp', location: 'Sani Pass, Southern Berg', price: 420, rating: 4.3, reviews: 33, img: 'https://images.unsplash.com/photo-1504280390367-361c6d9f38f4?w=800&q=80', category: 'Camp', amenities: ['braai', 'hiking'], guests: 8 },
-  { id: 's6', title: 'Giants Castle Boutique Hotel', location: 'Giants Castle', price: 3200, rating: 5.0, reviews: 17, img: 'https://images.unsplash.com/photo-1582719478250-c89cae4dc85b?w=800&q=80', category: 'Hotel', amenities: ['pool', 'wifi', 'braai', 'hiking'], guests: 2, featured: true },
-]
-
 type StayCard = {
   id: string
   title: string
@@ -72,9 +63,7 @@ export default function StaysPage() {
   const toggleAmenity = (a: string) =>
     setAmenities((prev) => prev.includes(a) ? prev.filter((x) => x !== a) : [...prev, a])
 
-  const allStays: StayCard[] = [...HARDCODED_STAYS, ...liveProperties]
-
-  const filtered = allStays
+  const filtered = liveProperties
     .filter((s) => (!s.price || s.price <= maxPrice) && (!amenities.length || amenities.every((a) => s.amenities.includes(a))))
     .sort((a, b) => {
       if (sortBy === 'Price: Low to High') return a.price - b.price
@@ -145,12 +134,14 @@ export default function StaysPage() {
         )}
 
         {/* Grid */}
+        {filtered.length === 0 && (
+          <p className="font-sans text-sm text-forest/40 py-16 text-center">No stays match these filters yet.</p>
+        )}
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-10">
           {filtered.map((stay) => {
             const discountedPrice = stay.discount ? Math.round(stay.price * (1 - stay.discount / 100)) : null
-            const href = stay.id.startsWith('s') ? `/stays/${stay.id}` : `/stays/${stay.id}`
             return (
-              <Link key={stay.id} href={href} className="group block">
+              <Link key={stay.id} href={`/stays/${stay.id}`} className="group block">
                 <div className="relative overflow-hidden aspect-[4/3] mb-4 bg-[#2d6a4f]/10">
                   {stay.img ? (
                     <img src={stay.img} alt={stay.title}
