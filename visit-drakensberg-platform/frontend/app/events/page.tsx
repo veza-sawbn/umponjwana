@@ -1,11 +1,14 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import Footer from '@/components/layout/Footer'
-import { CalendarDays, MapPin, Ticket, Star, Filter } from 'lucide-react'
+import { CalendarDays, MapPin, Ticket, Star, Filter, Check, Loader2 } from 'lucide-react'
+import { useBooking } from '@/lib/booking-context'
+import { getSupplierEntities } from '@/lib/supplier-entities'
 
 interface PublicEvent {
   id: string
+  supplierId: string
   title: string
   description: string
   event_type: 'event' | 'special'
@@ -15,96 +18,62 @@ interface PublicEvent {
   ticket_price: number
   total_tickets: number
   tickets_sold: number
-  image_bg: string
+  is_published: boolean
 }
 
-const EVENTS: PublicEvent[] = [
-  {
-    id: '1',
-    title: 'Drakensberg Star Gazing Night',
-    description: 'A guided star gazing session at 1800m altitude with a certified astronomer. Hot drinks and light snacks included.',
-    event_type: 'event',
-    location: 'Cathedral Peak',
-    starts_at: '2026-07-20T19:00',
-    ends_at: '2026-07-20T22:00',
-    ticket_price: 350,
-    total_tickets: 30,
-    tickets_sold: 12,
-    image_bg: 'bg-[#0a0a1a]',
-  },
-  {
-    id: '2',
-    title: 'Winter Wildflower Walk Special',
-    description: '20% off guided wildflower identification walks. Learn to identify over 200 Drakensberg endemic species.',
-    event_type: 'special',
-    location: "Monk's Cowl",
-    starts_at: '2026-07-01T08:00',
-    ends_at: '2026-07-31T17:00',
-    ticket_price: 180,
-    total_tickets: 100,
-    tickets_sold: 45,
-    image_bg: 'bg-[#2d6a4f]',
-  },
-  {
-    id: '3',
-    title: 'San Rock Art Full-Day Tour',
-    description: 'Explore ancient San rock paintings with an accredited heritage guide. Includes light lunch and transport.',
-    event_type: 'event',
-    location: 'Giant\'s Castle',
-    starts_at: '2026-08-05T07:00',
-    ends_at: '2026-08-05T16:00',
-    ticket_price: 620,
-    total_tickets: 16,
-    tickets_sold: 9,
-    image_bg: 'bg-[#8B4513]',
-  },
-  {
-    id: '4',
-    title: 'Berg & Braai Sunset Special',
-    description: 'Traditional South African braai at sunset with panoramic Berg views. Live music by local artists.',
-    event_type: 'special',
-    location: 'Champagne Valley',
-    starts_at: '2026-07-25T17:30',
-    ends_at: '2026-07-25T21:00',
-    ticket_price: 450,
-    total_tickets: 50,
-    tickets_sold: 22,
-    image_bg: 'bg-[#C9A96E]',
-  },
-  {
-    id: '5',
-    title: 'Photography & Landscape Workshop',
-    description: 'Two-day photography workshop with professional landscape photographer. All skill levels welcome.',
-    event_type: 'event',
-    location: 'Drakensberg Gardens',
-    starts_at: '2026-08-15T06:00',
-    ends_at: '2026-08-16T18:00',
-    ticket_price: 1850,
-    total_tickets: 10,
-    tickets_sold: 6,
-    image_bg: 'bg-[#1a1a2e]',
-  },
-  {
-    id: '6',
-    title: 'Kids Berg Explorer Camp',
-    description: 'A fun-filled two-night camp for children aged 8–14. Hiking, survival skills, nature journaling and more.',
-    event_type: 'event',
-    location: 'Royal Natal',
-    starts_at: '2026-07-12T08:00',
-    ends_at: '2026-07-14T15:00',
-    ticket_price: 2200,
-    total_tickets: 24,
-    tickets_sold: 18,
-    image_bg: 'bg-[#4A7251]',
-  },
-]
+const ENTITY = 'events'
+
+// No image field exists on the real supplier event record — a colour is
+// derived from the event type instead of a fake photo.
+const TYPE_BG: Record<PublicEvent['event_type'], string> = {
+  event: 'bg-[#1a1a2e]',
+  special: 'bg-[#2d6a4f]',
+}
 
 type Filter = 'all' | 'event' | 'special'
 
 export default function EventsPage() {
+  const booking = useBooking()
+  const [events, setEvents] = useState<PublicEvent[]>([])
+  const [loading, setLoading] = useState(true)
   const [filter, setFilter] = useState<Filter>('all')
 
-  const filtered = filter === 'all' ? EVENTS : EVENTS.filter(e => e.event_type === filter)
+  useEffect(() => {
+    getSupplierEntities<any>(ENTITY)
+      .then((all: PublicEvent[]) => {
+        const now = new Date().toISOString()
+        setEvents(
+          all
+            // RLS already hides drafts from the public, but a supplier
+            // browsing this page while signed in would otherwise see their
+            // own unpublished events too — filter defensively.
+            .filter(e => e.is_published && (e.ends_at || e.starts_at) >= now)
+            .sort((a, b) => a.starts_at.localeCompare(b.starts_at)),
+        )
+      })
+      .catch(() => setEvents([]))
+      .finally(() => setLoading(false))
+  }, [])
+
+  const filtered = filter === 'all' ? events : events.filter(e => e.event_type === filter)
+
+  function toggleAddon(event: PublicEvent) {
+    const addonId = `event-${event.id}`
+    if (booking.addons.some(a => a.id === addonId)) {
+      booking.removeAddon(addonId)
+    } else {
+      booking.addAddon({
+        id: addonId,
+        type: 'event',
+        title: event.title,
+        supplierId: event.supplierId,
+        date: event.starts_at.slice(0, 10),
+        price_per_person: event.ticket_price,
+        guests: 1,
+        location: event.location || undefined,
+      })
+    }
+  }
 
   return (
     <div className="min-h-screen bg-[#F7F5F2]">
@@ -136,60 +105,76 @@ export default function EventsPage() {
       </div>
 
       <main className="max-w-[1440px] mx-auto px-6 lg:px-12 py-12">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {filtered.map(event => {
-            const remaining = event.total_tickets > 0 ? event.total_tickets - event.tickets_sold : null
-            const almostFull = remaining !== null && remaining <= 5
-            const soldOut = remaining !== null && remaining === 0
-            return (
-              <div key={event.id} className="bg-white border border-gray-200 group cursor-pointer">
-                <div className={`relative aspect-[4/3] ${event.image_bg} flex items-end p-6 overflow-hidden`}>
-                  <div className="absolute inset-0 bg-black/20" />
-                  <div className="relative z-10 flex items-center justify-between w-full">
-                    <span className={`font-sans text-[10px] tracking-[0.14em] uppercase px-3 py-1.5 ${event.event_type === 'special' ? 'bg-[#C9A96E] text-[#2d2d2d]' : 'bg-white/20 backdrop-blur-sm text-white'}`}>
-                      {event.event_type === 'special' ? <><Star size={9} className="inline mr-1" />Special</> : 'Event'}
-                    </span>
-                    {soldOut && <span className="font-sans text-xs bg-red-600 text-white px-2.5 py-1">Sold Out</span>}
-                    {almostFull && !soldOut && <span className="font-sans text-xs bg-[#C9A96E] text-[#2d2d2d] px-2.5 py-1">Only {remaining} left</span>}
-                  </div>
-                </div>
-
-                <div className="p-6">
-                  <h3 className="font-display italic text-xl text-[#000000] mb-2 group-hover:text-[#2d6a4f] transition-colors">{event.title}</h3>
-                  <p className="font-sans text-sm text-gray-600 mb-4 line-clamp-2">{event.description}</p>
-
-                  <div className="space-y-1.5 mb-5">
-                    <p className="font-sans text-xs text-gray-500 flex items-center gap-1.5">
-                      <MapPin size={12} /> {event.location}
-                    </p>
-                    <p className="font-sans text-xs text-gray-500 flex items-center gap-1.5">
-                      <CalendarDays size={12} />
-                      {new Date(event.starts_at).toLocaleDateString('en-ZA', { weekday: 'short', day: 'numeric', month: 'long', year: 'numeric' })}
-                    </p>
-                    {remaining !== null && (
-                      <p className="font-sans text-xs text-gray-500 flex items-center gap-1.5">
-                        <Ticket size={12} /> {remaining} tickets remaining
-                      </p>
-                    )}
-                  </div>
-
-                  <div className="flex items-center justify-between pt-4 border-t border-gray-100">
-                    <div>
-                      <p className="font-sans text-[10px] tracking-[0.12em] uppercase text-gray-400">From</p>
-                      <p className="font-display italic text-2xl text-[#2d6a4f]">R {event.ticket_price}</p>
+        {loading ? (
+          <div className="py-24 flex justify-center"><Loader2 size={24} className="animate-spin text-gray-300" /></div>
+        ) : filtered.length === 0 ? (
+          <div className="py-24 text-center">
+            <p className="font-sans text-sm text-gray-400">No upcoming events or specials right now — check back soon.</p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {filtered.map(event => {
+              const remaining = event.total_tickets > 0 ? event.total_tickets - event.tickets_sold : null
+              const almostFull = remaining !== null && remaining <= 5
+              const soldOut = remaining !== null && remaining <= 0
+              const isAdded = booking.addons.some(a => a.id === `event-${event.id}`)
+              return (
+                <div key={event.id} className="bg-white border border-gray-200 group">
+                  <div className={`relative aspect-[4/3] ${TYPE_BG[event.event_type]} flex items-end p-6 overflow-hidden`}>
+                    <div className="absolute inset-0 bg-black/20" />
+                    <div className="relative z-10 flex items-center justify-between w-full">
+                      <span className={`font-sans text-[10px] tracking-[0.14em] uppercase px-3 py-1.5 ${event.event_type === 'special' ? 'bg-[#C9A96E] text-[#2d2d2d]' : 'bg-white/20 backdrop-blur-sm text-white'}`}>
+                        {event.event_type === 'special' ? <><Star size={9} className="inline mr-1" />Special</> : 'Event'}
+                      </span>
+                      {soldOut && <span className="font-sans text-xs bg-red-600 text-white px-2.5 py-1">Sold Out</span>}
+                      {almostFull && !soldOut && <span className="font-sans text-xs bg-[#C9A96E] text-[#2d2d2d] px-2.5 py-1">Only {remaining} left</span>}
                     </div>
-                    <button
-                      disabled={soldOut}
-                      className={`px-5 py-2.5 font-sans text-sm font-medium transition-colors ${soldOut ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : 'bg-[#2d6a4f] text-white hover:bg-[#235a3f]'}`}
-                    >
-                      {soldOut ? 'Sold Out' : 'Book Tickets'}
-                    </button>
+                  </div>
+
+                  <div className="p-6">
+                    <h3 className="font-display italic text-xl text-[#000000] mb-2 group-hover:text-[#2d6a4f] transition-colors">{event.title}</h3>
+                    {event.description && <p className="font-sans text-sm text-gray-600 mb-4 line-clamp-2">{event.description}</p>}
+
+                    <div className="space-y-1.5 mb-5">
+                      {event.location && (
+                        <p className="font-sans text-xs text-gray-500 flex items-center gap-1.5">
+                          <MapPin size={12} /> {event.location}
+                        </p>
+                      )}
+                      <p className="font-sans text-xs text-gray-500 flex items-center gap-1.5">
+                        <CalendarDays size={12} />
+                        {new Date(event.starts_at).toLocaleDateString('en-ZA', { weekday: 'short', day: 'numeric', month: 'long', year: 'numeric' })}
+                      </p>
+                      {remaining !== null && (
+                        <p className="font-sans text-xs text-gray-500 flex items-center gap-1.5">
+                          <Ticket size={12} /> {remaining} tickets remaining
+                        </p>
+                      )}
+                    </div>
+
+                    <div className="flex items-center justify-between pt-4 border-t border-gray-100">
+                      <div>
+                        <p className="font-sans text-[10px] tracking-[0.12em] uppercase text-gray-400">From</p>
+                        <p className="font-display italic text-2xl text-[#2d6a4f]">R {event.ticket_price.toLocaleString()}</p>
+                      </div>
+                      <button
+                        onClick={() => toggleAddon(event)}
+                        disabled={soldOut}
+                        className={`px-5 py-2.5 font-sans text-sm font-medium transition-colors flex items-center gap-1.5 ${
+                          soldOut ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                          : isAdded ? 'bg-[#2d6a4f]/10 text-[#2d6a4f] border border-[#2d6a4f]'
+                          : 'bg-[#2d6a4f] text-white hover:bg-[#235a3f]'
+                        }`}
+                      >
+                        {soldOut ? 'Sold Out' : isAdded ? <><Check size={14} /> Added</> : 'Book Tickets'}
+                      </button>
+                    </div>
                   </div>
                 </div>
-              </div>
-            )
-          })}
-        </div>
+              )
+            })}
+          </div>
+        )}
       </main>
 
       <Footer />

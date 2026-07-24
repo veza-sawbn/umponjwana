@@ -4,105 +4,13 @@ import { useState, useEffect } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import Footer from '@/components/layout/Footer'
-import { MapPin, Star, Users, Wifi, Flame, Utensils, Car, ArrowLeft, Calendar, Coffee, Waves, TreePine, ShieldCheck, BedDouble } from 'lucide-react'
+import { MapPin, Star, Users, Wifi, Flame, Utensils, Car, ArrowLeft, Calendar, Waves, TreePine, ShieldCheck, BedDouble } from 'lucide-react'
 import SmartRecommendations from '@/components/booking/SmartRecommendations'
 import RoomDetailModal, { type RoomDetail } from '@/components/listings/RoomDetailModal'
 import { useBooking } from '@/lib/booking-context'
 import { Check } from 'lucide-react'
 import { getPropertyById, type Property } from '@/lib/properties'
 import { getRoomsByProperty, getRoomUnitsLeft, type Room } from '@/lib/rooms'
-
-// Hardcoded showcase stays (keep existing behaviour for demo IDs)
-const HARDCODED: Record<string, any> = {
-  s1: {
-    title: 'Cathedral Peak Mountain Lodge',
-    category: 'Mountain Lodge',
-    location: 'Cathedral Peak, Northern Berg',
-    region: 'Northern Berg',
-    rating: 4.9,
-    review_count: 142,
-    member_since: '2019',
-    response_rate: '97%',
-    description: 'Perched beneath the towering Cathedral Peak massif, this classic mountain lodge offers an authentic Drakensberg experience. The lodge has been a beloved fixture in the Northern Berg since 1939, offering warm hospitality, fine dining and uninterrupted access to the surrounding wilderness.',
-    highlights: ['Situated at 1,400m altitude', 'Direct trailhead access', 'Licensed restaurant & bar', 'Guided hikes on request'],
-    price_from: 1850,
-    hero: 'bg-[#1a1a2e]',
-    amenities: [
-      { label: 'Free WiFi', icon: Wifi },
-      { label: 'Fireplace', icon: Flame },
-      { label: 'Restaurant', icon: Utensils },
-      { label: 'Parking', icon: Car },
-      { label: 'Breakfast', icon: Coffee },
-      { label: 'Pool', icon: Waves },
-    ],
-    images: [
-      'https://images.unsplash.com/photo-1571896349842-33c89424de2d?w=1400&q=80',
-      'https://images.unsplash.com/photo-1520250497591-112f2f40a3f4?w=800&q=80',
-      'https://images.unsplash.com/photo-1611892440504-42a792e24d32?w=800&q=80',
-      'https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=800&q=80',
-    ],
-    rooms: [
-      { id: 'r1', name: 'Mountain View Suite', description: 'Panoramic floor-to-ceiling views of the massif. King bed, en-suite bathroom with soaking tub.', max_guests: 2, price_per_night: 2200, amenities: ['En-suite', 'Soaking tub', 'Fireplace', 'Mountain view', 'King bed'] },
-      { id: 'r2', name: 'Garden Chalet', description: 'Self-contained chalet set in the garden. Ideal for families with a private braai area.', max_guests: 4, price_per_night: 1850, amenities: ['Private braai', 'Kitchen', 'Family room', 'Garden access'] },
-      { id: 'r3', name: 'Classic Double', description: 'Comfortable and cosy, with a private balcony overlooking the valley.', max_guests: 2, price_per_night: 1450, amenities: ['En-suite', 'Balcony', 'Double bed'] },
-      { id: 'r4', name: 'Backpacker Dorm', description: 'Shared dormitory with 6 beds, lockers and access to communal kitchen.', max_guests: 6, price_per_night: 380, amenities: ['Shared bathroom', 'Lockers', 'Kitchen access', 'Bunk beds'] },
-    ],
-    reviews_list: [
-      { name: 'Sarah van der Merwe', rating: 5, date: 'June 2026', comment: 'The location is simply breathtaking. Woke up every morning to mist rolling off the peaks. The staff are exceptional.' },
-      { name: 'James Fourie', rating: 5, date: 'May 2026', comment: 'We have stayed here three times and it never disappoints. The Mountain View Suite is worth every cent.' },
-      { name: 'Priya Naidoo', rating: 4, date: 'April 2026', comment: 'Beautiful setting, great food. The only minor issue was the WiFi being slow in our room, but that is hardly what you come here for!' },
-      { name: 'Tom Kruger', rating: 5, date: 'March 2026', comment: 'Perfect base for day hikes. The lodge provided packed lunches and arranged permits. Could not have been smoother.' },
-    ],
-  },
-  s2: {
-    title: 'Tendele Tented Camp',
-    category: 'Luxury Tented Camp',
-    location: 'Royal Natal National Park',
-    region: 'Northern Berg',
-    rating: 4.8,
-    review_count: 87,
-    member_since: '2021',
-    response_rate: '99%',
-    description: 'An exclusive tented camp within the Royal Natal National Park, Tendele offers a genuine wilderness immersion steps from the Amphitheatre and Tugela Falls.',
-    highlights: ['Inside Royal Natal National Park', 'Solar-powered off-grid camp', 'Private deck per tent', 'Fully catered'],
-    price_from: 2400,
-    hero: 'bg-[#2d6a4f]',
-    amenities: [{ label: 'Full Board', icon: Utensils }, { label: 'Firepit', icon: Flame }, { label: 'Nature Walks', icon: TreePine }, { label: 'Parking', icon: Car }],
-    images: ['https://images.unsplash.com/photo-1533873984035-25970ab07461?w=1400&q=80', 'https://images.unsplash.com/photo-1504280390367-361c6d9f38f4?w=800&q=80', 'https://images.unsplash.com/photo-1510798831971-661eb04b3739?w=800&q=80', 'https://images.unsplash.com/photo-1478131143081-80f7f84ca84d?w=800&q=80'],
-    rooms: [
-      { id: 'r1', name: 'Escarpment Tent', description: 'King-size bed, private en-suite with outdoor shower. Direct views of the Amphitheatre wall.', max_guests: 2, price_per_night: 3200, amenities: ['En-suite', 'Outdoor shower', 'Private deck', 'Escarpment view'] },
-      { id: 'r2', name: 'Family Tent', description: 'Two rooms connected by a shared lounge area. Ideal for families.', max_guests: 4, price_per_night: 2800, amenities: ['Two rooms', 'Shared lounge', 'Family layout', 'En-suite'] },
-    ],
-    reviews_list: [
-      { name: 'Megan & Luke H.', rating: 5, date: 'June 2026', comment: 'Our honeymoon stay. Completely secluded, exceptional food, and waking up to the Amphitheatre every morning was surreal.' },
-    ],
-  },
-  s3: {
-    title: "Giant's Castle Restcamp",
-    category: 'Self-Catering Restcamp',
-    location: "Giant's Castle, Central Berg",
-    region: 'Central Berg',
-    rating: 4.5,
-    review_count: 203,
-    member_since: '2018',
-    response_rate: '94%',
-    description: "Ezemvelo KZN Wildlife's flagship restcamp in the Giant's Castle Game Reserve. The camp sits at 1,750m and is the gateway to over 5,000 San Bushman rock art paintings.",
-    highlights: ['San rock art access on doorstep', 'Eland and vulture hide nearby', 'Lammergeier hide bookings', 'National Heritage Site'],
-    price_from: 680,
-    hero: 'bg-[#8B4513]',
-    amenities: [{ label: 'Self-Catering', icon: Utensils }, { label: 'Fireplace', icon: Flame }, { label: 'Parking', icon: Car }, { label: 'Nature Walks', icon: TreePine }],
-    images: ['https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?w=1400&q=80', 'https://images.unsplash.com/photo-1486870591958-9b9d0d1dda99?w=800&q=80', 'https://images.unsplash.com/photo-1501854140801-50d01698950b?w=800&q=80', 'https://images.unsplash.com/photo-1441974231531-c6227db76b6e?w=800&q=80'],
-    rooms: [
-      { id: 'r1', name: 'Luxury Cottage', description: 'Two-bedroom self-catering cottage with a fully equipped kitchen, fireplace and braai area.', max_guests: 4, price_per_night: 1250, amenities: ['2 bedrooms', 'Kitchen', 'Braai', 'Fireplace'] },
-      { id: 'r2', name: 'Standard Chalet', description: 'En-suite chalet sleeping 2, with a kitchenette and covered stoep.', max_guests: 2, price_per_night: 780, amenities: ['En-suite', 'Kitchenette', 'Stoep', 'Mountain view'] },
-      { id: 'r3', name: 'Budget Rondavel', description: 'Circular rondavel with twin beds and shared bathroom facilities.', max_guests: 2, price_per_night: 480, amenities: ['Twin beds', 'Shared bathroom', 'Camp shop access'] },
-    ],
-    reviews_list: [
-      { name: 'Nokukhanya Zulu', rating: 5, date: 'May 2026', comment: 'The rock art experience is like nothing else. A knowledgeable Ezemvelo guide made the history come alive.' },
-      { name: 'Riaan Botha', rating: 4, date: 'March 2026', comment: 'Excellent value. The luxury cottage was well-equipped. Bring your own firewood and supplies from town.' },
-    ],
-  },
-}
 
 const AMENITY_ICONS: Record<string, React.ComponentType<any>> = {
   'Wi-Fi': Wifi, 'Swimming Pool': Waves, 'Braai Facilities': Flame, 'Restaurant': Utensils,
@@ -154,8 +62,8 @@ export default function StayDetailPage() {
   const router = useRouter()
   const booking = useBooking()
 
-  const [stay, setStay] = useState<any>(HARDCODED[id] || null)
-  const [loading, setLoading] = useState(!HARDCODED[id])
+  const [stay, setStay] = useState<any>(null)
+  const [loading, setLoading] = useState(true)
 
   const [selectedRoom, setSelectedRoom] = useState<any>(null)
   const [showRooms, setShowRooms] = useState(false)
@@ -168,16 +76,17 @@ export default function StayDetailPage() {
   const [unitsLeft, setUnitsLeft] = useState<Record<string, number | null>>({})
 
   useEffect(() => {
-    if (HARDCODED[id]) return
+    setLoading(true)
     Promise.all([getPropertyById(id), getRoomsByProperty(id)]).then(([prop, rooms]) => {
       if (prop) setStay(propToStay(prop, rooms))
+      else setStay(null)
       setLoading(false)
     })
   }, [id])
 
-  // Live room inventory for the selected dates (real supplier rooms only).
+  // Live room inventory for the selected dates.
   useEffect(() => {
-    if (HARDCODED[id] || !stay?.rooms?.length || !checkIn || !checkOut || checkOut <= checkIn) {
+    if (!stay?.rooms?.length || !checkIn || !checkOut || checkOut <= checkIn) {
       setUnitsLeft({})
       return
     }

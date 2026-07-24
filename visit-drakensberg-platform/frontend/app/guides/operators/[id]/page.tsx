@@ -16,12 +16,6 @@ import { getUpcomingExperiences, type TrekkingExperience } from '@/lib/experienc
 // Supplier profile: company overview, compliance, guide roster and upcoming
 // departures. Guides always remain linked to their supplier.
 
-const SHOWCASE_REVIEWS = [
-  { name: 'Sarah T.', rating: 5, date: 'June 2026', comment: 'Professionally run from the first email to the summit. The guide read the weather perfectly and kept the whole group comfortable.' },
-  { name: 'James F.', rating: 5, date: 'May 2026', comment: 'Outstanding operator — permits, transport and meals all handled. We just had to walk.' },
-  { name: 'Priya N.', rating: 4, date: 'April 2026', comment: 'Well organised multi-day traverse. Camp setup and safety briefings were excellent.' },
-]
-
 function formatDate(iso: string) {
   return new Date(iso).toLocaleDateString('en-ZA', { day: 'numeric', month: 'short', year: 'numeric' })
 }
@@ -174,24 +168,8 @@ export default function OperatorProfilePage() {
             {/* Reviews */}
             <div>
               <h2 className="font-display italic text-2xl text-[#000000] mb-6">Customer Reviews</h2>
-              <div className="space-y-5">
-                {SHOWCASE_REVIEWS.map((r, i) => (
-                  <div key={i} className="bg-white border border-gray-200 p-5">
-                    <div className="flex items-center justify-between mb-2">
-                      <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 bg-[#2d6a4f]/10 flex items-center justify-center font-display italic text-[#2d6a4f]">{r.name[0]}</div>
-                        <div>
-                          <p className="font-sans text-sm font-medium">{r.name}</p>
-                          <p className="font-sans text-xs text-gray-400">{r.date}</p>
-                        </div>
-                      </div>
-                      <div className="flex gap-0.5">
-                        {Array.from({ length: r.rating }).map((_, j) => <Star key={j} size={12} className="text-[#C9A96E] fill-[#C9A96E]" />)}
-                      </div>
-                    </div>
-                    <p className="font-sans text-sm text-gray-700 leading-relaxed">{r.comment}</p>
-                  </div>
-                ))}
+              <div className="bg-white border border-gray-200 p-8 text-center">
+                <p className="font-sans text-sm text-gray-400">No reviews yet — be the first to book and share your experience.</p>
               </div>
             </div>
           </div>

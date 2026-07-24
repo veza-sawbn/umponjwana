@@ -11,49 +11,9 @@ import { getRegionNames, DEFAULT_REGIONS, regionsMatch } from '@/lib/regions'
 import { getProperties, type Property } from '@/lib/properties'
 import { getRoomsByProperty } from '@/lib/rooms'
 import { getActivities, type Activity } from '@/lib/activities'
+import { getTrails, trailStartPoint, type Trail } from '@/lib/trails'
+import { getSupplierEntities } from '@/lib/supplier-entities'
 import { StayDistance } from '@/lib/stay-distance'
-
-/* ── Mock data ─────────────────────────────────────────────────────────────── */
-
-const ALL_STAYS = [
-  { id: 's1', title: 'Cathedral Peak Mountain Lodge', region: 'Northern Berg', price: 1850, rating: 4.9, reviews: 142, img: 'https://images.unsplash.com/photo-1571896349842-33c89424de2d?w=600&q=80', available: true },
-  { id: 's2', title: 'Amphitheatre Backpackers', region: 'Royal Natal', price: 320, rating: 4.7, reviews: 89, img: 'https://images.unsplash.com/photo-1520250497591-112f2f40a3f4?w=600&q=80', available: true },
-  { id: 's3', title: 'Sani Lodge Drakensberg', region: 'Southern Berg', price: 2200, rating: 4.8, reviews: 67, img: 'https://images.unsplash.com/photo-1611892440504-42a792e24d32?w=600&q=80', available: true },
-  { id: 's4', title: "Drakensberg Sun Resort", region: 'Central Berg', price: 1400, rating: 4.5, reviews: 210, img: 'https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=600&q=80', available: false },
-  { id: 's5', title: "Monk's Cowl Tented Camp", region: 'Central Berg', price: 950, rating: 4.6, reviews: 54, img: 'https://images.unsplash.com/photo-1501854140801-50d01698950b?w=600&q=80', available: true },
-  { id: 's6', title: 'Royal Natal National Park Hotel', region: 'Royal Natal', price: 1650, rating: 4.8, reviews: 183, img: 'https://images.unsplash.com/photo-1566073771259-6a8506099945?w=600&q=80', available: true },
-]
-
-const ALL_HIKES = [
-  { id: 'tugela-falls', title: 'Tugela Falls Circuit', region: 'Royal Natal', distance: '14 km', difficulty: 'Hard', duration: '6–8 h', img: 'https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?w=600&q=80' },
-  { id: 'amphitheatre', title: 'Amphitheatre via Chain Ladder', region: 'Royal Natal', distance: '8 km', difficulty: 'Moderate', duration: '4–5 h', img: 'https://images.unsplash.com/photo-1501854140801-50d01698950b?w=600&q=80' },
-  { id: 'fairy-glen', title: 'Fairy Glen Waterfall Walk', region: 'Central Berg', distance: '5 km', difficulty: 'Easy', duration: '2 h', img: 'https://images.unsplash.com/photo-1542587222-e14b891ee40b?w=600&q=80' },
-  { id: 'cathedral-peak', title: 'Cathedral Peak Summit', region: 'Northern Berg', distance: '16 km', difficulty: 'Hard', duration: '8 h', img: 'https://images.unsplash.com/photo-1486870591958-9b9d0d1dda99?w=600&q=80' },
-  { id: 'giants-castle', title: "Giant's Castle via Meander", region: "Giant's Castle", distance: '18 km', difficulty: 'Moderate', duration: '7–9 h', img: 'https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=600&q=80' },
-]
-
-const ALL_ACTIVITIES = [
-  { id: 'a1', title: 'Guided Rock Climbing', region: 'Royal Natal', price: 750, category: 'Adventure', img: 'https://images.unsplash.com/photo-1551632811-561732d1e306?w=600&q=80' },
-  { id: 'a2', title: 'San Rock Art Full-Day Tour', region: "Giant's Castle", price: 620, category: 'Culture', img: 'https://images.unsplash.com/photo-1529946179074-1f3cf40c0a0e?w=600&q=80' },
-  { id: 'a3', title: 'Fly Fishing on the Mlambonja', region: 'Central Berg', price: 890, category: 'Nature', img: 'https://images.unsplash.com/photo-1508739773434-c26b3d09e071?w=600&q=80' },
-  { id: 'a4', title: 'Horse Riding in the Foothills', region: 'Southern Berg', price: 680, category: 'Adventure', img: 'https://images.unsplash.com/photo-1544551763-46a013bb70d5?w=600&q=80' },
-  { id: 'a5', title: 'Abseiling at Sani Pass', region: 'Sani Pass', price: 720, category: 'Adventure', img: 'https://images.unsplash.com/photo-1503614472-8c93d56e92ce?w=600&q=80' },
-]
-
-const ALL_EVENTS = [
-  { id: 'e1', title: 'Drakensberg Star Gazing Night', region: 'Northern Berg', date: '20 Jul 2026', price: 350, img: 'https://images.unsplash.com/photo-1419242902214-272b3f66ee7a?w=600&q=80' },
-  { id: 'e2', title: 'Winter Wildflower Walk', region: 'Central Berg', date: '1–31 Jul 2026', price: 180, img: 'https://images.unsplash.com/photo-1487530811015-780780bfe571?w=600&q=80' },
-  { id: 'e3', title: 'Berg & Braai Sunset Special', region: 'Champagne Valley', date: '25 Jul 2026', price: 450, img: 'https://images.unsplash.com/photo-1516684732162-798a0062be99?w=600&q=80' },
-  { id: 'e4', title: 'San Rock Art Photography Workshop', region: "Giant's Castle", date: '5 Aug 2026', price: 950, img: 'https://images.unsplash.com/photo-1529946179074-1f3cf40c0a0e?w=600&q=80' },
-  { id: 'e5', title: 'Drakensberg Boys Choir Performance', region: 'Central Berg', date: '19 Jul 2026', price: 280, img: 'https://images.unsplash.com/photo-1514320291840-2e0a9bf2a9ae?w=600&q=80' },
-]
-
-const ALL_RESTAURANTS = [
-  { id: 'r1', title: 'The Escarpment Restaurant', region: 'Northern Berg', cuisine: 'Modern South African', price_range: 'R180–R350', rating: 4.7, img: 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=600&q=80' },
-  { id: 'r2', title: 'Champagne Terrace', region: 'Champagne Valley', cuisine: 'Steakhouse & Grill', price_range: 'R120–R280', rating: 4.5, img: 'https://images.unsplash.com/photo-1414235077428-338989a2e8c0?w=600&q=80' },
-  { id: 'r3', title: 'Sani Top Chalet Bar', region: 'Sani Pass', cuisine: 'Pub Grub & Local', price_range: 'R80–R180', rating: 4.3, img: 'https://images.unsplash.com/photo-1543007630-9710e4a00a20?w=600&q=80' },
-  { id: 'r4', title: "The Drakensberg Kitchen", region: 'Central Berg', cuisine: 'Farm-to-Table', price_range: 'R160–R320', rating: 4.8, img: 'https://images.unsplash.com/photo-1466978913421-dad2ebd01d17?w=600&q=80' },
-]
 
 type LiveStay = {
   id: string
@@ -78,6 +38,29 @@ type LiveActivity = {
   img?: string
   gpsLat?: string
   gpsLng?: string
+}
+
+type LiveHike = {
+  id: string
+  title: string
+  region: string
+  distance: string
+  difficulty: string
+  duration: string
+  img?: string
+  lat?: string
+  lng?: string
+}
+
+type LiveEvent = {
+  id: string
+  supplierId: string
+  title: string
+  location: string
+  starts_at: string
+  event_type: 'event' | 'special'
+  ticket_price: number
+  is_published: boolean
 }
 
 function propertyToLiveStay(p: Property, minPrice: number): LiveStay {
@@ -108,9 +91,24 @@ function activityToLiveActivity(a: Activity): LiveActivity {
   }
 }
 
+function trailToLiveHike(t: Trail): LiveHike {
+  const start = trailStartPoint(t)
+  return {
+    id: t.id,
+    title: t.name,
+    region: t.region,
+    distance: t.distance,
+    difficulty: t.difficulty,
+    duration: t.duration,
+    img: t.image || undefined,
+    lat: start ? String(start.lat) : undefined,
+    lng: start ? String(start.lng) : undefined,
+  }
+}
+
 /* ── Helpers ───────────────────────────────────────────────────────────────── */
 
-const DIFF_COLOR: Record<string, string> = { Easy: '#4A7251', Moderate: '#C9A96E', Hard: '#c0392b', Strenuous: '#c0392b' }
+const DIFF_COLOR: Record<string, string> = { Easy: '#4A7251', Moderate: '#C9A96E', Strenuous: '#c0392b', Extreme: '#7f1d1d' }
 
 function nights(checkIn: string, checkOut: string) {
   if (!checkIn || !checkOut) return null
@@ -166,6 +164,8 @@ function SearchResults() {
   const [availableOnly, setAvailableOnly] = useState(false)
   const [liveStays, setLiveStays] = useState<LiveStay[]>([])
   const [liveActivities, setLiveActivities] = useState<LiveActivity[]>([])
+  const [liveHikes, setLiveHikes] = useState<LiveHike[]>([])
+  const [liveEvents, setLiveEvents] = useState<LiveEvent[]>([])
 
   const today = new Date().toISOString().split('T')[0]
 
@@ -195,6 +195,15 @@ function SearchResults() {
     getActivities().then(items => {
       setLiveActivities(items.filter(a => a.status === 'active').map(activityToLiveActivity))
     })
+    getTrails().then(trails => {
+      setLiveHikes(trails.filter(t => t.status === 'published').map(trailToLiveHike))
+    })
+    getSupplierEntities<any>('events').then((all: LiveEvent[]) => {
+      const now = new Date().toISOString()
+      // RLS already hides drafts from the public; filtering defensively in
+      // case a signed-in supplier is browsing and sees their own drafts too.
+      setLiveEvents(all.filter(e => e.is_published && e.starts_at >= now))
+    }).catch(() => setLiveEvents([]))
   }, [])
 
   const numNights = nights(checkIn, checkOut)
@@ -223,30 +232,25 @@ function SearchResults() {
   // Region narrows first; the free-text query then fuzzy-matches (typo- and
   // partial-match tolerant) across titles, regions and categories.
   const q = query.trim()
-  const allStays = [...ALL_STAYS, ...liveStays]
   // A stay is already selected: this is no longer an accommodation search,
   // so don't suggest alternatives — show only the one the visitor picked.
   const stays = booking.stay
-    ? allStays.filter(s => s.id === booking.stay!.id)
-    : fuzzyFilter(allStays.filter(s => matchRegion(s.region) && (!availableOnly || s.available)), q, s => `${s.title} ${s.region}`)
+    ? liveStays.filter(s => s.id === booking.stay!.id)
+    : fuzzyFilter(liveStays.filter(s => matchRegion(s.region) && (!availableOnly || s.available)), q, s => `${s.title} ${s.region}`)
   const hikes = fuzzyFilter(
-    ALL_HIKES.filter(h => matchRegion(h.region)),
+    liveHikes.filter(h => matchRegion(h.region)),
     q, h => `${h.title} ${h.region} ${h.difficulty} hike trail`,
   )
   const activities = fuzzyFilter(
-    ([...ALL_ACTIVITIES, ...liveActivities] as LiveActivity[]).filter(a => matchRegion(a.region)),
+    liveActivities.filter(a => matchRegion(a.region)),
     q, a => `${a.title} ${a.region} ${a.category}`,
   )
   const events = fuzzyFilter(
-    ALL_EVENTS.filter(e => matchRegion(e.region)),
-    q, e => `${e.title} ${e.region} event`,
-  )
-  const restaurants = fuzzyFilter(
-    ALL_RESTAURANTS.filter(r => matchRegion(r.region)),
-    q, r => `${r.title} ${r.region} ${r.cuisine} restaurant dining`,
+    liveEvents.filter(e => matchRegion(e.location)),
+    q, e => `${e.title} ${e.location} event`,
   )
 
-  const hasResults = stays.length + hikes.length + activities.length + events.length + restaurants.length > 0
+  const hasResults = stays.length + hikes.length + activities.length + events.length > 0
 
   return (
     <div className="min-h-screen bg-[#F7F5F2]">
@@ -453,8 +457,14 @@ function SearchResults() {
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
               {hikes.map(h => (
                 <Link key={h.id} href={`/hikes/${h.id}`} className="group bg-white">
-                  <div className="aspect-[4/3] overflow-hidden">
-                    <img loading="lazy" decoding="async" src={h.img} alt={h.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" />
+                  <div className="aspect-[4/3] overflow-hidden relative bg-[#2d6a4f]/10">
+                    {h.img ? (
+                      <img loading="lazy" decoding="async" src={h.img} alt={h.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center">
+                        <span className="font-display italic text-lg text-[#2d6a4f]/40">{h.title}</span>
+                      </div>
+                    )}
                   </div>
                   <div className="p-4">
                     <div className="flex items-center justify-between mb-1">
@@ -462,6 +472,7 @@ function SearchResults() {
                       <span className="font-sans text-xs px-2 py-0.5" style={{ color: DIFF_COLOR[h.difficulty], background: DIFF_COLOR[h.difficulty] + '20' }}>{h.difficulty}</span>
                     </div>
                     <h3 className="font-display italic text-lg mb-2">{h.title}</h3>
+                    <StayDistance lat={h.lat} lng={h.lng} className="mb-1" />
                     <p className="font-sans text-xs text-gray-400">{h.distance} · {h.duration}</p>
                   </div>
                 </Link>
@@ -510,41 +521,16 @@ function SearchResults() {
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
               {events.map(ev => (
                 <Link key={ev.id} href="/events" className="group bg-white">
-                  <div className="aspect-[3/2] overflow-hidden">
-                    <img loading="lazy" decoding="async" src={ev.img} alt={ev.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" />
+                  <div className={`aspect-[3/2] overflow-hidden flex items-center justify-center ${ev.event_type === 'special' ? 'bg-[#2d6a4f]' : 'bg-[#1a1a2e]'}`}>
+                    <span className="font-display italic text-lg text-white/70 px-4 text-center">{ev.title}</span>
                   </div>
                   <div className="p-4">
-                    <p className="font-sans text-[10px] tracking-[0.12em] uppercase text-[#C9A96E] mb-1">{ev.date}</p>
+                    <p className="font-sans text-[10px] tracking-[0.12em] uppercase text-[#C9A96E] mb-1">{fmt(ev.starts_at)}</p>
                     <h3 className="font-display italic text-base mb-1 group-hover:text-[#2d6a4f] transition-colors">{ev.title}</h3>
-                    <p className="font-sans text-xs text-gray-400 mb-2">{ev.region}</p>
-                    <p className="font-display italic text-lg text-[#2d6a4f]">R {ev.price}</p>
+                    {ev.location && <p className="font-sans text-xs text-gray-400 mb-2">{ev.location}</p>}
+                    <p className="font-display italic text-lg text-[#2d6a4f]">R {ev.ticket_price.toLocaleString()}</p>
                   </div>
                 </Link>
-              ))}
-            </div>
-          </section>
-        )}
-
-        {/* ── Restaurants ── */}
-        {restaurants.length > 0 && (
-          <section>
-            <SectionHeader label="Where to eat" heading="Restaurants & Dining" count={restaurants.length} />
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-              {restaurants.map(r => (
-                <div key={r.id} className="bg-white">
-                  <div className="aspect-[4/3] overflow-hidden">
-                    <img loading="lazy" decoding="async" src={r.img} alt={r.title} className="w-full h-full object-cover hover:scale-105 transition-transform duration-700" />
-                  </div>
-                  <div className="p-4">
-                    <div className="flex items-center justify-between mb-1">
-                      <span className="font-sans text-[10px] tracking-[0.12em] uppercase text-gray-400">{r.region}</span>
-                      <span className="font-sans text-xs text-[#2d6a4f]">★ {r.rating}</span>
-                    </div>
-                    <h3 className="font-display italic text-base mb-1">{r.title}</h3>
-                    <p className="font-sans text-xs text-gray-400">{r.cuisine}</p>
-                    <p className="font-sans text-xs text-gray-500 mt-1">{r.price_range} per person</p>
-                  </div>
-                </div>
               ))}
             </div>
           </section>

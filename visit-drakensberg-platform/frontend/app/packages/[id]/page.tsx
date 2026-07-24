@@ -15,22 +15,13 @@ import { getTrails, type Trail } from '@/lib/trails'
 
 // Public package page. Live admin-curated packages are bookable here in one
 // step — the platform then coordinates supplier fulfilment behind the scenes.
-// The p1–p4 showcase packages from the listing route to the trip planner.
-
-const SHOWCASE: Record<string, { title: string; location: string; duration: string; price: number; img: string; includes: string[] }> = {
-  p1: { title: 'Amphitheatre Weekend Escape', location: 'Royal Natal', duration: '3 nights', price: 4200, img: 'https://images.unsplash.com/photo-1590098563548-8f14eed3a47f?w=1200&q=80', includes: ['3 nights accommodation', 'Daily breakfast', 'Tugela Falls guided hike', 'San rock art tour'] },
-  p2: { title: 'Central Berg Family Adventure', location: 'Cathedral Peak', duration: '5 nights', price: 8900, img: 'https://images.unsplash.com/photo-1503614472-8c93d56e92ce?w=1200&q=80', includes: ['5 nights family cottage', 'All meals', 'Horse riding', 'Nature walks', 'Rock art excursion'] },
-  p3: { title: 'Sani Pass & Southern Berg Explorer', location: 'Underberg', duration: '4 nights', price: 6600, img: 'https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?w=1200&q=80', includes: ['4 nights lodge', 'Sani Pass 4x4 tour', 'Mountain bike day', 'Fly-fishing half day'] },
-  p4: { title: 'Grand Berg Traverse — 7 Days', location: 'Northern to Southern Berg', duration: '7 nights', price: 18500, img: 'https://images.unsplash.com/photo-1551632811-561732d1e306?w=1200&q=80', includes: ['7 nights premium accommodation', 'All meals', 'Private guide', 'All park fees', 'Transfers'] },
-}
 
 export default function PackageDetailPage() {
   const { id } = useParams() as { id: string }
   const router = useRouter()
-  const showcase = SHOWCASE[id]
   const [pkg, setPkg] = useState<MarketplacePackage | null>(null)
   const [trails, setTrails] = useState<Trail[]>([])
-  const [loaded, setLoaded] = useState(!!showcase)
+  const [loaded, setLoaded] = useState(false)
   const [userId, setUserId] = useState<string | null>(null)
 
   const [form, setForm] = useState({ startDate: '', guests: 2, customerName: '', customerEmail: '', customerPhone: '', specialRequests: '' })
@@ -40,7 +31,6 @@ export default function PackageDetailPage() {
   const [done, setDone] = useState<{ reference: string } | null>(null)
 
   useEffect(() => {
-    if (showcase) return
     Promise.all([getPackageById(id), getTrails()]).then(([p, trls]) => {
       setPkg(p)
       setTrails(trls)
@@ -51,7 +41,7 @@ export default function PackageDetailPage() {
       const meta = user?.user_metadata ?? {}
       setForm(f => ({ ...f, customerName: f.customerName || meta.full_name || '', customerEmail: f.customerEmail || user?.email || '' }))
     })
-  }, [id, showcase])
+  }, [id])
 
   async function submit() {
     if (!pkg) return
@@ -80,45 +70,6 @@ export default function PackageDetailPage() {
     } finally {
       setBooking(false)
     }
-  }
-
-  // ── Showcase fallback ────────────────────────────────────────────────────
-  if (showcase) {
-    return (
-      <main className="bg-mist min-h-screen pt-16">
-        <section className="relative h-[40vh] min-h-[320px] overflow-hidden">
-          <img src={showcase.img} alt={showcase.title} className="w-full h-full object-cover" />
-          <div className="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent" />
-          <div className="absolute bottom-0 left-0 right-0 px-6 lg:px-12 pb-10">
-            <div className="max-w-[1440px] mx-auto">
-              <Link href="/packages" className="inline-flex items-center gap-2 text-white/70 hover:text-white text-sm mb-4 transition-colors"><ArrowLeft size={16} /> All Packages</Link>
-              <h1 className="font-display text-4xl lg:text-5xl text-white">{showcase.title}</h1>
-              <p className="font-sans text-sm text-white/70 mt-2">{showcase.location} · {showcase.duration}</p>
-            </div>
-          </div>
-        </section>
-        <div className="max-w-[900px] mx-auto px-6 lg:px-12 py-12">
-          <div className="bg-white border border-black/8 p-8">
-            <h2 className="font-display text-2xl text-forest mb-4">What's included</h2>
-            <ul className="space-y-2 mb-8">
-              {showcase.includes.map(i => (
-                <li key={i} className="flex items-center gap-2.5 font-sans text-sm text-forest/70"><CheckCircle size={14} className="text-gold shrink-0" /> {i}</li>
-              ))}
-            </ul>
-            <div className="flex items-center justify-between border-t border-black/6 pt-6 flex-wrap gap-4">
-              <div>
-                <p className="font-display text-3xl text-forest">R{showcase.price.toLocaleString()}</p>
-                <p className="font-sans text-xs text-forest/40">per person</p>
-              </div>
-              <Link href="/plan" className="bg-forest text-white px-8 py-3.5 font-sans text-sm hover:bg-forest/90 transition-colors">
-                Plan this Trip →
-              </Link>
-            </div>
-          </div>
-        </div>
-        <Footer />
-      </main>
-    )
   }
 
   // ── Live package ─────────────────────────────────────────────────────────
