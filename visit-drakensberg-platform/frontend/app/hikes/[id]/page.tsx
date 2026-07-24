@@ -5,7 +5,7 @@ import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import Footer from '@/components/layout/Footer'
 import { ArrowLeft, Mountain, Clock, TrendingUp, Users, Star, CheckCircle, ChevronRight, X } from 'lucide-react'
-import { getTrails, Trail, DEFAULT_TRAILS } from '@/lib/trails'
+import { getTrails, Trail, DEFAULT_TRAILS, trailCategory } from '@/lib/trails'
 import UpcomingDepartures from '@/components/tours/UpcomingDepartures'
 import TrailExperiences from '@/components/experiences/TrailExperiences'
 import { getDepartures } from '@/lib/departures'
@@ -18,6 +18,12 @@ import RouteArtwork from '@/components/trails/RouteArtwork'
 
 const DIFF_COLOR: Record<string, string> = { Easy: '#4A7251', Moderate: '#C9A96E', Hard: '#c0392b', Strenuous: '#c0392b', Extreme: '#7f1d1d' }
 const DIFF_BG: Record<string, string> = { Easy: '#4A725122', Moderate: '#C9A96E22', Hard: '#c0392b22', Strenuous: '#c0392b22', Extreme: '#7f1d1d22' }
+
+const CATEGORY_LABEL: Record<string, string> = {
+  day_hike: 'Day Hike',
+  multi_day_hike: 'Multi-Day Hike',
+  speciality_walk: 'Speciality Walk',
+}
 
 const TRAIL_COLOR: Record<string, string> = {
   Easy: 'bg-[#4A7251]',
@@ -108,7 +114,10 @@ export default function HikeDetailPage() {
           )}
           <div className="relative z-10 flex items-start justify-between flex-wrap gap-4">
             <div>
-              <p className="font-sans text-[10px] tracking-[0.2em] uppercase text-[#C9A96E] mb-2">{trail.region}</p>
+              <p className="font-sans text-[10px] tracking-[0.2em] uppercase text-[#C9A96E] mb-2">
+                {trail.region}
+                {' · '}{trailCategory(trail) === 'speciality_walk' && trail.speciality_type ? trail.speciality_type : CATEGORY_LABEL[trailCategory(trail)]}
+              </p>
               <h1 className="font-display italic text-5xl lg:text-6xl mb-4">{trail.name}</h1>
               <p className="font-sans text-sm text-white/60">Starting point: {trail.trailhead}</p>
             </div>

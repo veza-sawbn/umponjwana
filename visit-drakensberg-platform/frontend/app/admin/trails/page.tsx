@@ -2,12 +2,24 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { Plus, Pencil, Trash2, Star, X, Check, GripVertical, ImagePlus, CalendarDays } from 'lucide-react'
-import { Trail, TrailDay, getTrails, saveTrails, DEFAULT_TRAILS } from '@/lib/trails'
+import { Trail, TrailDay, TrailCategory, getTrails, saveTrails, DEFAULT_TRAILS, trailCategory, SPECIALITY_WALK_TYPES } from '@/lib/trails'
 import { analyseGpxAsync, ROUTE_TYPES } from '@/lib/gpx'
 import RouteArtwork from '@/components/trails/RouteArtwork'
 
 const REGIONS = ['Northern Berg', 'Central Berg', 'Southern Berg', 'Royal Natal National Park', 'Champagne Valley', "Giant's Castle", 'Sani Pass']
 const DIFFICULTIES = ['Easy', 'Moderate', 'Strenuous', 'Extreme'] as const
+
+const TRAIL_CATEGORIES: { value: TrailCategory; label: string }[] = [
+  { value: 'day_hike', label: 'Day Hike' },
+  { value: 'multi_day_hike', label: 'Multi-Day Hike' },
+  { value: 'speciality_walk', label: 'Speciality Walk' },
+]
+
+const CATEGORY_STYLE: Record<TrailCategory, string> = {
+  day_hike: 'bg-[#2d6a4f]/10 text-[#2d6a4f]',
+  multi_day_hike: 'bg-[#1a1a2e]/80 text-white',
+  speciality_walk: 'bg-[#C9A96E]/20 text-[#8B6914]',
+}
 
 const DIFF_STYLE: Record<string, string> = {
   Easy: 'bg-green-50 text-green-700',
@@ -253,6 +265,41 @@ function TrailForm({ trail, onChange, onSave, onCancel, saveLabel, saving }: {
           </select>
         </div>
         <div>
+          <label className={labelCls}>Trail Category</label>
+          <select
+            value={trailCategory(trail)}
+            onChange={e => {
+              const value = e.target.value as TrailCategory
+              onChange('category', value)
+              onChange('is_multi_day', value === 'multi_day_hike')
+            }}
+            className={inputCls}
+          >
+            {TRAIL_CATEGORIES.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
+          </select>
+        </div>
+        {trailCategory(trail) === 'speciality_walk' && (
+          <div>
+            <label className={labelCls}>Speciality Walk Type</label>
+            <select
+              value={SPECIALITY_WALK_TYPES.includes(trail.speciality_type as any) ? trail.speciality_type : (trail.speciality_type ? 'Custom' : SPECIALITY_WALK_TYPES[0])}
+              onChange={e => onChange('speciality_type', e.target.value === 'Custom' ? '' : e.target.value)}
+              className={inputCls}
+            >
+              {SPECIALITY_WALK_TYPES.map(s => <option key={s}>{s}</option>)}
+              <option value="Custom">Custom…</option>
+            </select>
+            {(!SPECIALITY_WALK_TYPES.includes(trail.speciality_type as any)) && (
+              <input
+                value={trail.speciality_type || ''}
+                onChange={e => onChange('speciality_type', e.target.value)}
+                placeholder="e.g. Waterfall Walk"
+                className={`${inputCls} mt-2`}
+              />
+            )}
+          </div>
+        )}
+        <div>
           <label className={labelCls}>Route Type</label>
           <select value={trail.trail_type || 'Out and back'} onChange={e => onChange('trail_type', e.target.value)} className={inputCls}>
             {ROUTE_TYPES.map(r => <option key={r}>{r}</option>)}
@@ -343,17 +390,16 @@ function TrailForm({ trail, onChange, onSave, onCancel, saveLabel, saving }: {
         </label>
       </div>
 
-      {/* Multi-day toggle */}
-      <div className="border-t border-gray-100 pt-6">
-        <label className="flex items-center gap-2 font-sans text-sm font-medium text-gray-700 cursor-pointer mb-4">
-          <input type="checkbox" checked={trail.is_multi_day} onChange={e => onChange('is_multi_day', e.target.checked)} className="accent-[#2d6a4f]" />
-          <CalendarDays size={15} className="text-[#2d6a4f]" />
-          Multi-day hike (show daily breakdown on trail page)
-        </label>
-        {trail.is_multi_day && (
+      {/* Day-by-day itinerary — shown whenever the trail is categorized as multi-day */}
+      {trailCategory(trail) === 'multi_day_hike' && (
+        <div className="border-t border-gray-100 pt-6">
+          <p className="flex items-center gap-2 font-sans text-sm font-medium text-gray-700 mb-4">
+            <CalendarDays size={15} className="text-[#2d6a4f]" />
+            Day-by-Day Itinerary
+          </p>
           <DaysEditor days={trail.days} onChange={days => onChange('days', days)} />
-        )}
-      </div>
+        </div>
+      )}
 
       {/* Actions */}
       <div className="flex gap-3 border-t border-gray-100 pt-5">
@@ -369,7 +415,7 @@ function TrailForm({ trail, onChange, onSave, onCancel, saveLabel, saving }: {
 const BLANK_TRAIL: Trail = {
   id: '', name: '', region: 'Northern Berg', difficulty: 'Moderate', distance: '', duration: '', elevation: '',
   status: 'draft', featured: false, image: '', gallery: [], description: '', trailhead: '', slug: '', park: '', visibility: 'public', trail_type: 'Out and back',
-  permit_required: false, permit_cost: 0, what_to_bring: [], highlights: [], is_multi_day: false, days: [],
+  permit_required: false, permit_cost: 0, what_to_bring: [], highlights: [], is_multi_day: false, days: [], category: 'day_hike',
 }
 
 export default function AdminTrailsPage() {
@@ -378,6 +424,7 @@ export default function AdminTrailsPage() {
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
   const [regionFilter, setRegionFilter] = useState<string>('All')
+  const [categoryFilter, setCategoryFilter] = useState<'All' | TrailCategory>('All')
   const [editingTrail, setEditingTrail] = useState<Trail | null>(null)
   const [showAdd, setShowAdd] = useState(false)
   const [newTrail, setNewTrail] = useState<Trail>({ ...BLANK_TRAIL })
@@ -386,7 +433,10 @@ export default function AdminTrailsPage() {
     getTrails().then(t => { setTrails(t); setLoading(false) })
   }, [])
 
-  const filtered = trails.filter(t => regionFilter === 'All' || t.region === regionFilter)
+  const filtered = trails.filter(t =>
+    (regionFilter === 'All' || t.region === regionFilter) &&
+    (categoryFilter === 'All' || trailCategory(t) === categoryFilter)
+  )
 
   async function persistTrails(updated: Trail[]) {
     setSaving(true)
@@ -472,6 +522,21 @@ export default function AdminTrailsPage() {
       </div>
 
       {/* Filter pills */}
+      <div className="flex flex-wrap gap-2 mb-3">
+        {(['All', ...TRAIL_CATEGORIES.map(c => c.value)] as const).map(c => (
+          <button
+            key={c}
+            onClick={() => setCategoryFilter(c)}
+            className={`px-4 py-1.5 font-sans text-xs tracking-[0.08em] uppercase transition-colors ${
+              categoryFilter === c
+                ? 'bg-[#C9A96E] text-white'
+                : 'border border-gray-200 text-gray-600 hover:border-[#C9A96E] hover:text-[#C9A96E] bg-white'
+            }`}
+          >
+            {c === 'All' ? 'All Categories' : TRAIL_CATEGORIES.find(t => t.value === c)!.label}
+          </button>
+        ))}
+      </div>
       <div className="flex flex-wrap gap-2 mb-6">
         {['All', ...REGIONS].map(r => (
           <button
@@ -496,9 +561,9 @@ export default function AdminTrailsPage() {
               {trail.image && <img src={trail.image} alt={trail.name} className="w-full h-full object-cover" />}
               <div className="absolute top-2 left-2 flex gap-1.5">
                 <span className={`font-sans text-[10px] tracking-[0.1em] uppercase px-2.5 py-1 ${DIFF_STYLE[trail.difficulty]}`}>{trail.difficulty}</span>
-                {trail.is_multi_day && (
-                  <span className="font-sans text-[10px] tracking-[0.1em] uppercase px-2.5 py-1 bg-[#1a1a2e]/80 text-white">Multi-day</span>
-                )}
+                <span className={`font-sans text-[10px] tracking-[0.1em] uppercase px-2.5 py-1 ${CATEGORY_STYLE[trailCategory(trail)]}`}>
+                  {trailCategory(trail) === 'speciality_walk' && trail.speciality_type ? trail.speciality_type : TRAIL_CATEGORIES.find(c => c.value === trailCategory(trail))!.label}
+                </span>
               </div>
               <button
                 onClick={() => toggleFeatured(trail.id)}

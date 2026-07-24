@@ -10,6 +10,16 @@ export type TrailDay = {
   notes?: string
 }
 
+// Day hikes and multi-day hikes are grouped by duration; speciality walks are
+// grouped by theme instead (heritage, birding, star gazing, …) regardless of
+// how long they take, so they get their own category rather than being
+// inferred from `is_multi_day`.
+export type TrailCategory = 'day_hike' | 'multi_day_hike' | 'speciality_walk'
+
+export const SPECIALITY_WALK_TYPES = [
+  'Heritage Walk', 'Birding Walk', 'Star Gazing', 'Cultural Walk', 'Photography Walk', 'Wildflower Walk',
+] as const
+
 export type Trail = {
   id: string
   name: string
@@ -30,6 +40,11 @@ export type Trail = {
   highlights?: string[]
   is_multi_day: boolean
   days: TrailDay[]
+  // Falls back to `is_multi_day` via trailCategory() for trails saved before
+  // this field existed — see trailCategory().
+  category?: TrailCategory
+  // Only meaningful when category is 'speciality_walk'.
+  speciality_type?: string
   slug?: string
   park?: string
   visibility?: 'public' | 'private'
@@ -184,6 +199,11 @@ export const DEFAULT_TRAILS: Trail[] = [
     days: [],
   },
 ]
+
+/** A trail's category, defaulting older trails without one to day/multi-day by duration. */
+export function trailCategory(trail: Trail): TrailCategory {
+  return trail.category ?? (trail.is_multi_day ? 'multi_day_hike' : 'day_hike')
+}
 
 /** Starting point of a trail: the GPX Start waypoint if present, otherwise the first track point. */
 export function trailStartPoint(trail: Trail): { lat: number; lng: number } | null {
