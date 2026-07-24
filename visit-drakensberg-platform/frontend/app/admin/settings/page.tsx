@@ -1,8 +1,148 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import Link from 'next/link'
+import toast from 'react-hot-toast'
 import { Save, CheckCircle, MessageCircle, ChevronRight } from 'lucide-react'
+import { getSiteContent, setSiteContent, SITE_CONTENT_DEFAULTS } from '@/lib/site-content'
+import { getFinanceSettings, setFinanceSettings } from '@/lib/invoices'
+
+type BusinessDetails = typeof SITE_CONTENT_DEFAULTS.business_details
+
+function BusinessDetailsCard() {
+  const [details, setDetails] = useState<BusinessDetails>(SITE_CONTENT_DEFAULTS.business_details)
+  const [saving, setSaving] = useState(false)
+  const [loaded, setLoaded] = useState(false)
+
+  useEffect(() => { getSiteContent('business_details').then(d => { setDetails(d); setLoaded(true) }) }, [])
+
+  const set = (k: keyof BusinessDetails, v: string) => setDetails(d => ({ ...d, [k]: v }))
+
+  async function save() {
+    setSaving(true)
+    try {
+      await setSiteContent('business_details', details)
+      toast.success('Business details saved.')
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Could not save business details')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const field = (label: string, key: keyof BusinessDetails, placeholder = '') => (
+    <div>
+      <label className="block font-sans text-[10px] tracking-[0.12em] uppercase text-gray-400 mb-1.5">{label}</label>
+      <input
+        value={details[key]}
+        onChange={e => set(key, e.target.value)}
+        placeholder={placeholder}
+        className="w-full border border-gray-200 px-4 py-3 font-sans text-sm focus:outline-none focus:border-[#2d6a4f] bg-[#F7F5F2]"
+      />
+    </div>
+  )
+
+  return (
+    <div className="bg-white border border-gray-200 p-6">
+      <div className="flex items-center justify-between mb-5">
+        <h2 className="font-display italic text-xl">Business Details</h2>
+        <button onClick={save} disabled={!loaded || saving} className="inline-flex items-center gap-1.5 font-sans text-xs text-[#2d6a4f] hover:underline disabled:opacity-50">
+          <Save size={12} /> {saving ? 'Saving…' : 'Save'}
+        </button>
+      </div>
+      <p className="font-sans text-xs text-gray-400 mb-5">Appears on every invoice and quote — legal name, registration/VAT numbers, and banking details for EFT payers.</p>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {field('Business Name', 'business_name')}
+        {field('Registration Number', 'registration_number', 'e.g. 2024/000000/07')}
+        {field('VAT Number', 'vat_number', 'e.g. 4123456789')}
+        {field('Email', 'email')}
+        {field('Phone', 'phone', '+27 33 000 0000')}
+        {field('Country', 'country')}
+        {field('Address Line 1', 'address_line1')}
+        {field('Address Line 2', 'address_line2')}
+        {field('City', 'city')}
+        {field('Postal Code', 'postal_code')}
+      </div>
+      <div className="h-px bg-gray-100 my-5" />
+      <p className="font-sans text-[10px] tracking-[0.12em] uppercase text-gray-400 mb-3">Banking Details (for EFT payments)</p>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {field('Bank Name', 'bank_name')}
+        {field('Account Holder', 'bank_account_holder')}
+        {field('Account Number', 'bank_account_number')}
+        {field('Branch Code', 'bank_branch_code')}
+      </div>
+      <div className="mt-4">
+        <label className="block font-sans text-[10px] tracking-[0.12em] uppercase text-gray-400 mb-1.5">Invoice Footer Note (optional)</label>
+        <textarea
+          value={details.invoice_footer_note}
+          onChange={e => set('invoice_footer_note', e.target.value)}
+          rows={2}
+          placeholder="e.g. Thank you for your business — payment due within 7 days."
+          className="w-full border border-gray-200 px-4 py-3 font-sans text-sm focus:outline-none focus:border-[#2d6a4f] bg-[#F7F5F2] resize-none"
+        />
+      </div>
+    </div>
+  )
+}
+
+function TaxSettingsCard() {
+  const [vatRate, setVatRate] = useState('15')
+  const [serviceFeeRate, setServiceFeeRate] = useState('12')
+  const [currency, setCurrency] = useState('ZAR')
+  const [saving, setSaving] = useState(false)
+  const [loaded, setLoaded] = useState(false)
+
+  useEffect(() => {
+    getFinanceSettings().then(s => {
+      setVatRate(String(Math.round(s.vatRate * 1000) / 10))
+      setServiceFeeRate(String(Math.round(s.serviceFeeRate * 1000) / 10))
+      setCurrency(s.currency)
+      setLoaded(true)
+    })
+  }, [])
+
+  async function save() {
+    setSaving(true)
+    try {
+      await setFinanceSettings({
+        vatRate: (parseFloat(vatRate) || 0) / 100,
+        serviceFeeRate: (parseFloat(serviceFeeRate) || 0) / 100,
+        currency,
+      })
+      toast.success('Tax & fee settings saved.')
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Could not save settings')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <div className="bg-white border border-gray-200 p-6">
+      <div className="flex items-center justify-between mb-5">
+        <h2 className="font-display italic text-xl">Tax & Fees</h2>
+        <button onClick={save} disabled={!loaded || saving} className="inline-flex items-center gap-1.5 font-sans text-xs text-[#2d6a4f] hover:underline disabled:opacity-50">
+          <Save size={12} /> {saving ? 'Saving…' : 'Save'}
+        </button>
+      </div>
+      <p className="font-sans text-xs text-gray-400 mb-5">Applied by default to every new order, invoice and quote — individual documents can still override these.</p>
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div>
+          <label className="block font-sans text-[10px] tracking-[0.12em] uppercase text-gray-400 mb-1.5">VAT Rate (%)</label>
+          <input type="number" step="0.1" min="0" value={vatRate} onChange={e => setVatRate(e.target.value)} className="w-full border border-gray-200 px-4 py-3 font-sans text-sm focus:outline-none focus:border-[#2d6a4f] bg-[#F7F5F2]" />
+        </div>
+        <div>
+          <label className="block font-sans text-[10px] tracking-[0.12em] uppercase text-gray-400 mb-1.5">Default Service Fee (%)</label>
+          <input type="number" step="0.1" min="0" value={serviceFeeRate} onChange={e => setServiceFeeRate(e.target.value)} className="w-full border border-gray-200 px-4 py-3 font-sans text-sm focus:outline-none focus:border-[#2d6a4f] bg-[#F7F5F2]" />
+        </div>
+        <div>
+          <label className="block font-sans text-[10px] tracking-[0.12em] uppercase text-gray-400 mb-1.5">Currency</label>
+          <input value={currency} onChange={e => setCurrency(e.target.value.toUpperCase())} maxLength={3} className="w-full border border-gray-200 px-4 py-3 font-sans text-sm focus:outline-none focus:border-[#2d6a4f] bg-[#F7F5F2]" />
+        </div>
+      </div>
+    </div>
+  )
+}
 
 export default function AdminSettingsPage() {
   const [saved, setSaved] = useState(false)
@@ -40,6 +180,9 @@ export default function AdminSettingsPage() {
       </div>
 
       <div className="max-w-2xl space-y-8">
+        <BusinessDetailsCard />
+        <TaxSettingsCard />
+
         {/* Integrations */}
         <Link href="/admin/settings/channels" className="block bg-white border border-gray-200 p-6 hover:border-[#2d6a4f] transition-colors group">
           <div className="flex items-center justify-between">

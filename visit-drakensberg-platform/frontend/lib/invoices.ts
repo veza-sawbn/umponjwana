@@ -90,6 +90,19 @@ export async function getFinanceSettings(): Promise<{ serviceFeeRate: number; va
   return out
 }
 
+/** Admin-only write (RLS: vd_finance_settings is admin-managed). */
+export async function setFinanceSettings(patch: Partial<{ serviceFeeRate: number; vatRate: number; currency: string }>): Promise<void> {
+  const rows: { key: string; value: unknown }[] = []
+  if (patch.serviceFeeRate !== undefined) rows.push({ key: 'service_fee_rate', value: patch.serviceFeeRate })
+  if (patch.vatRate !== undefined) rows.push({ key: 'vat_rate', value: patch.vatRate })
+  if (patch.currency !== undefined) rows.push({ key: 'default_currency', value: patch.currency })
+  if (rows.length === 0) return
+  const { error } = await supabase.from('vd_finance_settings').upsert(
+    rows.map(r => ({ ...r, updated_at: new Date().toISOString() })), { onConflict: 'key' },
+  )
+  if (error) throw new Error(error.message || 'Could not save finance settings')
+}
+
 export async function getReceipts(orderId?: string): Promise<Receipt[]> {
   try {
     let q = supabase.from('vd_receipts').select('*').order('created_at', { ascending: false })

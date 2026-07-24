@@ -7,7 +7,7 @@ import {
   FileText, BarChart2, Search, Settings, LogOut, Mountain,
   Globe, MapPin, Image, Store, Package, ShieldCheck,
   Receipt, Landmark, Banknote, ClipboardList, MessageSquare, Bus,
-  TreePine, Building2,
+  TreePine, Building2, FileSignature, UserCog,
 } from 'lucide-react'
 import { signOut } from '@/lib/auth'
 import { useRouter } from 'next/navigation'
@@ -21,6 +21,7 @@ const NAV = [
   { href: '/admin/bookings', label: 'Bookings', icon: CalendarDays },
   { href: '/admin/orders', label: 'Orders', icon: Receipt },
   { href: '/admin/invoices', label: 'Invoices', icon: FileText },
+  { href: '/admin/quotes', label: 'Quotes', icon: FileSignature },
   { href: '/admin/finance', label: 'Finance', icon: Landmark },
   { href: '/admin/settlements', label: 'Settlements', icon: Banknote },
   { href: '/admin/operations', label: 'Operations', icon: ClipboardList },
@@ -38,6 +39,7 @@ const NAV = [
   { href: '/admin/media', label: 'Media Library', icon: Image },
   { href: '/admin/analytics', label: 'Analytics', icon: BarChart2 },
   { href: '/admin/seo', label: 'SEO', icon: Search },
+  { href: '/admin/roles', label: 'Roles & Permissions', icon: UserCog },
   { href: '/admin/settings', label: 'Settings', icon: Settings },
 ]
 

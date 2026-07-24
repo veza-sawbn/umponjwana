@@ -169,6 +169,25 @@ export const SITE_CONTENT_DEFAULTS = {
     essential_4_title: 'Safety',
     essential_4_body: 'Never hike alone above the escarpment. Register your route with the camp office. Carry a whistle, first aid kit, and a charged phone. Afternoon lightning is common in summer — be off exposed ridges by 1 pm.',
   },
+  // Business details printed on invoices/quotes and used for legal/contact
+  // info. Editable at /admin/settings.
+  business_details: {
+    business_name: 'Visit Drakensberg',
+    registration_number: '',
+    vat_number: '',
+    address_line1: '',
+    address_line2: '',
+    city: '',
+    postal_code: '',
+    country: 'South Africa',
+    email: 'bookings@visitdrakensberg.co.za',
+    phone: '',
+    bank_name: '',
+    bank_account_holder: '',
+    bank_account_number: '',
+    bank_branch_code: '',
+    invoice_footer_note: '',
+  },
   about_page: {
     eyebrow: 'Our story',
     heading: 'About Visit Drakensberg',

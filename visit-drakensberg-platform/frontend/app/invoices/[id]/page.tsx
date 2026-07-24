@@ -5,8 +5,11 @@ import { useParams, useRouter, useSearchParams } from 'next/navigation'
 import { Printer, ArrowLeft, CreditCard, Loader2 } from 'lucide-react'
 import { getInvoiceById, getReceipts, type Invoice, type Receipt } from '@/lib/invoices'
 import { getOrderById, type MasterOrder } from '@/lib/orders'
+import { getSiteContent, SITE_CONTENT_DEFAULTS } from '@/lib/site-content'
 import { formatMoney } from '@/lib/allocation'
 import Logo from '@/components/Logo'
+
+type BusinessDetails = typeof SITE_CONTENT_DEFAULTS.business_details
 
 // Printable customer invoice. One invoice per Master Order — every purchased
 // service on a single document, no supplier payout information. Access is
@@ -24,9 +27,12 @@ function PrintableInvoiceInner() {
   const [invoice, setInvoice] = useState<Invoice | null>(null)
   const [order, setOrder] = useState<MasterOrder | null>(null)
   const [receipts, setReceipts] = useState<Receipt[]>([])
+  const [business, setBusiness] = useState<BusinessDetails>(SITE_CONTENT_DEFAULTS.business_details)
   const [loading, setLoading] = useState(true)
   const [paying, setPaying] = useState(false)
   const [payError, setPayError] = useState('')
+
+  useEffect(() => { getSiteContent('business_details').then(setBusiness) }, [])
 
   const load = useCallback((id: string) => {
     return getInvoiceById(decodeURIComponent(id)).then(async inv => {
@@ -146,9 +152,12 @@ function PrintableInvoiceInner() {
             <div>
               <Logo className="h-6 w-auto text-[#2d6a4f]" />
               <p className="font-sans text-xs text-gray-400 mt-3 leading-relaxed">
-                Visit Drakensberg<br />
-                KwaZulu-Natal, South Africa<br />
-                bookings@visitdrakensberg.co.za
+                {business.business_name}<br />
+                {[business.address_line1, business.address_line2, business.city, business.country].filter(Boolean).join(', ') || 'KwaZulu-Natal, South Africa'}<br />
+                {business.email}
+                {business.phone && <><br />{business.phone}</>}
+                {business.registration_number && <><br />Reg. {business.registration_number}</>}
+                {business.vat_number && <><br />VAT {business.vat_number}</>}
               </p>
             </div>
             <div className="text-right">
@@ -237,8 +246,25 @@ function PrintableInvoiceInner() {
             </div>
           )}
 
+          {Number(invoice.balance) > 0 && business.bank_account_number && (
+            <div className="mt-10 pt-6 border-t border-gray-200">
+              <p className="font-sans text-[10px] tracking-[0.14em] uppercase text-gray-400 mb-2">Pay by EFT</p>
+              <div className="grid grid-cols-2 gap-x-8 gap-y-1 font-sans text-xs text-gray-600 max-w-md">
+                {business.bank_name && <><span className="text-gray-400">Bank</span><span>{business.bank_name}</span></>}
+                {business.bank_account_holder && <><span className="text-gray-400">Account holder</span><span>{business.bank_account_holder}</span></>}
+                <span className="text-gray-400">Account number</span><span>{business.bank_account_number}</span>
+                {business.bank_branch_code && <><span className="text-gray-400">Branch code</span><span>{business.bank_branch_code}</span></>}
+                <span className="text-gray-400">Reference</span><span>{invoice.invoice_number}</span>
+              </div>
+            </div>
+          )}
+
+          {business.invoice_footer_note && (
+            <p className="mt-6 font-sans text-[11px] text-gray-400 leading-relaxed whitespace-pre-line">{business.invoice_footer_note}</p>
+          )}
+
           <p className="mt-10 pt-6 border-t border-gray-200 font-sans text-[11px] text-gray-400 leading-relaxed">
-            This invoice covers all services in your trip, arranged through Visit Drakensberg.
+            This invoice covers all services in your trip, arranged through {business.business_name}.
             Payments reconcile against order {order?.order_number}. Thank you for exploring the Drakensberg with us.
           </p>
         </div>
