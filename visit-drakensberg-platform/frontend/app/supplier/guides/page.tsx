@@ -6,6 +6,8 @@ import { supabase } from '@/lib/auth'
 import {
   getSupplierEntities, addSupplierEntity, deleteSupplierEntity, type SupplierEntity,
 } from '@/lib/supplier-entities'
+import { supplierMediaSource } from '@/lib/supplier-media'
+import { MediaPicker } from '@/components/media/MediaPicker'
 
 type Guide = SupplierEntity & {
   name: string; certs: string; guideNo: string; speciality: string; languages: string; rating: number; tours: number; status: 'verified' | 'pending' | 'rejected'
@@ -97,7 +99,7 @@ export default function GuidesPage() {
             <F label="Years of Experience"><input type="number" min="0" value={form.yearsExperience} onChange={e => set('yearsExperience', e.target.value)} className={inp} /></F>
             <F label="Highest Summit"><input value={form.highestSummit} onChange={e => set('highestSummit', e.target.value)} placeholder="e.g. Mafadi (3,450m)" className={inp} /></F>
             <F label="Completed Expeditions"><input type="number" min="0" value={form.completedExpeditions} onChange={e => set('completedExpeditions', e.target.value)} className={inp} /></F>
-            <F label="Portrait URL"><input value={form.portrait} onChange={e => set('portrait', e.target.value)} placeholder="https://…" className={inp} /></F>
+            <F label="Portrait"><MediaPicker value={form.portrait} onChange={url => set('portrait', url)} source={supplierMediaSource} /></F>
           </div>
           <F label="Biography"><textarea rows={3} value={form.bio} onChange={e => set('bio', e.target.value)} className={`${inp} resize-none`} placeholder="Shown on the guide's public profile…" /></F>
           <p className="font-sans text-xs text-black/40">Guides will be reviewed within 2–3 business days before appearing publicly.</p>

@@ -5,6 +5,8 @@ import { ChevronRight, ChevronLeft, Plus, Trash2 } from 'lucide-react'
 import { supabase } from '@/lib/auth'
 import { getPropertiesBySupplier, type Property } from '@/lib/properties'
 import { addRoom } from '@/lib/rooms'
+import { supplierMediaSource } from '@/lib/supplier-media'
+import { MediaGalleryPicker } from '@/components/media/MediaPicker'
 
 const BED_CONFIGS = ['Single', 'Twin', 'Double', 'Queen', 'King', '2×Queen', '2×King', 'Bunk Beds']
 const ROOM_FEATURES = ['Air Con', 'Heater', 'TV', 'Mini-fridge', 'Safe', 'Balcony', 'Mountain View', 'Private Entrance', 'Wheelchair Accessible', 'Fireplace', 'Kitchenette', 'Bathtub']
@@ -53,39 +55,10 @@ function ChipPicker({ label, options, selected, onChange }: { label: string; opt
 }
 
 function ImageList({ images, onChange }: { images: string[]; onChange: (v: string[]) => void }) {
-  const [draft, setDraft] = useState('')
-  function add() {
-    const url = draft.trim()
-    if (!url) return
-    onChange([...images, url])
-    setDraft('')
-  }
   return (
     <div className="space-y-2">
-      <p className="font-sans text-sm font-medium text-black/70">Image URLs</p>
-      {images.map((url, i) => (
-        <div key={i} className="flex gap-2 items-center">
-          <input value={url} onChange={e => { const next = [...images]; next[i] = e.target.value; onChange(next) }} className={`${inp} flex-1 text-xs`} />
-          <button type="button" onClick={() => onChange(images.filter((_, j) => j !== i))} className="text-red-400 hover:text-red-600 shrink-0">
-            <Trash2 size={14} />
-          </button>
-        </div>
-      ))}
-      <div className="flex gap-2">
-        <input value={draft} onChange={e => setDraft(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); add() } }} placeholder="https://… paste image URL and press Enter" className={`${inp} flex-1 text-xs`} />
-        <button type="button" onClick={add} className="shrink-0 flex items-center gap-1 font-sans text-xs text-[#C9A96E] border border-[#C9A96E]/30 rounded-lg px-2.5 py-1.5 hover:border-[#C9A96E]/60">
-          <Plus size={12} /> Add
-        </button>
-      </div>
-      {images.length > 0 && (
-        <div className="grid grid-cols-3 gap-2 mt-2">
-          {images.map((url, i) => (
-            <div key={i} className="aspect-video rounded-lg overflow-hidden bg-black/5 border border-black/8">
-              <img src={url} alt="" className="w-full h-full object-cover" onError={e => { (e.target as HTMLImageElement).style.display = 'none' }} />
-            </div>
-          ))}
-        </div>
-      )}
+      <p className="font-sans text-sm font-medium text-black/70">Photos</p>
+      <MediaGalleryPicker value={images} onChange={onChange} source={supplierMediaSource} />
     </div>
   )
 }

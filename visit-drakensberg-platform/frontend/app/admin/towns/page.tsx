@@ -4,6 +4,8 @@ import { useEffect, useState } from 'react'
 import { Plus, Trash2, Check } from 'lucide-react'
 import { getTowns, saveAllTowns, type Town } from '@/lib/towns'
 import { getRegions, DEFAULT_REGIONS, type Region } from '@/lib/regions'
+import { adminMediaSource } from '@/lib/admin-supabase'
+import { MediaPicker } from '@/components/media/MediaPicker'
 
 function blankTown(): Town {
   return {
@@ -111,7 +113,7 @@ export default function AdminTownsPage() {
               </div>
             </div>
             <div><label className={labelCls}>Role / Label</label><input value={data.gateway} onChange={e => update('gateway', e.target.value)} className={inputCls} placeholder="e.g. North Berg gateway"/></div>
-            <div><label className={labelCls}>Hero Image URL</label><input value={data.image} onChange={e => update('image', e.target.value)} className={inputCls}/>{data.image && <img src={data.image} alt="Preview" className="mt-2 h-32 w-full object-cover"/>}</div>
+            <div><label className={labelCls}>Hero Image</label><MediaPicker value={data.image} onChange={url => update('image', url)} source={adminMediaSource} /></div>
             <div><label className={labelCls}>Description</label><textarea value={data.description} onChange={e => update('description', e.target.value)} rows={4} className={`${inputCls} resize-none`}/></div>
 
             <div>

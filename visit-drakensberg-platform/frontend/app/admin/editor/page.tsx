@@ -3,7 +3,7 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import {
   X, Check, Loader2, Monitor, Tablet, Smartphone, ExternalLink, MousePointer2,
   Undo2, Redo2, Eye, EyeOff, GripVertical, ChevronRight, ChevronDown, Layers,
-  LayoutPanelTop, Image as ImageIcon, Upload, Search, Plus, Copy, Trash2,
+  LayoutPanelTop, Image as ImageIcon, Plus, Copy, Trash2,
   ArrowUp, ArrowDown, UploadCloud, History, MoreVertical, FileClock, Type,
 } from 'lucide-react'
 import {
@@ -15,7 +15,8 @@ import {
   EDITOR_PAGES, findSection, type EditorPage, type EditorSection,
   type EditorField, type EditorCardCollection,
 } from '@/lib/editor-schema'
-import { getAdminMedia, uploadAdminMedia, type AdminMedia } from '@/lib/admin-supabase'
+import { adminMediaSource } from '@/lib/admin-supabase'
+import { MediaPicker } from '@/components/media/MediaPicker'
 import type { EditFieldConfig } from '@/lib/edit-mode-context'
 
 /* ─── Types ────────────────────────────────────────────────────────────────── */
@@ -57,7 +58,6 @@ export default function AdminEditorPage() {
   const [menuOpen, setMenuOpen] = useState(false)
   const [hasBackup, setHasBackup] = useState(false)
   const [expanded, setExpanded] = useState<Record<string, boolean>>({})
-  const [mediaPicker, setMediaPicker] = useState<{ onPick: (url: string) => void } | null>(null)
 
   // Undo / redo
   const undoStack = useRef<EditorPending[]>([])
@@ -626,7 +626,6 @@ export default function AdminEditorPage() {
               value={sectionValue(selection.field.section, selection.field.fieldKey) || selection.field.value}
               onChange={v => applyChange(selection.field.section, selection.field.fieldKey, v)}
               onClose={() => setSelection(null)}
-              onBrowse={onPick => setMediaPicker({ onPick })}
             />
           )}
 
@@ -649,7 +648,6 @@ export default function AdminEditorPage() {
               onSelectCard={i => setSelection({ kind: 'card', contentKey: selectedSection.cards!.contentKey, fieldKey: selectedSection.cards!.fieldKey, index: i })}
               onAddCard={() => selectedSection.cards && addCard(selectedSection.cards)}
               onClose={() => setSelection(null)}
-              onBrowse={onPick => setMediaPicker({ onPick })}
             />
           )}
 
@@ -663,31 +661,21 @@ export default function AdminEditorPage() {
               onField={(key, v) => updateCard(selection.contentKey, selection.fieldKey, selection.index, { [key]: v })}
               onAction={a => cardAction(selectedCardCollection, selection.index, a)}
               onClose={() => setSelection(null)}
-              onBrowse={onPick => setMediaPicker({ onPick })}
             />
           )}
         </div>
       </div>
-
-      {/* ── Media library modal ── */}
-      {mediaPicker && (
-        <MediaLibraryModal
-          onPick={url => { mediaPicker.onPick(url); setMediaPicker(null) }}
-          onClose={() => setMediaPicker(null)}
-        />
-      )}
     </div>
   )
 }
 
 /* ─── Inspector: single field ──────────────────────────────────────────────── */
 
-function FieldInspector({ field, value, onChange, onClose, onBrowse }: {
+function FieldInspector({ field, value, onChange, onClose }: {
   field: EditFieldConfig
   value: any
   onChange: (v: any) => void
   onClose: () => void
-  onBrowse: (onPick: (url: string) => void) => void
 }) {
   return (
     <>
@@ -701,7 +689,7 @@ function FieldInspector({ field, value, onChange, onClose, onBrowse }: {
         </button>
       </div>
       <div className="flex-1 p-5 overflow-y-auto">
-        <EditInput type={field.type} value={value} min={field.min} max={field.max} onChange={onChange} onBrowse={onBrowse} />
+        <EditInput type={field.type} value={value} min={field.min} max={field.max} onChange={onChange} />
       </div>
       <div className="px-5 py-3 border-t border-gray-100 bg-gray-50">
         <p className="font-sans text-[11px] text-gray-400 leading-relaxed">
@@ -716,7 +704,7 @@ function FieldInspector({ field, value, onChange, onClose, onBrowse }: {
 
 function SectionInspector({
   section, tab, setTab, sectionValue, applyChange, styleOverride, setStyle,
-  hidden, toggleHidden, orderIndex, orderLength, onMove, cards, onSelectCard, onAddCard, onClose, onBrowse,
+  hidden, toggleHidden, orderIndex, orderLength, onMove, cards, onSelectCard, onAddCard, onClose,
 }: {
   section: EditorSection
   tab: 'content' | 'style' | 'advanced'
@@ -734,7 +722,6 @@ function SectionInspector({
   onSelectCard: (i: number) => void
   onAddCard: () => void
   onClose: () => void
-  onBrowse: (onPick: (url: string) => void) => void
 }) {
   const labelCls = 'block font-sans text-[10px] tracking-[0.12em] uppercase text-gray-400 mb-1.5'
   return (
@@ -779,7 +766,6 @@ function SectionInspector({
                   min={f.min}
                   max={f.max}
                   onChange={v => applyChange(section.contentKey!, f.key, v)}
-                  onBrowse={onBrowse}
                   compact
                 />
               </div>
@@ -915,7 +901,7 @@ function SectionInspector({
 
 /* ─── Inspector: card ──────────────────────────────────────────────────────── */
 
-function CardInspector({ collection, index, card, total, onField, onAction, onClose, onBrowse }: {
+function CardInspector({ collection, index, card, total, onField, onAction, onClose }: {
   collection: EditorCardCollection
   index: number
   card: HomeCard | undefined
@@ -923,7 +909,6 @@ function CardInspector({ collection, index, card, total, onField, onAction, onCl
   onField: (key: string, v: any) => void
   onAction: (a: 'duplicate' | 'delete' | 'up' | 'down' | 'toggle') => void
   onClose: () => void
-  onBrowse: (onPick: (url: string) => void) => void
 }) {
   const labelCls = 'block font-sans text-[10px] tracking-[0.12em] uppercase text-gray-400 mb-1.5'
   if (!card) return (
@@ -976,7 +961,6 @@ function CardInspector({ collection, index, card, total, onField, onAction, onCl
               type={f.type as any}
               value={(card[f.key] as any) ?? ''}
               onChange={v => onField(f.key, v)}
-              onBrowse={onBrowse}
               compact
             />
           </div>
@@ -988,13 +972,12 @@ function CardInspector({ collection, index, card, total, onField, onAction, onCl
 
 /* ─── Input component ──────────────────────────────────────────────────────── */
 
-function EditInput({ type, value, min, max, onChange, onBrowse, compact }: {
+function EditInput({ type, value, min, max, onChange, compact }: {
   type: string
   value: string | number
   min?: number
   max?: number
   onChange: (v: string | number) => void
-  onBrowse?: (onPick: (url: string) => void) => void
   compact?: boolean
 }) {
   const inputCls = 'w-full border border-gray-200 px-3 py-2.5 font-sans text-sm focus:outline-none focus:border-forest bg-[#F7F5F2]'
@@ -1004,18 +987,7 @@ function EditInput({ type, value, min, max, onChange, onBrowse, compact }: {
   )
 
   if (type === 'image') return (
-    <div className="space-y-2">
-      <input type="text" value={String(value ?? '')} onChange={e => onChange(e.target.value)} placeholder="https://…" className={inputCls} />
-      {onBrowse && (
-        <button
-          onClick={() => onBrowse(url => onChange(url))}
-          className="flex items-center gap-1.5 font-sans text-xs text-forest hover:text-forest/70 transition-colors"
-        >
-          <ImageIcon className="w-3.5 h-3.5" /> Choose from Media Library
-        </button>
-      )}
-      {value ? <img src={String(value)} alt="Preview" className="w-full h-28 object-cover border border-gray-200" onError={e => { (e.target as HTMLImageElement).style.display = 'none' }} /> : null}
-    </div>
+    <MediaPicker value={String(value ?? '')} onChange={url => onChange(url)} source={adminMediaSource} />
   )
 
   if (type === 'range') return (
@@ -1041,86 +1013,3 @@ function EditInput({ type, value, min, max, onChange, onBrowse, compact }: {
   )
 }
 
-/* ─── Media library modal ──────────────────────────────────────────────────── */
-
-function MediaLibraryModal({ onPick, onClose }: { onPick: (url: string) => void; onClose: () => void }) {
-  const [media, setMedia] = useState<AdminMedia[]>([])
-  const [search, setSearch] = useState('')
-  const [loading, setLoading] = useState(true)
-  const [uploading, setUploading] = useState(false)
-  const [error, setError] = useState('')
-  const fileRef = useRef<HTMLInputElement>(null)
-
-  useEffect(() => {
-    getAdminMedia().then(setMedia).catch(() => setError('Could not load the media library.')).finally(() => setLoading(false))
-  }, [])
-
-  async function upload(file?: File) {
-    if (!file) return
-    setUploading(true)
-    setError('')
-    try {
-      const created = await uploadAdminMedia(file)
-      setMedia(m => [...m, created])
-      onPick(created.url)
-    } catch (e: any) {
-      setError(e?.message || 'Upload failed.')
-    } finally {
-      setUploading(false)
-    }
-  }
-
-  const filtered = media.filter(m => m.type === 'image' && m.name.toLowerCase().includes(search.toLowerCase()))
-
-  return (
-    <div className="fixed inset-0 z-[1100] bg-black/70 flex items-center justify-center p-6" onClick={onClose}>
-      <div className="bg-white w-full max-w-3xl max-h-[80vh] flex flex-col" onClick={e => e.stopPropagation()}>
-        <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between gap-3">
-          <p className="font-sans text-sm font-semibold text-gray-900">Media Library</p>
-          <div className="flex items-center gap-2 flex-1 max-w-xs ml-auto">
-            <Search className="w-3.5 h-3.5 text-gray-300 shrink-0" />
-            <input
-              value={search}
-              onChange={e => setSearch(e.target.value)}
-              placeholder="Search images…"
-              className="flex-1 font-sans text-sm focus:outline-none"
-            />
-          </div>
-          <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={e => upload(e.target.files?.[0])} />
-          <button
-            onClick={() => fileRef.current?.click()}
-            disabled={uploading}
-            className="flex items-center gap-1.5 bg-forest text-white px-3 py-1.5 font-sans text-xs disabled:opacity-50"
-          >
-            {uploading ? <Loader2 className="w-3 h-3 animate-spin" /> : <Upload className="w-3 h-3" />}
-            {uploading ? 'Uploading…' : 'Upload'}
-          </button>
-          <button onClick={onClose} className="text-gray-300 hover:text-gray-600"><X className="w-4 h-4" /></button>
-        </div>
-        {error && <p className="px-5 py-2 font-sans text-xs text-red-500 bg-red-50">{error}</p>}
-        <div className="flex-1 overflow-y-auto p-5">
-          {loading ? (
-            <div className="py-16 flex justify-center"><Loader2 className="w-5 h-5 text-gray-300 animate-spin" /></div>
-          ) : filtered.length === 0 ? (
-            <p className="py-16 text-center font-sans text-sm text-gray-400">No images found — upload one to get started.</p>
-          ) : (
-            <div className="grid grid-cols-4 gap-3">
-              {filtered.map(item => (
-                <button
-                  key={item.id}
-                  onClick={() => onPick(item.url)}
-                  className="group border border-gray-200 hover:border-forest transition-colors text-left"
-                >
-                  <div className="aspect-[4/3] overflow-hidden bg-gray-100">
-                    <img src={item.url} alt={item.name} className="w-full h-full object-cover group-hover:opacity-90 transition-opacity" />
-                  </div>
-                  <p className="px-2 py-1.5 font-sans text-[10px] text-gray-500 truncate">{item.name}</p>
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
-      </div>
-    </div>
-  )
-}

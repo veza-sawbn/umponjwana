@@ -160,6 +160,8 @@ export async function deleteAdminMedia(id: string): Promise<void> {
   }
 }
 
+export const adminMediaSource = { list: getAdminMedia, upload: uploadAdminMedia }
+
 export async function getAdminSuppliers(): Promise<AdminSupplier[]> {
   const { data, error } = await supabase
     .from('profiles')

@@ -4,6 +4,8 @@ import { useEffect, useState } from 'react'
 import { Plus, Trash2, Check } from 'lucide-react'
 import { getReserves, saveAllReserves, type Reserve, type ReservePeak } from '@/lib/reserves'
 import { getRegions, DEFAULT_REGIONS, type Region } from '@/lib/regions'
+import { adminMediaSource } from '@/lib/admin-supabase'
+import { MediaPicker } from '@/components/media/MediaPicker'
 
 type PeakDifficulty = ReservePeak['difficulty']
 
@@ -121,7 +123,7 @@ export default function AdminReservesPage() {
               </div>
               <div><label className={labelCls}>Tagline</label><input value={data.tagline} onChange={e => update('tagline', e.target.value)} className={inputCls}/></div>
             </div>
-            <div><label className={labelCls}>Hero Image URL</label><input value={data.image} onChange={e => update('image', e.target.value)} className={inputCls}/>{data.image && <img src={data.image} alt="Hero preview" className="mt-2 h-32 w-full object-cover"/>}</div>
+            <div><label className={labelCls}>Hero Image</label><MediaPicker value={data.image} onChange={url => update('image', url)} source={adminMediaSource} /></div>
             <div><label className={labelCls}>Description</label><textarea value={data.description} onChange={e => update('description', e.target.value)} rows={5} className={`${inputCls} resize-none`}/></div>
             <div className="grid grid-cols-2 gap-4">
               <div><label className={labelCls}>Panorama Viewpoint Name</label><input value={data.viewpointName} onChange={e => update('viewpointName', e.target.value)} className={inputCls}/></div>

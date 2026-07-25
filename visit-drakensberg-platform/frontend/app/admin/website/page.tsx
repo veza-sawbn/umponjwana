@@ -4,6 +4,8 @@ import { useState, useEffect } from 'react'
 import { Check, Loader2, Plus, Trash2, ExternalLink, Paintbrush } from 'lucide-react'
 import Link from 'next/link'
 import { getAllSiteContent, setSiteContent, SITE_CONTENT_DEFAULTS } from '@/lib/site-content'
+import { adminMediaSource } from '@/lib/admin-supabase'
+import { MediaPicker } from '@/components/media/MediaPicker'
 
 type Section = 'hero' | 'featured' | 'promos' | 'footer' | 'nav' | 'about'
 
@@ -177,15 +179,12 @@ export default function AdminWebsitePage() {
                   </Field>
                 </div>
 
-                <Field label="Background Image URL">
-                  <input value={hero.image_url} onChange={e => setHero(h => ({ ...h, image_url: e.target.value }))} className={inputCls} placeholder="https://…" />
-                  {hero.image_url && (
-                    <img src={hero.image_url} alt="Hero preview" className="mt-2 h-28 w-full object-cover border border-gray-200" />
-                  )}
+                <Field label="Background Image">
+                  <MediaPicker value={hero.image_url} onChange={url => setHero(h => ({ ...h, image_url: url }))} source={adminMediaSource} />
                 </Field>
 
-                <Field label="Background Video URL (overrides image when set)">
-                  <input value={hero.video_url} onChange={e => setHero(h => ({ ...h, video_url: e.target.value }))} className={inputCls} placeholder="https://… (mp4 or webm)" />
+                <Field label="Background Video (overrides image when set)">
+                  <MediaPicker value={hero.video_url} onChange={url => setHero(h => ({ ...h, video_url: url }))} source={adminMediaSource} accept="video" />
                   <p className="font-sans text-xs text-gray-400 mt-1">Leave blank to use the image above. Video autoplays muted.</p>
                 </Field>
 
