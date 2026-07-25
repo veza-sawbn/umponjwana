@@ -3,6 +3,8 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { Plus, Pencil, Eye, Trash2, X, CheckCircle } from 'lucide-react'
+import { adminMediaSource } from '@/lib/admin-supabase'
+import { MediaPicker } from '@/components/media/MediaPicker'
 
 const CATEGORIES = ['Culture', 'Heritage', 'Wildlife', 'Cuisine', 'History', 'Hiking Stories', 'Conservation', 'Photography']
 
@@ -118,13 +120,8 @@ export default function AdminBlogPage() {
               </select>
             </div>
             <div>
-              <label className="block font-sans text-[10px] tracking-[0.12em] uppercase text-gray-400 mb-1.5">Featured Image URL</label>
-              <input
-                value={newPost.featured_image}
-                onChange={e => setNewPost(p => ({ ...p, featured_image: e.target.value }))}
-                className="w-full border border-gray-200 px-3 py-2.5 font-sans text-sm focus:outline-none focus:border-[#2d6a4f] bg-[#F7F5F2]"
-                placeholder="https://…"
-              />
+              <label className="block font-sans text-[10px] tracking-[0.12em] uppercase text-gray-400 mb-1.5">Featured Image</label>
+              <MediaPicker value={newPost.featured_image} onChange={url => setNewPost(p => ({ ...p, featured_image: url }))} source={adminMediaSource} />
             </div>
           </div>
           <div className="mb-4">
@@ -189,13 +186,8 @@ export default function AdminBlogPage() {
               </select>
             </div>
             <div>
-              <label className="block font-sans text-[10px] tracking-[0.12em] uppercase text-gray-400 mb-1.5">Featured Image URL</label>
-              <input
-                value={editingPost.featured_image}
-                onChange={e => setEditingPost(p => p ? { ...p, featured_image: e.target.value } : p)}
-                className="w-full border border-gray-200 px-3 py-2.5 font-sans text-sm focus:outline-none focus:border-[#2d6a4f] bg-[#F7F5F2]"
-                placeholder="https://…"
-              />
+              <label className="block font-sans text-[10px] tracking-[0.12em] uppercase text-gray-400 mb-1.5">Featured Image</label>
+              <MediaPicker value={editingPost.featured_image} onChange={url => setEditingPost(p => p ? { ...p, featured_image: url } : p)} source={adminMediaSource} />
             </div>
           </div>
           <div className="mb-4">

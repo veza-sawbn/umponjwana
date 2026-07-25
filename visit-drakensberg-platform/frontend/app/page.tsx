@@ -4,7 +4,7 @@ import Link from 'next/link'
 import toast from 'react-hot-toast'
 import { ArrowRight, ChevronDown, X } from 'lucide-react'
 import { supabase } from '@/lib/auth'
-import { motion } from 'framer-motion'
+import { motion, AnimatePresence } from 'framer-motion'
 import SearchBar from '@/components/search/SearchBar'
 import Footer from '@/components/layout/Footer'
 import { getAllSiteContent, SITE_CONTENT_DEFAULTS, type HomeCard } from '@/lib/site-content'
@@ -72,12 +72,58 @@ function cardDimClass(card: HomeCard, inEditor: boolean) {
 
 /* ─── Edit-mode hero ─────────────────────────────────────────────────────────── */
 
+// Crossfades through a list of images, each with its own slow continuous
+// parallax drift (a fixed slight overscale panning slowly side to side —
+// not a zoom, the scale never changes) that restarts from scratch every
+// time a slide comes back around. Below two images this is indistinguishable
+// from a static hero image, so callers only reach for it once there's an
+// actual carousel to show.
+const HERO_SLIDE_SECONDS = 7
+const HERO_FADE_SECONDS = 1.5
+const HERO_OVERSCALE = 1.12 // headroom for the pan so it never reveals an edge
+
+function HeroCarousel({ images }: { images: string[] }) {
+  const [index, setIndex] = useState(0)
+
+  useEffect(() => {
+    setIndex(0)
+    if (images.length < 2) return
+    const id = setInterval(() => setIndex(i => (i + 1) % images.length), HERO_SLIDE_SECONDS * 1000)
+    return () => clearInterval(id)
+  }, [images])
+
+  const panFromLeft = index % 2 === 0
+
+  return (
+    <AnimatePresence>
+      <motion.div
+        key={index}
+        className="absolute inset-0 overflow-hidden"
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        transition={{ duration: HERO_FADE_SECONDS, ease: 'easeInOut' }}
+      >
+        <motion.img
+          src={images[index]}
+          alt="Drakensberg mountains"
+          className="w-full h-full object-cover"
+          initial={{ scale: HERO_OVERSCALE, x: panFromLeft ? '-3%' : '3%', y: '-2%' }}
+          animate={{ scale: HERO_OVERSCALE, x: panFromLeft ? '3%' : '-3%', y: '2%' }}
+          transition={{ duration: HERO_SLIDE_SECONDS + HERO_FADE_SECONDS, ease: 'linear' }}
+        />
+      </motion.div>
+    </AnimatePresence>
+  )
+}
+
 function HeroSection({ hero }: { hero: typeof SITE_CONTENT_DEFAULTS.hero }) {
   const editMode = useEditMode()
   const headline = editMode?.getValue('hero', 'headline', hero.headline) ?? hero.headline
   const subheadline = editMode?.getValue('hero', 'subheadline', hero.subheadline) ?? hero.subheadline
   const locationLabel = editMode?.getValue('hero', 'location_label', hero.location_label) ?? hero.location_label
   const imageUrl = String(editMode?.getValue('hero', 'image_url', hero.image_url) ?? hero.image_url)
+  const carouselImages = (editMode?.getValue('hero', 'images', hero.images) ?? hero.images) as string[]
   const overlayOpacity = Number(editMode?.getValue('hero', 'overlay_opacity', hero.overlay_opacity) ?? hero.overlay_opacity)
 
   return (
@@ -85,6 +131,8 @@ function HeroSection({ hero }: { hero: typeof SITE_CONTENT_DEFAULTS.hero }) {
       <div className="absolute inset-0">
         {hero.video_url ? (
           <video src={hero.video_url} autoPlay muted loop playsInline className="w-full h-full object-cover" />
+        ) : carouselImages.length > 1 ? (
+          <HeroCarousel images={carouselImages} />
         ) : (
           <Editable section="hero" fieldKey="image_url" value={imageUrl} label="Background Image" type="image">
             <img src={imageUrl} alt="Drakensberg mountains" className="w-full h-full object-cover" />

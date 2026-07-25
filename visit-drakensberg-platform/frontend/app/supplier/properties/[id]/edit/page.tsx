@@ -5,6 +5,8 @@ import { ChevronRight, ChevronLeft } from 'lucide-react'
 import { getPropertyById, updateProperty, PROPERTY_REGIONS } from '@/lib/properties'
 import { getRegionNames } from '@/lib/regions'
 import { GoogleAddressField } from '@/components/maps/GoogleAddressField'
+import { supplierMediaSource } from '@/lib/supplier-media'
+import { MediaGalleryPicker } from '@/components/media/MediaPicker'
 
 const PROPERTY_TYPES = ['Lodge', 'Guesthouse', 'Hotel', 'Self-catering Cottage', 'Campsite', 'Backpackers', 'Boutique Hotel']
 const AMENITIES = ['Swimming Pool', 'Braai Facilities', 'Wi-Fi', 'Restaurant', 'Bar', 'Spa', 'Gym', 'Laundry', 'Pet-Friendly', 'Wheelchair Access', 'Airport Transfers', 'Hiking Trails Access']
@@ -223,34 +225,8 @@ export default function EditPropertyPage() {
 
         {step === 3 && (
           <div>
-            <p className="font-sans text-sm font-medium text-black/70 mb-3">Photo URLs</p>
-            <div className="space-y-2">
-              {[...form.photos, ''].map((url, i) => (
-                <input
-                  key={i}
-                  value={url}
-                  onChange={e => {
-                    const updated = [...form.photos]
-                    if (i === form.photos.length) {
-                      if (e.target.value) updated.push(e.target.value)
-                    } else {
-                      updated[i] = e.target.value
-                      if (!e.target.value) updated.splice(i, 1)
-                    }
-                    setField('photos', updated)
-                  }}
-                  placeholder={i === form.photos.length ? 'Add photo URL…' : `Photo ${i + 1}`}
-                  className={input}
-                />
-              ))}
-            </div>
-            {form.photos.length > 0 && (
-              <div className="grid grid-cols-3 gap-2 mt-4">
-                {form.photos.filter(Boolean).map((url, i) => (
-                  <img key={i} src={url} alt="" className="aspect-video object-cover rounded border border-black/10" onError={e => (e.currentTarget.style.display = 'none')} />
-                ))}
-              </div>
-            )}
+            <p className="font-sans text-sm font-medium text-black/70 mb-3">Photos</p>
+            <MediaGalleryPicker value={form.photos} onChange={v => setField('photos', v)} source={supplierMediaSource} />
           </div>
         )}
 

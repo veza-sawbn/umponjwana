@@ -6,6 +6,8 @@ import { Building2, Eye, EyeOff } from 'lucide-react'
 import { supabase } from '@/lib/auth'
 import { getMyOperatorProfile, saveOperatorProfile, type OperatorProfile } from '@/lib/operators'
 import { PROPERTY_REGIONS } from '@/lib/properties'
+import { supplierMediaSource } from '@/lib/supplier-media'
+import { MediaPicker } from '@/components/media/MediaPicker'
 
 // Public supplier-directory profile: what visitors see on /guides. Guides
 // registered under /supplier/guides appear on the public profile
@@ -139,10 +141,8 @@ export default function CompanyProfilePage() {
 
       <div className="bg-white rounded-xl border border-black/8 p-6 space-y-4">
         <F label="Company Name" required><input value={form.companyName} onChange={e => set('companyName', e.target.value)} className={inp} /></F>
-        <div className="grid grid-cols-2 gap-4">
-          <F label="Logo URL"><input value={form.logo} onChange={e => set('logo', e.target.value)} placeholder="https://…" className={inp} /></F>
-          <F label="Location / Town"><input value={form.location} onChange={e => set('location', e.target.value)} placeholder="e.g. Winterton, Central Berg" className={inp} /></F>
-        </div>
+        <F label="Logo"><MediaPicker value={form.logo} onChange={url => set('logo', url)} source={supplierMediaSource} /></F>
+        <F label="Location / Town"><input value={form.location} onChange={e => set('location', e.target.value)} placeholder="e.g. Winterton, Central Berg" className={inp} /></F>
         <div className="grid grid-cols-2 gap-4">
           <F label="Years Operating"><input type="number" min={0} value={form.yearsOperating} onChange={e => set('yearsOperating', Math.max(0, +e.target.value))} className={inp} /></F>
           <F label="Languages (comma separated)"><input value={form.languages} onChange={e => set('languages', e.target.value)} placeholder="English, Zulu" className={inp} /></F>

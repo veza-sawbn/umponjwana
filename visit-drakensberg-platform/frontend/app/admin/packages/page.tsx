@@ -13,8 +13,9 @@ import {
   PACKAGE_STATUS_LABELS, COMPONENT_TYPE_LABELS,
   type MarketplacePackage, type PackageComponent, type PackageComponentType, type PackageStatus,
 } from '@/lib/packages'
-import { getAdminSuppliers, type AdminSupplier } from '@/lib/admin-supabase'
+import { getAdminSuppliers, adminMediaSource, type AdminSupplier } from '@/lib/admin-supabase'
 import { getTrails, type Trail } from '@/lib/trails'
+import { MediaPicker } from '@/components/media/MediaPicker'
 
 // Admin Package Builder: packages are curated by Visit Drakensberg from
 // services supplied by multiple businesses. Each component keeps its own
@@ -291,8 +292,8 @@ export default function AdminPackagesPage() {
                 <textarea rows={4} value={draft.description} onChange={e => set('description', e.target.value)} className={`${inputCls} resize-none`} />
               </div>
               <div>
-                <label className={labelCls}>Hero Image URL</label>
-                <input value={draft.image} onChange={e => set('image', e.target.value)} className={inputCls} />
+                <label className={labelCls}>Hero Image</label>
+                <MediaPicker value={draft.image} onChange={url => set('image', url)} source={adminMediaSource} />
               </div>
               <div>
                 <label className={labelCls}>Region</label>

@@ -1,10 +1,12 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
-import { Plus, Pencil, Trash2, Star, X, Check, GripVertical, ImagePlus, CalendarDays } from 'lucide-react'
+import { Plus, Pencil, Trash2, Star, X, Check, GripVertical, CalendarDays } from 'lucide-react'
 import { Trail, TrailDay, TrailCategory, getTrails, saveTrails, DEFAULT_TRAILS, trailCategory, SPECIALITY_WALK_TYPES } from '@/lib/trails'
 import { analyseGpxAsync, ROUTE_TYPES } from '@/lib/gpx'
 import RouteArtwork from '@/components/trails/RouteArtwork'
+import { MediaPicker, MediaGalleryPicker } from '@/components/media/MediaPicker'
+import { adminMediaSource } from '@/lib/admin-supabase'
 
 const REGIONS = ['Northern Berg', 'Central Berg', 'Southern Berg', 'Royal Natal National Park', 'Champagne Valley', "Giant's Castle", 'Sani Pass']
 const DIFFICULTIES = ['Easy', 'Moderate', 'Strenuous', 'Extreme'] as const
@@ -69,51 +71,10 @@ function GpxBuilder({ trail, onApply }: { trail: Trail; onApply: (patch: Partial
 }
 
 function GalleryEditor({ images, onChange }: { images: string[]; onChange: (imgs: string[]) => void }) {
-  const [newUrl, setNewUrl] = useState('')
-
-  function add() {
-    if (!newUrl.trim()) return
-    onChange([...images, newUrl.trim()])
-    setNewUrl('')
-  }
-
-  function remove(i: number) {
-    onChange(images.filter((_, idx) => idx !== i))
-  }
-
   return (
     <div>
       <label className={labelCls}>Gallery Images</label>
-      <div className="grid grid-cols-3 gap-2 mb-3">
-        {images.map((url, i) => (
-          <div key={i} className="relative group">
-            <img src={url} alt="" className="w-full aspect-[4/3] object-cover" />
-            <button
-              onClick={() => remove(i)}
-              className="absolute top-1 right-1 bg-black/70 text-white p-0.5 opacity-0 group-hover:opacity-100 transition-opacity"
-            >
-              <X size={12} />
-            </button>
-          </div>
-        ))}
-        {images.length === 0 && (
-          <div className="col-span-3 bg-[#F7F5F2] border border-dashed border-gray-300 flex items-center justify-center py-6">
-            <span className="font-sans text-xs text-gray-400">No gallery images yet</span>
-          </div>
-        )}
-      </div>
-      <div className="flex gap-2">
-        <input
-          value={newUrl}
-          onChange={e => setNewUrl(e.target.value)}
-          onKeyDown={e => e.key === 'Enter' && add()}
-          placeholder="Paste image URL and press Enter…"
-          className={inputCls + ' flex-1'}
-        />
-        <button onClick={add} className="bg-[#2d6a4f] text-white px-4 py-2 font-sans text-sm hover:bg-[#235a3f] transition-colors flex items-center gap-1.5">
-          <ImagePlus size={14} /> Add
-        </button>
-      </div>
+      <MediaGalleryPicker value={images} onChange={onChange} source={adminMediaSource} />
     </div>
   )
 }
@@ -344,11 +305,8 @@ function TrailForm({ trail, onChange, onSave, onCancel, saveLabel, saving }: {
 
       {/* Hero image */}
       <div>
-        <label className={labelCls}>Hero Image URL</label>
-        <div className="flex gap-3 items-start">
-          <input value={trail.image} onChange={e => onChange('image', e.target.value)} placeholder="https://…" className={inputCls} />
-          {trail.image && <img src={trail.image} alt="" className="w-24 h-16 object-cover shrink-0 border border-gray-200" />}
-        </div>
+        <label className={labelCls}>Hero Image</label>
+        <MediaPicker value={trail.image} onChange={url => onChange('image', url)} source={adminMediaSource} />
       </div>
 
       <GpxBuilder trail={trail} onApply={patch => Object.entries(patch).forEach(([field, value]) => onChange(field, value))} />

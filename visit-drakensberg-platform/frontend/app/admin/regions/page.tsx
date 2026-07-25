@@ -2,8 +2,9 @@
 
 import { useEffect, useState } from 'react'
 import { Plus, Trash2, Check } from 'lucide-react'
-import { getAdminRegions, saveAdminRegions } from '@/lib/admin-supabase'
+import { getAdminRegions, saveAdminRegions, adminMediaSource } from '@/lib/admin-supabase'
 import { DEFAULT_REGIONS } from '@/lib/regions'
+import { MediaPicker } from '@/components/media/MediaPicker'
 
 type KeyAttraction = { id: string; name: string; description: string }
 type Subregion = { id: string; name: string; description: string }
@@ -76,8 +77,8 @@ export default function AdminRegionsPage() {
     <div className="flex gap-6 items-start"><div className="w-52 shrink-0 bg-white border border-gray-200">{regions.map(r => <button key={r.id} onClick={() => setSelectedId(r.id!)} className={`w-full text-left px-4 py-3 font-sans text-sm border-b border-gray-100 last:border-b-0 ${data.id === r.id ? 'bg-[#2d6a4f] text-white' : 'text-gray-700 hover:bg-[#F7F5F2]'}`}>{r.name}</button>)}</div>
       <div className="flex-1 bg-white border border-gray-200 p-6"><div className="flex items-center justify-between mb-6"><h2 className="font-display italic text-xl">{data.name}</h2><button onClick={deleteRegion} className="inline-flex items-center gap-1 text-red-400 font-sans text-xs"><Trash2 size={13}/> Delete region</button></div>
         <div className="space-y-5"><div className="grid grid-cols-2 gap-4"><div><label className={labelCls}>Region Name</label><input value={data.name} onChange={e => update('name', e.target.value)} className={inputCls}/></div><div><label className={labelCls}>Tagline</label><input value={data.tagline} onChange={e => update('tagline', e.target.value)} className={inputCls}/></div></div>
-          <div><label className={labelCls}>Hero Image URL</label><input value={data.heroImage} onChange={e => update('heroImage', e.target.value)} className={inputCls}/>{data.heroImage && <img src={data.heroImage} alt="Hero preview" className="mt-2 h-32 w-full object-cover"/>}</div>
-          <div><label className={labelCls}>Hero Video URL</label><input value={data.heroVideo} onChange={e => update('heroVideo', e.target.value)} className={inputCls}/></div>
+          <div><label className={labelCls}>Hero Image</label><MediaPicker value={data.heroImage} onChange={url => update('heroImage', url)} source={adminMediaSource} /></div>
+          <div><label className={labelCls}>Hero Video</label><MediaPicker value={data.heroVideo} onChange={url => update('heroVideo', url)} source={adminMediaSource} accept="video" /></div>
           <div><label className={labelCls}>Overview</label><textarea value={data.overview} onChange={e => update('overview', e.target.value)} rows={5} className={`${inputCls} resize-none`}/></div>
           <div><div className="flex items-center justify-between mb-2"><label className={labelCls}>Highlights</label><button onClick={() => update('highlights', [...data.highlights, ''])} className="flex items-center gap-1 font-sans text-xs text-[#2d6a4f]"><Plus size={12}/> Add</button></div>{data.highlights.map((h, i) => <div key={i} className="flex gap-2 mb-2"><input value={h} onChange={e => update('highlights', data.highlights.map((item, index) => index === i ? e.target.value : item))} className="flex-1 border border-gray-200 px-3 py-2 font-sans text-sm bg-[#F7F5F2]"/><button onClick={() => update('highlights', data.highlights.filter((_, index) => index !== i))} className="p-2 text-gray-400 hover:text-red-400"><Trash2 size={13}/></button></div>)}</div>
           <div><label className={labelCls}>Getting There</label><textarea value={data.gettingThere} onChange={e => update('gettingThere', e.target.value)} rows={3} className={`${inputCls} resize-none`}/></div><div><label className={labelCls}>Best Time to Visit</label><textarea value={data.bestTime} onChange={e => update('bestTime', e.target.value)} rows={3} className={`${inputCls} resize-none`}/></div>

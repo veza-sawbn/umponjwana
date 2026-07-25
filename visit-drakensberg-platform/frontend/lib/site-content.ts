@@ -17,6 +17,10 @@ export const SITE_CONTENT_DEFAULTS = {
     cta_label: 'Plan Your Trip',
     cta_link: '/plan',
     image_url: 'https://images.unsplash.com/photo-1590098563548-8f14eed3a47f?w=1800&q=85',
+    // Carousel of hero background images (crossfade + slow zoom). Falls back
+    // to a single static image_url when empty, so existing sites keep
+    // working without reconfiguration.
+    images: [] as string[],
     video_url: '',
     overlay_opacity: 40,
     location_label: 'KwaZulu-Natal · South Africa',
