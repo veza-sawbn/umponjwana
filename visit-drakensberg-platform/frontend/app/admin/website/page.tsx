@@ -5,7 +5,7 @@ import { Check, Loader2, Plus, Trash2, ExternalLink, Paintbrush } from 'lucide-r
 import Link from 'next/link'
 import { getAllSiteContent, setSiteContent, SITE_CONTENT_DEFAULTS } from '@/lib/site-content'
 import { adminMediaSource } from '@/lib/admin-supabase'
-import { MediaPicker } from '@/components/media/MediaPicker'
+import { MediaPicker, MediaGalleryPicker } from '@/components/media/MediaPicker'
 
 type Section = 'hero' | 'featured' | 'promos' | 'footer' | 'nav' | 'about'
 
@@ -181,11 +181,17 @@ export default function AdminWebsitePage() {
 
                 <Field label="Background Image">
                   <MediaPicker value={hero.image_url} onChange={url => setHero(h => ({ ...h, image_url: url }))} source={adminMediaSource} />
+                  <p className="font-sans text-xs text-gray-400 mt-1">Used when the carousel below is empty or has only one photo.</p>
                 </Field>
 
-                <Field label="Background Video (overrides image when set)">
+                <Field label="Background Carousel (fades between photos, each with a slow zoom)">
+                  <MediaGalleryPicker value={hero.images} onChange={imgs => setHero(h => ({ ...h, images: imgs }))} source={adminMediaSource} />
+                  <p className="font-sans text-xs text-gray-400 mt-1">Add two or more photos to turn the hero into a rotating carousel. Leave empty to use the single background image above.</p>
+                </Field>
+
+                <Field label="Background Video (overrides image/carousel when set)">
                   <MediaPicker value={hero.video_url} onChange={url => setHero(h => ({ ...h, video_url: url }))} source={adminMediaSource} accept="video" />
-                  <p className="font-sans text-xs text-gray-400 mt-1">Leave blank to use the image above. Video autoplays muted.</p>
+                  <p className="font-sans text-xs text-gray-400 mt-1">Leave blank to use the image or carousel above. Video autoplays muted.</p>
                 </Field>
 
                 <Field label={`Overlay Opacity: ${hero.overlay_opacity}%`}>
