@@ -24,7 +24,7 @@ function fmt(d: string) {
 }
 
 function listingName(booking: SavedBooking) {
-  return booking.stay?.title || booking.addons[0]?.title || booking.shuttle?.label || 'Custom itinerary'
+  return booking.stay?.title || booking.addons[0]?.title || booking.shuttles[0]?.label || 'Custom itinerary'
 }
 
 function supplierName(booking: SavedBooking) {
@@ -33,7 +33,7 @@ function supplierName(booking: SavedBooking) {
 
 function bookingType(booking: SavedBooking) {
   if (booking.stay) return 'accommodation'
-  if (booking.shuttle) return 'shuttle'
+  if (booking.shuttles.length > 0) return 'shuttle'
   return booking.addons[0]?.type || 'itinerary'
 }
 

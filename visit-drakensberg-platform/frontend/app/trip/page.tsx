@@ -22,7 +22,7 @@ export default function TripPage() {
 
   const hikeAddons = booking.addons.filter(a => a.type === 'hike' || a.type === 'tour' || a.type === 'activity')
   const hasStay = !!booking.stay
-  const hasShuttle = !!booking.shuttle
+  const hasShuttle = booking.shuttles.length > 0
   const isEmpty = booking.addons.length === 0 && !booking.stay && !hasShuttle
 
   const checkIn = booking.checkIn
@@ -147,8 +147,12 @@ export default function TripPage() {
                     </div>
                   )}
 
-                  {/* Shuttle: partner selection + meet & greet configuration */}
-                  <ShuttleTripCard />
+                  {/* Shuttles: partner selection + meet & greet configuration,
+                      one card per leg so far-apart activities can each carry
+                      their own private transfer under this booking. */}
+                  {booking.shuttles.map(shuttle => (
+                    <ShuttleTripCard key={shuttle.id} shuttle={shuttle} />
+                  ))}
                 </div>
               )}
             </section>
@@ -304,14 +308,14 @@ export default function TripPage() {
                       <span className="text-black/80 shrink-0 font-medium">R {(booking.stay.price_per_night * booking.nights).toLocaleString()}</span>
                     </div>
                   )}
-                  {booking.shuttle && (
-                    <div className="flex justify-between gap-2 font-sans text-sm">
+                  {booking.shuttles.map(shuttle => (
+                    <div key={shuttle.id} className="flex justify-between gap-2 font-sans text-sm">
                       <span className="text-black/50 truncate">
-                        Shuttle{booking.shuttle.companyName ? ` · ${booking.shuttle.companyName}` : ''}
+                        Shuttle{shuttle.companyName ? ` · ${shuttle.companyName}` : ''}
                       </span>
-                      <span className="text-black/80 shrink-0 font-medium">R {booking.shuttle.price.toLocaleString()}</span>
+                      <span className="text-black/80 shrink-0 font-medium">R {shuttle.price.toLocaleString()}</span>
                     </div>
-                  )}
+                  ))}
                 </div>
               )}
 

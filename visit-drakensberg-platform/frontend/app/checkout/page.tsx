@@ -41,7 +41,7 @@ export default function CheckoutPage() {
   const [phone, setPhone] = useState('')
   const [specialRequests, setSpecialRequests] = useState('')
 
-  const isEmpty = !booking.stay && booking.addons.length === 0 && !booking.shuttle
+  const isEmpty = !booking.stay && booking.addons.length === 0 && booking.shuttles.length === 0
 
   // True once payment succeeded: clearing the cart empties the state, and the
   // empty-cart guard below must NOT hijack the redirect to the success page.
@@ -58,7 +58,7 @@ export default function CheckoutPage() {
   const nights = booking.nights
   const stayTotal = booking.stay ? booking.stay.price_per_night * nights : 0
   const addonTotal = booking.addons.reduce((s, a) => s + a.price_per_person * a.guests, 0)
-  const shuttleTotal = booking.shuttle?.price ?? 0
+  const shuttleTotal = booking.shuttles.reduce((sum, s) => sum + s.price, 0)
   const subtotal = stayTotal + addonTotal + shuttleTotal
   const serviceFee = Math.round(subtotal * 0.12)
   const tax = Math.round((subtotal + serviceFee) * 0.15)
@@ -101,7 +101,7 @@ export default function CheckoutPage() {
         guests: booking.guests,
         stay: booking.stay,
         addons: [...booking.addons],
-        shuttle: booking.shuttle,
+        shuttles: [...booking.shuttles],
       }
 
       if (!user) {
@@ -322,13 +322,17 @@ export default function CheckoutPage() {
                   </div>
                 )}
 
-                {booking.shuttle && (
+                {booking.shuttles.length > 0 && (
                   <div className="mb-4 pb-4 border-b border-white/10">
-                    <p className="font-sans text-[10px] uppercase text-white/30 mb-1">Shuttle</p>
-                    <div className="flex justify-between font-sans text-xs text-white/60">
-                      <span className="flex items-center gap-1 truncate mr-2"><Bus size={10} />{booking.shuttle.label}</span>
-                      <span className="shrink-0">R {booking.shuttle.price.toLocaleString()}</span>
-                    </div>
+                    <p className="font-sans text-[10px] uppercase text-white/30 mb-2">
+                      Shuttle{booking.shuttles.length > 1 ? 's' : ''}
+                    </p>
+                    {booking.shuttles.map(shuttle => (
+                      <div key={shuttle.id} className="flex justify-between font-sans text-xs text-white/60 mb-1.5">
+                        <span className="flex items-center gap-1 truncate mr-2"><Bus size={10} />{shuttle.label}</span>
+                        <span className="shrink-0">R {shuttle.price.toLocaleString()}</span>
+                      </div>
+                    ))}
                   </div>
                 )}
 

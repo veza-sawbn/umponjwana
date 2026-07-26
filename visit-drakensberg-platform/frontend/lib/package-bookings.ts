@@ -66,7 +66,7 @@ export async function bookPackage(input: PackageBookingInput): Promise<SavedBook
       price_per_person: pkg.pricePerPerson,
       guests,
     }],
-    shuttle: null,
+    shuttles: [],
     subtotal,
     serviceFee,
     vat,

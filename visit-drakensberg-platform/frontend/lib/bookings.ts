@@ -21,7 +21,7 @@ export type SavedBooking = {
   guests: number
   stay: BookingStay | null
   addons: BookingAddon[]
-  shuttle: ShuttleOption | null
+  shuttles: ShuttleOption[]
   subtotal: number
   serviceFee: number
   vat: number

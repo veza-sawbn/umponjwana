@@ -337,44 +337,47 @@ export async function createTransportRequest(params: {
 }
 
 /**
- * Every shuttle on a customer itinerary becomes a transport request so the
- * job ultimately belongs to a real supplier. Called from addBooking().
+ * Every shuttle on a customer itinerary becomes its own transport request so
+ * each leg ultimately belongs to a real supplier — a guest with several
+ * far-apart activities can have one request per private transfer, all under
+ * the same booking. Called from addBooking().
  */
-export async function createTransportRequestForBooking(booking: SavedBooking): Promise<TransportRequest | null> {
-  const shuttle = booking.shuttle
-  if (!shuttle) return null
+export async function createTransportRequestForBooking(booking: SavedBooking): Promise<TransportRequest[]> {
+  if (booking.shuttles.length === 0) return []
+  const companies = await getTransportCompanies()
 
-  // The customer picked a supplier + vehicle during the booking journey —
-  // route the job straight to them.
-  let preselected: PreselectedSupplier | undefined
-  if (shuttle.supplierId && shuttle.companyId && shuttle.companyName) {
-    const companies = await getTransportCompanies()
-    const company = companies.find(c => c.id === shuttle.companyId)
-    preselected = {
-      supplierId: shuttle.supplierId,
-      companyId: shuttle.companyId,
-      companyName: shuttle.companyName,
-      category: company?.category ?? 'regional',
-      vehicleId: shuttle.vehicleId,
-      vehicleName: shuttle.vehicleName,
+  return Promise.all(booking.shuttles.map(shuttle => {
+    // The customer picked a supplier + vehicle during the booking journey —
+    // route the job straight to them.
+    let preselected: PreselectedSupplier | undefined
+    if (shuttle.supplierId && shuttle.companyId && shuttle.companyName) {
+      const company = companies.find(c => c.id === shuttle.companyId)
+      preselected = {
+        supplierId: shuttle.supplierId,
+        companyId: shuttle.companyId,
+        companyName: shuttle.companyName,
+        category: company?.category ?? 'regional',
+        vehicleId: shuttle.vehicleId,
+        vehicleName: shuttle.vehicleName,
+      }
     }
-  }
 
-  return createTransportRequest({
-    preselected,
-    userId: booking.userId,
-    customerName: booking.customerName,
-    bookingId: booking.id,
-    bookingReference: booking.reference,
-    pickup: { address: shuttle.pickup ?? shuttle.label, lat: shuttle.pickupLat, lng: shuttle.pickupLng },
-    dropoff: { address: shuttle.destination ?? booking.stay?.title ?? booking.region, lat: shuttle.destinationLat, lng: shuttle.destinationLng },
-    date: shuttle.date || booking.checkIn,
-    time: shuttle.meetAndGreet?.arrivalTime,
-    meetAndGreet: shuttle.meetAndGreet,
-    passengers: shuttle.passengers ?? booking.guests,
-    shuttleType: shuttle.shuttleType,
-    distanceKm: shuttle.distanceKm,
-    durationMinutes: shuttle.durationMinutes,
-    quotedPrice: shuttle.price,
-  })
+    return createTransportRequest({
+      preselected,
+      userId: booking.userId,
+      customerName: booking.customerName,
+      bookingId: booking.id,
+      bookingReference: booking.reference,
+      pickup: { address: shuttle.pickup ?? shuttle.label, lat: shuttle.pickupLat, lng: shuttle.pickupLng },
+      dropoff: { address: shuttle.destination ?? booking.stay?.title ?? booking.region, lat: shuttle.destinationLat, lng: shuttle.destinationLng },
+      date: shuttle.date || booking.checkIn,
+      time: shuttle.meetAndGreet?.arrivalTime,
+      meetAndGreet: shuttle.meetAndGreet,
+      passengers: shuttle.passengers ?? booking.guests,
+      shuttleType: shuttle.shuttleType,
+      distanceKm: shuttle.distanceKm,
+      durationMinutes: shuttle.durationMinutes,
+      quotedPrice: shuttle.price,
+    })
+  }))
 }

@@ -156,18 +156,18 @@ function SuccessInner() {
               </div>
             )}
 
-            {/* Shuttle */}
-            {booking.shuttle && (
-              <div className="bg-white border border-gray-200 p-6 flex items-start gap-4">
+            {/* Shuttles */}
+            {booking.shuttles.map(shuttle => (
+              <div key={shuttle.id} className="bg-white border border-gray-200 p-6 flex items-start gap-4">
                 <Bus size={18} className="text-[#C9A96E] shrink-0 mt-0.5" />
                 <div>
                   <p className="font-sans text-xs text-gray-400 uppercase tracking-wider mb-1">Shuttle</p>
-                  <p className="font-display italic text-lg">{booking.shuttle.label}</p>
-                  <p className="font-sans text-xs text-gray-500 mt-0.5">{booking.shuttle.description}</p>
+                  <p className="font-display italic text-lg">{shuttle.label}</p>
+                  <p className="font-sans text-xs text-gray-500 mt-0.5">{shuttle.description}</p>
                 </div>
-                <p className="font-display italic text-lg text-[#2d6a4f] ml-auto shrink-0">R {booking.shuttle.price.toLocaleString()}</p>
+                <p className="font-display italic text-lg text-[#2d6a4f] ml-auto shrink-0">R {shuttle.price.toLocaleString()}</p>
               </div>
-            )}
+            ))}
 
             {/* What happens next */}
             <div className="bg-white border border-gray-200 p-6 print:hidden">

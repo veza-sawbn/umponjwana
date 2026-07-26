@@ -65,7 +65,9 @@ export type BookingState = {
   guests: number
   stay: BookingStay | null
   addons: BookingAddon[]
-  shuttle: ShuttleOption | null
+  /** Every private-shuttle leg the guest has added — one per far-apart
+   *  activity/stay transfer, all carried into the same booking. */
+  shuttles: ShuttleOption[]
 }
 
 type BookingActions = {
@@ -73,7 +75,9 @@ type BookingActions = {
   setStay: (stay: BookingStay | null) => void
   addAddon: (addon: BookingAddon) => void
   removeAddon: (id: string) => void
-  setShuttle: (shuttle: ShuttleOption | null) => void
+  addShuttle: (shuttle: ShuttleOption) => void
+  removeShuttle: (id: string) => void
+  updateShuttle: (id: string, patch: Partial<ShuttleOption>) => void
   clearBooking: () => void
   hasActiveSearch: boolean
   nights: number
@@ -90,7 +94,7 @@ const EMPTY: BookingState = {
   guests: 2,
   stay: null,
   addons: [],
-  shuttle: null,
+  shuttles: [],
 }
 
 const BookingContext = createContext<BookingState & BookingActions>({
@@ -99,7 +103,9 @@ const BookingContext = createContext<BookingState & BookingActions>({
   setStay: () => {},
   addAddon: () => {},
   removeAddon: () => {},
-  setShuttle: () => {},
+  addShuttle: () => {},
+  removeShuttle: () => {},
+  updateShuttle: () => {},
   clearBooking: () => {},
   hasActiveSearch: false,
   nights: 0,
@@ -123,7 +129,16 @@ export function BookingProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     try {
       const saved = localStorage.getItem(STORAGE_KEY)
-      if (saved) setState(JSON.parse(saved))
+      if (saved) {
+        const parsed = JSON.parse(saved)
+        // Migrate carts saved before multi-shuttle support: a single
+        // `shuttle` field becomes a one-item `shuttles` array.
+        if (parsed && 'shuttle' in parsed && !('shuttles' in parsed)) {
+          parsed.shuttles = parsed.shuttle ? [parsed.shuttle] : []
+          delete parsed.shuttle
+        }
+        setState({ ...EMPTY, ...parsed })
+      }
     } catch {}
     setHydrated(true)
   }, [])
@@ -158,8 +173,24 @@ export function BookingProvider({ children }: { children: React.ReactNode }) {
     setState(s => ({ ...s, addons: s.addons.filter(a => a.id !== id) }))
   }, [])
 
-  const setShuttle = useCallback((shuttle: ShuttleOption | null) => {
-    setState(s => ({ ...s, shuttle }))
+  const addShuttle = useCallback((shuttle: ShuttleOption) => {
+    setState(s => ({
+      ...s,
+      shuttles: s.shuttles.some(sh => sh.id === shuttle.id)
+        ? s.shuttles
+        : [...s.shuttles, shuttle],
+    }))
+  }, [])
+
+  const removeShuttle = useCallback((id: string) => {
+    setState(s => ({ ...s, shuttles: s.shuttles.filter(sh => sh.id !== id) }))
+  }, [])
+
+  const updateShuttle = useCallback((id: string, patch: Partial<ShuttleOption>) => {
+    setState(s => ({
+      ...s,
+      shuttles: s.shuttles.map(sh => sh.id === id ? { ...sh, ...patch } : sh),
+    }))
   }, [])
 
   const clearBooking = useCallback(() => {
@@ -171,7 +202,7 @@ export function BookingProvider({ children }: { children: React.ReactNode }) {
   const totalPrice =
     (state.stay ? state.stay.price_per_night * nights : 0) +
     state.addons.reduce((sum, a) => sum + a.price_per_person * a.guests, 0) +
-    (state.shuttle ? state.shuttle.price : 0)
+    state.shuttles.reduce((sum, sh) => sum + sh.price, 0)
 
   const hasActiveSearch = !!(state.checkIn && state.checkOut)
 
@@ -182,7 +213,9 @@ export function BookingProvider({ children }: { children: React.ReactNode }) {
       setStay,
       addAddon,
       removeAddon,
-      setShuttle,
+      addShuttle,
+      removeShuttle,
+      updateShuttle,
       clearBooking,
       hasActiveSearch,
       nights,
