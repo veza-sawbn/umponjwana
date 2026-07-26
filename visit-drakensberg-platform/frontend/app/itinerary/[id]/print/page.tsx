@@ -47,14 +47,14 @@ function buildSchedule(b: SavedBooking): Array<{ date: string; label: string; ev
       detail: [b.stay.roomName, b.stay.region, b.stay.address].filter(Boolean).join(' · '),
     })
   }
-  if (b.shuttle) {
-    push(b.shuttle.date || b.checkIn, {
+  for (const shuttle of b.shuttles) {
+    push(shuttle.date || b.checkIn, {
       time: 'Transfer',
-      title: b.shuttle.label,
+      title: shuttle.label,
       detail: [
-        b.shuttle.pickup && b.shuttle.destination ? `${b.shuttle.pickup} → ${b.shuttle.destination}` : b.shuttle.description,
-        b.shuttle.passengers ? `${b.shuttle.passengers} passenger${b.shuttle.passengers !== 1 ? 's' : ''}` : '',
-        b.shuttle.durationText,
+        shuttle.pickup && shuttle.destination ? `${shuttle.pickup} → ${shuttle.destination}` : shuttle.description,
+        shuttle.passengers ? `${shuttle.passengers} passenger${shuttle.passengers !== 1 ? 's' : ''}` : '',
+        shuttle.durationText,
       ].filter(Boolean).join(' · '),
     })
   }

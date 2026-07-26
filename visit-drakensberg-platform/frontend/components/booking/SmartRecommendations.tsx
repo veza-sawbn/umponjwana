@@ -160,7 +160,7 @@ export default function SmartRecommendations({ region, excludeListingId, originL
             return (
               <button
                 key={shuttle.id}
-                onClick={() => booking.setShuttle(shuttle)}
+                onClick={() => booking.addShuttle(shuttle)}
                 className="w-full text-left group flex gap-3 bg-white border border-[#2d6a4f]/30 hover:border-[#2d6a4f] transition-colors p-3"
               >
                 <div className="w-14 h-14 shrink-0 bg-[#2d6a4f]/10 flex items-center justify-center text-[#2d6a4f]">

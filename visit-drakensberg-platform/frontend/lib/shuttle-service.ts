@@ -122,12 +122,13 @@ function addonPlace(addon: BookingState['addons'][number]): DistancePlace | null
  *  — which stores a longer `stay.address`-based destination string rather
  *  than the bare `stay.title` this hook generates), so the airport-transfer
  *  suggestion shouldn't be repeated. */
-function airportLegCovered(shuttle: ShuttleOption | null, stay: NonNullable<BookingState['stay']>): boolean {
-  if (!shuttle) return false
-  if (shuttle.destination === stay.title) return true
-  if (shuttle.destination?.includes(stay.title)) return true
-  if (stay.lat && stay.lng && shuttle.destinationLat === stay.lat && shuttle.destinationLng === stay.lng) return true
-  return false
+function airportLegCovered(shuttles: ShuttleOption[], stay: NonNullable<BookingState['stay']>): boolean {
+  return shuttles.some(shuttle => {
+    if (shuttle.destination === stay.title) return true
+    if (shuttle.destination?.includes(stay.title)) return true
+    if (stay.lat && stay.lng && shuttle.destinationLat === stay.lat && shuttle.destinationLng === stay.lng) return true
+    return false
+  })
 }
 
 /**
@@ -157,7 +158,7 @@ export function useShuttleRecommendations(booking: BookingState, limit = 8): Shu
   const recommendations: ShuttleOption[] = []
   if (!stay || status !== 'done') return recommendations
 
-  if (booking.checkIn && !airportLegCovered(booking.shuttle, stay)) {
+  if (booking.checkIn && !airportLegCovered(booking.shuttles, stay)) {
     type HubDistance = { hub: typeof MAJOR_HUBS[number]; result: DistanceResult }
     const best = results.slice(0, MAJOR_HUBS.length).reduce<HubDistance | null>((closest, result, i) => {
       if (!result) return closest
@@ -196,6 +197,6 @@ export function useShuttleRecommendations(booking: BookingState, limit = 8): Shu
   })
 
   return recommendations
-    .filter(rec => rec.id !== booking.shuttle?.id)
+    .filter(rec => !booking.shuttles.some(sh => sh.id === rec.id))
     .slice(0, limit)
 }

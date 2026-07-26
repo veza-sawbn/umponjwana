@@ -674,26 +674,32 @@ function ItineraryInner() {
           )
         })}
 
-        {/* ── Shuttle ── */}
-        {booking.shuttle && (
-          <Section title="Shuttle Transfer" icon={Bus} defaultOpen={false}>
-            <div className="flex items-start gap-4">
-              <div className="flex-1">
-                <p className="font-display italic text-xl mb-1">{booking.shuttle.label}</p>
-                <p className="font-sans text-sm text-gray-500 leading-relaxed">{booking.shuttle.description}</p>
-                <p className="font-sans text-xs text-gray-400 mt-3">Your shuttle operator will confirm pickup time and exact location 24 hours before departure.</p>
-              </div>
-              <p className="font-display italic text-2xl text-[#2d6a4f] shrink-0">R {booking.shuttle.price.toLocaleString()}</p>
-            </div>
-            <div className="mt-4 pt-4 border-t border-gray-100">
-              <SupplierMessageBlock
-                booking={booking}
-                currentUser={currentUser}
-                supplierId=""
-                supplierName="Visit Drakensberg Shuttle Desk"
-                serviceTitle={`Shuttle — ${booking.shuttle.label}`}
-                buttonLabel="Message Shuttle Desk"
-              />
+        {/* ── Shuttles ── */}
+        {booking.shuttles.length > 0 && (
+          <Section title={`Shuttle Transfer${booking.shuttles.length > 1 ? 's' : ''}`} icon={Bus} defaultOpen={false}>
+            <div className="space-y-6">
+              {booking.shuttles.map((shuttle, i) => (
+                <div key={shuttle.id} className={i > 0 ? 'pt-6 border-t border-gray-100' : ''}>
+                  <div className="flex items-start gap-4">
+                    <div className="flex-1">
+                      <p className="font-display italic text-xl mb-1">{shuttle.label}</p>
+                      <p className="font-sans text-sm text-gray-500 leading-relaxed">{shuttle.description}</p>
+                      <p className="font-sans text-xs text-gray-400 mt-3">Your shuttle operator will confirm pickup time and exact location 24 hours before departure.</p>
+                    </div>
+                    <p className="font-display italic text-2xl text-[#2d6a4f] shrink-0">R {shuttle.price.toLocaleString()}</p>
+                  </div>
+                  <div className="mt-4 pt-4 border-t border-gray-100">
+                    <SupplierMessageBlock
+                      booking={booking}
+                      currentUser={currentUser}
+                      supplierId=""
+                      supplierName="Visit Drakensberg Shuttle Desk"
+                      serviceTitle={`Shuttle — ${shuttle.label}`}
+                      buttonLabel="Message Shuttle Desk"
+                    />
+                  </div>
+                </div>
+              ))}
             </div>
           </Section>
         )}
@@ -714,12 +720,12 @@ function ItineraryInner() {
                   <span>R {(booking.stay.price_per_night * booking.nights).toLocaleString()}</span>
                 </div>
               )}
-              {booking.shuttle && (
-                <div className="flex justify-between font-sans text-sm text-gray-700">
-                  <span>{booking.shuttle.label}</span>
-                  <span>R {booking.shuttle.price.toLocaleString()}</span>
+              {booking.shuttles.map(shuttle => (
+                <div key={shuttle.id} className="flex justify-between font-sans text-sm text-gray-700">
+                  <span>{shuttle.label}</span>
+                  <span>R {shuttle.price.toLocaleString()}</span>
                 </div>
-              )}
+              ))}
             </div>
             <div className="border-t border-gray-100 pt-3 space-y-1.5">
               <div className="flex justify-between font-sans text-sm text-gray-500"><span>Subtotal</span><span>R {booking.subtotal.toLocaleString()}</span></div>

@@ -21,15 +21,16 @@ export default function BookingBar() {
   const [open, setOpen] = useState(false)
 
   const hidden = ['/admin', '/checkout', '/auth'].some(p => pathname.startsWith(p))
-  const itemCount = (booking.stay ? 1 : 0) + booking.addons.length + (booking.shuttle ? 1 : 0)
+  const itemCount = (booking.stay ? 1 : 0) + booking.addons.length + booking.shuttles.length
   const shuttleRecommendations = useShuttleRecommendations(booking)
   const visible = !hidden && (booking.hasActiveSearch || itemCount > 0)
 
   function handleCheckout() {
-    // No shuttle yet, or a suggested shuttle without a chosen transport
-    // partner: go through the transfer step so the customer picks the
-    // company/vehicle and leaves arrival details before paying.
-    if (!booking.shuttle || !booking.shuttle.supplierId) {
+    // No shuttle added yet at all: go through the transfer step so the
+    // customer at least decides self-drive vs. a first transfer before
+    // paying. Once any shuttle is in the cart, further legs and transport
+    // partners can be added/configured from the trip page.
+    if (booking.shuttles.length === 0) {
       router.push('/checkout/shuttle')
     } else {
       router.push('/checkout')
@@ -147,13 +148,14 @@ export default function BookingBar() {
                     </AnimatePresence>
 
                     {/* Every leg (airport→stay, plus one per activity/hike/tour) is quoted
-                        independently — picking one must never hide the rest. */}
+                        independently — adding one must never hide or replace the rest,
+                        so guests can stack a private shuttle for each far-apart activity. */}
                     {shuttleRecommendations.length > 0 && (
                       <div className="space-y-2">
                         {shuttleRecommendations.map(shuttle => (
                           <button
                             key={shuttle.id}
-                            onClick={() => booking.setShuttle(shuttle)}
+                            onClick={() => booking.addShuttle(shuttle)}
                             className="w-full flex items-center justify-between bg-[#2d6a4f]/5 border border-[#2d6a4f]/20 px-4 py-3 text-left hover:border-[#2d6a4f] transition-colors"
                           >
                             <div className="flex items-center gap-2">
@@ -176,10 +178,11 @@ export default function BookingBar() {
                       </div>
                     )}
 
-                    {/* Shuttle */}
+                    {/* Shuttles — every added leg gets its own row */}
                     <AnimatePresence>
-                      {booking.shuttle && (
+                      {booking.shuttles.map(shuttle => (
                         <motion.div
+                          key={shuttle.id}
                           className="flex items-center justify-between bg-[#F7F5F2] px-4 py-3"
                           initial={{ opacity: 0, height: 0 }}
                           animate={{ opacity: 1, height: 'auto' }}
@@ -189,19 +192,19 @@ export default function BookingBar() {
                           <div className="flex items-center gap-2">
                             <span className="font-sans text-[10px] tracking-[0.1em] uppercase px-2 py-0.5 bg-[#2d6a4f]/10 text-[#2d6a4f]">Shuttle</span>
                             <div>
-                              <p className="font-sans text-sm font-medium">{booking.shuttle.label}</p>
+                              <p className="font-sans text-sm font-medium">{shuttle.label}</p>
                               <p className="font-sans text-xs text-gray-400">
-                                R {booking.shuttle.price.toLocaleString()}
-                                {booking.shuttle.companyName && ` · ${booking.shuttle.companyName}`}
+                                R {shuttle.price.toLocaleString()}
+                                {shuttle.companyName && ` · ${shuttle.companyName}`}
                               </p>
                             </div>
                           </div>
                           <div className="flex items-center gap-3 ml-3 shrink-0">
                             <Link href="/trip" className="font-sans text-xs text-[#2d6a4f] hover:underline">
-                              {booking.shuttle.supplierId ? 'Configure' : 'Choose partner & flight details'}
+                              {shuttle.supplierId ? 'Configure' : 'Choose partner & flight details'}
                             </Link>
                             <motion.button
-                              onClick={() => booking.setShuttle(null)}
+                              onClick={() => booking.removeShuttle(shuttle.id)}
                               className="text-gray-300 hover:text-red-400 transition-colors"
                               whileTap={{ scale: 0.85 }}
                             >
@@ -209,7 +212,7 @@ export default function BookingBar() {
                             </motion.button>
                           </div>
                         </motion.div>
-                      )}
+                      ))}
                     </AnimatePresence>
                   </div>
                 </div>
@@ -284,7 +287,7 @@ export default function BookingBar() {
               whileTap={{ scale: 0.97 }}
               transition={{ duration: 0.1 }}
             >
-              {!booking.shuttle ? 'Continue →' : 'Go to Checkout →'}
+              {booking.shuttles.length === 0 ? 'Continue →' : 'Go to Checkout →'}
             </motion.button>
           </div>
         </div>

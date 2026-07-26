@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { ArrowLeft, Car, Bus, Check, Clock, ChevronRight, MapPin } from 'lucide-react'
-import { useBooking } from '@/lib/booking-context'
+import { useBooking, type ShuttleOption } from '@/lib/booking-context'
 import { GoogleAddressField, useAutoDrivingDistance, type GooglePlaceSelection } from '@/components/maps/GoogleAddressField'
 import { buildShuttleOption, estimateTransferPrice, suggestedVehicleType, SHUTTLE_TYPES, type ShuttleSupplierChoice, type ShuttleType } from '@/lib/shuttle-service'
 import { TransportSupplierPicker } from '@/components/booking/TransportSupplierPicker'
@@ -26,14 +26,21 @@ export default function ShuttlePage() {
   const [eligibleCount, setEligibleCount] = useState<number | null>(null)
   const [meetAndGreet, setMeetAndGreet] = useState<MeetAndGreetDetails>({})
   const prefilled = useRef(false)
+  // Id of the cart shuttle being configured, when this page picked one up
+  // for completion rather than starting a brand-new leg.
+  const existingIdRef = useRef<string | null>(null)
 
   // A suggested transfer already in the cart (from the trip banner) lands
   // here for configuration: restore its route, partner and arrival details.
+  // Only the leg still missing a transport partner is picked up — other
+  // shuttles already added stay untouched and are configured individually
+  // from the trip page.
   useEffect(() => {
     if (!booking.hydrated || prefilled.current) return
     prefilled.current = true
-    const existing = booking.shuttle
+    const existing = booking.shuttles.find(s => !s.supplierId)
     if (!existing) return
+    existingIdRef.current = existing.id
     setNeedsShuttle(true)
     setPickup({ address: existing.pickup ?? '', lat: existing.pickupLat, lng: existing.pickupLng })
     if (existing.date) setDate(existing.date)
@@ -74,14 +81,13 @@ export default function ShuttlePage() {
 
   function confirm() {
     if (needsShuttle === false) {
-      booking.setShuttle(null)
       router.push('/checkout')
       return
     }
     if (!result || !date) return
-    booking.setShuttle({
+    const option: ShuttleOption = {
       ...buildShuttleOption({
-        id: `shuttle-${Date.now()}`,
+        id: existingIdRef.current ?? `shuttle-${Date.now()}`,
         pickup: { address: pickup.address, lat: pickup.lat, lng: pickup.lng },
         destination: { address: destination.address, lat: destination.lat, lng: destination.lng },
         date,
@@ -91,7 +97,12 @@ export default function ShuttlePage() {
         supplier: supplierChoice ?? undefined,
       }),
       meetAndGreet,
-    })
+    }
+    if (existingIdRef.current) {
+      booking.updateShuttle(existingIdRef.current, option)
+    } else {
+      booking.addShuttle(option)
+    }
     router.push('/checkout')
   }
 

@@ -54,7 +54,7 @@ export default function ShuttlesPage() {
 
   function addToTrip() {
     if (!result || !date) return
-    booking.setShuttle(buildShuttleOption({
+    booking.addShuttle(buildShuttleOption({
       id: `shuttle-${Date.now()}`,
       pickup: { address: pickup.address, lat: pickup.lat, lng: pickup.lng },
       destination: { address: destination.address, lat: destination.lat, lng: destination.lng },

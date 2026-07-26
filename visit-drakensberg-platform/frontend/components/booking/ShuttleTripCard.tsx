@@ -2,30 +2,28 @@
 
 import { useEffect, useState } from 'react'
 import { Bus, Check, ChevronDown, ChevronUp, Trash2, Truck } from 'lucide-react'
-import { useBooking } from '@/lib/booking-context'
+import { useBooking, type ShuttleOption } from '@/lib/booking-context'
 import type { MeetAndGreetDetails } from '@/lib/transport'
 import type { ShuttleSupplierChoice } from '@/lib/shuttle-service'
 import { TransportSupplierPicker } from './TransportSupplierPicker'
 import { MeetAndGreetForm } from './MeetAndGreetForm'
 
-// The shuttle line in the trip cart, expanded into its configuration hub:
-// choose (or change) the transport partner + vehicle, and capture the
+// A single shuttle line in the trip cart, expanded into its configuration
+// hub: choose (or change) the transport partner + vehicle, and capture the
 // arrival details the partner needs for passenger tracking and meet & greet.
+// The trip page renders one of these per shuttle leg the guest has added.
 
-export function ShuttleTripCard() {
+export function ShuttleTripCard({ shuttle }: { shuttle: ShuttleOption }) {
   const booking = useBooking()
-  const shuttle = booking.shuttle
   const [changingPartner, setChangingPartner] = useState(false)
   const [detailsOpen, setDetailsOpen] = useState(false)
-  const [draft, setDraft] = useState<MeetAndGreetDetails>({})
+  const [draft, setDraft] = useState<MeetAndGreetDetails>(shuttle.meetAndGreet ?? {})
   const [savedFlash, setSavedFlash] = useState(false)
 
   useEffect(() => {
-    setDraft(shuttle?.meetAndGreet ?? {})
+    setDraft(shuttle.meetAndGreet ?? {})
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [shuttle?.id])
-
-  if (!shuttle) return null
+  }, [shuttle.id])
 
   const hasPartner = Boolean(shuttle.supplierId && shuttle.vehicleId)
   const hasCoords = Boolean(shuttle.pickupLat && shuttle.pickupLng && shuttle.destinationLat && shuttle.destinationLng)
@@ -34,9 +32,8 @@ export function ShuttleTripCard() {
   const detailsMissing = !shuttle.meetAndGreet?.contactPhone && !shuttle.meetAndGreet?.flightNumber
 
   function applyPartner(choice: ShuttleSupplierChoice | null) {
-    if (!choice || !shuttle) return
-    booking.setShuttle({
-      ...shuttle,
+    if (!choice) return
+    booking.updateShuttle(shuttle.id, {
       supplierId: choice.supplierId,
       companyId: choice.companyId,
       companyName: choice.companyName,
@@ -50,8 +47,7 @@ export function ShuttleTripCard() {
   }
 
   function saveDetails() {
-    if (!shuttle) return
-    booking.setShuttle({ ...shuttle, meetAndGreet: draft })
+    booking.updateShuttle(shuttle.id, { meetAndGreet: draft })
     setSavedFlash(true)
     setTimeout(() => setSavedFlash(false), 2500)
   }
@@ -74,7 +70,7 @@ export function ShuttleTripCard() {
         </div>
         <div className="flex items-center gap-4 shrink-0">
           <p className="font-sans text-sm font-semibold text-black/80">R {shuttle.price.toLocaleString()}</p>
-          <button onClick={() => booking.setShuttle(null)} className="text-red-400 hover:text-red-600 transition-colors" title="Remove">
+          <button onClick={() => booking.removeShuttle(shuttle.id)} className="text-red-400 hover:text-red-600 transition-colors" title="Remove">
             <Trash2 size={14} />
           </button>
         </div>

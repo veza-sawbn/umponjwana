@@ -215,21 +215,21 @@ export async function buildOrderLinesFromBooking(booking: SavedBooking): Promise
     })
   }
 
-  if (booking.shuttle) {
+  for (const shuttle of booking.shuttles) {
     lines.push({
       supplierName: 'Visit Drakensberg',
       category: 'shuttle',
-      productId: booking.shuttle.id,
-      title: booking.shuttle.label,
-      serviceDate: booking.shuttle.date || booking.checkIn,
+      productId: shuttle.id,
+      title: shuttle.label,
+      serviceDate: shuttle.date || booking.checkIn,
       quantity: 1,
       unitLabel: 'trip',
-      unitPrice: booking.shuttle.price,
-      grossAmount: booking.shuttle.price,
+      unitPrice: shuttle.price,
+      grossAmount: shuttle.price,
       value: {
-        pickup: booking.shuttle.pickup,
-        destination: booking.shuttle.destination,
-        passengers: booking.shuttle.passengers,
+        pickup: shuttle.pickup,
+        destination: shuttle.destination,
+        passengers: shuttle.passengers,
       },
     })
   }
