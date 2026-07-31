@@ -37,7 +37,7 @@ export default function SearchBar() {
   }
 
   return (
-    <div className="bg-white border border-white/20 shadow-2xl">
+    <div className="bg-white/50 backdrop-blur-md border border-white/20 shadow-lg">
       <button
         type="button"
         onClick={() => setIsMobileExpanded(open => !open)}
@@ -54,7 +54,7 @@ export default function SearchBar() {
 
       <div id="home-search-availability-fields" className={`${isMobileExpanded ? 'block' : 'hidden'} md:block`}>
       {/* Free-text query */}
-      <div className="px-5 py-4 border-b border-black/10 flex items-center gap-3">
+      <div className="px-5 py-4 border-b border-black/5 flex items-center gap-3">
         <Search size={14} className="text-gray-400 shrink-0" />
         <input
           type="search"
@@ -68,7 +68,7 @@ export default function SearchBar() {
       </div>
 
       {/* Fields row */}
-      <div className="grid grid-cols-1 md:grid-cols-4 divide-y md:divide-y-0 md:divide-x divide-black/10">
+      <div className="grid grid-cols-1 md:grid-cols-4 divide-y md:divide-y-0 md:divide-x divide-black/5">
 
         {/* Region */}
         <div className="px-5 py-4">

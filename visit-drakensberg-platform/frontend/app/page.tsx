@@ -165,7 +165,7 @@ function HeroSection({ hero }: { hero: typeof SITE_CONTENT_DEFAULTS.hero }) {
             {subheadline}
           </motion.p>
         </Editable>
-        <motion.div variants={fadeUp} className="max-w-2xl">
+        <motion.div variants={fadeUp} className="w-full">
           <SearchBar />
         </motion.div>
       </motion.div>
