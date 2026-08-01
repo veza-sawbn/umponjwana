@@ -5,17 +5,34 @@ import type { NextRequest } from 'next/server'
 const PROTECTED_ROUTES = ['/dashboard', '/checkout', '/supplier', '/admin', '/account']
 const ADMIN_ROUTES = ['/admin']
 const SUPPLIER_ROUTES = ['/supplier']
+// Routes that must stay reachable even while maintenance mode is on — the
+// admin/supplier consoles (per the settings toggle's own description), the
+// auth flow (needed to sign in and reach those consoles), and the
+// maintenance page itself (avoid rewriting it into a loop).
+const MAINTENANCE_EXEMPT_ROUTES = ['/admin', '/supplier', '/auth', '/maintenance']
 
 export async function middleware(req: NextRequest) {
   // `res` must be passed through so auth-helpers can refresh the session cookie.
   const res = NextResponse.next()
   const supabase = createMiddlewareClient({ req, res })
 
+  const pathname = req.nextUrl.pathname
+
+  if (!MAINTENANCE_EXEMPT_ROUTES.some(r => pathname.startsWith(r))) {
+    const { data: platformSettings } = await supabase
+      .from('site_content')
+      .select('value')
+      .eq('key', 'platform_settings')
+      .maybeSingle()
+    if (platformSettings?.value?.maintenance_mode) {
+      return NextResponse.redirect(new URL('/maintenance', req.url))
+    }
+  }
+
   // Always call getSession so the helper has a chance to refresh the token and
   // write updated Set-Cookie headers onto `res`.
   const { data: { session } } = await supabase.auth.getSession()
 
-  const pathname = req.nextUrl.pathname
   const isProtected = PROTECTED_ROUTES.some(r => pathname.startsWith(r))
 
   if (isProtected && !session) {
@@ -62,11 +79,7 @@ export async function middleware(req: NextRequest) {
 }
 
 export const config = {
-  matcher: [
-    '/dashboard/:path*',
-    '/checkout/:path*',
-    '/supplier/:path*',
-    '/admin/:path*',
-    '/account/:path*',
-  ],
+  // Run on every page so maintenance mode can gate public routes too, while
+  // skipping static assets, API routes and Next internals.
+  matcher: ['/((?!_next/static|_next/image|api|favicon.ico|.*\\..*).*)'],
 }

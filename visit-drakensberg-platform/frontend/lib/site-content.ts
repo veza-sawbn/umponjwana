@@ -173,6 +173,19 @@ export const SITE_CONTENT_DEFAULTS = {
     essential_4_title: 'Safety',
     essential_4_body: 'Never hike alone above the escarpment. Register your route with the camp office. Carry a whistle, first aid kit, and a charged phone. Afternoon lightning is common in summer — be off exposed ridges by 1 pm.',
   },
+  // Platform-wide settings edited on the main /admin/settings page, including
+  // maintenance_mode, which middleware.ts reads to gate public traffic.
+  platform_settings: {
+    site_name: 'Visit Drakensberg',
+    tagline: 'Discover the Berg',
+    contact_email: 'hello@visitdrakensberg.com',
+    support_phone: '+27 33 000 0000',
+    booking_commission: '10',
+    loyalty_per_rand: '1',
+    require_supplier_approval: true,
+    auto_publish_listings: false,
+    maintenance_mode: false,
+  },
   // Business details printed on invoices/quotes and used for legal/contact
   // info. Editable at /admin/settings.
   business_details: {

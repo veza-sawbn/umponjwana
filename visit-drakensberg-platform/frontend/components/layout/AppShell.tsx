@@ -10,7 +10,7 @@ import EditModeGate from '@/components/editor/EditModeGate'
 
 export default function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
-  const isAdmin = pathname.startsWith('/admin') || pathname.startsWith('/supplier')
+  const isAdmin = pathname.startsWith('/admin') || pathname.startsWith('/supplier') || pathname === '/maintenance'
   const [queryClient] = useState(() => new QueryClient({
     defaultOptions: { queries: { staleTime: 60 * 1000 } },
   }))
