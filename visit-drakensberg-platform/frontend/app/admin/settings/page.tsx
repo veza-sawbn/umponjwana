@@ -144,23 +144,29 @@ function TaxSettingsCard() {
   )
 }
 
+type PlatformSettings = typeof SITE_CONTENT_DEFAULTS.platform_settings
+
 export default function AdminSettingsPage() {
   const [saved, setSaved] = useState(false)
-  const [site, setSite] = useState({
-    site_name: 'Visit Drakensberg',
-    tagline: 'Discover the Berg',
-    contact_email: 'hello@visitdrakensberg.com',
-    support_phone: '+27 33 000 0000',
-    booking_commission: '10',
-    loyalty_per_rand: '1',
-    require_supplier_approval: true,
-    auto_publish_listings: false,
-    maintenance_mode: false,
-  })
+  const [saving, setSaving] = useState(false)
+  const [loaded, setLoaded] = useState(false)
+  const [site, setSite] = useState<PlatformSettings>(SITE_CONTENT_DEFAULTS.platform_settings)
 
-  function handleSave() {
-    setSaved(true)
-    setTimeout(() => setSaved(false), 2000)
+  useEffect(() => {
+    getSiteContent('platform_settings').then(s => { setSite(s); setLoaded(true) })
+  }, [])
+
+  async function handleSave() {
+    setSaving(true)
+    try {
+      await setSiteContent('platform_settings', site)
+      setSaved(true)
+      setTimeout(() => setSaved(false), 2000)
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Could not save settings')
+    } finally {
+      setSaving(false)
+    }
   }
 
   return (
@@ -172,10 +178,11 @@ export default function AdminSettingsPage() {
         </div>
         <button
           onClick={handleSave}
-          className={`inline-flex items-center gap-2 px-5 py-2.5 font-sans text-sm transition-colors ${saved ? 'bg-[#2d6a4f] text-white' : 'bg-[#C9A96E] text-[#1a1a1a] hover:bg-[#b8935e]'}`}
+          disabled={!loaded || saving}
+          className={`inline-flex items-center gap-2 px-5 py-2.5 font-sans text-sm transition-colors disabled:opacity-50 ${saved ? 'bg-[#2d6a4f] text-white' : 'bg-[#C9A96E] text-[#1a1a1a] hover:bg-[#b8935e]'}`}
         >
           {saved ? <CheckCircle size={15} /> : <Save size={15} />}
-          {saved ? 'Saved' : 'Save Settings'}
+          {saved ? 'Saved' : saving ? 'Saving…' : 'Save Settings'}
         </button>
       </div>
 
