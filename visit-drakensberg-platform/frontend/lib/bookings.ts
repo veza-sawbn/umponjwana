@@ -41,8 +41,15 @@ type Row = {
 }
 
 function rowToBooking(r: Row): SavedBooking {
+  const value = r.value as unknown as SavedBooking & { shuttle?: ShuttleOption }
   return {
-    ...(r.value as unknown as SavedBooking),
+    ...value,
+    stay: value?.stay ?? null,
+    addons: value?.addons ?? [],
+    // Bookings saved before multi-shuttle support stored a single `shuttle`
+    // field instead of `shuttles` — same legacy shape migrated in
+    // booking-context.tsx. Preserve it instead of dropping the transfer.
+    shuttles: value?.shuttles ?? (value?.shuttle ? [value.shuttle] : []),
     id: r.id,
     reference: r.reference,
     userId: r.user_id,
