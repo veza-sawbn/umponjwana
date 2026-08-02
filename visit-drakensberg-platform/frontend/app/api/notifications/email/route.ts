@@ -2,16 +2,18 @@ import { NextResponse } from 'next/server'
 import { cookies } from 'next/headers'
 import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs'
 import { supabaseAdmin } from '@/lib/supabase-admin'
+import { sendMail, emailSignature } from '@/lib/mailer'
 
 export const dynamic = 'force-dynamic'
 
 // Emails a user/supplier whenever an in-app notification (lib/notifications.ts
-// notify()) is raised for them — same Resend pattern as app/api/receipts/send,
-// silently skipped if RESEND_API_KEY isn't set. The trigger side can be any
-// signed-in user (per the "Authenticated create notifications" RLS policy on
-// vd_notifications, any signed-in user may notify any other), so the
-// recipient's email is looked up with the admin client rather than trusting
-// the caller's session — the caller never gets the address back.
+// notify()) is raised for them — sent via the domains.co.za mailbox
+// (lib/mailer.ts), silently skipped if SMTP isn't configured. The trigger
+// side can be any signed-in user (per the "Authenticated create
+// notifications" RLS policy on vd_notifications, any signed-in user may
+// notify any other), so the recipient's email is looked up with the admin
+// client rather than trusting the caller's session — the caller never gets
+// the address back.
 
 function emailHtml(o: { title: string; body: string; link: string | null; name: string | null }) {
   return `<!doctype html><html><body style="margin:0;background:#F7F5F2;font-family:Georgia,serif;">
@@ -26,6 +28,7 @@ function emailHtml(o: { title: string; body: string; link: string | null; name: 
       ${o.link ? `<p style="margin:24px 0 0;">
         <a href="${o.link}" style="display:inline-block;background:#2d6a4f;color:#fff;text-decoration:none;padding:12px 24px;font-size:13px;font-family:Arial,sans-serif;">View details</a>
       </p>` : ''}
+      ${emailSignature()}
     </div>
   </div></body></html>`
 }
@@ -45,9 +48,6 @@ export async function POST(req: Request) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'unauthorized' }, { status: 401 })
 
-  const apiKey = process.env.RESEND_API_KEY
-  if (!apiKey) return NextResponse.json({ sent: false, error: 'RESEND_API_KEY not configured' })
-
   const { data: profile } = await supabaseAdmin()
     .from('profiles').select('email, full_name').eq('id', payload.userId).maybeSingle()
   if (!profile?.email) return NextResponse.json({ sent: false, error: 'recipient has no email on file' })
@@ -55,24 +55,11 @@ export async function POST(req: Request) {
   const origin = process.env.NEXT_PUBLIC_SITE_URL || new URL(req.url).origin
   const link = payload.link ? `${origin}${payload.link}` : null
 
-  let sent = false
-  let sendError: string | null = null
-  try {
-    const res = await fetch('https://api.resend.com/emails', {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        from: process.env.RECEIPTS_FROM_EMAIL || 'Visit Drakensberg <notifications@visitdrakensberg.co.za>',
-        to: [profile.email],
-        subject: payload.title,
-        html: emailHtml({ title: payload.title, body: payload.body, link, name: profile.full_name }),
-      }),
-    })
-    sent = res.ok
-    if (!res.ok) sendError = `resend ${res.status}`
-  } catch (e) {
-    sendError = e instanceof Error ? e.message : 'send failed'
-  }
+  const { sent, error } = await sendMail({
+    to: profile.email,
+    subject: payload.title,
+    html: emailHtml({ title: payload.title, body: payload.body, link, name: profile.full_name }),
+  })
 
-  return NextResponse.json({ sent, error: sendError })
+  return NextResponse.json({ sent, error })
 }

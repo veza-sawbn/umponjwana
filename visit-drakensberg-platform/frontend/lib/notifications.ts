@@ -57,8 +57,8 @@ export async function notify(
 
   // Mirror the in-app notification by email, fire-and-forget, so suppliers
   // and customers hear about it without having to be signed in. Skipped
-  // gracefully server-side (no RESEND_API_KEY) or if the recipient has no
-  // email on file — see app/api/notifications/email.
+  // gracefully if SMTP isn't configured or the recipient has no email on
+  // file — see app/api/notifications/email.
   if (typeof fetch === 'function') {
     fetch('/api/notifications/email', {
       method: 'POST',

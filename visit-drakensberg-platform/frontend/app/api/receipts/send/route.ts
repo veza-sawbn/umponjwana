@@ -2,16 +2,18 @@ import { NextResponse } from 'next/server'
 import { cookies } from 'next/headers'
 import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs'
 import { supabaseAdmin } from '@/lib/supabase-admin'
+import { sendMail, emailSignature } from '@/lib/mailer'
 
 export const dynamic = 'force-dynamic'
 
 // Emails a payment receipt to the customer. Called automatically after a
 // payment is recorded (checkout, admin console, package booking).
 //
-// Delivery: Resend HTTP API when RESEND_API_KEY is configured
-// (RECEIPTS_FROM_EMAIL overrides the sender). Without a key the email is
-// skipped gracefully — the in-app notification below still fires, so the
-// customer always sees the receipt in their account.
+// Delivery: SMTP via the domains.co.za mailbox (lib/mailer.ts) when
+// SMTP_HOST/SMTP_USER/SMTP_PASSWORD are configured (EMAIL_FROM overrides the
+// sender). Without them the email is skipped gracefully — the in-app
+// notification below still fires, so the customer always sees the receipt
+// in their account.
 //
 // Data access runs under the CALLER's Supabase session, so RLS applies:
 // a customer can only trigger receipts for their own orders, staff for any.
@@ -77,6 +79,7 @@ function receiptHtml(o: {
         This receipt covers your single trip invoice with Visit Drakensberg — all accommodation,
         activities, transfers and extras appear on one document. Keep this email for your records.
       </p>
+      ${emailSignature()}
     </div>
   </div></body></html>`
 }
@@ -124,43 +127,31 @@ export async function POST(req: Request) {
 
   let sent = false
   let sendError: string | null = null
-  const apiKey = process.env.RESEND_API_KEY
 
-  if (apiKey && email) {
-    try {
-      const res = await fetch('https://api.resend.com/emails', {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          from: process.env.RECEIPTS_FROM_EMAIL || 'Visit Drakensberg <receipts@visitdrakensberg.co.za>',
-          to: [email],
-          subject: isRefund
-            ? `Refund receipt ${receipt.receipt_number} — ${order.order_number}`
-            : `Payment receipt ${receipt.receipt_number} — ${order.order_number}`,
-          html: receiptHtml({
-            customerName: order.customer_name,
-            receiptNumber: receipt.receipt_number,
-            invoiceNumber: invoice?.invoice_number ?? '—',
-            orderNumber: order.order_number,
-            tripName: order.trip_name,
-            amount: Number(receipt.amount),
-            isRefund,
-            method: receipt.method,
-            currency: receipt.currency,
-            date: receipt.created_at,
-            totalPaid: Number(order.amount_paid),
-            balance: Number(order.outstanding_balance),
-            invoiceUrl,
-          }),
-        }),
-      })
-      sent = res.ok
-      if (!res.ok) sendError = `resend ${res.status}`
-    } catch (e) {
-      sendError = e instanceof Error ? e.message : 'send failed'
-    }
-  } else if (!apiKey) {
-    sendError = 'RESEND_API_KEY not configured'
+  if (email) {
+    const result = await sendMail({
+      to: email,
+      subject: isRefund
+        ? `Refund receipt ${receipt.receipt_number} — ${order.order_number}`
+        : `Payment receipt ${receipt.receipt_number} — ${order.order_number}`,
+      html: receiptHtml({
+        customerName: order.customer_name,
+        receiptNumber: receipt.receipt_number,
+        invoiceNumber: invoice?.invoice_number ?? '—',
+        orderNumber: order.order_number,
+        tripName: order.trip_name,
+        amount: Number(receipt.amount),
+        isRefund,
+        method: receipt.method,
+        currency: receipt.currency,
+        date: receipt.created_at,
+        totalPaid: Number(order.amount_paid),
+        balance: Number(order.outstanding_balance),
+        invoiceUrl,
+      }),
+    })
+    sent = result.sent
+    sendError = result.error
   } else {
     sendError = 'order has no customer email'
   }
