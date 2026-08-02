@@ -7,9 +7,11 @@ const ADMIN_ROUTES = ['/admin']
 const SUPPLIER_ROUTES = ['/supplier']
 // Routes that must stay reachable even while maintenance mode is on — the
 // admin/supplier consoles (per the settings toggle's own description), the
-// auth flow (needed to sign in and reach those consoles), and the
-// maintenance page itself (avoid rewriting it into a loop).
-const MAINTENANCE_EXEMPT_ROUTES = ['/admin', '/supplier', '/auth', '/maintenance']
+// auth flow (needed to sign in and reach those consoles), the maintenance
+// page itself (avoid rewriting it into a loop), and customer-facing
+// invoices/quotes (RLS-gated per document, not part of the public site the
+// toggle is meant to hide).
+const MAINTENANCE_EXEMPT_ROUTES = ['/admin', '/supplier', '/auth', '/maintenance', '/invoices', '/quotes']
 
 export async function middleware(req: NextRequest) {
   // `res` must be passed through so auth-helpers can refresh the session cookie.
