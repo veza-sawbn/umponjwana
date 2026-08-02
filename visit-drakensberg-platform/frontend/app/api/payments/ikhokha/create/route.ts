@@ -80,6 +80,17 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'Could not start the payment — please try again shortly.' }, { status: 502 })
   }
 
+  // iKhokha can respond 200 with an app-level failure (bad entityID, invalid
+  // params, etc.) instead of a non-2xx HTTP status — createPaymentLink()
+  // only throws on the latter. Treat a response with no paylinkUrl as a
+  // failure too, and log the raw body: this is currently the only way to
+  // see *why* iKhokha rejected it, since this integration has never been
+  // verified against a real merchant account (see lib/ikhokha.ts header).
+  if (!link.paylinkUrl || !link.paylinkID) {
+    console.error('[ikhokha] createPaymentLink returned no paylinkUrl — raw response:', JSON.stringify(link))
+    return NextResponse.json({ error: 'iKhokha did not return a payment link — please try again shortly.' }, { status: 502 })
+  }
+
   const admin = supabaseAdmin()
   const { error: insertError } = await admin.from('vd_payment_links').insert({
     id: `plink-${randomUUID()}`,
