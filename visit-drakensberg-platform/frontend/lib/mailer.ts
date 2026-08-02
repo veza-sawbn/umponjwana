@@ -29,6 +29,24 @@ function normaliseHost(raw: string): string {
     .replace(/:\d+$/, '')                      // port
 }
 
+/**
+ * SMTP_SECURE describes how the connection is encrypted, which follows from
+ * the port: 465 is implicit TLS, 587 and 25 upgrade via STARTTLS. Hosts don't
+ * usually state it, so leaving it unset and inferring from the port is the
+ * expected configuration — an explicit value only overrides an unusual setup.
+ *
+ * Accepts the spellings people actually type. A strict === 'true' silently
+ * turned "TRUE" into false, which breaks a port-465 connection in a way that
+ * looks like the server is unreachable.
+ */
+function parseSecure(raw: string | undefined, port: number): boolean {
+  const v = raw?.trim().toLowerCase()
+  if (!v) return port === 465
+  if (['true', '1', 'yes', 'on', 'ssl', 'tls'].includes(v)) return true
+  if (['false', '0', 'no', 'off', 'starttls', 'none'].includes(v)) return false
+  return port === 465
+}
+
 function getTransporter() {
   if (transporter) return transporter
   const { SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASSWORD } = process.env
@@ -38,7 +56,7 @@ function getTransporter() {
   transporter = nodemailer.createTransport({
     host: normaliseHost(SMTP_HOST),
     port,
-    secure: process.env.SMTP_SECURE ? process.env.SMTP_SECURE === 'true' : port === 465,
+    secure: parseSecure(process.env.SMTP_SECURE, port),
     // The username is always trimmed — a mailbox name can't contain leading or
     // trailing spaces, so whitespace there is only ever a paste artefact. The
     // password is passed through untouched: trailing space is far more likely
