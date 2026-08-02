@@ -13,11 +13,12 @@
 --
 -- This function only does the sweep — something has to call it on a
 -- schedule. See app/api/cron/expire-pending-bookings/route.ts and the
--- `crons` entry in vercel.json. Vercel's free Hobby tier only runs cron
--- jobs once a day, not on the schedule configured there — on Hobby, expiry
--- latency is effectively "up to a day", not the TTL below. Pro (or an
--- external pinger hitting the route on a real schedule) is needed for the
--- TTL to actually mean what it says.
+-- `crons` entry in vercel.json, currently once daily (03:00 UTC) — Vercel's
+-- free Hobby tier rejects the whole deployment if any cron runs more often
+-- than that, so on Hobby, expiry latency is effectively "up to a day", not
+-- the 30-minute TTL this function defaults to. Pro (or an external pinger
+-- hitting the route on a tighter schedule) is needed for the TTL to
+-- actually mean what it says.
 -- ============================================================================
 
 create or replace function public.vd_expire_pending_bookings(p_older_than_minutes int default 30)
