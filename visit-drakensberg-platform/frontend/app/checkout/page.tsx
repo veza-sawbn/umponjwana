@@ -5,21 +5,12 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import toast from 'react-hot-toast'
 import Footer from '@/components/layout/Footer'
-import { ArrowLeft, ShieldCheck, Lock, CreditCard, Calendar, Users, MapPin, Bus } from 'lucide-react'
+import { ArrowLeft, ShieldCheck, Lock, Calendar, Users, MapPin, Bus } from 'lucide-react'
 import { useBooking } from '@/lib/booking-context'
 import { addBooking } from '@/lib/bookings'
 import { getDepartures, bookDepartureSeats, releaseDepartureSeats } from '@/lib/departures'
 import { getSupplierEntities } from '@/lib/supplier-entities'
 import { supabase } from '@/lib/auth'
-
-function formatCardNumber(val: string) {
-  return val.replace(/\D/g, '').slice(0, 16).replace(/(.{4})/g, '$1 ').trim()
-}
-
-function formatExpiry(val: string) {
-  const d = val.replace(/\D/g, '').slice(0, 4)
-  return d.length >= 3 ? `${d.slice(0, 2)}/${d.slice(2)}` : d
-}
 
 function formatDate(iso: string) {
   if (!iso) return ''
@@ -31,10 +22,6 @@ export default function CheckoutPage() {
   const booking = useBooking()
   const [agreed, setAgreed] = useState(false)
   const [loading, setLoading] = useState(false)
-  const [cardNumber, setCardNumber] = useState('')
-  const [expiry, setExpiry] = useState('')
-  const [cvc, setCvc] = useState('')
-  const [cardholderName, setCardholderName] = useState('')
   const [firstName, setFirstName] = useState('')
   const [lastName, setLastName] = useState('')
   const [email, setEmail] = useState('')
@@ -64,30 +51,9 @@ export default function CheckoutPage() {
   const tax = Math.round((subtotal + serviceFee) * 0.15)
   const total = subtotal + serviceFee + tax
 
-  function expiryIsValid(val: string) {
-    const m = val.match(/^(\d{2})\/(\d{2})$/)
-    if (!m) return false
-    const month = parseInt(m[1], 10)
-    if (month < 1 || month > 12) return false
-    const year = 2000 + parseInt(m[2], 10)
-    return new Date(year, month, 0, 23, 59, 59) >= new Date()
-  }
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!agreed || isEmpty) return
-    if (cardNumber.replace(/\s/g, '').length < 15) {
-      toast.error('Please enter a valid card number.')
-      return
-    }
-    if (!expiryIsValid(expiry)) {
-      toast.error('Card expiry must be a valid future date (MM/YY).')
-      return
-    }
-    if (cvc.length < 3) {
-      toast.error('Please enter your card security code (CVV).')
-      return
-    }
     setLoading(true)
     try {
       const { data: { user } } = await supabase.auth.getUser()
@@ -146,8 +112,9 @@ export default function CheckoutPage() {
         return
       }
 
-      // Persist booking
-      const saved = await addBooking({
+      // Persist booking as 'pending' — holds the room/seats, but isn't
+      // confirmed until iKhokha verifies a real payment (see the webhook).
+      const { booking: saved, invoiceId } = await addBooking({
         userId: user.id,
         customerName: `${firstName} ${lastName}`.trim(),
         customerEmail: email,
@@ -158,12 +125,37 @@ export default function CheckoutPage() {
         serviceFee,
         vat: tax,
         total,
-        status: 'confirmed',
+        status: 'pending',
       })
 
       completedRef.current = true
       booking.clearBooking()
-      router.push(`/checkout/success?id=${saved.id}`)
+
+      if (!invoiceId) {
+        // Booking + inventory hold succeeded but the order/invoice failed —
+        // there's nothing to pay against. Send them to the booking's status
+        // page rather than a broken payment redirect.
+        toast.error('Your booking was saved but payment setup failed — please contact us to complete it.')
+        router.push(`/checkout/success?id=${saved.id}`)
+        return
+      }
+
+      // The booking + invoice now exist — a failure from here on is a
+      // payment-start problem, not a booking problem, so send them to the
+      // booking's own page to retry rather than showing "not charged".
+      try {
+        const res = await fetch('/api/payments/ikhokha/create', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ bookingId: saved.id }),
+        })
+        const json = await res.json()
+        if (!res.ok || !json.paylinkUrl) throw new Error(json.error || 'Could not start payment')
+        window.location.href = json.paylinkUrl
+      } catch (payErr) {
+        toast.error(payErr instanceof Error ? payErr.message : 'Could not start payment — you can retry from your booking.')
+        router.push(`/checkout/success?id=${saved.id}`)
+      }
     } catch (err) {
       console.error('Booking save failed:', err)
       const msg = err instanceof Error ? err.message : ''
@@ -233,33 +225,16 @@ export default function CheckoutPage() {
 
               {/* Payment */}
               <div className="bg-white border border-gray-200 p-6">
-                <div className="flex items-center justify-between mb-6">
-                  <h2 className="font-display italic text-2xl text-[#000000]">Payment Details</h2>
+                <div className="flex items-center justify-between mb-3">
+                  <h2 className="font-display italic text-2xl text-[#000000]">Payment</h2>
                   <div className="flex items-center gap-1.5 text-gray-400">
-                    <CreditCard size={14} />
-                    <span className="font-sans text-xs">Visa · Mastercard · Amex</span>
+                    <Lock size={14} />
+                    <span className="font-sans text-xs">Secured by iKhokha</span>
                   </div>
                 </div>
-                <div className="space-y-4">
-                  <div>
-                    <label className="block font-sans text-[10px] tracking-[0.12em] uppercase text-gray-400 mb-1.5">Cardholder Name</label>
-                    <input required value={cardholderName} onChange={e => setCardholderName(e.target.value)} placeholder="As it appears on your card" className="w-full border border-gray-200 px-4 py-3 font-sans text-sm focus:outline-none focus:border-[#2d6a4f] bg-[#F7F5F2]" />
-                  </div>
-                  <div>
-                    <label className="block font-sans text-[10px] tracking-[0.12em] uppercase text-gray-400 mb-1.5">Card Number</label>
-                    <input required value={cardNumber} onChange={e => setCardNumber(formatCardNumber(e.target.value))} placeholder="0000 0000 0000 0000" maxLength={19} className="w-full border border-gray-200 px-4 py-3 font-sans text-sm focus:outline-none focus:border-[#2d6a4f] bg-[#F7F5F2] font-mono tracking-widest" />
-                  </div>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <label className="block font-sans text-[10px] tracking-[0.12em] uppercase text-gray-400 mb-1.5">Expiry</label>
-                      <input required value={expiry} onChange={e => setExpiry(formatExpiry(e.target.value))} placeholder="MM/YY" maxLength={5} className="w-full border border-gray-200 px-4 py-3 font-sans text-sm focus:outline-none focus:border-[#2d6a4f] bg-[#F7F5F2]" />
-                    </div>
-                    <div>
-                      <label className="block font-sans text-[10px] tracking-[0.12em] uppercase text-gray-400 mb-1.5">CVV</label>
-                      <input required value={cvc} onChange={e => setCvc(e.target.value.replace(/\D/g, '').slice(0, 4))} placeholder="000" maxLength={4} className="w-full border border-gray-200 px-4 py-3 font-sans text-sm focus:outline-none focus:border-[#2d6a4f] bg-[#F7F5F2]" />
-                    </div>
-                  </div>
-                </div>
+                <p className="font-sans text-sm text-gray-600 leading-relaxed">
+                  Your card details are never entered on this site. After you submit, you&apos;ll be redirected to iKhokha&apos;s secure payment page to complete the transaction — your booking is only confirmed once that payment succeeds.
+                </p>
               </div>
 
               {/* Cancellation policy */}
@@ -358,7 +333,7 @@ export default function CheckoutPage() {
                 </div>
 
                 <button type="submit" disabled={!agreed || loading} className={`w-full py-4 font-sans text-sm font-medium transition-colors ${agreed && !loading ? 'bg-[#C9A96E] text-[#000000] hover:bg-[#b8945a]' : 'bg-white/10 text-white/30 cursor-not-allowed'}`}>
-                  {loading ? 'Processing…' : `Pay R ${total.toLocaleString()}`}
+                  {loading ? 'Redirecting to payment…' : `Continue to Payment — R ${total.toLocaleString()}`}
                 </button>
                 <div className="flex items-center justify-center gap-2 mt-4 text-white/30">
                   <ShieldCheck size={12} />

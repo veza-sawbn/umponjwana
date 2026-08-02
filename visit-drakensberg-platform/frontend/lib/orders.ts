@@ -115,6 +115,8 @@ export type OrderNote = {
 
 export type CreateOrderInput = {
   bookingId?: string
+  /** 'pending' until a real payment (e.g. iKhokha) confirms it — defaults to 'confirmed'. */
+  bookingStatus?: 'pending' | 'confirmed'
   /** Staff-only: order for a walk-in/phone customer with no account. */
   guest?: boolean
   customerName: string
@@ -246,6 +248,7 @@ export async function createOrderForBooking(booking: SavedBooking): Promise<Crea
   return createOrder(
     {
       bookingId: booking.id,
+      bookingStatus: booking.status === 'confirmed' ? 'confirmed' : 'pending',
       customerName: booking.customerName,
       customerEmail: booking.customerEmail,
       tripName: `${booking.region || 'Drakensberg'} trip — ${booking.reference}`,
@@ -259,6 +262,8 @@ export async function createOrderForBooking(booking: SavedBooking): Promise<Crea
     },
     lines,
     {
+      // Real payment now happens via iKhokha after the order/invoice exists
+      // (see app/api/payments/ikhokha/*) — never attached at creation time.
       payment: booking.status === 'confirmed' && booking.total > 0
         ? { amount: booking.total, type: 'payment', method: 'card', reference: booking.reference }
         : undefined,

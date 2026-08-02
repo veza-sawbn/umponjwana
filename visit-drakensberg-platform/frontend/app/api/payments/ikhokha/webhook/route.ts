@@ -67,6 +67,18 @@ export async function POST(req: Request) {
     if (error) throw error
     await admin.from('vd_payment_links').update({ payment_id: paymentId }).eq('id', link.id)
 
+    // A checkout-created booking starts life as status='pending' (holding
+    // inventory but unconfirmed) until this point — flip it, its Master
+    // Order, and its per-supplier orders to confirmed now that iKhokha has
+    // verified the payment. Invoice-only payments (no linked booking) skip
+    // this — vd_record_order_payment above already handled the invoice.
+    const { data: order } = await admin.from('vd_orders').select('booking_id').eq('id', link.order_id).maybeSingle()
+    if (order?.booking_id) {
+      await admin.from('vd_bookings').update({ status: 'confirmed' }).eq('id', order.booking_id).eq('status', 'pending')
+      await admin.from('vd_orders').update({ booking_status: 'confirmed' }).eq('id', link.order_id)
+      await admin.from('vd_booking_orders').update({ status: 'confirmed' }).eq('booking_id', order.booking_id)
+    }
+
     // Fire-and-forget the same receipt email + in-app notification a manual
     // payment gets, authenticating as a trusted internal caller since there's
     // no customer session here.

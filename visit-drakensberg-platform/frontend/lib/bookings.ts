@@ -26,7 +26,7 @@ export type SavedBooking = {
   serviceFee: number
   vat: number
   total: number
-  status: 'confirmed' | 'cancelled'
+  status: 'pending' | 'confirmed' | 'cancelled'
   createdAt: string
 }
 
@@ -88,7 +88,9 @@ export async function getBookings(): Promise<SavedBooking[]> {
   return []
 }
 
-export async function addBooking(booking: Omit<SavedBooking, 'id' | 'reference' | 'createdAt'>): Promise<SavedBooking> {
+export async function addBooking(
+  booking: Omit<SavedBooking, 'id' | 'reference' | 'createdAt'>,
+): Promise<{ booking: SavedBooking; invoiceId: string | null }> {
   const supplierIds = await collectSupplierIds(booking)
   const newBooking: SavedBooking = {
     ...booking,
@@ -125,10 +127,12 @@ export async function addBooking(booking: Omit<SavedBooking, 'id' | 'reference' 
   }
 
   // Master Order: the trip's single financial source of truth — line items
-  // with supplier allocations, the customer's single invoice, the checkout
-  // payment, receipt and balanced ledger entries.
+  // with supplier allocations, the customer's single invoice (unpaid until
+  // iKhokha confirms payment), and balanced ledger entries.
+  let invoiceId: string | null = null
   try {
-    await createOrderForBooking(newBooking)
+    const result = await createOrderForBooking(newBooking)
+    invoiceId = result.invoiceId
   } catch (err) {
     console.error('Master order creation failed (booking saved):', err)
   }
@@ -150,7 +154,7 @@ export async function addBooking(booking: Omit<SavedBooking, 'id' | 'reference' 
       '/supplier/bookings')
   ))
 
-  return newBooking
+  return { booking: newBooking, invoiceId }
 }
 
 export async function getBookingById(id: string): Promise<SavedBooking | null> {
@@ -175,7 +179,7 @@ export async function getBookingsByUser(userId: string): Promise<SavedBooking[]>
 
 export async function updateBookingStatus(
   id: string,
-  status: 'confirmed' | 'cancelled',
+  status: SavedBooking['status'],
   opts?: { notifyUser?: boolean; notifySuppliers?: boolean },
 ): Promise<void> {
   const booking = await getBookingById(id)
