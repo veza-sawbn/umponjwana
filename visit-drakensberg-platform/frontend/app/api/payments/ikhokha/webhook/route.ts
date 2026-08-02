@@ -74,9 +74,28 @@ export async function POST(req: Request) {
     // this — vd_record_order_payment above already handled the invoice.
     const { data: order } = await admin.from('vd_orders').select('booking_id').eq('id', link.order_id).maybeSingle()
     if (order?.booking_id) {
-      await admin.from('vd_bookings').update({ status: 'confirmed' }).eq('id', order.booking_id).eq('status', 'pending')
+      const { data: confirmedBooking } = await admin.from('vd_bookings')
+        .update({ status: 'confirmed' }).eq('id', order.booking_id).eq('status', 'pending')
+        .select('reference, supplier_ids, value').maybeSingle()
       await admin.from('vd_orders').update({ booking_status: 'confirmed' }).eq('id', link.order_id)
       await admin.from('vd_booking_orders').update({ status: 'confirmed' }).eq('booking_id', order.booking_id)
+
+      // Supplier notifications wait for this point rather than firing at
+      // booking creation (see lib/bookings.ts) — inserted directly with the
+      // service-role client since there's no customer session here to
+      // notify() through.
+      if (confirmedBooking) {
+        const value = confirmedBooking.value as { customerName?: string; guests?: number } | null
+        const guests = value?.guests ?? 1
+        const rows = (confirmedBooking.supplier_ids ?? []).map((sid: string) => ({
+          user_id: sid,
+          type: 'booking',
+          title: `New booking ${confirmedBooking.reference}`,
+          body: `${value?.customerName ?? 'A guest'} booked with you (${guests} guest${guests !== 1 ? 's' : ''}). Open your bookings for details.`,
+          link: '/supplier/bookings',
+        }))
+        if (rows.length > 0) await admin.from('vd_notifications').insert(rows)
+      }
     }
 
     // Fire-and-forget the same receipt email + in-app notification a manual

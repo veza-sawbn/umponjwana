@@ -140,19 +140,31 @@ export async function addBooking(
   // Shuttle on the itinerary → transport request into the supplier
   // marketplace, so the transfer ultimately belongs to a real transport
   // company (dispatch scores and offers it to the best-ranked suppliers).
+  //
+  // NOTE: this still fires immediately, before payment is confirmed — same
+  // as the supplier notification below used to. Moving it to fire only on
+  // confirmation (from the iKhokha webhook, like the notification now does)
+  // would require the whole dispatch/ranking pipeline (rankSuppliers,
+  // getTransportCompanies, lib/entities.ts) to run under the service role
+  // instead of the browser-session client it's built on — lib/entities.ts is
+  // shared by most of the catalog, so that's a wider refactor than this pass
+  // covers. Left as a known, deliberately deferred follow-up.
   try {
     await createTransportRequestForBooking(newBooking)
   } catch (err) {
     console.error('Transport request creation failed (booking saved):', err)
   }
 
-  // Tell each involved supplier a new order arrived — no itinerary details
-  // beyond their own service in the notification.
-  await Promise.all(supplierIds.map(sid =>
-    notify(sid, 'booking', `New booking ${newBooking.reference}`,
-      `${newBooking.customerName} booked with you (${newBooking.guests} guest${newBooking.guests !== 1 ? 's' : ''}). Open your bookings for details.`,
-      '/supplier/bookings')
-  ))
+  // Only notify suppliers once the booking is actually confirmed — for a
+  // 'pending' booking (the checkout default now) that happens later, from
+  // the iKhokha webhook once payment is verified, not here.
+  if (newBooking.status === 'confirmed') {
+    await Promise.all(supplierIds.map(sid =>
+      notify(sid, 'booking', `New booking ${newBooking.reference}`,
+        `${newBooking.customerName} booked with you (${newBooking.guests} guest${newBooking.guests !== 1 ? 's' : ''}). Open your bookings for details.`,
+        '/supplier/bookings')
+    ))
+  }
 
   return { booking: newBooking, invoiceId }
 }
