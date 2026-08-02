@@ -15,6 +15,20 @@ import nodemailer from 'nodemailer'
 
 let transporter: ReturnType<typeof nodemailer.createTransport> | null = null
 
+/**
+ * SMTP_HOST must be a bare hostname — nodemailer hands it straight to a DNS
+ * lookup, so a pasted URL like "https://mail.example.com" fails with an
+ * opaque `queryA EBADNAME`. Strip the scheme, any path, and a stray port
+ * (SMTP_PORT governs that) so a copy-pasted webmail URL still works.
+ */
+function normaliseHost(raw: string): string {
+  return raw
+    .trim()
+    .replace(/^[a-z][a-z0-9+.-]*:\/\//i, '')  // scheme
+    .replace(/\/.*$/, '')                      // path
+    .replace(/:\d+$/, '')                      // port
+}
+
 function getTransporter() {
   if (transporter) return transporter
   const { SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASSWORD } = process.env
@@ -22,7 +36,7 @@ function getTransporter() {
 
   const port = Number(SMTP_PORT)
   transporter = nodemailer.createTransport({
-    host: SMTP_HOST,
+    host: normaliseHost(SMTP_HOST),
     port,
     secure: process.env.SMTP_SECURE ? process.env.SMTP_SECURE === 'true' : port === 465,
     auth: { user: SMTP_USER, pass: SMTP_PASSWORD },
@@ -42,7 +56,13 @@ export async function sendMail(o: { to: string; subject: string; html: string })
     })
     return { sent: true, error: null }
   } catch (e) {
-    return { sent: false, error: e instanceof Error ? e.message : 'send failed' }
+    const message = e instanceof Error ? e.message : 'send failed'
+    // DNS failures almost always mean SMTP_HOST is wrong rather than the mail
+    // server being down — say so, since the raw error names neither.
+    if (/EBADNAME|ENOTFOUND|EAI_AGAIN/.test(message)) {
+      return { sent: false, error: `${message} — check SMTP_HOST is a bare hostname (e.g. mail.example.com), not a URL` }
+    }
+    return { sent: false, error: message }
   }
 }
 
