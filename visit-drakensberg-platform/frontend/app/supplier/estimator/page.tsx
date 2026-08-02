@@ -2,7 +2,7 @@
 
 import { useRouter } from 'next/navigation'
 import { useState, useMemo, useEffect } from 'react'
-import { ChevronLeft, Copy, Send, CheckCircle, MapPin, Plus, Trash2 } from 'lucide-react'
+import { ChevronLeft, Copy, MapPin, Plus, Trash2 } from 'lucide-react'
 import { GoogleAddressField, useAutoDrivingDistance } from '@/components/maps/GoogleAddressField'
 
 function F({ label, required, children }: { label: string; required?: boolean; children: React.ReactNode }) {
@@ -72,8 +72,6 @@ export default function EstimatorPage() {
   const [notes, setNotes] = useState('')
 
   const [copyMsg, setCopyMsg] = useState('')
-  const [sendMsg, setSendMsg] = useState('')
-  const [paid, setPaid] = useState(false)
 
   const routeLabel = `${pickupAddress || 'Pickup address'} → ${dropoffAddress || 'Drop-off address'}`
   const selectedRatePerKm = vehicleRates[vehicleType] ?? 0
@@ -134,14 +132,42 @@ export default function EstimatorPage() {
     setFees(current => current.filter(fee => fee.id !== id))
   }
 
-  function handleCopyLink() {
-    setCopyMsg('Link copied!')
-    setTimeout(() => setCopyMsg(''), 2500)
+  // This page is a pricing calculator, not a quote issuer — nothing here is
+  // persisted. Issuing a real quote to a guest stays with staff in
+  // /admin/quotes, which writes vd_quotes and emails the customer a link.
+  // The copy below hands the supplier a plain-text estimate to paste into
+  // their own message or into that admin flow.
+  function quoteSummary(): string {
+    const lines = [
+      `Estimate ${quoteRef} — Visit Drakensberg`,
+      '',
+      `Route: ${routeLabel}`,
+      `Distance: ${distanceKm} km${returnTrip ? ' each way (return trip)' : ''}`,
+    ]
+    if (pickupDate || pickupTime) {
+      const date = pickupDate ? new Date(pickupDate + 'T00:00:00').toLocaleDateString('en-ZA', { day: 'numeric', month: 'short', year: 'numeric' }) : '—'
+      lines.push(`Date / time: ${date}${pickupTime ? ` at ${pickupTime}` : ''}`)
+    }
+    lines.push(`Passengers: ${passengers}`, `Vehicle: ${vehicleType}`, `Luggage: ${luggage}`)
+    if (guestName) lines.push(`Guest: ${guestName}${guestEmail ? ` <${guestEmail}>` : ''}`)
+    else if (guestEmail) lines.push(`Guest: ${guestEmail}`)
+    lines.push('', 'Breakdown:')
+    for (const item of lineItems) {
+      lines.push(`  ${item.label}${item.sublabel ? ` (${item.sublabel})` : ''}: ${fmt(item.amount)}`)
+    }
+    lines.push('', `Total: ${fmt(total)} (includes all fees · ZAR)`)
+    if (notes.trim()) lines.push('', `Notes: ${notes.trim()}`)
+    return lines.join('\n')
   }
 
-  function handleSend() {
-    setSendMsg(`Quote sent to ${guestEmail || 'guest'}!`)
-    setTimeout(() => setSendMsg(''), 3000)
+  async function handleCopy() {
+    try {
+      await navigator.clipboard.writeText(quoteSummary())
+      setCopyMsg('Estimate copied to clipboard.')
+    } catch {
+      setCopyMsg('Could not copy — your browser blocked clipboard access.')
+    }
+    setTimeout(() => setCopyMsg(''), 3000)
   }
 
   return (
@@ -153,7 +179,7 @@ export default function EstimatorPage() {
           </button>
           <div>
             <h1 className="font-display italic text-2xl font-semibold text-black">Route Estimator</h1>
-            <p className="font-sans text-sm text-black/50 mt-0.5">Build distance-based shuttle quotations with your own rates and fees</p>
+            <p className="font-sans text-sm text-black/50 mt-0.5">Work out distance-based shuttle pricing with your own rates and fees</p>
           </div>
         </div>
 
@@ -241,7 +267,7 @@ export default function EstimatorPage() {
 
           <div className="bg-white rounded-xl border border-black/8 overflow-hidden sticky top-6">
             <div className="bg-black px-5 py-4">
-              <div className="flex items-start justify-between"><div><p className="font-display italic text-white/50 text-xs mb-0.5">Quotation</p><p className="font-display italic text-white text-lg font-semibold">{quoteRef}</p></div><div className="text-right"><p className="font-sans text-white/40 text-xs">Visit Drakensberg</p><p className="font-sans text-white/60 text-xs mt-0.5">Shuttle Supplier Portal</p></div></div>
+              <div className="flex items-start justify-between"><div><p className="font-display italic text-white/50 text-xs mb-0.5">Estimate</p><p className="font-display italic text-white text-lg font-semibold">{quoteRef}</p></div><div className="text-right"><p className="font-sans text-white/40 text-xs">Visit Drakensberg</p><p className="font-sans text-white/60 text-xs mt-0.5">Shuttle Supplier Portal</p></div></div>
             </div>
 
             <div className="p-5 space-y-4">
@@ -264,11 +290,10 @@ export default function EstimatorPage() {
               </div>
 
               {copyMsg && <div className="bg-black/5 rounded-lg px-3 py-2 font-sans text-xs text-black/60 text-center">{copyMsg}</div>}
-              {sendMsg && <div className="bg-emerald-50 rounded-lg px-3 py-2 font-sans text-xs text-emerald-700 text-center">{sendMsg}</div>}
 
               <div className="space-y-2 pt-1">
-                <div className="grid grid-cols-2 gap-2"><button onClick={handleCopyLink} className="flex items-center justify-center gap-1.5 font-sans text-sm px-3 py-2 rounded-lg border border-black/10 text-black/60 hover:bg-black/5 transition-colors"><Copy size={14} />Copy Link</button><button onClick={handleSend} className="flex items-center justify-center gap-1.5 font-sans text-sm px-3 py-2 rounded-lg bg-[#C9A96E] text-white hover:bg-[#b8935a] transition-colors"><Send size={14} />Send to Guest</button></div>
-                <button onClick={() => setPaid(true)} disabled={paid} className={`w-full flex items-center justify-center gap-2 font-sans text-sm px-3 py-2.5 rounded-lg transition-colors ${paid ? 'bg-emerald-500 text-white cursor-default' : 'border border-black/10 text-black/60 hover:bg-black/5'}`}>{paid ? <><CheckCircle size={15} />Paid ✓</> : 'Mark as Paid'}</button>
+                <button onClick={handleCopy} className="w-full flex items-center justify-center gap-1.5 font-sans text-sm px-3 py-2 rounded-lg border border-black/10 text-black/60 hover:bg-black/5 transition-colors"><Copy size={14} />Copy Estimate</button>
+                <p className="font-sans text-xs text-black/40 text-center leading-relaxed">This is an estimate only — nothing is saved or sent. Ask an administrator to issue it as a formal quote.</p>
               </div>
             </div>
           </div>
