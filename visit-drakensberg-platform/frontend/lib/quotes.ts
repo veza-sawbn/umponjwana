@@ -121,13 +121,27 @@ export async function deleteQuote(id: string): Promise<void> {
   await supabase.from('vd_quotes').delete().eq('id', id)
 }
 
-/** Marks a draft as sent (opens it up for the customer to view/accept) and emails the link. */
-export async function sendQuote(id: string): Promise<void> {
+/**
+ * Marks a draft as sent (opens it up for the customer to view/accept) and
+ * emails the link.
+ *
+ * The status update and the email are separate outcomes: the quote is opened
+ * up either way, but the caller needs to know whether the customer actually
+ * received anything, so the email result is returned rather than swallowed.
+ * The send endpoint reports delivery failures in its body with a 200, so
+ * `sent` must be read from the payload — `res.ok` alone is not enough.
+ */
+export async function sendQuote(id: string): Promise<{ sent: boolean; error: string | null }> {
   await updateQuote(id, { status: 'sent', sent_at: new Date().toISOString() } as Partial<Quote>)
-  if (typeof fetch === 'function') {
-    fetch('/api/quotes/send', {
+  try {
+    const res = await fetch('/api/quotes/send', {
       method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ quoteId: id }),
-    }).catch(err => console.error('Quote email failed:', err))
+    })
+    const body = await res.json().catch(() => ({} as { sent?: boolean; error?: string }))
+    if (!res.ok) return { sent: false, error: body.error || `Email service returned ${res.status}` }
+    return { sent: !!body.sent, error: body.error ?? null }
+  } catch (e) {
+    return { sent: false, error: e instanceof Error ? e.message : 'Email request failed' }
   }
 }
 

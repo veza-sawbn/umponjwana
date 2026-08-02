@@ -3,8 +3,8 @@
 import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import toast from 'react-hot-toast'
-import { Search, RefreshCw, Plus, Printer, Trash2, X, FileText } from 'lucide-react'
-import { getInvoices, getFinanceSettings, type Invoice } from '@/lib/invoices'
+import { Search, RefreshCw, Plus, Printer, Trash2, X, FileText, Send } from 'lucide-react'
+import { getInvoices, getFinanceSettings, sendInvoice, type Invoice } from '@/lib/invoices'
 import { createOrder, type OrderLineInput } from '@/lib/orders'
 import { formatMoney } from '@/lib/allocation'
 import { supabase } from '@/lib/auth'
@@ -240,6 +240,7 @@ export default function AdminInvoicesPage() {
   const [filter, setFilter] = useState('all')
   const [loading, setLoading] = useState(true)
   const [showNew, setShowNew] = useState(false)
+  const [sending, setSending] = useState<string | null>(null)
 
   async function load() {
     setLoading(true)
@@ -256,6 +257,14 @@ export default function AdminInvoicesPage() {
     setLoading(false)
   }
   useEffect(() => { load() }, [])
+
+  async function handleSend(id: string) {
+    setSending(id)
+    const { sent, error } = await sendInvoice(id)
+    if (sent) toast.success('Invoice emailed to the customer.')
+    else toast.error(`Could not email the invoice: ${error || 'unknown error'}`, { duration: 8000 })
+    setSending(null)
+  }
 
   const customers = useMemo(() => people.filter(p => p.role !== 'supplier'), [people])
   const suppliers = useMemo(() => people.filter(p => p.role === 'supplier'), [people])
@@ -336,9 +345,15 @@ export default function AdminInvoicesPage() {
                   <span className={`font-sans text-[10px] tracking-[0.1em] uppercase px-2.5 py-1 ${STATUS_BADGE[i.status] ?? STATUS_BADGE.unpaid}`}>{i.status}</span>
                 </td>
                 <td className="px-5 py-4">
-                  <Link href={`/invoices/${i.id}`} className="inline-flex items-center gap-1.5 font-sans text-xs text-[#2d6a4f] hover:underline">
-                    <Printer size={12} /> View / Print
-                  </Link>
+                  <div className="flex items-center gap-3">
+                    <Link href={`/invoices/${i.id}`} className="inline-flex items-center gap-1.5 font-sans text-xs text-[#2d6a4f] hover:underline">
+                      <Printer size={12} /> View / Print
+                    </Link>
+                    <button onClick={() => handleSend(i.id)} disabled={sending === i.id}
+                      className={`inline-flex items-center gap-1.5 font-sans text-xs transition-colors ${sending === i.id ? 'text-gray-300 cursor-not-allowed' : 'text-[#2d6a4f] hover:underline'}`}>
+                      <Send size={12} /> {sending === i.id ? 'Sending…' : 'Email'}
+                    </button>
+                  </div>
                 </td>
               </tr>
             ))}
