@@ -4,28 +4,40 @@ import { createHmac } from 'crypto'
 // process.env and must never be imported by a client component; it is only
 // ever called from app/api/payments/ikhokha/* route handlers.
 //
-// Reverse-engineered from iKhokha's public examples repo
-// (github.com/ikhokha/ik-pay-api-examples) since the interactive developer
-// docs at developer.ikhokha.com could not be fetched from this environment.
-// Field names, the HMAC-SHA256 signing scheme (hex digest of `path +
-// JSON.stringify(body)`, keyed by the App Key) and the IK-APPID/IK-SIGN
-// headers all come from that reference implementation. Verify against real
-// sandbox credentials before taking a live payment — in particular confirm
-// entityID/externalEntityID are the right values for this merchant account.
+// Signing scheme verified 2026-08-02 against the official reference
+// implementation (github.com/ikhokha/ik-pay-api-examples, nodejs/index.js
+// and nodejs/pay-api-app/backend/paylink.js) after a live request failed
+// with IK-001 "Token or Hash invalid" — the two bugs that caused it:
+//   1. The signed payload must use the request's FULL URL path
+//      (/public-api/v1/api/payment), not just the fragment appended to
+//      BASE_URL (/payment) that an earlier version of this file signed.
+//   2. The payload (path + JSON body) must be escaped before hashing:
+//      backslash/double-quote/single-quote get a backslash prefix, and each
+//      NUL byte (code point 0) becomes the literal two-character sequence
+//      backslash-zero — see escape() below, which matches the reference's
+//      String.replace(/[\\"']/g, "\\$&").replace(/\u0000/g, "\\0") exactly.
+// The reference also trims the App ID/App Key/signature before use, which
+// this file now does too (protects against trailing whitespace pasted into
+// an env var).
 
 const BASE_URL = 'https://api.ikhokha.com/public-api/v1/api'
+const BASE_PATH = '/public-api/v1/api' // full pathname signed requests must use
 
 function credentials() {
-  const appId = process.env.IKHOKHA_APP_ID
-  const appKey = process.env.IKHOKHA_APP_KEY
+  const appId = process.env.IKHOKHA_APP_ID?.trim()
+  const appKey = process.env.IKHOKHA_APP_KEY?.trim()
   if (!appId || !appKey) {
     throw new Error('iKhokha is not configured — set IKHOKHA_APP_ID and IKHOKHA_APP_KEY')
   }
   return { appId, appKey }
 }
 
-function sign(path: string, body: string, appKey: string): string {
-  return createHmac('sha256', appKey).update(path + body).digest('hex')
+function escape(payload: string): string {
+  return payload.replace(/[\\"']/g, '\\$&').replace(/\u0000/g, '\\0')
+}
+
+function sign(fullPath: string, body: string, appKey: string): string {
+  return createHmac('sha256', appKey).update(escape(fullPath + body)).digest('hex')
 }
 
 async function ikhokhaRequest<T>(method: 'GET' | 'POST', path: string, body?: unknown): Promise<T> {
@@ -37,7 +49,7 @@ async function ikhokhaRequest<T>(method: 'GET' | 'POST', path: string, body?: un
       Accept: 'application/json',
       'Content-Type': 'application/json',
       'IK-APPID': appId,
-      'IK-SIGN': sign(path, bodyStr, appKey),
+      'IK-SIGN': sign(`${BASE_PATH}${path}`, bodyStr, appKey),
     },
     body: method === 'POST' ? bodyStr : undefined,
   })
