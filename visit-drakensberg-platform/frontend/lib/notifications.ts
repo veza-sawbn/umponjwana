@@ -54,6 +54,18 @@ export async function notify(
       link: link ?? null,
     })
   } catch {}
+
+  // Mirror the in-app notification by email, fire-and-forget, so suppliers
+  // and customers hear about it without having to be signed in. Skipped
+  // gracefully if SMTP isn't configured or the recipient has no email on
+  // file — see app/api/notifications/email.
+  if (typeof fetch === 'function') {
+    fetch('/api/notifications/email', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userId, title, body, link: link ?? null }),
+    }).catch(() => {})
+  }
 }
 
 export async function getMyNotifications(limit = 30): Promise<Notification[]> {
