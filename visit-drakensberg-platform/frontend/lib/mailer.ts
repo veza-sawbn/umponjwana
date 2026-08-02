@@ -29,6 +29,24 @@ function normaliseHost(raw: string): string {
     .replace(/:\d+$/, '')                      // port
 }
 
+/**
+ * SMTP_SECURE describes how the connection is encrypted, which follows from
+ * the port: 465 is implicit TLS, 587 and 25 upgrade via STARTTLS. Hosts don't
+ * usually state it, so leaving it unset and inferring from the port is the
+ * expected configuration — an explicit value only overrides an unusual setup.
+ *
+ * Accepts the spellings people actually type. A strict === 'true' silently
+ * turned "TRUE" into false, which breaks a port-465 connection in a way that
+ * looks like the server is unreachable.
+ */
+function parseSecure(raw: string | undefined, port: number): boolean {
+  const v = raw?.trim().toLowerCase()
+  if (!v) return port === 465
+  if (['true', '1', 'yes', 'on', 'ssl', 'tls'].includes(v)) return true
+  if (['false', '0', 'no', 'off', 'starttls', 'none'].includes(v)) return false
+  return port === 465
+}
+
 function getTransporter() {
   if (transporter) return transporter
   const { SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASSWORD } = process.env
@@ -38,10 +56,37 @@ function getTransporter() {
   transporter = nodemailer.createTransport({
     host: normaliseHost(SMTP_HOST),
     port,
-    secure: process.env.SMTP_SECURE ? process.env.SMTP_SECURE === 'true' : port === 465,
-    auth: { user: SMTP_USER, pass: SMTP_PASSWORD },
+    secure: parseSecure(process.env.SMTP_SECURE, port),
+    // The username is always trimmed — a mailbox name can't contain leading or
+    // trailing spaces, so whitespace there is only ever a paste artefact. The
+    // password is passed through untouched: trailing space is far more likely
+    // to be an accident than intentional, but silently trimming a legitimate
+    // one would break auth with no way to tell. authHint() reports it instead.
+    auth: { user: SMTP_USER.trim(), pass: SMTP_PASSWORD },
   })
   return transporter
+}
+
+/**
+ * A 535 names nothing useful on its own, and the two usual causes are both
+ * invisible from a hosting dashboard: the username being a bare mailbox name
+ * where the host wants the full address, and whitespace picked up when the
+ * password was pasted. Report both without ever echoing the credentials.
+ */
+function authHint(): string {
+  const user = process.env.SMTP_USER ?? ''
+  const pass = process.env.SMTP_PASSWORD ?? ''
+  const notes: string[] = []
+  if (!user.includes('@')) {
+    notes.push(`SMTP_USER is "${user.trim()}" — most mailbox hosts want the full email address`)
+  }
+  if (pass !== pass.trim()) {
+    notes.push('SMTP_PASSWORD has leading or trailing whitespace, which is usually a paste artefact')
+  }
+  if (user !== user.trim()) {
+    notes.push('SMTP_USER had surrounding whitespace (trimmed automatically)')
+  }
+  return notes.length ? ` — ${notes.join('; ')}` : ' — check SMTP_USER and SMTP_PASSWORD against the mailbox credentials'
 }
 
 export async function sendMail(o: { to: string; subject: string; html: string }): Promise<{ sent: boolean; error: string | null }> {
@@ -61,6 +106,9 @@ export async function sendMail(o: { to: string; subject: string; html: string })
     // server being down — say so, since the raw error names neither.
     if (/EBADNAME|ENOTFOUND|EAI_AGAIN/.test(message)) {
       return { sent: false, error: `${message} — check SMTP_HOST is a bare hostname (e.g. mail.example.com), not a URL` }
+    }
+    if (/535|Invalid login|authentication failed/i.test(message)) {
+      return { sent: false, error: `${message}${authHint()}` }
     }
     return { sent: false, error: message }
   }
