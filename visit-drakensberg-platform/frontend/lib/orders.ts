@@ -32,6 +32,12 @@ export type OrderLineInput = {
   discountAmount?: number
   commissionRate?: number   // suggestion only — supplier terms win server-side
   shareCustomerName?: boolean
+  // Opt-in: vd_create_order re-prices this line from its canonical
+  // vd_entities row (room/activity/departure/supplier_events) instead of
+  // trusting unitPrice/grossAmount. Only set for real customer-facing retail
+  // lines (checkout) — never for package components or admin manual invoice
+  // lines, which intentionally price at internal cost, not retail.
+  validatePrice?: boolean
   value?: Record<string, unknown>
 }
 
@@ -196,8 +202,12 @@ export async function buildOrderLinesFromBooking(booking: SavedBooking): Promise
       guests: booking.guests,
       quantity: booking.nights || 1,
       unitLabel: 'night',
+      // roomId lets vd_create_order look up the room's canonical basePrice
+      // server-side and re-price this line instead of trusting the client.
+      value: { roomId: booking.stay.roomId },
       unitPrice: booking.stay.price_per_night,
       grossAmount: booking.stay.price_per_night * booking.nights,
+      validatePrice: true,
     })
   }
 
@@ -214,6 +224,7 @@ export async function buildOrderLinesFromBooking(booking: SavedBooking): Promise
       unitLabel: 'guest',
       unitPrice: a.price_per_person,
       grossAmount: a.price_per_person * a.guests,
+      validatePrice: true,
     })
   }
 
@@ -228,6 +239,10 @@ export async function buildOrderLinesFromBooking(booking: SavedBooking): Promise
       unitLabel: 'trip',
       unitPrice: shuttle.price,
       grossAmount: shuttle.price,
+      // No canonical shuttle price exists yet (live distance quote) — see
+      // the 20260802 migration header for the follow-up needed to close
+      // this. Flag included for when that lands.
+      validatePrice: true,
       value: {
         pickup: shuttle.pickup,
         destination: shuttle.destination,

@@ -9,12 +9,40 @@
 -- iKhokha webhook (app/api/payments/ikhokha/webhook/route.ts), after
 -- verifying payment with iKhokha's own status API, flips it to 'confirmed'.
 --
--- Two follow-ups this migration deliberately does NOT solve:
+-- This revision of vd_create_order also closes a second, more serious gap:
+-- the customer's cart lives in browser localStorage, and vd_create_order
+-- previously trusted p_order->>'subtotal'/'serviceFee'/'taxAmount'/'total'
+-- and each line's unitPrice/grossAmount verbatim — a tampered cart could
+-- book a real stay/activity/tour/event and pay iKhokha almost nothing for
+-- it. vd_create_order now recomputes each line's price from its canonical
+-- vd_entities row (room/activity/departure/supplier_events) via the new
+-- vd_canonical_unit_price() helper wherever one exists, derives the order
+-- subtotal as the sum of those (corrected) line amounts rather than a
+-- client-supplied number, and derives service_fee/tax/total server-side
+-- from vd_finance_settings rates rather than trusting the client's own fee
+-- calculation.
+--
+-- IMPORTANT: this redefinition is based on 20260718_guest_orders.sql (the
+-- most recent prior definition, which added guest-order support) — not the
+-- older 20260716_order_management.sql version, so guest orders keep working.
+--
+-- Follow-ups this migration deliberately does NOT solve:
 --   1. A 'pending' booking holds room/seat inventory indefinitely if the
 --      customer abandons payment — needs a scheduled job to expire stale
 --      pending bookings (and release their departure seats) after some TTL.
 --   2. Supplier notifications and transport dispatch still fire at booking
 --      creation (pre-payment), not on confirmation — unchanged for now.
+--   3. Price validation has no canonical row to check for two categories,
+--      which remain client-trusted same as before:
+--        - Shuttles: prices are live distance-based quotes (Google Maps),
+--          not a catalog value — closing this needs a server-side re-quote
+--          (or a signed/expiring quote token), not a SQL lookup.
+--        - "Upcoming Departures" widgets fed by lib/tour-dates.ts hardcoded
+--          fixture data have no backing vd_entities row at all — needs a
+--          data-model fix (real departures) before it's validatable.
+--      Per-package pricing within a departure (vd_entities.value->'packages')
+--      is also not resolved — validation falls back to the departure's own
+--      top-level pricePerPerson regardless of which package was selected.
 -- ============================================================================
 
 -- A 'pending' booking must hold the room the same as 'confirmed', otherwise
@@ -40,9 +68,29 @@ create or replace function public.vd_room_booked_count(
     )
 $$;
 
--- vd_create_order now honours an optional bookingStatus in p_order so a
--- checkout-created order can start life as booking_status='pending' instead
--- of the table default 'confirmed', matching the booking it belongs to.
+-- Canonical per-unit price for an order line, or null when the category has
+-- no single-row source of truth (shuttles, legacy hardcoded tour-date ids —
+-- see header). p_room_id is only used for category='accommodation', where
+-- the line's productId is the *property* id, not the room.
+create or replace function public.vd_canonical_unit_price(
+  p_category text, p_product_id text, p_room_id text default null
+) returns numeric language sql stable security definer set search_path = public as $$
+  select case coalesce(p_category, '')
+    when 'accommodation' then
+      (select (value->>'basePrice')::numeric from vd_entities where id = p_room_id and kind = 'room')
+    when 'activity' then
+      (select (value->>'pricePerPerson')::numeric from vd_entities where id = p_product_id and kind = 'activity')
+    when 'hike' then
+      (select (value->>'pricePerPerson')::numeric from vd_entities where id = p_product_id and kind = 'departure')
+    when 'tour' then
+      (select (value->>'pricePerPerson')::numeric from vd_entities where id = p_product_id and kind = 'departure')
+    when 'event' then
+      (select (value->>'ticket_price')::numeric from vd_entities where id = p_product_id and kind = 'supplier_events')
+    else null
+  end
+$$;
+grant execute on function public.vd_canonical_unit_price(text, text, text) to authenticated;
+
 create or replace function public.vd_create_order(
   p_order         jsonb,
   p_lines         jsonb,
@@ -52,6 +100,7 @@ create or replace function public.vd_create_order(
 ) returns jsonb language plpgsql security definer set search_path = public as $$
 declare
   v_user uuid;
+  v_guest boolean := coalesce((p_order->>'guest')::boolean, false);
   v_order_id text := 'vdo-' || gen_random_uuid();
   v_order_number text := vd_next_number('VD');
   v_invoice_id text := 'inv-' || gen_random_uuid();
@@ -59,13 +108,12 @@ declare
   v_currency text := coalesce(p_order->>'currency', (select value #>> '{}' from vd_finance_settings where key = 'default_currency'), 'ZAR');
   v_destination text := coalesce(p_order->>'destination', (select value #>> '{}' from vd_finance_settings where key = 'default_destination'), 'drakensberg');
   v_vat_rate numeric := coalesce((select (value #>> '{}')::numeric from vd_finance_settings where key = 'vat_rate'), 0.15);
+  v_service_fee_rate numeric := coalesce((select (value #>> '{}')::numeric from vd_finance_settings where key = 'service_fee_rate'), 0.12);
   v_default_commission numeric := coalesce((select (value #>> '{}')::numeric from vd_finance_settings where key = 'default_commission_rate'), 0.12);
-  v_subtotal numeric := coalesce((p_order->>'subtotal')::numeric, 0);
-  v_service_fee numeric := coalesce((p_order->>'serviceFee')::numeric, 0);
-  v_tax numeric := coalesce((p_order->>'taxAmount')::numeric, 0);
-  v_total numeric := coalesce((p_order->>'total')::numeric, v_subtotal + v_service_fee + v_tax);
   v_booking_status text := coalesce(nullif(p_order->>'bookingStatus', ''), 'confirmed');
   v_line jsonb;
+  v_priced_lines jsonb := '[]'::jsonb;
+  v_canonical numeric;
   v_supplier uuid;
   v_supplier_name text;
   v_gross numeric; v_discount numeric; v_net numeric;
@@ -79,15 +127,60 @@ declare
   v_inv_lines jsonb;
   v_customer_name text := coalesce(p_order->>'customerName', '');
   v_line_id text;
+  v_subtotal numeric := 0;
+  v_service_fee numeric;
+  v_tax numeric;
+  v_total numeric;
 begin
-  if auth.uid() is null and p_user_id is null then
+  if v_guest then
+    -- Guest orders carry customer contact details on the order row itself
+    -- and belong to no user account. Staff-only.
+    if auth.uid() is not null and not is_admin() then
+      raise exception 'admin only for guest orders';
+    end if;
+    v_user := null;
+  elsif p_user_id is not null and (auth.uid() is null or is_admin()) then
+    v_user := p_user_id;
+  elsif auth.uid() is not null then
+    v_user := auth.uid();
+  else
     raise exception 'authentication required';
   end if;
-  if p_user_id is not null and (auth.uid() is null or is_admin()) then
-    v_user := p_user_id;
-  else
-    v_user := auth.uid();
-  end if;
+
+  -- Pass 1: re-price every opted-in line (validatePrice=true — set only by
+  -- checkout's buildOrderLinesFromBooking, never by package-bookings.ts or
+  -- the admin manual-invoice UI, both of which intentionally price lines at
+  -- internal cost rather than retail) from its canonical vd_entities row
+  -- where one exists (accommodation/activity/hike/tour/event), overwriting
+  -- the client-submitted unitPrice/grossAmount so the client can no longer
+  -- control what it's charged for those categories. Lines with no canonical
+  -- row (shuttles, legacy fixture tour-dates) or not opted in keep their
+  -- submitted amount — a known, separate follow-up (see header). The order
+  -- subtotal is then the sum of these corrected line amounts, never a
+  -- client-supplied number.
+  for v_line in select * from jsonb_array_elements(coalesce(p_lines, '[]'::jsonb)) loop
+    if coalesce((v_line->>'validatePrice')::boolean, false) then
+      v_canonical := vd_canonical_unit_price(v_line->>'category', v_line->>'productId', v_line->'value'->>'roomId');
+    else
+      v_canonical := null;
+    end if;
+    if v_canonical is not null and v_canonical >= 0 then
+      v_gross := v_canonical * coalesce((v_line->>'quantity')::numeric, 1);
+      v_line := v_line || jsonb_build_object('unitPrice', v_canonical, 'grossAmount', v_gross);
+    else
+      v_gross := coalesce((v_line->>'grossAmount')::numeric,
+                          coalesce((v_line->>'unitPrice')::numeric,0) * coalesce((v_line->>'quantity')::numeric,1));
+    end if;
+    v_discount := coalesce((v_line->>'discountAmount')::numeric, 0);
+    v_subtotal := v_subtotal + greatest(v_gross - v_discount, 0);
+    v_priced_lines := v_priced_lines || jsonb_build_array(v_line);
+  end loop;
+
+  -- Fee/VAT rates are always server-owned (vd_finance_settings), never the
+  -- client's own calculation — total is fully derived, never trusted.
+  v_service_fee := round(v_subtotal * v_service_fee_rate, 2);
+  v_tax := round((v_subtotal + v_service_fee) * v_vat_rate, 2);
+  v_total := v_subtotal + v_service_fee + v_tax;
 
   insert into vd_orders (
     id, order_number, user_id, booking_id, customer_name, customer_email,
@@ -104,8 +197,9 @@ begin
     0, v_total, v_booking_status, coalesce(p_order->'value', '{}'::jsonb)
   );
 
-  -- Lines + supplier allocation
-  for v_line in select * from jsonb_array_elements(coalesce(p_lines, '[]'::jsonb)) loop
+  -- Pass 2: insert lines + supplier allocation from the already-repriced
+  -- v_priced_lines, so nothing here re-derives price independently.
+  for v_line in select * from jsonb_array_elements(v_priced_lines) loop
     v_supplier := case when coalesce(v_line->>'supplierId','') ~ '^[0-9a-f]{8}-'
                        then (v_line->>'supplierId')::uuid else null end;
     v_supplier_name := coalesce(nullif(v_line->>'supplierName',''),
@@ -178,7 +272,7 @@ begin
                         coalesce((l->>'unitPrice')::numeric,0) * coalesce((l->>'quantity')::numeric,1))
                - coalesce((l->>'discountAmount')::numeric, 0)
     )), '[]'::jsonb)
-    from jsonb_array_elements(coalesce(p_lines, '[]'::jsonb)) l
+    from jsonb_array_elements(v_priced_lines) l
   ));
 
   insert into vd_invoices (
@@ -214,7 +308,8 @@ begin
   end if;
 
   perform vd_audit('order.created', 'order', v_order_id,
-    jsonb_build_object('orderNumber', v_order_number, 'total', v_total, 'lines', jsonb_array_length(coalesce(p_lines,'[]'::jsonb))));
+    jsonb_build_object('orderNumber', v_order_number, 'total', v_total, 'guest', v_guest,
+                       'lines', jsonb_array_length(coalesce(p_lines,'[]'::jsonb))));
 
   if p_payment is not null and coalesce((p_payment->>'amount')::numeric, 0) > 0 then
     perform vd_record_order_payment(
