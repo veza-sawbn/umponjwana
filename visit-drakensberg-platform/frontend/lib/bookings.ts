@@ -26,7 +26,7 @@ export type SavedBooking = {
   serviceFee: number
   vat: number
   total: number
-  status: 'confirmed' | 'cancelled'
+  status: 'pending' | 'confirmed' | 'cancelled'
   createdAt: string
 }
 
@@ -88,7 +88,9 @@ export async function getBookings(): Promise<SavedBooking[]> {
   return []
 }
 
-export async function addBooking(booking: Omit<SavedBooking, 'id' | 'reference' | 'createdAt'>): Promise<SavedBooking> {
+export async function addBooking(
+  booking: Omit<SavedBooking, 'id' | 'reference' | 'createdAt'>,
+): Promise<{ booking: SavedBooking; invoiceId: string | null }> {
   const supplierIds = await collectSupplierIds(booking)
   const newBooking: SavedBooking = {
     ...booking,
@@ -125,10 +127,12 @@ export async function addBooking(booking: Omit<SavedBooking, 'id' | 'reference' 
   }
 
   // Master Order: the trip's single financial source of truth — line items
-  // with supplier allocations, the customer's single invoice, the checkout
-  // payment, receipt and balanced ledger entries.
+  // with supplier allocations, the customer's single invoice (unpaid until
+  // iKhokha confirms payment), and balanced ledger entries.
+  let invoiceId: string | null = null
   try {
-    await createOrderForBooking(newBooking)
+    const result = await createOrderForBooking(newBooking)
+    invoiceId = result.invoiceId
   } catch (err) {
     console.error('Master order creation failed (booking saved):', err)
   }
@@ -136,21 +140,33 @@ export async function addBooking(booking: Omit<SavedBooking, 'id' | 'reference' 
   // Shuttle on the itinerary → transport request into the supplier
   // marketplace, so the transfer ultimately belongs to a real transport
   // company (dispatch scores and offers it to the best-ranked suppliers).
+  //
+  // NOTE: this still fires immediately, before payment is confirmed — same
+  // as the supplier notification below used to. Moving it to fire only on
+  // confirmation (from the iKhokha webhook, like the notification now does)
+  // would require the whole dispatch/ranking pipeline (rankSuppliers,
+  // getTransportCompanies, lib/entities.ts) to run under the service role
+  // instead of the browser-session client it's built on — lib/entities.ts is
+  // shared by most of the catalog, so that's a wider refactor than this pass
+  // covers. Left as a known, deliberately deferred follow-up.
   try {
     await createTransportRequestForBooking(newBooking)
   } catch (err) {
     console.error('Transport request creation failed (booking saved):', err)
   }
 
-  // Tell each involved supplier a new order arrived — no itinerary details
-  // beyond their own service in the notification.
-  await Promise.all(supplierIds.map(sid =>
-    notify(sid, 'booking', `New booking ${newBooking.reference}`,
-      `${newBooking.customerName} booked with you (${newBooking.guests} guest${newBooking.guests !== 1 ? 's' : ''}). Open your bookings for details.`,
-      '/supplier/bookings')
-  ))
+  // Only notify suppliers once the booking is actually confirmed — for a
+  // 'pending' booking (the checkout default now) that happens later, from
+  // the iKhokha webhook once payment is verified, not here.
+  if (newBooking.status === 'confirmed') {
+    await Promise.all(supplierIds.map(sid =>
+      notify(sid, 'booking', `New booking ${newBooking.reference}`,
+        `${newBooking.customerName} booked with you (${newBooking.guests} guest${newBooking.guests !== 1 ? 's' : ''}). Open your bookings for details.`,
+        '/supplier/bookings')
+    ))
+  }
 
-  return newBooking
+  return { booking: newBooking, invoiceId }
 }
 
 export async function getBookingById(id: string): Promise<SavedBooking | null> {
@@ -175,7 +191,7 @@ export async function getBookingsByUser(userId: string): Promise<SavedBooking[]>
 
 export async function updateBookingStatus(
   id: string,
-  status: 'confirmed' | 'cancelled',
+  status: SavedBooking['status'],
   opts?: { notifyUser?: boolean; notifySuppliers?: boolean },
 ): Promise<void> {
   const booking = await getBookingById(id)

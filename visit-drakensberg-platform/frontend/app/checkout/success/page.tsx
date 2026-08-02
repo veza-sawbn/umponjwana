@@ -1,10 +1,11 @@
 'use client'
 
-import { Suspense, useEffect, useState } from 'react'
+import { Suspense, useCallback, useEffect, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
+import toast from 'react-hot-toast'
 import Footer from '@/components/layout/Footer'
-import { CheckCircle, Download, Calendar, MapPin, Users, ArrowRight, Mail, Mountain, Bus, Printer } from 'lucide-react'
+import { CheckCircle, Download, Calendar, MapPin, Users, ArrowRight, Mail, Mountain, Bus, Printer, CreditCard, Loader2 } from 'lucide-react'
 import { getBookingById, type SavedBooking } from '@/lib/bookings'
 
 function fmt(iso: string) {
@@ -20,13 +21,51 @@ function fmtLong(iso: string) {
 function SuccessInner() {
   const params = useSearchParams()
   const id = params.get('id')
+  const paymentResult = params.get('payment') // success|failed|cancelled
   const [booking, setBooking] = useState<SavedBooking | null>(null)
   const [loading, setLoading] = useState(true)
+  const [paying, setPaying] = useState(false)
+
+  const load = useCallback((bookingId: string) => {
+    return getBookingById(bookingId).then(b => { setBooking(b); return b })
+  }, [])
 
   useEffect(() => {
     if (!id) { setLoading(false); return }
-    getBookingById(id).then(b => { setBooking(b); setLoading(false) })
-  }, [id])
+    load(id).finally(() => setLoading(false))
+  }, [id, load])
+
+  // A successful gateway redirect can arrive slightly before the webhook has
+  // reconciled the payment — poll briefly so this updates without a manual
+  // refresh, instead of just trusting the redirect itself.
+  useEffect(() => {
+    if (paymentResult !== 'success' || !id) return
+    let attempts = 0
+    const interval = setInterval(async () => {
+      attempts += 1
+      const b = await load(id)
+      if ((b && b.status === 'confirmed') || attempts >= 6) clearInterval(interval)
+    }, 2500)
+    return () => clearInterval(interval)
+  }, [paymentResult, id, load])
+
+  async function payNow() {
+    if (!id) return
+    setPaying(true)
+    try {
+      const res = await fetch('/api/payments/ikhokha/create', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ bookingId: id }),
+      })
+      const json = await res.json()
+      if (!res.ok || !json.paylinkUrl) throw new Error(json.error || 'Could not start payment')
+      window.location.href = json.paylinkUrl
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Could not start payment')
+      setPaying(false)
+    }
+  }
 
   if (loading) {
     return (
@@ -42,6 +81,54 @@ function SuccessInner() {
         <div className="text-center">
           <p className="font-sans text-sm text-black/40 mb-4">Booking not found.</p>
           <Link href="/account" className="font-sans text-sm text-[#2d6a4f] hover:underline">Go to My Bookings</Link>
+        </div>
+      </div>
+    )
+  }
+
+  if (booking.status === 'cancelled') {
+    return (
+      <div className="min-h-screen bg-[#F7F5F2] flex items-center justify-center px-6">
+        <div className="text-center max-w-md">
+          <p className="font-sans text-sm text-gray-600 mb-4">
+            Booking {booking.reference} was cancelled and is no longer awaiting payment.
+          </p>
+          <Link href="/account" className="font-sans text-sm text-[#2d6a4f] hover:underline">Go to My Bookings</Link>
+        </div>
+      </div>
+    )
+  }
+
+  if (booking.status !== 'confirmed') {
+    return (
+      <div className="min-h-screen bg-[#F7F5F2] flex items-center justify-center px-6">
+        <div className="max-w-md w-full bg-white border border-gray-200 p-8 text-center">
+          <span className="font-sans text-[10px] tracking-[0.2em] uppercase text-gray-400 block mb-2">Booking {booking.reference}</span>
+          {paymentResult === 'success' ? (
+            <>
+              <Loader2 size={28} className="animate-spin text-[#2d6a4f] mx-auto mb-4" />
+              <h1 className="font-display italic text-2xl text-[#000000] mb-2">Confirming your payment…</h1>
+              <p className="font-sans text-sm text-gray-500 leading-relaxed">
+                Payment received — confirming with the bank. This page will update automatically.
+              </p>
+            </>
+          ) : (
+            <>
+              <h1 className="font-display italic text-2xl text-[#000000] mb-2">
+                {paymentResult === 'failed' ? "Payment didn't go through" : paymentResult === 'cancelled' ? 'Payment cancelled' : 'Complete your payment'}
+              </h1>
+              <p className="font-sans text-sm text-gray-500 leading-relaxed mb-6">
+                Your booking is on hold — the room/seats are reserved, but it won&apos;t be confirmed until payment succeeds.
+              </p>
+              <button
+                onClick={payNow}
+                disabled={paying}
+                className="inline-flex items-center gap-2 bg-[#C9A96E] text-[#1a1a1a] px-6 py-3 font-sans text-sm font-medium hover:bg-[#b8935e] transition-colors disabled:opacity-60"
+              >
+                <CreditCard size={14} /> {paying ? 'Redirecting…' : `Pay R ${booking.total.toLocaleString()}`}
+              </button>
+            </>
+          )}
         </div>
       </div>
     )

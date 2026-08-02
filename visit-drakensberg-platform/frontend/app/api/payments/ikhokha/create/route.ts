@@ -7,17 +7,21 @@ import { supabaseAdmin } from '@/lib/supabase-admin'
 
 export const dynamic = 'force-dynamic'
 
-// Starts an online payment for one invoice. The customer is redirected to
-// the returned paylinkUrl; the actual "mark as paid" happens later, in the
+// Starts an online payment for one invoice — either an existing invoice
+// (Pay Now on /invoices/[id]) or a just-created checkout booking, resolved
+// to its invoice via vd_orders.booking_id. The customer is redirected to the
+// returned paylinkUrl; the actual "mark as paid" happens later, in the
 // webhook route, once iKhokha confirms the payment really went through.
 export async function POST(req: Request) {
-  let body: { invoiceId?: string }
+  let body: { invoiceId?: string; bookingId?: string }
   try {
     body = await req.json()
   } catch {
     return NextResponse.json({ error: 'invalid body' }, { status: 400 })
   }
-  if (!body.invoiceId) return NextResponse.json({ error: 'invoiceId required' }, { status: 400 })
+  if (!body.invoiceId && !body.bookingId) {
+    return NextResponse.json({ error: 'invoiceId or bookingId required' }, { status: 400 })
+  }
 
   if (!isIkhokhaConfigured()) {
     return NextResponse.json({ error: 'Online payment is not set up yet — please contact us to arrange payment.' }, { status: 503 })
@@ -27,8 +31,17 @@ export async function POST(req: Request) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'unauthorized' }, { status: 401 })
 
-  // RLS scopes this read to the caller's own invoice, or staff.
-  const { data: invoice } = await supabase.from('vd_invoices').select('*').eq('id', body.invoiceId).maybeSingle()
+  // RLS scopes every read below to the caller's own rows, or staff.
+  let invoice: { id: string; order_id: string; invoice_number: string; balance: unknown; currency: string; status: string } | null = null
+  if (body.invoiceId) {
+    const { data } = await supabase.from('vd_invoices').select('*').eq('id', body.invoiceId).maybeSingle()
+    invoice = data
+  } else {
+    const { data: order } = await supabase.from('vd_orders').select('id').eq('booking_id', body.bookingId).maybeSingle()
+    if (!order) return NextResponse.json({ error: 'booking not found' }, { status: 404 })
+    const { data } = await supabase.from('vd_invoices').select('*').eq('order_id', order.id).maybeSingle()
+    invoice = data
+  }
   if (!invoice) return NextResponse.json({ error: 'invoice not found' }, { status: 404 })
 
   const balance = Number(invoice.balance)
@@ -37,6 +50,18 @@ export async function POST(req: Request) {
 
   const origin = process.env.NEXT_PUBLIC_SITE_URL || new URL(req.url).origin
   const externalTransactionID = `${invoice.id}-${Date.now()}`
+
+  const returnUrls = body.bookingId
+    ? {
+        successPageUrl: `${origin}/checkout/success?id=${body.bookingId}&payment=success`,
+        failurePageUrl: `${origin}/checkout/success?id=${body.bookingId}&payment=failed`,
+        cancelUrl: `${origin}/checkout/success?id=${body.bookingId}&payment=cancelled`,
+      }
+    : {
+        successPageUrl: `${origin}/invoices/${invoice.id}?payment=success`,
+        failurePageUrl: `${origin}/invoices/${invoice.id}?payment=failed`,
+        cancelUrl: `${origin}/invoices/${invoice.id}?payment=cancelled`,
+      }
 
   let link
   try {
@@ -48,9 +73,7 @@ export async function POST(req: Request) {
       externalTransactionID,
       requesterUrl: origin,
       callbackUrl: `${origin}/api/payments/ikhokha/webhook`,
-      successPageUrl: `${origin}/invoices/${invoice.id}?payment=success`,
-      failurePageUrl: `${origin}/invoices/${invoice.id}?payment=failed`,
-      cancelUrl: `${origin}/invoices/${invoice.id}?payment=cancelled`,
+      ...returnUrls,
     })
   } catch (e) {
     console.error('[ikhokha] create payment link failed:', e)
@@ -76,7 +99,8 @@ export async function POST(req: Request) {
   if (insertError) {
     // The webhook reconciles a payment by looking up this row via paylink_id
     // — without it, a real payment could complete with no way to mark the
-    // invoice paid. Fail loudly rather than send the customer to pay anyway.
+    // invoice (or booking) paid. Fail loudly rather than send the customer
+    // to pay anyway.
     console.error('[ikhokha] failed to persist payment link:', insertError)
     return NextResponse.json({ error: 'Could not start the payment — please try again shortly.' }, { status: 500 })
   }
