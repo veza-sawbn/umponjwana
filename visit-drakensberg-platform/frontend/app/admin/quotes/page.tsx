@@ -235,8 +235,11 @@ export default function AdminQuotesPage() {
 
   async function handleSend(id: string) {
     try {
-      await sendQuote(id)
-      toast.success('Quote sent.')
+      const { sent, error } = await sendQuote(id)
+      // The quote is open for the customer either way — but don't claim it was
+      // emailed when it wasn't, or the email failure goes unnoticed.
+      if (sent) toast.success('Quote sent.')
+      else toast.error(`Quote opened for the customer, but the email failed: ${error || 'unknown error'}`, { duration: 8000 })
       load()
     } catch (e) {
       toast.error(e instanceof Error ? e.message : 'Could not send quote')

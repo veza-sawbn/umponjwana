@@ -103,6 +103,24 @@ export async function setFinanceSettings(patch: Partial<{ serviceFeeRate: number
   if (error) throw new Error(error.message || 'Could not save finance settings')
 }
 
+/**
+ * Emails the customer their invoice link. The endpoint reports delivery
+ * failures in its body with a 200, so `sent` must be read from the payload —
+ * `res.ok` alone is not enough.
+ */
+export async function sendInvoice(invoiceId: string): Promise<{ sent: boolean; error: string | null }> {
+  try {
+    const res = await fetch('/api/invoices/send', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ invoiceId }),
+    })
+    const body = await res.json().catch(() => ({} as { sent?: boolean; error?: string }))
+    if (!res.ok) return { sent: false, error: body.error || `Email service returned ${res.status}` }
+    return { sent: !!body.sent, error: body.error ?? null }
+  } catch (e) {
+    return { sent: false, error: e instanceof Error ? e.message : 'Email request failed' }
+  }
+}
+
 export async function getReceipts(orderId?: string): Promise<Receipt[]> {
   try {
     let q = supabase.from('vd_receipts').select('*').order('created_at', { ascending: false })
