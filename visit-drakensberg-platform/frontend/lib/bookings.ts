@@ -41,8 +41,12 @@ type Row = {
 }
 
 function rowToBooking(r: Row): SavedBooking {
+  const value = r.value as unknown as SavedBooking
   return {
-    ...(r.value as unknown as SavedBooking),
+    ...value,
+    stay: value?.stay ?? null,
+    addons: value?.addons ?? [],
+    shuttles: value?.shuttles ?? [],
     id: r.id,
     reference: r.reference,
     userId: r.user_id,
