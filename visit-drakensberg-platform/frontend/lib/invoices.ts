@@ -6,6 +6,8 @@ import { supabase } from './auth'
 
 export type InvoiceLine = {
   title: string
+  /** Free-text detail shown beneath the title on the invoice document. */
+  description?: string
   category: string
   quantity: number
   unitLabel: string
