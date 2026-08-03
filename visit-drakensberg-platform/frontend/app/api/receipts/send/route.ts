@@ -2,7 +2,8 @@ import { NextResponse } from 'next/server'
 import { cookies } from 'next/headers'
 import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs'
 import { supabaseAdmin } from '@/lib/supabase-admin'
-import { sendMail, emailSignature } from '@/lib/mailer'
+import { sendMail } from '@/lib/mailer'
+import { emailShell, ctaButton, detailTable, esc, getFeaturedExperiences, type FeaturedExperience } from '@/lib/email-layout'
 
 export const dynamic = 'force-dynamic'
 
@@ -41,47 +42,40 @@ function receiptHtml(o: {
   totalPaid: number
   balance: number
   invoiceUrl: string
+  origin: string
+  featured: FeaturedExperience[]
 }) {
-  const rows = [
-    ['Receipt', o.receiptNumber],
-    ['Invoice', o.invoiceNumber],
-    ['Order', o.orderNumber],
-    ['Trip', o.tripName || '—'],
-    ['Date', fmtDate(o.date)],
-    ['Payment method', o.method.replace(/_/g, ' ')],
-    ['Total paid to date', money(o.totalPaid, o.currency)],
-    ['Balance due', money(o.balance, o.currency)],
-  ].map(([k, v]) =>
-    `<tr><td style="padding:6px 0;color:#8a8a8a;font-size:13px;">${k}</td>` +
-    `<td style="padding:6px 0;text-align:right;font-size:13px;color:#1a1a1a;">${v}</td></tr>`
-  ).join('')
-
-  return `<!doctype html><html><body style="margin:0;background:#F7F5F2;font-family:Georgia,serif;">
-  <div style="max-width:560px;margin:0 auto;padding:32px 16px;">
-    <div style="background:#000;color:#fff;padding:28px 32px;">
-      <p style="margin:0;font-size:11px;letter-spacing:3px;text-transform:uppercase;color:#C9A96E;">Visit Drakensberg</p>
-      <h1 style="margin:8px 0 0;font-style:italic;font-weight:normal;font-size:26px;">
-        ${o.isRefund ? 'Refund processed' : 'Payment received'}
-      </h1>
-    </div>
-    <div style="background:#fff;border:1px solid #e5e5e5;border-top:none;padding:28px 32px;">
-      <p style="font-size:14px;color:#444;margin:0 0 4px;">Dear ${o.customerName || 'traveller'},</p>
-      <p style="font-size:14px;color:#444;margin:0 0 20px;">
+  return emailShell({
+    origin: o.origin,
+    eyebrow: `Receipt ${o.receiptNumber}`,
+    heading: o.isRefund ? 'Refund processed' : 'Payment received',
+    preheader: o.isRefund
+      ? `Refund of ${money(o.amount, o.currency)} processed against your booking.`
+      : `Payment of ${money(o.amount, o.currency)} received — thank you.`,
+    featured: o.featured,
+    bodyHtml: `
+      <p style="margin:0 0 4px;">Dear ${esc(o.customerName || 'traveller')},</p>
+      <p style="margin:0 0 20px;">
         ${o.isRefund
-          ? `We have processed a refund of <strong>${money(o.amount, o.currency)}</strong> against your booking.`
-          : `Thank you — we have received your payment of <strong>${money(o.amount, o.currency)}</strong>.`}
+          ? `We have processed a refund of <strong>${esc(money(o.amount, o.currency))}</strong> against your booking.`
+          : `Thank you — we have received your payment of <strong>${esc(money(o.amount, o.currency))}</strong>.`}
       </p>
-      <table style="width:100%;border-collapse:collapse;border-top:1px solid #eee;border-bottom:1px solid #eee;">${rows}</table>
-      <p style="margin:24px 0 0;">
-        <a href="${o.invoiceUrl}" style="display:inline-block;background:#2d6a4f;color:#fff;text-decoration:none;padding:12px 24px;font-size:13px;font-family:Arial,sans-serif;">View your invoice</a>
-      </p>
-      <p style="font-size:11px;color:#aaa;margin:24px 0 0;line-height:1.6;">
+      ${detailTable([
+        ['Receipt', o.receiptNumber],
+        ['Invoice', o.invoiceNumber],
+        ['Order', o.orderNumber],
+        ['Trip', o.tripName || '—'],
+        ['Date', fmtDate(o.date)],
+        ['Payment method', o.method.replace(/_/g, ' ')],
+        ['Total paid to date', money(o.totalPaid, o.currency)],
+        ['Balance due', money(o.balance, o.currency)],
+      ])}
+      ${ctaButton(o.invoiceUrl, 'View your invoice')}
+      <p style="margin:24px 0 0;font-family:Arial,Helvetica,sans-serif;font-size:11px;color:#aaaaaa;line-height:1.6;">
         This receipt covers your single trip invoice with Visit Drakensberg — all accommodation,
         activities, transfers and extras appear on one document. Keep this email for your records.
-      </p>
-      ${emailSignature()}
-    </div>
-  </div></body></html>`
+      </p>`,
+  })
 }
 
 export async function POST(req: Request) {
@@ -129,6 +123,7 @@ export async function POST(req: Request) {
   let sendError: string | null = null
 
   if (email) {
+    const featured = await getFeaturedExperiences(origin)
     const result = await sendMail({
       to: email,
       subject: isRefund
@@ -148,6 +143,8 @@ export async function POST(req: Request) {
         totalPaid: Number(order.amount_paid),
         balance: Number(order.outstanding_balance),
         invoiceUrl,
+        origin,
+        featured,
       }),
     })
     sent = result.sent

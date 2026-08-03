@@ -1,7 +1,8 @@
 import { NextResponse } from 'next/server'
 import { cookies } from 'next/headers'
 import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs'
-import { sendMail, emailSignature } from '@/lib/mailer'
+import { sendMail } from '@/lib/mailer'
+import { emailShell, ctaButton, detailTable, esc, getFeaturedExperiences, type FeaturedExperience } from '@/lib/email-layout'
 
 export const dynamic = 'force-dynamic'
 
@@ -33,46 +34,42 @@ function invoiceHtml(o: {
   balance: number
   issuedAt: string
   invoiceUrl: string
+  origin: string
+  featured: FeaturedExperience[]
 }) {
-  const rows = [
-    ['Invoice', o.invoiceNumber],
-    ['Order', o.orderNumber],
-    ['Trip', o.tripName || '—'],
-    ['Issued', fmtDate(o.issuedAt)],
-    ['Invoice total', money(o.total, o.currency)],
-    ['Paid to date', money(o.amountPaid, o.currency)],
-    ['Balance due', money(o.balance, o.currency)],
-  ].map(([k, v]) =>
-    `<tr><td style="padding:6px 0;color:#8a8a8a;font-size:13px;">${k}</td>` +
-    `<td style="padding:6px 0;text-align:right;font-size:13px;color:#1a1a1a;">${v}</td></tr>`
-  ).join('')
-
   const settled = o.balance <= 0
+  const trip = o.tripName ? ` for ${esc(o.tripName)}` : ''
 
-  return `<!doctype html><html><body style="margin:0;background:#F7F5F2;font-family:Georgia,serif;">
-  <div style="max-width:560px;margin:0 auto;padding:32px 16px;">
-    <div style="background:#000;color:#fff;padding:28px 32px;">
-      <p style="margin:0;font-size:11px;letter-spacing:3px;text-transform:uppercase;color:#C9A96E;">Visit Drakensberg</p>
-      <h1 style="margin:8px 0 0;font-style:italic;font-weight:normal;font-size:26px;">Your invoice</h1>
-    </div>
-    <div style="background:#fff;border:1px solid #e5e5e5;border-top:none;padding:28px 32px;">
-      <p style="font-size:14px;color:#444;margin:0 0 4px;">Dear ${o.customerName || 'traveller'},</p>
-      <p style="font-size:14px;color:#444;margin:0 0 20px;">
+  return emailShell({
+    origin: o.origin,
+    eyebrow: `Invoice ${o.invoiceNumber}`,
+    heading: 'Your invoice',
+    preheader: settled
+      ? `Invoice ${o.invoiceNumber} — fully paid, no payment due.`
+      : `Invoice ${o.invoiceNumber} — ${money(o.balance, o.currency)} outstanding.`,
+    featured: o.featured,
+    bodyHtml: `
+      <p style="margin:0 0 4px;">Dear ${esc(o.customerName || 'traveller')},</p>
+      <p style="margin:0 0 20px;">
         ${settled
-          ? `Here is invoice <strong>${o.invoiceNumber}</strong>${o.tripName ? ` for ${o.tripName}` : ''}. It is fully paid — no further payment is due.`
-          : `Here is invoice <strong>${o.invoiceNumber}</strong>${o.tripName ? ` for ${o.tripName}` : ''}, with <strong>${money(o.balance, o.currency)}</strong> still outstanding.`}
+          ? `Here is invoice <strong>${esc(o.invoiceNumber)}</strong>${trip}. It is fully paid — no further payment is due.`
+          : `Here is invoice <strong>${esc(o.invoiceNumber)}</strong>${trip}, with <strong>${esc(money(o.balance, o.currency))}</strong> still outstanding.`}
       </p>
-      <table style="width:100%;border-collapse:collapse;border-top:1px solid #eee;border-bottom:1px solid #eee;">${rows}</table>
-      <p style="margin:24px 0 0;">
-        <a href="${o.invoiceUrl}" style="display:inline-block;background:#2d6a4f;color:#fff;text-decoration:none;padding:12px 24px;font-size:13px;font-family:Arial,sans-serif;">${settled ? 'View your invoice' : 'View & pay your invoice'}</a>
-      </p>
-      <p style="font-size:11px;color:#aaa;margin:24px 0 0;line-height:1.6;">
+      ${detailTable([
+        ['Invoice', o.invoiceNumber],
+        ['Order', o.orderNumber],
+        ['Trip', o.tripName || '—'],
+        ['Issued', fmtDate(o.issuedAt)],
+        ['Invoice total', money(o.total, o.currency)],
+        ['Paid to date', money(o.amountPaid, o.currency)],
+        ['Balance due', money(o.balance, o.currency)],
+      ])}
+      ${ctaButton(o.invoiceUrl, settled ? 'View your invoice' : 'View & pay your invoice')}
+      <p style="margin:24px 0 0;font-family:Arial,Helvetica,sans-serif;font-size:11px;color:#aaaaaa;line-height:1.6;">
         This invoice covers your single trip with Visit Drakensberg — all accommodation,
         activities, transfers and extras appear on one document.
-      </p>
-      ${emailSignature()}
-    </div>
-  </div></body></html>`
+      </p>`,
+  })
 }
 
 export async function POST(req: Request) {
@@ -101,6 +98,7 @@ export async function POST(req: Request) {
   if (!email) return NextResponse.json({ sent: false, error: 'order has no customer email' })
 
   const origin = process.env.NEXT_PUBLIC_SITE_URL || new URL(req.url).origin
+  const featured = await getFeaturedExperiences(origin)
 
   const { sent, error } = await sendMail({
     to: email,
@@ -116,6 +114,8 @@ export async function POST(req: Request) {
       balance: Number(invoice.balance),
       issuedAt: invoice.issued_at,
       invoiceUrl: `${origin}/invoices/${invoice.id}`,
+      origin,
+      featured,
     }),
   })
 

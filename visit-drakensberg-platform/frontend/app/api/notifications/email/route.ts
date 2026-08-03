@@ -2,7 +2,8 @@ import { NextResponse } from 'next/server'
 import { cookies } from 'next/headers'
 import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs'
 import { supabaseAdmin } from '@/lib/supabase-admin'
-import { sendMail, emailSignature } from '@/lib/mailer'
+import { sendMail } from '@/lib/mailer'
+import { emailShell, ctaButton, esc, getFeaturedExperiences, type FeaturedExperience } from '@/lib/email-layout'
 
 export const dynamic = 'force-dynamic'
 
@@ -15,22 +16,24 @@ export const dynamic = 'force-dynamic'
 // client rather than trusting the caller's session — the caller never gets
 // the address back.
 
-function emailHtml(o: { title: string; body: string; link: string | null; name: string | null }) {
-  return `<!doctype html><html><body style="margin:0;background:#F7F5F2;font-family:Georgia,serif;">
-  <div style="max-width:560px;margin:0 auto;padding:32px 16px;">
-    <div style="background:#000;color:#fff;padding:28px 32px;">
-      <p style="margin:0;font-size:11px;letter-spacing:3px;text-transform:uppercase;color:#C9A96E;">Visit Drakensberg</p>
-      <h1 style="margin:8px 0 0;font-style:italic;font-weight:normal;font-size:26px;">${o.title}</h1>
-    </div>
-    <div style="background:#fff;border:1px solid #e5e5e5;border-top:none;padding:28px 32px;">
-      <p style="font-size:14px;color:#444;margin:0 0 4px;">Dear ${o.name || 'there'},</p>
-      <p style="font-size:14px;color:#444;margin:0 0 20px;white-space:pre-wrap;">${o.body}</p>
-      ${o.link ? `<p style="margin:24px 0 0;">
-        <a href="${o.link}" style="display:inline-block;background:#2d6a4f;color:#fff;text-decoration:none;padding:12px 24px;font-size:13px;font-family:Arial,sans-serif;">View details</a>
-      </p>` : ''}
-      ${emailSignature()}
-    </div>
-  </div></body></html>`
+function emailHtml(o: {
+  title: string
+  body: string
+  link: string | null
+  name: string | null
+  origin: string
+  featured: FeaturedExperience[]
+}) {
+  return emailShell({
+    origin: o.origin,
+    heading: o.title,
+    preheader: o.body.slice(0, 140),
+    featured: o.featured,
+    bodyHtml: `
+      <p style="margin:0 0 4px;">Dear ${esc(o.name || 'there')},</p>
+      <p style="margin:0 0 20px;white-space:pre-wrap;">${esc(o.body)}</p>
+      ${o.link ? ctaButton(o.link, 'View details') : ''}`,
+  })
 }
 
 export async function POST(req: Request) {
@@ -54,11 +57,14 @@ export async function POST(req: Request) {
 
   const origin = process.env.NEXT_PUBLIC_SITE_URL || new URL(req.url).origin
   const link = payload.link ? `${origin}${payload.link}` : null
+  const featured = await getFeaturedExperiences(origin)
 
   const { sent, error } = await sendMail({
     to: profile.email,
     subject: payload.title,
-    html: emailHtml({ title: payload.title, body: payload.body, link, name: profile.full_name }),
+    html: emailHtml({
+      title: payload.title, body: payload.body, link, name: profile.full_name, origin, featured,
+    }),
   })
 
   return NextResponse.json({ sent, error })
