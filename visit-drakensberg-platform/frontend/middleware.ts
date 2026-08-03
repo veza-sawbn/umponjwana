@@ -2,16 +2,21 @@ import { createMiddlewareClient } from '@supabase/auth-helpers-nextjs'
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 
-const PROTECTED_ROUTES = ['/dashboard', '/checkout', '/supplier', '/admin', '/account']
+const PROTECTED_ROUTES = ['/dashboard', '/checkout', '/supplier', '/admin', '/account', '/partner']
 const ADMIN_ROUTES = ['/admin']
 const SUPPLIER_ROUTES = ['/supplier']
+// /partner is signed-in-only but deliberately NOT role-gated. Authority there
+// comes from vd_establishment_access, not profiles.role — an invited partner
+// may still be a plain 'visitor' when they accept, and /partner/accept has to
+// be reachable before they hold any access at all. The portal's own queries
+// are scoped by RLS, so an account with no assignments simply sees nothing.
 // Routes that must stay reachable even while maintenance mode is on — the
 // admin/supplier consoles (per the settings toggle's own description), the
 // auth flow (needed to sign in and reach those consoles), the maintenance
 // page itself (avoid rewriting it into a loop), and customer-facing
 // invoices/quotes (RLS-gated per document, not part of the public site the
 // toggle is meant to hide).
-const MAINTENANCE_EXEMPT_ROUTES = ['/admin', '/supplier', '/auth', '/maintenance', '/invoices', '/quotes']
+const MAINTENANCE_EXEMPT_ROUTES = ['/admin', '/supplier', '/partner', '/auth', '/maintenance', '/invoices', '/quotes']
 
 export async function middleware(req: NextRequest) {
   // `res` must be passed through so auth-helpers can refresh the session cookie.
