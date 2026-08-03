@@ -177,6 +177,8 @@ function InvoiceModal({ customers, suppliers, draft, editing, onClose, onDone }:
             tripName: tripName.trim() || undefined,
             travelStart: travelStart || undefined,
             travelEnd: travelEnd || undefined,
+            serviceFeeOverride: feeOverride,
+            taxOverride: taxOverride,
           },
           orderLines,
           { invoiceLines },
@@ -192,6 +194,8 @@ function InvoiceModal({ customers, suppliers, draft, editing, onClose, onDone }:
             travelStart: travelStart || undefined,
             travelEnd: travelEnd || undefined,
             subtotal, serviceFee, taxAmount: tax, total,
+            serviceFeeOverride: feeOverride,
+            taxOverride: taxOverride,
             value: isGuest ? { manual: true, customerPhone: guestPhone.trim() } : { manual: true },
           },
           orderLines,
@@ -325,7 +329,9 @@ function InvoiceModal({ customers, suppliers, draft, editing, onClose, onDone }:
           <div className="text-right">
             <p className="font-sans text-xs text-gray-500">Subtotal {formatMoney(subtotal)} · Fee {formatMoney(serviceFee)} · VAT {formatMoney(tax)}</p>
             <p className="font-display italic text-2xl text-[#2d6a4f]">Total {formatMoney(total)}</p>
-            <p className="font-sans text-[10px] text-gray-400 mt-0.5">Fees and VAT are re-derived server-side on save.</p>
+            <p className="font-sans text-[10px] text-gray-400 mt-0.5">
+              Leave fee/VAT blank to use the configured rates. Any value entered — including 0 — is applied exactly.
+            </p>
           </div>
           <div className="flex gap-2">
             {!editing && (

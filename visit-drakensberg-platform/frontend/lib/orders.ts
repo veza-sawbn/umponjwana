@@ -140,6 +140,14 @@ export type CreateOrderInput = {
   taxAmount: number
   total: number
   depositAmount?: number
+  /**
+   * Admin-only: force an exact service fee / VAT amount instead of the rate
+   * from vd_finance_settings. Honoured server-side only for admins, so
+   * checkout can never zero out its own charges. Omit (or pass '') to derive
+   * as normal — note that '0' is a real override, not an absent one.
+   */
+  serviceFeeOverride?: string
+  taxOverride?: string
   value?: Record<string, unknown>
 }
 
@@ -184,7 +192,9 @@ export async function createOrder(
  */
 export async function updateOrder(
   orderId: string,
-  order: Partial<Pick<CreateOrderInput, 'customerName' | 'customerEmail' | 'tripName' | 'currency' | 'travelStart' | 'travelEnd'>>,
+  order: Partial<Pick<CreateOrderInput,
+    'customerName' | 'customerEmail' | 'tripName' | 'currency' | 'travelStart' | 'travelEnd'
+    | 'serviceFeeOverride' | 'taxOverride'>>,
   lines: OrderLineInput[],
   opts?: { invoiceLines?: Array<{ title: string; description?: string; category?: string; quantity: number; unitLabel?: string; unitPrice: number; total: number }> },
 ): Promise<CreateOrderResult> {

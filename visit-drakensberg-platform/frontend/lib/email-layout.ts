@@ -49,7 +49,10 @@ export type FeaturedExperience = {
 
 function money(amount: number, currency = 'ZAR'): string {
   const symbol = currency === 'ZAR' ? 'R ' : `${currency} `
-  return `${symbol}${Math.abs(amount).toLocaleString('en-ZA', { maximumFractionDigits: 0 })}`
+  const value = Number.isFinite(amount) ? amount : 0
+  // Period-decimal accounting form — see formatMoney in lib/allocation.ts.
+  const body = `${symbol}${Math.abs(value).toLocaleString('en-US', { minimumFractionDigits: 3, maximumFractionDigits: 3 })}`
+  return value < 0 ? `(${body})` : body
 }
 
 /**
