@@ -114,15 +114,5 @@ export async function sendMail(o: { to: string; subject: string; html: string })
   }
 }
 
-// Programmatic sends bypass any signature configured in the mailbox's
-// webmail client, so every template appends this footer itself.
-export function emailSignature(): string {
-  return `<div style="margin-top:28px;padding-top:20px;border-top:1px solid #eee;">
-    <p style="font-size:13px;color:#444;margin:0 0 2px;">Warm regards,</p>
-    <p style="font-size:13px;color:#1a1a1a;margin:0 0 12px;font-weight:bold;">The Visit Drakensberg Team</p>
-    <p style="font-size:11px;color:#aaa;margin:0;line-height:1.6;">
-      Visit Drakensberg · <a href="https://visitdrakensberg.co.za" style="color:#aaa;">visitdrakensberg.co.za</a><br/>
-      This is an automated message — please do not reply directly to this email.
-    </p>
-  </div>`
-}
+// Presentation now lives in lib/email-layout.ts — this module is transport
+// only. The signature is part of the shared shell's footer there.

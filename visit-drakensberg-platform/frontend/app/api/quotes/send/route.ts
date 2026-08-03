@@ -1,7 +1,8 @@
 import { NextResponse } from 'next/server'
 import { cookies } from 'next/headers'
 import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs'
-import { sendMail, emailSignature } from '@/lib/mailer'
+import { sendMail } from '@/lib/mailer'
+import { emailShell, ctaButton, detailTable, esc, getFeaturedExperiences } from '@/lib/email-layout'
 
 export const dynamic = 'force-dynamic'
 
@@ -35,28 +36,36 @@ export async function POST(req: Request) {
 
   const origin = process.env.NEXT_PUBLIC_SITE_URL || new URL(req.url).origin
   const quoteUrl = `${origin}/quotes/${quote.id}`
+  const featured = await getFeaturedExperiences(origin)
+
+  const validUntil = quote.valid_until
+    ? new Date(quote.valid_until).toLocaleDateString('en-ZA', { day: 'numeric', month: 'long', year: 'numeric' })
+    : null
 
   const { sent, error } = await sendMail({
     to: quote.customer_email,
     subject: `Your quote ${quote.quote_number} — Visit Drakensberg`,
-    html: `<!doctype html><html><body style="margin:0;background:#F7F5F2;font-family:Georgia,serif;">
-      <div style="max-width:560px;margin:0 auto;padding:32px 16px;">
-        <div style="background:#000;color:#fff;padding:28px 32px;">
-          <p style="margin:0;font-size:11px;letter-spacing:3px;text-transform:uppercase;color:#C9A96E;">Visit Drakensberg</p>
-          <h1 style="margin:8px 0 0;font-style:italic;font-weight:normal;font-size:26px;">Your quote is ready</h1>
-        </div>
-        <div style="background:#fff;border:1px solid #e5e5e5;border-top:none;padding:28px 32px;">
-          <p style="font-size:14px;color:#444;margin:0 0 4px;">Dear ${quote.customer_name || 'traveller'},</p>
-          <p style="font-size:14px;color:#444;margin:0 0 20px;">
-            We've put together a quote${quote.trip_name ? ` for ${quote.trip_name}` : ''} — <strong>${money(Number(quote.total), quote.currency)}</strong> total.
-            ${quote.valid_until ? `This quote is valid until ${new Date(quote.valid_until).toLocaleDateString('en-ZA', { day: 'numeric', month: 'long', year: 'numeric' })}.` : ''}
-          </p>
-          <p style="margin:24px 0 0;">
-            <a href="${quoteUrl}" style="display:inline-block;background:#2d6a4f;color:#fff;text-decoration:none;padding:12px 24px;font-size:13px;font-family:Arial,sans-serif;">View & Accept Quote</a>
-          </p>
-          ${emailSignature()}
-        </div>
-      </div></body></html>`,
+    html: emailShell({
+      origin,
+      eyebrow: `Quote ${quote.quote_number}`,
+      heading: 'Your quote is ready',
+      preheader: `${money(Number(quote.total), quote.currency)} total${validUntil ? ` — valid until ${validUntil}` : ''}.`,
+      featured,
+      bodyHtml: `
+        <p style="margin:0 0 4px;">Dear ${esc(quote.customer_name || 'traveller')},</p>
+        <p style="margin:0 0 20px;">
+          We've put together a quote${quote.trip_name ? ` for ${esc(quote.trip_name)}` : ''} —
+          <strong>${esc(money(Number(quote.total), quote.currency))}</strong> total.
+          ${validUntil ? `This quote is valid until ${esc(validUntil)}.` : ''}
+        </p>
+        ${detailTable([
+          ['Quote', quote.quote_number],
+          ...(quote.trip_name ? [['Trip', quote.trip_name] as [string, string]] : []),
+          ...(validUntil ? [['Valid until', validUntil] as [string, string]] : []),
+          ['Total', money(Number(quote.total), quote.currency)],
+        ])}
+        ${ctaButton(quoteUrl, 'View & Accept Quote')}`,
+    }),
   })
 
   return NextResponse.json({ sent, error })
