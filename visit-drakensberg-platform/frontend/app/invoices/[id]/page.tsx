@@ -204,9 +204,12 @@ function PrintableInvoiceInner() {
             <tbody className="divide-y divide-gray-100">
               {invoice.lines.map((l, i) => (
                 <tr key={i}>
-                  <td className="py-3">
+                  <td className="py-3 pr-4">
                     <p className="font-sans text-sm text-gray-800">{l.title}</p>
-                    <p className="font-sans text-[11px] text-gray-400 capitalize">{l.category}</p>
+                    {l.description && (
+                      <p className="font-sans text-[12px] text-gray-600 mt-0.5 whitespace-pre-wrap">{l.description}</p>
+                    )}
+                    <p className="font-sans text-[11px] text-gray-400 capitalize mt-0.5">{l.category}</p>
                   </td>
                   <td className="py-3 text-right font-sans text-sm text-gray-600">{Number(l.quantity)} {l.unitLabel}{Number(l.quantity) !== 1 ? 's' : ''}</td>
                   <td className="py-3 text-right font-sans text-sm text-gray-600">{formatMoney(Number(l.unitPrice), invoice.currency)}</td>

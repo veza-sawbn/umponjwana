@@ -22,6 +22,8 @@ export type OrderLineInput = {
   category: string        // accommodation|activity|tour|hike|event|shuttle|equipment|permit|levy|donation|meal|package|extra
   productId?: string
   title: string
+  /** Free-text detail shown beneath the title on the customer invoice. */
+  description?: string
   serviceDate?: string
   endDate?: string
   guests?: number
@@ -82,6 +84,7 @@ export type OrderLine = {
   category: string
   product_id: string | null
   title: string
+  description: string
   service_date: string | null
   end_date: string | null
   guests: number | null
@@ -170,6 +173,29 @@ export async function createOrder(
   // receipt emailed straight away.
   if (opts?.payment && opts.payment.amount > 0) sendReceiptEmail(result.orderId)
   return result
+}
+
+/**
+ * Re-price an existing order in place, keeping its id, order number and
+ * invoice number. Admin only, and rejected server-side once any payment has
+ * been recorded — a paid invoice has to be corrected with a credit note, not
+ * rewritten. The RPC reverses the order's original ledger journal and re-posts
+ * from the new figures, so the books stay balanced across the edit.
+ */
+export async function updateOrder(
+  orderId: string,
+  order: Partial<Pick<CreateOrderInput, 'customerName' | 'customerEmail' | 'tripName' | 'currency' | 'travelStart' | 'travelEnd'>>,
+  lines: OrderLineInput[],
+  opts?: { invoiceLines?: Array<{ title: string; description?: string; category?: string; quantity: number; unitLabel?: string; unitPrice: number; total: number }> },
+): Promise<CreateOrderResult> {
+  const { data, error } = await supabase.rpc('vd_update_order', {
+    p_order_id: orderId,
+    p_order: order,
+    p_lines: lines,
+    p_invoice_lines: opts?.invoiceLines ?? null,
+  })
+  if (error) throw new Error(error.message || 'Invoice update failed')
+  return data as CreateOrderResult
 }
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
