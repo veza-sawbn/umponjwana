@@ -77,6 +77,18 @@ export async function getInvoiceById(id: string): Promise<Invoice | null> {
   return getInvoiceByOrder(id)
 }
 
+/**
+ * A stored rate of 0 is a deliberate setting (zero-rated VAT, waived service
+ * fee), not a missing one — so the fallback applies only when the row is
+ * absent or unparseable. The previous `Number(value) || default` read a saved
+ * 0 back as the 15%/12% default, which then got written back on the next save
+ * and silently undid the change.
+ */
+function rate(value: unknown, fallback: number): number {
+  const n = Number(value)
+  return Number.isFinite(n) && n >= 0 ? n : fallback
+}
+
 /** Editable finance defaults (vd_finance_settings) with sensible fallbacks. */
 export async function getFinanceSettings(): Promise<{ serviceFeeRate: number; vatRate: number; currency: string }> {
   const out = { serviceFeeRate: 0.12, vatRate: 0.15, currency: 'ZAR' }
@@ -84,8 +96,8 @@ export async function getFinanceSettings(): Promise<{ serviceFeeRate: number; va
     const { data } = await supabase.from('vd_finance_settings').select('key, value')
     for (const row of data ?? []) {
       const r = row as { key: string; value: unknown }
-      if (r.key === 'service_fee_rate') out.serviceFeeRate = Number(r.value) || out.serviceFeeRate
-      if (r.key === 'vat_rate') out.vatRate = Number(r.value) || out.vatRate
+      if (r.key === 'service_fee_rate') out.serviceFeeRate = rate(r.value, out.serviceFeeRate)
+      if (r.key === 'vat_rate') out.vatRate = rate(r.value, out.vatRate)
       if (r.key === 'default_currency' && typeof r.value === 'string') out.currency = r.value
     }
   } catch {}

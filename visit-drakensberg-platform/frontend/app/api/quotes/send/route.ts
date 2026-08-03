@@ -11,7 +11,10 @@ export const dynamic = 'force-dynamic'
 
 function money(amount: number, currency: string) {
   const symbol = currency === 'ZAR' ? 'R ' : `${currency} `
-  return `${symbol}${Math.abs(amount).toLocaleString('en-ZA', { maximumFractionDigits: 2 })}`
+  const value = Number.isFinite(amount) ? amount : 0
+  // Period-decimal accounting form — see formatMoney in lib/allocation.ts.
+  const body = `${symbol}${Math.abs(value).toLocaleString('en-US', { minimumFractionDigits: 3, maximumFractionDigits: 3 })}`
+  return value < 0 ? `(${body})` : body
 }
 
 export async function POST(req: Request) {

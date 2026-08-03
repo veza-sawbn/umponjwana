@@ -42,7 +42,25 @@ export function allocateLine(input: AllocationInput): Allocation {
   }
 }
 
+/**
+ * Accounting presentation: comma-grouped thousands, fixed to three decimals,
+ * with negatives in parentheses rather than a minus sign — so credits, refunds
+ * and reversals read the way they do on a statement.
+ *
+ * Grouping is deliberately not en-ZA. That locale uses a comma as the DECIMAL
+ * separator and a space for thousands, which is unambiguous at two decimals
+ * but not at three: zero renders "R 0,000" and "R 1 288,500" reads as a
+ * million. Period-decimal is the conventional accounting form and is what
+ * finance exports and statements are read against.
+ */
+const MONEY_FORMAT = new Intl.NumberFormat('en-US', {
+  minimumFractionDigits: 3,
+  maximumFractionDigits: 3,
+})
+
 export function formatMoney(amount: number, currency = 'ZAR'): string {
   const symbol = currency === 'ZAR' ? 'R ' : `${currency} `
-  return `${symbol}${(amount ?? 0).toLocaleString('en-ZA', { maximumFractionDigits: 2 })}`
+  const value = Number.isFinite(amount) ? amount : 0
+  const body = `${symbol}${MONEY_FORMAT.format(Math.abs(value))}`
+  return value < 0 ? `(${body})` : body
 }
