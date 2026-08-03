@@ -2,20 +2,13 @@ import { NextResponse } from 'next/server'
 import { cookies } from 'next/headers'
 import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs'
 import { sendMail } from '@/lib/mailer'
+import { formatMoney as money } from '@/lib/allocation'
 import { emailShell, ctaButton, detailTable, esc, getFeaturedExperiences } from '@/lib/email-layout'
 
 export const dynamic = 'force-dynamic'
 
 // Emails the customer their quote link. Same SMTP pattern as
 // app/api/receipts/send — silently skipped if SMTP isn't configured.
-
-function money(amount: number, currency: string) {
-  const symbol = currency === 'ZAR' ? 'R ' : `${currency} `
-  const value = Number.isFinite(amount) ? amount : 0
-  // Period-decimal accounting form — see formatMoney in lib/allocation.ts.
-  const body = `${symbol}${Math.abs(value).toLocaleString('en-US', { minimumFractionDigits: 3, maximumFractionDigits: 3 })}`
-  return value < 0 ? `(${body})` : body
-}
 
 export async function POST(req: Request) {
   let body: { quoteId?: string }

@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { cookies } from 'next/headers'
 import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs'
 import { sendMail } from '@/lib/mailer'
+import { formatMoney as money } from '@/lib/allocation'
 import { emailShell, ctaButton, detailTable, esc, getFeaturedExperiences, type FeaturedExperience } from '@/lib/email-layout'
 
 export const dynamic = 'force-dynamic'
@@ -13,14 +14,6 @@ export const dynamic = 'force-dynamic'
 //
 // Data access runs under the CALLER's Supabase session, so RLS applies: a
 // customer can only send their own invoice, staff can send any.
-
-function money(amount: number, currency: string) {
-  const symbol = currency === 'ZAR' ? 'R ' : `${currency} `
-  const value = Number.isFinite(amount) ? amount : 0
-  // Period-decimal accounting form — see formatMoney in lib/allocation.ts.
-  const body = `${symbol}${Math.abs(value).toLocaleString('en-US', { minimumFractionDigits: 3, maximumFractionDigits: 3 })}`
-  return value < 0 ? `(${body})` : body
-}
 
 function fmtDate(iso: string) {
   return new Date(iso).toLocaleDateString('en-ZA', { day: 'numeric', month: 'long', year: 'numeric' })

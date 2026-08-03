@@ -43,24 +43,34 @@ export function allocateLine(input: AllocationInput): Allocation {
 }
 
 /**
- * Accounting presentation: comma-grouped thousands, fixed to three decimals,
- * with negatives in parentheses rather than a minus sign — so credits, refunds
- * and reversals read the way they do on a statement.
+ * The single money formatter for the whole platform — screens, invoices,
+ * statements and emails all render through this, so figures never disagree
+ * between a document and the console that produced it.
  *
- * Grouping is deliberately not en-ZA. That locale uses a comma as the DECIMAL
- * separator and a space for thousands, which is unambiguous at two decimals
- * but not at three: zero renders "R 0,000" and "R 1 288,500" reads as a
- * million. Period-decimal is the conventional accounting form and is what
- * finance exports and statements are read against.
+ * South African accounting presentation: space-grouped thousands, period
+ * decimal, exactly two decimals, negatives in parentheses rather than carrying
+ * a minus sign so credits and refunds read the way they do on a statement.
+ *
+ *   1288.5      →  R 1 288.50
+ *   -450.25     →  (R 450.25)
+ *   1234567.891 →  R 1 234 567.89
+ *
+ * Grouping is applied manually rather than via the en-ZA locale, which pairs
+ * space grouping with a COMMA decimal separator — mixing the two conventions
+ * is what makes a figure ambiguous. The separator is a non-breaking space so a
+ * number never wraps across lines mid-value.
  */
+const GROUP_SEPARATOR = ' '
+
 const MONEY_FORMAT = new Intl.NumberFormat('en-US', {
-  minimumFractionDigits: 3,
-  maximumFractionDigits: 3,
+  minimumFractionDigits: 2,
+  maximumFractionDigits: 2,
 })
 
 export function formatMoney(amount: number, currency = 'ZAR'): string {
   const symbol = currency === 'ZAR' ? 'R ' : `${currency} `
   const value = Number.isFinite(amount) ? amount : 0
-  const body = `${symbol}${MONEY_FORMAT.format(Math.abs(value))}`
+  const digits = MONEY_FORMAT.format(Math.abs(value)).replace(/,/g, GROUP_SEPARATOR)
+  const body = `${symbol}${digits}`
   return value < 0 ? `(${body})` : body
 }
