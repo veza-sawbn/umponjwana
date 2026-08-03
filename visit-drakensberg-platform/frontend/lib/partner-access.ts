@@ -252,6 +252,69 @@ export async function getInvitations(establishmentId: string): Promise<Invitatio
   return []
 }
 
+export type ListingChangeStatus =
+  | 'draft' | 'submitted' | 'changes_requested' | 'approved' | 'published' | 'rejected'
+
+export type ListingChange = {
+  id: string
+  establishment_id: string
+  submitted_by: string | null
+  previous_value: Record<string, unknown>
+  proposed_value: Record<string, unknown>
+  changed_fields: string[]
+  status: ListingChangeStatus
+  review_notes: string
+  reviewed_by: string | null
+  reviewed_at: string | null
+  created_at: string
+}
+
+/**
+ * The ONLY way a partner changes anything. Partners have no write access to
+ * vd_entities at all, so this is not a convenience wrapper — it is the write
+ * path. The database decides per field whether the change publishes now or
+ * queues, based on auto_publish / auto_publish_fields on the access row.
+ *
+ * Works for child records too (a room, a rate): the establishment is resolved
+ * from the entity's parent reference server-side.
+ */
+export async function submitListingChange(
+  entityId: string,
+  changes: Record<string, unknown>,
+): Promise<{ applied: string[]; queued: string[]; changeId: string | null }> {
+  const { data, error } = await supabase.rpc('vd_submit_listing_change', {
+    p_entity: entityId,
+    p_changes: changes,
+  })
+  if (error) throw new Error(error.message || 'Could not submit the change')
+  const r = data as { applied: string[]; queued: string[]; changeId: string | null }
+  return { applied: r.applied ?? [], queued: r.queued ?? [], changeId: r.changeId ?? null }
+}
+
+/** Staff only — approvals.manage is platform-only, so no partner can call this. */
+export async function reviewListingChange(
+  changeId: string,
+  decision: 'approved' | 'rejected' | 'changes_requested',
+  notes = '',
+): Promise<void> {
+  const { error } = await supabase.rpc('vd_review_listing_change', {
+    p_change_id: changeId,
+    p_decision: decision,
+    p_notes: notes,
+  })
+  if (error) throw new Error(error.message || 'Could not record the review')
+}
+
+export async function getListingChanges(status?: ListingChangeStatus): Promise<ListingChange[]> {
+  try {
+    let q = supabase.from('vd_listing_changes').select('*').order('created_at', { ascending: false })
+    if (status) q = q.eq('status', status)
+    const { data } = await q
+    if (Array.isArray(data)) return data as ListingChange[]
+  } catch {}
+  return []
+}
+
 export async function getOrganisations(): Promise<Organisation[]> {
   try {
     const { data } = await supabase

@@ -238,7 +238,124 @@ select pg_temp.check(
   'revoked partner holds no permissions',
   cardinality(vd_effective_permissions('d0000000-0000-0000-0000-000000000004','t-est-a')) = 0);
 
--- ── 9. every action is audited ──────────────────────────────────────────────
+-- ── 9. the approval workflow is not bypassable ──────────────────────────────
+-- Regression guard: auto_publish was once stored but unenforced, so a partner
+-- whose edits were meant to be reviewed could write straight to vd_entities.
+reset role;
+update vd_entities set value = '{"name":"Lodge A","description":"Original","availability":"original dates"}'::jsonb
+ where id = 't-est-a';
+delete from vd_listing_changes where establishment_id = 't-est-a';
+update vd_establishment_access
+   set access_status = 'active', auto_publish = false, auto_publish_fields = '{}'
+ where id = 't-acc-a';
+
+set local role authenticated;
+set local request.jwt.claim.sub = 'b0000000-0000-0000-0000-000000000002';
+update vd_entities set value = value || '{"description":"SELF-APPROVED"}'::jsonb where id = 't-est-a';
+reset role;
+select pg_temp.check(
+  'a partner cannot write to the catalog directly',
+  (select value->>'description' from vd_entities where id = 't-est-a') = 'Original');
+
+set local role authenticated;
+set local request.jwt.claim.sub = 'b0000000-0000-0000-0000-000000000002';
+select vd_submit_listing_change('t-est-a', '{"description":"Proposed","availability":"Proposed dates"}'::jsonb);
+reset role;
+select pg_temp.check(
+  'a reviewed partner''s edit does not reach the live listing',
+  (select value->>'description' from vd_entities where id = 't-est-a') = 'Original');
+select pg_temp.check(
+  'the edit is queued for review instead',
+  exists (select 1 from vd_listing_changes
+           where establishment_id = 't-est-a' and status = 'submitted'
+             and 'description' = any (changed_fields)));
+
+-- a partner may not resolve their own submission
+set local role authenticated;
+set local request.jwt.claim.sub = 'b0000000-0000-0000-0000-000000000002';
+do $$
+declare v_ok boolean := false;
+begin
+  begin
+    perform vd_review_listing_change(
+      (select id from vd_listing_changes where establishment_id = 't-est-a' and status = 'submitted' limit 1),
+      'approved', 'self');
+    v_ok := true;
+  exception when others then null;
+  end;
+  if v_ok then raise exception 'FAIL  a partner approved their own change'; end if;
+  raise notice 'pass  a partner cannot approve their own change';
+end $$;
+
+-- nor force the queue row to published
+update vd_listing_changes set status = 'published' where establishment_id = 't-est-a';
+reset role;
+select pg_temp.check(
+  'a partner cannot force a queued change to published',
+  exists (select 1 from vd_listing_changes where establishment_id = 't-est-a' and status = 'submitted'));
+
+-- staff approval applies it
+set local request.jwt.claim.sub = 'a0000000-0000-0000-0000-000000000001';
+select vd_review_listing_change(
+  (select id from vd_listing_changes where establishment_id = 't-est-a' and status = 'submitted' limit 1),
+  'approved', 'ok');
+select pg_temp.check(
+  'staff approval publishes the change',
+  (select value->>'description' from vd_entities where id = 't-est-a') = 'Proposed');
+
+-- field-level trust: availability publishes, description still queues
+update vd_establishment_access set auto_publish_fields = array['availability'] where id = 't-acc-a';
+delete from vd_listing_changes where establishment_id = 't-est-a';
+set local role authenticated;
+set local request.jwt.claim.sub = 'b0000000-0000-0000-0000-000000000002';
+select vd_submit_listing_change('t-est-a', '{"availability":"Dec open","description":"Rewritten"}'::jsonb);
+reset role;
+select pg_temp.check(
+  'an auto-publish field goes live immediately',
+  (select value->>'availability' from vd_entities where id = 't-est-a') = 'Dec open');
+select pg_temp.check(
+  'a non-auto-publish field in the same submission still queues',
+  (select value->>'description' from vd_entities where id = 't-est-a') = 'Proposed'
+  and exists (select 1 from vd_listing_changes
+               where establishment_id = 't-est-a' and status = 'submitted'
+                 and 'description' = any (changed_fields)));
+
+-- child records resolve to the parent establishment
+insert into vd_entities (id, kind, owner_id, status, value) values
+  ('t-room-1', 'room', null, 'active', '{"name":"Suite","propertyId":"t-est-a","rates":"R1600"}'::jsonb)
+on conflict (id) do nothing;
+select pg_temp.check(
+  'a child record resolves to its parent establishment',
+  vd_resolve_establishment('t-room-1') = 't-est-a');
+
+set local role authenticated;
+set local request.jwt.claim.sub = 'b0000000-0000-0000-0000-000000000002';
+select vd_submit_listing_change('t-room-1', '{"rates":"R1850"}'::jsonb);
+reset role;
+select pg_temp.check(
+  'a queued child-record change does not reach the live record',
+  (select value->>'rates' from vd_entities where id = 't-room-1') = 'R1600');
+
+-- a stranger cannot submit, and cannot learn the establishment exists
+set local role authenticated;
+set local request.jwt.claim.sub = 'c0000000-0000-0000-0000-000000000003';
+do $$
+declare v_ok boolean := false; v_msg text;
+begin
+  begin
+    perform vd_submit_listing_change('t-est-a', '{"description":"hijacked"}'::jsonb);
+    v_ok := true;
+  exception when others then v_msg := SQLERRM;
+  end;
+  if v_ok then raise exception 'FAIL  a stranger submitted a change'; end if;
+  if v_msg <> 'not found' then
+    raise exception 'FAIL  a stranger learned the establishment exists (got: %)', v_msg;
+  end if;
+  raise notice 'pass  a stranger cannot submit, and gets an indistinguishable error';
+end $$;
+reset role;
+
+-- ── 10. every action is audited ─────────────────────────────────────────────
 select pg_temp.check(
   'handover actions are written to the audit log',
   (select count(*) from vd_audit_log
