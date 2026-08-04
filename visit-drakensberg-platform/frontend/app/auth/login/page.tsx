@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { signIn } from '@/lib/auth'
+import { signIn, resolveStaffAccess } from '@/lib/auth'
 
 const schema = z.object({
   email: z.string().email('Enter a valid email'),
@@ -26,7 +26,13 @@ export default function LoginPage() {
       const result = await signIn(data.email, data.password)
       const role = result?.user?.app_metadata?.role ?? result?.user?.user_metadata?.role
       const redirect = new URLSearchParams(window.location.search).get('redirect')
-      const defaultPath = role === 'supplier' ? '/supplier' : role === 'admin' ? '/admin' : '/account'
+      // Metadata can lag behind a promotion made in profiles, so confirm there
+      // before dropping a staff member on /account — during maintenance mode
+      // that page is the end of the road, with the public site redirecting.
+      const { isStaff } = role === 'admin' || role === 'supplier'
+        ? { isStaff: role === 'admin' }
+        : await resolveStaffAccess()
+      const defaultPath = role === 'supplier' ? '/supplier' : (role === 'admin' || isStaff) ? '/admin' : '/account'
       const targetPath = redirect?.startsWith('/') && !redirect.startsWith('//') ? redirect : defaultPath
       // Hard navigation: guarantees the middleware sees the fresh session
       // cookie and bypasses any prefetched redirect cached by the router.

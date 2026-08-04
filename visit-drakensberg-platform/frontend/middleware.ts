@@ -41,16 +41,20 @@ export async function middleware(req: NextRequest) {
     // supabase.auth.updateUser. Roles should be assigned in app_metadata.
     role = session.user.app_metadata?.role ?? session.user.user_metadata?.role
     staffRole = session.user.app_metadata?.staff_role ?? session.user.user_metadata?.staff_role
-    if (!role) {
-      // Accounts created outside the signup form may have no role in auth
-      // metadata at all — fall back to the profiles table (RLS: own row).
+    // profiles is what RLS actually reads (is_admin()/is_finance()/is_ops()),
+    // and admin_set_staff_role() writes only there — so auth metadata can lag
+    // behind a promotion, or never carry it at all for accounts created
+    // outside the signup form. Whenever the metadata alone doesn't establish
+    // staff, confirm against profiles (RLS: own row) rather than locking a
+    // real admin out of the console.
+    if (role !== 'admin' && !staffRole) {
       const { data: profile } = await supabase
         .from('profiles')
         .select('role, staff_role')
         .eq('id', session.user.id)
         .maybeSingle()
-      role = profile?.role ?? 'visitor'
-      staffRole = staffRole ?? profile?.staff_role
+      role = profile?.role ?? role ?? 'visitor'
+      staffRole = profile?.staff_role ?? undefined
     }
   }
   // Finance/operations collaborators (role stays 'visitor', staff_role set)

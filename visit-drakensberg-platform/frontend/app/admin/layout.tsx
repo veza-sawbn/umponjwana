@@ -12,6 +12,7 @@ import {
 import { signOut } from '@/lib/auth'
 import { useRouter } from 'next/navigation'
 import Logo from '@/components/Logo'
+import MaintenanceNotice from '@/components/admin/MaintenanceNotice'
 
 const NAV = [
   { href: '/admin', label: 'Overview', icon: LayoutDashboard, exact: true },
@@ -107,6 +108,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
       {/* Main */}
       <div className="ml-60 flex-1 min-h-screen bg-[#F7F5F2]">
+        <MaintenanceNotice />
         {children}
       </div>
     </div>

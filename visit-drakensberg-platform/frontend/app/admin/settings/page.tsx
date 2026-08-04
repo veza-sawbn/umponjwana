@@ -258,7 +258,7 @@ export default function AdminSettingsPage() {
             {[
               { key: 'require_supplier_approval', label: 'Require admin approval for new suppliers', desc: 'Suppliers must be approved before they can publish listings.' },
               { key: 'auto_publish_listings', label: 'Auto-publish supplier listings', desc: 'Skip the pending state and publish listings immediately on creation.' },
-              { key: 'maintenance_mode', label: 'Maintenance mode', desc: 'Takes the public site offline. Admin and supplier dashboards remain accessible.' },
+              { key: 'maintenance_mode', label: 'Maintenance mode', desc: 'Shows visitors the maintenance page instead of the public site. Signed-in staff keep full access — admin console, supplier dashboards, and the visual editor with its live preview.' },
             ].map(toggle => (
               <div key={toggle.key} className="flex items-start justify-between gap-6 py-3 border-b border-gray-100 last:border-0">
                 <div>

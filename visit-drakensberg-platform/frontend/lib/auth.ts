@@ -48,6 +48,48 @@ export async function resetPassword(email: string) {
   if (error) throw error
 }
 
+export type StaffAccess = {
+  role?: string
+  staffRole?: string
+  /** Admin or a finance/operations collaborator — console access. */
+  isStaff: boolean
+  /** Full CMS rights: publishing content, editing the live site. */
+  isAdmin: boolean
+}
+
+/**
+ * Resolves the signed-in user's role the same way middleware.ts does: auth
+ * metadata first, then the profiles table — which is what RLS reads and what
+ * admin_set_staff_role() writes, so a promotion can exist there and nowhere
+ * else. Client-side gates must agree with the middleware, otherwise a real
+ * admin gets through to the console and then finds editing switched off.
+ */
+export async function resolveStaffAccess(): Promise<StaffAccess> {
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { isStaff: false, isAdmin: false }
+
+  let role: string | undefined = user.app_metadata?.role ?? user.user_metadata?.role
+  let staffRole: string | undefined = user.app_metadata?.staff_role ?? user.user_metadata?.staff_role
+
+  if (role !== 'admin' && !staffRole) {
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('role, staff_role')
+      .eq('id', user.id)
+      .maybeSingle()
+    role = (profile as { role?: string } | null)?.role ?? role
+    staffRole = (profile as { staff_role?: string } | null)?.staff_role ?? undefined
+  }
+
+  const isAdmin = role === 'admin'
+  return {
+    role,
+    staffRole,
+    isAdmin,
+    isStaff: isAdmin || staffRole === 'finance' || staffRole === 'operations',
+  }
+}
+
 export function onAuthStateChange(callback: Parameters<typeof supabase.auth.onAuthStateChange>[0]) {
   return supabase.auth.onAuthStateChange(callback)
 }
