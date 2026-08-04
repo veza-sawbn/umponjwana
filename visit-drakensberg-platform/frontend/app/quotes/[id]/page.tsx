@@ -2,10 +2,17 @@
 
 import { useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
-import { ArrowLeft, Check, X, FileSignature } from 'lucide-react'
+import { ArrowLeft, Check, X, FileSignature, Printer } from 'lucide-react'
 import { getQuoteById, acceptQuote, declineQuote, type Quote } from '@/lib/quotes'
+import { getSiteContent, SITE_CONTENT_DEFAULTS } from '@/lib/site-content'
 import { formatMoney } from '@/lib/allocation'
 import Logo from '@/components/Logo'
+
+type BusinessDetails = typeof SITE_CONTENT_DEFAULTS.business_details
+
+// Printable customer quote — the same document treatment as an invoice, so a
+// quote can be printed or saved as a PDF and sent on. The accept/decline
+// controls are screen-only; the printed copy is a plain quotation.
 
 function fmt(d?: string | null) {
   return d ? new Date(d).toLocaleDateString('en-ZA', { day: 'numeric', month: 'long', year: 'numeric' }) : '—'
@@ -15,9 +22,12 @@ export default function QuotePage() {
   const params = useParams<{ id: string }>()
   const router = useRouter()
   const [quote, setQuote] = useState<Quote | null>(null)
+  const [business, setBusiness] = useState<BusinessDetails>(SITE_CONTENT_DEFAULTS.business_details)
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState<'accept' | 'decline' | null>(null)
   const [error, setError] = useState('')
+
+  useEffect(() => { getSiteContent('business_details').then(setBusiness) }, [])
 
   useEffect(() => {
     if (!params?.id) return
@@ -66,23 +76,44 @@ export default function QuotePage() {
 
   return (
     <div className="min-h-screen bg-[#F7F5F2] pt-28 pb-16 px-4">
-      <div className="max-w-[820px] mx-auto">
-        <button onClick={() => router.back()} className="inline-flex items-center gap-2 font-sans text-sm text-gray-500 hover:text-[#2d6a4f] transition-colors mb-4">
-          <ArrowLeft size={14} /> Back
-        </button>
+      {/* Print isolation: only the quote document is printed. */}
+      <style>{`
+        @media print {
+          body * { visibility: hidden !important; }
+          #quote-doc, #quote-doc * { visibility: visible !important; }
+          #quote-doc { position: absolute !important; left: 0; top: 0; width: 100%; margin: 0; box-shadow: none !important; border: none !important; }
+          @page { margin: 14mm; }
+        }
+      `}</style>
 
-        <div className="bg-white border border-gray-200 p-10">
+      <div className="max-w-[820px] mx-auto">
+        <div className="flex items-center justify-between mb-4 print:hidden">
+          <button onClick={() => router.back()} className="inline-flex items-center gap-2 font-sans text-sm text-gray-500 hover:text-[#2d6a4f] transition-colors">
+            <ArrowLeft size={14} /> Back
+          </button>
+          <button onClick={() => window.print()} className="inline-flex items-center gap-2 bg-[#2d6a4f] text-white px-5 py-2.5 font-sans text-sm hover:bg-[#245741] transition-colors">
+            <Printer size={14} /> Print / Save as PDF
+          </button>
+        </div>
+
+        <div id="quote-doc" className="bg-white border border-gray-200 p-10">
           <div className="flex items-start justify-between pb-8 border-b border-gray-200">
             <div>
               <Logo className="h-6 w-auto text-[#2d6a4f]" />
               <p className="font-sans text-xs text-gray-400 mt-3 leading-relaxed">
-                Visit Drakensberg<br />KwaZulu-Natal, South Africa
+                {business.business_name}<br />
+                {[business.address_line1, business.address_line2, business.city, business.country].filter(Boolean).join(', ') || 'KwaZulu-Natal, South Africa'}<br />
+                {business.email}
+                {business.phone && <><br />{business.phone}</>}
+                {business.registration_number && <><br />Reg. {business.registration_number}</>}
+                {business.vat_number && <><br />VAT {business.vat_number}</>}
               </p>
             </div>
             <div className="text-right">
-              <p className="font-sans text-[10px] tracking-[0.2em] uppercase text-[#C9A96E] mb-1">Quote</p>
+              <p className="font-sans text-[10px] tracking-[0.2em] uppercase text-[#C9A96E] mb-1">Quotation</p>
               <h1 className="font-display italic text-3xl text-[#000000]">{quote.quote_number}</h1>
-              {quote.valid_until && <p className="font-sans text-xs text-gray-400 mt-2">Valid until {fmt(quote.valid_until)}</p>}
+              <p className="font-sans text-xs text-gray-400 mt-2">Prepared {fmt(quote.sent_at || quote.created_at)}</p>
+              {quote.valid_until && <p className="font-sans text-xs text-gray-400">Valid until {fmt(quote.valid_until)}</p>}
               <p className={`font-sans text-[10px] tracking-[0.1em] uppercase inline-block px-2.5 py-1 mt-2 ${
                 quote.status === 'converted' ? 'bg-[#2d6a4f]/10 text-[#2d6a4f]'
                 : quote.status === 'declined' || quote.status === 'expired' ? 'bg-red-50 text-red-400'
@@ -151,16 +182,23 @@ export default function QuotePage() {
           )}
 
           {isOpen && !expired ? (
-            <div className="mt-10 pt-6 border-t border-gray-200 flex items-center gap-3">
-              <FileSignature size={16} className="text-[#C9A96E] shrink-0" />
-              <p className="font-sans text-sm text-gray-600 flex-1">Accepting converts this quote into a payable invoice.</p>
-              <button onClick={handleDecline} disabled={!!busy} className="inline-flex items-center gap-2 border border-gray-300 text-gray-500 px-5 py-2.5 font-sans text-sm hover:border-red-300 hover:text-red-500 transition-colors disabled:opacity-50">
-                <X size={14} /> {busy === 'decline' ? 'Declining…' : 'Decline'}
-              </button>
-              <button onClick={handleAccept} disabled={!!busy} className="inline-flex items-center gap-2 bg-[#2d6a4f] text-white px-5 py-2.5 font-sans text-sm hover:bg-[#245741] transition-colors disabled:opacity-60">
-                <Check size={14} /> {busy === 'accept' ? 'Accepting…' : 'Accept Quote'}
-              </button>
-            </div>
+            <>
+              <div className="mt-10 pt-6 border-t border-gray-200 flex items-center gap-3 print:hidden">
+                <FileSignature size={16} className="text-[#C9A96E] shrink-0" />
+                <p className="font-sans text-sm text-gray-600 flex-1">Accepting converts this quote into a payable invoice.</p>
+                <button onClick={handleDecline} disabled={!!busy} className="inline-flex items-center gap-2 border border-gray-300 text-gray-500 px-5 py-2.5 font-sans text-sm hover:border-red-300 hover:text-red-500 transition-colors disabled:opacity-50">
+                  <X size={14} /> {busy === 'decline' ? 'Declining…' : 'Decline'}
+                </button>
+                <button onClick={handleAccept} disabled={!!busy} className="inline-flex items-center gap-2 bg-[#2d6a4f] text-white px-5 py-2.5 font-sans text-sm hover:bg-[#245741] transition-colors disabled:opacity-60">
+                  <Check size={14} /> {busy === 'accept' ? 'Accepting…' : 'Accept Quote'}
+                </button>
+              </div>
+              {/* The printed copy can't carry buttons — say how to accept instead. */}
+              <p className="hidden print:block mt-10 pt-6 border-t border-gray-200 font-sans text-sm text-gray-600 leading-relaxed">
+                To accept this quote, open the link we emailed you{quote.valid_until ? ` on or before ${fmt(quote.valid_until)}` : ''}.
+                Accepting converts it into a payable invoice.
+              </p>
+            </>
           ) : (
             <p className="mt-10 pt-6 border-t border-gray-200 font-sans text-sm text-gray-500">
               {quote.status === 'converted' ? 'This quote has been accepted and converted into an invoice.'
@@ -168,7 +206,17 @@ export default function QuotePage() {
                 : 'This quote has expired.'}
             </p>
           )}
-          {error && <p className="mt-3 font-sans text-xs text-red-600 text-right">{error}</p>}
+          {error && <p className="mt-3 font-sans text-xs text-red-600 text-right print:hidden">{error}</p>}
+
+          {business.invoice_footer_note && (
+            <p className="mt-6 font-sans text-[11px] text-gray-400 leading-relaxed whitespace-pre-line">{business.invoice_footer_note}</p>
+          )}
+
+          <p className="mt-10 pt-6 border-t border-gray-200 font-sans text-[11px] text-gray-400 leading-relaxed">
+            This is a quotation, not a tax invoice — no payment is due against it. Prices are held
+            {quote.valid_until ? ` until ${fmt(quote.valid_until)}` : ' for the validity period above'} and remain subject to
+            availability at the time of booking. A tax invoice is issued by {business.business_name} once the quote is accepted.
+          </p>
         </div>
       </div>
     </div>
