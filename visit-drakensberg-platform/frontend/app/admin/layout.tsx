@@ -1,56 +1,20 @@
 'use client'
 
 import Link from 'next/link'
-import { usePathname } from 'next/navigation'
-import {
-  LayoutDashboard, ListChecks, Users, CalendarDays,
-  FileText, BarChart2, Search, Settings, LogOut, Mountain,
-  Globe, MapPin, Image, Store, Package, ShieldCheck,
-  Receipt, Landmark, Banknote, ClipboardList, MessageSquare, Bus,
-  TreePine, Building2, FileSignature, UserCog,
-} from 'lucide-react'
+import { usePathname, useRouter } from 'next/navigation'
+import { LogOut, Mountain } from 'lucide-react'
 import { signOut } from '@/lib/auth'
-import { useRouter } from 'next/navigation'
 import Logo from '@/components/Logo'
+import AdminMobileShell from '@/components/admin/AdminMobileShell'
+import { ADMIN_NAV, isAdminNavActive } from '@/lib/admin-nav'
 
-const NAV = [
-  { href: '/admin', label: 'Overview', icon: LayoutDashboard, exact: true },
-  { href: '/admin/listings', label: 'Listings', icon: ListChecks },
-  { href: '/admin/suppliers', label: 'Suppliers', icon: Users },
-  { href: '/admin/verification', label: 'Verification', icon: ShieldCheck },
-  { href: '/admin/bookings', label: 'Bookings', icon: CalendarDays },
-  { href: '/admin/orders', label: 'Orders', icon: Receipt },
-  { href: '/admin/invoices', label: 'Invoices', icon: FileText },
-  { href: '/admin/quotes', label: 'Quotes', icon: FileSignature },
-  { href: '/admin/finance', label: 'Finance', icon: Landmark },
-  { href: '/admin/settlements', label: 'Settlements', icon: Banknote },
-  { href: '/admin/operations', label: 'Operations', icon: ClipboardList },
-  { href: '/admin/transport', label: 'Transport', icon: Bus },
-  { href: '/admin/messages', label: 'Communications', icon: MessageSquare },
-  { href: '/admin/marketplace', label: 'Marketplace', icon: Store },
-  { href: '/admin/packages', label: 'Package Builder', icon: Package },
-  { href: '/admin/blog', label: 'Blog & Content', icon: FileText },
-  { href: '/admin/editor', label: 'Visual Editor', icon: Globe },
-  { href: '/admin/website', label: 'Website Settings', icon: Settings },
-  { href: '/admin/trails', label: 'Hiking Trails', icon: Mountain },
-  { href: '/admin/regions', label: 'Regions', icon: MapPin },
-  { href: '/admin/reserves', label: 'Nature Reserves', icon: TreePine },
-  { href: '/admin/towns', label: 'Towns & Cities', icon: Building2 },
-  { href: '/admin/media', label: 'Media Library', icon: Image },
-  { href: '/admin/analytics', label: 'Analytics', icon: BarChart2 },
-  { href: '/admin/seo', label: 'SEO', icon: Search },
-  { href: '/admin/roles', label: 'Roles & Permissions', icon: UserCog },
-  { href: '/admin/settings', label: 'Settings', icon: Settings },
-]
+// Desktop keeps the fixed sidebar. Below lg the sidebar is hidden and
+// AdminMobileShell supplies a top bar, drawer, tab bar and quick-action sheet;
+// the padding on <main> matches those bar heights.
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
   const router = useRouter()
-
-  function isActive(item: typeof NAV[0]) {
-    if (item.exact) return pathname === item.href
-    return pathname.startsWith(item.href)
-  }
 
   async function handleSignOut() {
     await signOut()
@@ -59,8 +23,8 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
   return (
     <div className="min-h-screen bg-[#0a0a0a] flex">
-      {/* Sidebar */}
-      <aside className="w-60 shrink-0 bg-[#111111] border-r border-white/8 flex flex-col fixed inset-y-0 left-0 z-40">
+      {/* Sidebar — desktop only */}
+      <aside className="hidden lg:flex w-60 shrink-0 bg-[#111111] border-r border-white/8 flex-col fixed inset-y-0 left-0 z-40">
         {/* Brand */}
         <div className="px-6 py-5 border-b border-white/8">
           <Link href="/" className="flex flex-col gap-2">
@@ -71,9 +35,9 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
         {/* Nav */}
         <nav className="flex-1 px-3 py-4 space-y-0.5 overflow-y-auto">
-          {NAV.map(item => {
+          {ADMIN_NAV.map(item => {
             const Icon = item.icon
-            const active = isActive(item)
+            const active = isAdminNavActive(item, pathname)
             return (
               <Link
                 key={item.href}
@@ -105,8 +69,11 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         </div>
       </aside>
 
-      {/* Main */}
-      <div className="ml-60 flex-1 min-h-screen bg-[#F7F5F2]">
+      {/* Mobile chrome */}
+      <AdminMobileShell />
+
+      {/* Main — admin-main clears the mobile tab bar; no-op from lg up */}
+      <div className="admin-main flex-1 min-w-0 min-h-screen bg-[#F7F5F2] pt-14 lg:pt-0 lg:ml-60">
         {children}
       </div>
     </div>

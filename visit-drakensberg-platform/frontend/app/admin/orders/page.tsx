@@ -119,7 +119,7 @@ function OrderDetail({ order, onChanged }: { order: MasterOrder; onChanged: () =
   ] as const
 
   return (
-    <div className="border-t border-gray-100 bg-[#F7F5F2] px-5 py-5">
+    <div className="border-t border-gray-100 bg-[#F7F5F2] px-4 sm:px-5 py-4 sm:py-5">
       {/* Status controls */}
       <div className="flex flex-wrap gap-3 mb-4">
         {([
@@ -219,15 +219,15 @@ function OrderDetail({ order, onChanged }: { order: MasterOrder; onChanged: () =
           <div className="bg-white border border-gray-200 p-4">
             <p className="font-sans text-[10px] tracking-[0.12em] uppercase text-gray-400 mb-3">Record payment / refund / credit</p>
             <div className="flex flex-wrap gap-2">
-              <input value={payAmount} onChange={e => setPayAmount(e.target.value)} placeholder="Amount" className="w-28 border border-gray-200 px-3 py-2 font-sans text-sm focus:outline-none" />
+              <input value={payAmount} onChange={e => setPayAmount(e.target.value)} inputMode="decimal" placeholder="Amount" className="w-28 border border-gray-200 px-3 py-2.5 sm:py-2 font-sans text-base sm:text-sm focus:outline-none" />
               <select value={payType} onChange={e => setPayType(e.target.value)} className="border border-gray-200 bg-white px-2 py-2 font-sans text-sm focus:outline-none">
                 {PAYMENT_TYPES.map(t => <option key={t} value={t}>{t.replace('_', ' ')}</option>)}
               </select>
               <select value={payMethod} onChange={e => setPayMethod(e.target.value)} className="border border-gray-200 bg-white px-2 py-2 font-sans text-sm focus:outline-none">
                 {PAYMENT_METHODS.map(m => <option key={m} value={m}>{m.replace('_', ' ')}</option>)}
               </select>
-              <input value={payRef} onChange={e => setPayRef(e.target.value)} placeholder="Reference (optional)" className="flex-1 min-w-[140px] border border-gray-200 px-3 py-2 font-sans text-sm focus:outline-none" />
-              <button onClick={submitPayment} className="bg-[#2d6a4f] text-white px-4 py-2 font-sans text-sm hover:bg-[#245741] transition-colors">Record</button>
+              <input value={payRef} onChange={e => setPayRef(e.target.value)} placeholder="Reference (optional)" className="flex-1 min-w-[140px] border border-gray-200 px-3 py-2.5 sm:py-2 font-sans text-base sm:text-sm focus:outline-none" />
+              <button onClick={submitPayment} className="w-full sm:w-auto bg-[#2d6a4f] text-white px-4 py-3 sm:py-2 font-sans text-sm hover:bg-[#245741] transition-colors">Record</button>
             </div>
             <p className="font-sans text-[11px] text-gray-400 mt-2">
               Outstanding: {formatMoney(Number(order.outstanding_balance), order.currency)} · Refund balance: {formatMoney(Number(order.refund_balance), order.currency)}
@@ -324,7 +324,7 @@ function OrderDetail({ order, onChanged }: { order: MasterOrder; onChanged: () =
         <div className="space-y-3 max-w-2xl">
           <div className="flex gap-2">
             <input value={newNote} onChange={e => setNewNote(e.target.value)} placeholder="Add an internal note (never visible to customers or suppliers)…"
-              className="flex-1 border border-gray-200 px-3 py-2 font-sans text-sm bg-white focus:outline-none" />
+              className="flex-1 min-w-0 border border-gray-200 px-3 py-2.5 sm:py-2 font-sans text-base sm:text-sm bg-white focus:outline-none" />
             <button onClick={submitNote} className="bg-[#2d6a4f] text-white px-4 py-2 font-sans text-sm hover:bg-[#245741] transition-colors">Add</button>
           </div>
           {notes.map(n => (
@@ -369,19 +369,19 @@ export default function AdminOrdersPage() {
   const refundExposure = orders.reduce((s, o) => s + Number(o.refund_balance), 0)
 
   return (
-    <div className="p-8">
-      <div className="mb-8 flex items-start justify-between">
+    <div className="p-4 sm:p-6 lg:p-8">
+      <div className="mb-6 lg:mb-8 flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
         <div>
           <p className="font-sans text-[10px] tracking-[0.14em] uppercase text-gray-400 mb-1">Order Management</p>
-          <h1 className="font-display italic text-3xl text-[#000000]">Master Orders</h1>
+          <h1 className="font-display italic text-2xl sm:text-3xl text-[#000000]">Master Orders</h1>
           <p className="font-sans text-sm text-gray-500 mt-1">Every trip as a single order — line items, supplier allocations, invoice, payments and ledger.</p>
         </div>
-        <button onClick={load} className="inline-flex items-center gap-2 border border-gray-200 px-4 py-2 font-sans text-sm text-gray-600 hover:border-[#2d6a4f] hover:text-[#2d6a4f] transition-colors">
+        <button onClick={load} className="inline-flex items-center justify-center gap-2 border border-gray-200 px-4 py-3 sm:py-2 font-sans text-sm text-gray-600 hover:border-[#2d6a4f] hover:text-[#2d6a4f] transition-colors shrink-0">
           <RefreshCw size={14} /> Refresh
         </button>
       </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4 mb-6 lg:mb-8">
         {[
           { label: 'Order Value', value: formatMoney(totalValue), icon: Receipt, color: 'text-[#2d6a4f]', bg: 'bg-[#2d6a4f]/8' },
           { label: 'Cash Received', value: formatMoney(received), icon: Wallet, color: 'text-[#2d6a4f]', bg: 'bg-[#2d6a4f]/8' },
@@ -399,22 +399,55 @@ export default function AdminOrdersPage() {
         })}
       </div>
 
-      <div className="flex flex-wrap gap-3 mb-6">
-        <div className="flex items-center gap-2 border border-gray-200 bg-white px-3 py-2 flex-1 min-w-[220px]">
+      <div className="flex flex-col sm:flex-row sm:flex-wrap gap-3 mb-6">
+        <div className="flex items-center gap-2 border border-gray-200 bg-white px-3 py-2.5 sm:py-2 flex-1 sm:min-w-[220px]">
           <Search size={14} className="text-gray-400 shrink-0" />
-          <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search order number, customer, trip…" className="flex-1 font-sans text-sm focus:outline-none" />
+          <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search order number, customer, trip…" className="flex-1 min-w-0 font-sans text-base sm:text-sm focus:outline-none" />
         </div>
-        <div className="flex gap-0 border border-gray-200 bg-white overflow-hidden">
-          {['all', 'paid', 'partial', 'unpaid', 'outstanding', 'cancelled'].map(f => (
-            <button key={f} onClick={() => setFilter(f)}
-              className={`px-4 py-2 font-sans text-xs capitalize transition-colors border-r border-gray-100 last:border-0 ${filter === f ? 'bg-[#2d6a4f] text-white' : 'text-gray-500 hover:bg-[#F7F5F2]'}`}>
-              {f}
-            </button>
-          ))}
+        <div className="-mx-4 px-4 sm:mx-0 sm:px-0 overflow-x-auto">
+          <div className="flex w-max border border-gray-200 bg-white">
+            {['all', 'paid', 'partial', 'unpaid', 'outstanding', 'cancelled'].map(f => (
+              <button key={f} onClick={() => setFilter(f)}
+                className={`px-4 py-2.5 sm:py-2 font-sans text-xs capitalize whitespace-nowrap transition-colors border-r border-gray-100 last:border-0 ${filter === f ? 'bg-[#2d6a4f] text-white' : 'text-gray-500 hover:bg-[#F7F5F2]'}`}>
+                {f}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 
-      <div className="bg-white border border-gray-200">
+      {/* Phones: a card per order, tapping expands the same detail panel. */}
+      <div className="md:hidden bg-white border border-gray-200 divide-y divide-gray-100">
+        {filtered.map(o => (
+          <div key={o.id}>
+            <button onClick={() => setExpanded(expanded === o.id ? null : o.id)} className="w-full text-left p-4">
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="font-mono text-xs text-gray-500">{o.order_number}</p>
+                  <p className="font-sans text-sm font-medium truncate mt-0.5">{o.customer_name || '—'}</p>
+                  <p className="font-sans text-xs text-gray-400 truncate">{o.trip_name}</p>
+                </div>
+                {expanded === o.id ? <ChevronUp size={16} className="text-gray-400 shrink-0" /> : <ChevronDown size={16} className="text-gray-400 shrink-0" />}
+              </div>
+              <div className="flex items-end justify-between gap-3 mt-3">
+                <div className="flex flex-wrap gap-1.5">
+                  <Badge v={o.payment_status} />
+                  <Badge v={o.booking_status} />
+                </div>
+                <div className="text-right shrink-0">
+                  <p className="font-display italic text-xl text-[#2d6a4f]">{formatMoney(Number(o.total_value), o.currency)}</p>
+                  <p className="font-sans text-xs text-gray-400">Outstanding {formatMoney(Number(o.outstanding_balance), o.currency)}</p>
+                </div>
+              </div>
+            </button>
+            {expanded === o.id && <OrderDetail order={o} onChanged={load} />}
+          </div>
+        ))}
+        {!loading && filtered.length === 0 && <p className="px-4 py-12 text-center font-sans text-sm text-gray-400">No orders found. Orders are created automatically at checkout.</p>}
+        {loading && <p className="px-4 py-12 text-center font-sans text-sm text-gray-400">Loading orders…</p>}
+      </div>
+
+      <div className="hidden md:block bg-white border border-gray-200">
         <div className="overflow-x-auto">
           <table className="w-full min-w-[1000px]">
             <thead><tr className="border-b border-gray-100">

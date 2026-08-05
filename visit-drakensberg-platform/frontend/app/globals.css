@@ -99,6 +99,18 @@ body {
   }
 }
 
+/* ── Admin console mobile shell ──────────────────────────────────────── */
+/* Clears the fixed bottom tab bar (4rem) plus any device safe area.
+   From lg up the tab bar is hidden and the sidebar takes over. */
+.admin-main {
+  padding-bottom: calc(4rem + env(safe-area-inset-bottom));
+}
+@media (min-width: 1024px) {
+  .admin-main {
+    padding-bottom: 0;
+  }
+}
+
 /* ── Visual editor chrome (only active inside the admin editor iframe) ── */
 .vd-flash {
   animation: vd-flash-anim 1.6s ease-out;
