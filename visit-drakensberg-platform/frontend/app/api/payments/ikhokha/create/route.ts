@@ -4,6 +4,8 @@ import { randomUUID } from 'crypto'
 import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs'
 import { createPaymentLink, isIkhokhaConfigured } from '@/lib/ikhokha'
 import { supabaseAdmin } from '@/lib/supabase-admin'
+import { maxTip, tippableTotal } from '@/lib/tips'
+import type { InvoiceLine } from '@/lib/invoices'
 
 export const dynamic = 'force-dynamic'
 
@@ -13,7 +15,7 @@ export const dynamic = 'force-dynamic'
 // returned paylinkUrl; the actual "mark as paid" happens later, in the
 // webhook route, once iKhokha confirms the payment really went through.
 export async function POST(req: Request) {
-  let body: { invoiceId?: string; bookingId?: string }
+  let body: { invoiceId?: string; bookingId?: string; tip?: unknown }
   try {
     body = await req.json()
   } catch {
@@ -32,7 +34,10 @@ export async function POST(req: Request) {
   if (!user) return NextResponse.json({ error: 'unauthorized' }, { status: 401 })
 
   // RLS scopes every read below to the caller's own rows, or staff.
-  let invoice: { id: string; order_id: string; invoice_number: string; balance: unknown; currency: string; status: string } | null = null
+  let invoice: {
+    id: string; order_id: string; invoice_number: string; balance: unknown
+    currency: string; status: string; lines: InvoiceLine[] | null
+  } | null = null
   if (body.invoiceId) {
     const { data } = await supabase.from('vd_invoices').select('*').eq('id', body.invoiceId).maybeSingle()
     invoice = data
@@ -47,6 +52,37 @@ export async function POST(req: Request) {
   const balance = Number(invoice.balance)
   if (!(balance > 0)) return NextResponse.json({ error: 'This invoice has no outstanding balance.' }, { status: 400 })
   if (invoice.status === 'void') return NextResponse.json({ error: 'This invoice is void.' }, { status: 400 })
+
+  // Gratuity. The guest picks it here, but nothing is written to the order or
+  // the invoice until iKhokha confirms the payment — the amount rides on the
+  // payment link until the webhook applies it. Every rule the invoice page
+  // shows is re-checked here, since the page can't be trusted.
+  let tip = 0
+  if (body.tip !== undefined && body.tip !== null && body.tip !== '') {
+    tip = Math.round((Number(body.tip) || 0) * 100) / 100
+    if (!Number.isFinite(tip) || tip < 0) {
+      return NextResponse.json({ error: 'Invalid tip amount.' }, { status: 400 })
+    }
+    if (tip > 0) {
+      const tippable = tippableTotal(invoice.lines ?? [])
+      if (tippable <= 0) {
+        return NextResponse.json({ error: 'This invoice has no activity to tip.' }, { status: 400 })
+      }
+      if (tip > maxTip(tippable)) {
+        return NextResponse.json(
+          { error: 'A tip cannot be more than the activity it is for. Please enter a smaller amount.' },
+          { status: 400 },
+        )
+      }
+      const { data: setting } = await supabase
+        .from('vd_finance_settings').select('value').eq('key', 'tipping_enabled').maybeSingle()
+      if (setting?.value === false) {
+        return NextResponse.json({ error: 'Tipping is currently switched off.' }, { status: 400 })
+      }
+    }
+  }
+
+  const chargeAmount = Math.round((balance + tip) * 100) / 100
 
   const origin = process.env.NEXT_PUBLIC_SITE_URL || new URL(req.url).origin
   const externalTransactionID = `${invoice.id}-${Date.now()}`
@@ -66,9 +102,11 @@ export async function POST(req: Request) {
   let link
   try {
     link = await createPaymentLink({
-      amount: balance,
+      amount: chargeAmount,
       currency: invoice.currency,
-      description: `Invoice ${invoice.invoice_number} — Visit Drakensberg`,
+      description: tip > 0
+        ? `Invoice ${invoice.invoice_number} + gratuity — Visit Drakensberg`
+        : `Invoice ${invoice.invoice_number} — Visit Drakensberg`,
       paymentReference: invoice.invoice_number,
       externalTransactionID,
       requesterUrl: origin,
@@ -101,7 +139,8 @@ export async function POST(req: Request) {
     mode: process.env.IKHOKHA_MODE === 'live' ? 'live' : 'test',
     paylink_id: link.paylinkID,
     external_transaction_id: externalTransactionID,
-    amount: balance,
+    amount: chargeAmount,
+    tip_amount: tip,
     currency: invoice.currency,
     status: 'pending',
     paylink_url: link.paylinkUrl,

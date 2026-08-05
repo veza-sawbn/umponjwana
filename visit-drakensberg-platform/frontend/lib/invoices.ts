@@ -1,4 +1,5 @@
 import { supabase } from './auth'
+import { DEFAULT_TIP_PRESETS } from './tips'
 
 // Customer invoices & receipts. One invoice per Master Order — the customer
 // never receives multiple invoices because multiple suppliers are involved,
@@ -89,9 +90,33 @@ function rate(value: unknown, fallback: number): number {
   return Number.isFinite(n) && n >= 0 ? n : fallback
 }
 
+/** Tip presets are percentages: keep whole, sane, ascending values only. */
+function tipPresets(value: unknown, fallback: number[]): number[] {
+  if (!Array.isArray(value)) return fallback
+  const clean = value
+    .map(v => Number(v))
+    .filter(n => Number.isFinite(n) && n > 0 && n <= 100)
+    .map(n => Math.round(n * 10) / 10)
+    .sort((a, b) => a - b)
+  return clean.length > 0 ? clean : fallback
+}
+
+export type FinanceSettings = {
+  serviceFeeRate: number
+  vatRate: number
+  currency: string
+  /** Whether guests may add a gratuity when paying an activity invoice online. */
+  tippingEnabled: boolean
+  /** Percentages offered on the invoice's tip selector. */
+  tipPresets: number[]
+}
+
 /** Editable finance defaults (vd_finance_settings) with sensible fallbacks. */
-export async function getFinanceSettings(): Promise<{ serviceFeeRate: number; vatRate: number; currency: string }> {
-  const out = { serviceFeeRate: 0.12, vatRate: 0.15, currency: 'ZAR' }
+export async function getFinanceSettings(): Promise<FinanceSettings> {
+  const out: FinanceSettings = {
+    serviceFeeRate: 0.12, vatRate: 0.15, currency: 'ZAR',
+    tippingEnabled: true, tipPresets: [...DEFAULT_TIP_PRESETS],
+  }
   try {
     const { data } = await supabase.from('vd_finance_settings').select('key, value')
     for (const row of data ?? []) {
@@ -99,17 +124,21 @@ export async function getFinanceSettings(): Promise<{ serviceFeeRate: number; va
       if (r.key === 'service_fee_rate') out.serviceFeeRate = rate(r.value, out.serviceFeeRate)
       if (r.key === 'vat_rate') out.vatRate = rate(r.value, out.vatRate)
       if (r.key === 'default_currency' && typeof r.value === 'string') out.currency = r.value
+      if (r.key === 'tipping_enabled') out.tippingEnabled = r.value !== false
+      if (r.key === 'tip_presets') out.tipPresets = tipPresets(r.value, out.tipPresets)
     }
   } catch {}
   return out
 }
 
 /** Admin-only write (RLS: vd_finance_settings is admin-managed). */
-export async function setFinanceSettings(patch: Partial<{ serviceFeeRate: number; vatRate: number; currency: string }>): Promise<void> {
+export async function setFinanceSettings(patch: Partial<FinanceSettings>): Promise<void> {
   const rows: { key: string; value: unknown }[] = []
   if (patch.serviceFeeRate !== undefined) rows.push({ key: 'service_fee_rate', value: patch.serviceFeeRate })
   if (patch.vatRate !== undefined) rows.push({ key: 'vat_rate', value: patch.vatRate })
   if (patch.currency !== undefined) rows.push({ key: 'default_currency', value: patch.currency })
+  if (patch.tippingEnabled !== undefined) rows.push({ key: 'tipping_enabled', value: patch.tippingEnabled })
+  if (patch.tipPresets !== undefined) rows.push({ key: 'tip_presets', value: patch.tipPresets })
   if (rows.length === 0) return
   const { error } = await supabase.from('vd_finance_settings').upsert(
     rows.map(r => ({ ...r, updated_at: new Date().toISOString() })), { onConflict: 'key' },

@@ -56,13 +56,30 @@ export async function POST(req: Request) {
   if (!claimed) return NextResponse.json({ ok: true }) // another callback already handled it
 
   try {
+    // A gratuity the guest chose at checkout is written only now, with the
+    // money confirmed — it appends a zero-commission, zero-VAT line per
+    // operator and lifts the order and invoice totals, so the payment
+    // recorded below (balance + tip) settles the invoice exactly.
+    // tip_applied_at keeps a retried callback from crediting it twice.
+    const tip = Number(link.tip_amount ?? 0)
+    if (tip > 0 && !link.tip_applied_at) {
+      const { error: tipError } = await admin.rpc('vd_apply_order_tip', {
+        p_order_id: link.order_id,
+        p_amount: tip,
+      })
+      if (tipError) throw tipError
+      await admin.from('vd_payment_links')
+        .update({ tip_applied_at: new Date().toISOString() })
+        .eq('id', link.id)
+    }
+
     const { data: paymentId, error } = await admin.rpc('vd_record_order_payment', {
       p_order_id: link.order_id,
       p_amount: Number(link.amount),
       p_type: 'payment',
       p_method: 'online',
       p_reference: `ikhokha:${paylinkID}`,
-      p_notes: 'Paid online via iKhokha',
+      p_notes: tip > 0 ? `Paid online via iKhokha (includes ${tip.toFixed(2)} gratuity)` : 'Paid online via iKhokha',
     })
     if (error) throw error
     await admin.from('vd_payment_links').update({ payment_id: paymentId }).eq('id', link.id)
