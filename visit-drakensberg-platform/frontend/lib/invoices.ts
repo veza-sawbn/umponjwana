@@ -111,11 +111,19 @@ export type FinanceSettings = {
   tipPresets: number[]
 }
 
-/** Editable finance defaults (vd_finance_settings) with sensible fallbacks. */
+/**
+ * Editable finance defaults (vd_finance_settings) with sensible fallbacks.
+ *
+ * tippingEnabled defaults to false, unlike the rate fallbacks above: the
+ * migration that adds the tipping machinery is also what seeds the
+ * tipping_enabled row, so an absent row means this database can't record a
+ * gratuity yet. Better to not offer one than to offer one that fails at the
+ * payment step.
+ */
 export async function getFinanceSettings(): Promise<FinanceSettings> {
   const out: FinanceSettings = {
     serviceFeeRate: 0.12, vatRate: 0.15, currency: 'ZAR',
-    tippingEnabled: true, tipPresets: [...DEFAULT_TIP_PRESETS],
+    tippingEnabled: false, tipPresets: [...DEFAULT_TIP_PRESETS],
   }
   try {
     const { data } = await supabase.from('vd_finance_settings').select('key, value')

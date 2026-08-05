@@ -9,6 +9,24 @@ import type { InvoiceLine } from '@/lib/invoices'
 
 export const dynamic = 'force-dynamic'
 
+/**
+ * Has this database run the tipping migration?
+ *
+ * PostgREST words an unknown column differently across versions — PGRST204
+ * "Could not find the 'tip_amount' column ... in the schema cache", or a
+ * 42703 'column "tip_amount" ... does not exist' — so match on the wording
+ * rather than the code alone. Narrow enough not to swallow anything else:
+ * the only other error this column can raise is its >= 0 check, and the tip
+ * is validated non-negative long before the insert.
+ */
+function isMissingTipColumn(error: { code?: string; message?: string } | null): boolean {
+  if (!error) return false
+  const message = String(error.message ?? '')
+  if (!message.includes('tip_amount')) return false
+  return /does not exist|schema cache|could not find/i.test(message)
+    || error.code === 'PGRST204' || error.code === '42703'
+}
+
 // Starts an online payment for one invoice — either an existing invoice
 // (Pay Now on /invoices/[id]) or a just-created checkout booking, resolved
 // to its invoice via vd_orders.booking_id. The customer is redirected to the
@@ -115,7 +133,10 @@ export async function POST(req: Request) {
     })
   } catch (e) {
     console.error('[ikhokha] create payment link failed:', e)
-    return NextResponse.json({ error: 'Could not start the payment — please try again shortly.' }, { status: 502 })
+    return NextResponse.json(
+      { error: 'The payment provider did not respond — please try again shortly.', code: 'gateway_unreachable' },
+      { status: 502 },
+    )
   }
 
   // iKhokha can respond 200 with an app-level failure (bad entityID, invalid
@@ -126,11 +147,14 @@ export async function POST(req: Request) {
   // verified against a real merchant account (see lib/ikhokha.ts header).
   if (!link.paylinkUrl || !link.paylinkID) {
     console.error('[ikhokha] createPaymentLink returned no paylinkUrl — raw response:', JSON.stringify(link))
-    return NextResponse.json({ error: 'iKhokha did not return a payment link — please try again shortly.' }, { status: 502 })
+    return NextResponse.json(
+      { error: 'iKhokha did not return a payment link — please try again shortly.', code: 'gateway_rejected' },
+      { status: 502 },
+    )
   }
 
   const admin = supabaseAdmin()
-  const { error: insertError } = await admin.from('vd_payment_links').insert({
+  const linkRow: Record<string, unknown> = {
     id: `plink-${randomUUID()}`,
     order_id: invoice.order_id,
     invoice_id: invoice.id,
@@ -145,14 +169,42 @@ export async function POST(req: Request) {
     status: 'pending',
     paylink_url: link.paylinkUrl,
     raw_create_response: link,
-  })
+  }
+
+  let { error: insertError } = await admin.from('vd_payment_links').insert(linkRow)
+
+  // A database that hasn't run 20260806_activity_tips.sql yet has no
+  // tip_amount column, and PostgREST rejects the whole insert over it.
+  // Paying an invoice must not depend on the tipping migration when there is
+  // no tip to record — drop the column and carry on. With a tip, there is
+  // nowhere to record it, so the guest is told rather than charged for
+  // something that would never reach the operator.
+  if (insertError && isMissingTipColumn(insertError)) {
+    if (tip > 0) {
+      console.error('[ikhokha] tip requested but vd_payment_links.tip_amount is missing — run migration 20260806_activity_tips.sql')
+      return NextResponse.json(
+        {
+          error: 'Tips are not switched on for this site yet — please pay without a tip, or contact us to add one.',
+          code: 'tipping_not_migrated',
+        },
+        { status: 503 },
+      )
+    }
+    console.warn('[ikhokha] vd_payment_links.tip_amount is missing — run migration 20260806_activity_tips.sql. Continuing without it.')
+    delete linkRow.tip_amount
+    ;({ error: insertError } = await admin.from('vd_payment_links').insert(linkRow))
+  }
+
   if (insertError) {
     // The webhook reconciles a payment by looking up this row via paylink_id
     // — without it, a real payment could complete with no way to mark the
     // invoice (or booking) paid. Fail loudly rather than send the customer
     // to pay anyway.
     console.error('[ikhokha] failed to persist payment link:', insertError)
-    return NextResponse.json({ error: 'Could not start the payment — please try again shortly.' }, { status: 500 })
+    return NextResponse.json(
+      { error: 'Could not start the payment — please try again shortly.', code: 'link_not_saved' },
+      { status: 500 },
+    )
   }
 
   return NextResponse.json({ paylinkUrl: link.paylinkUrl })
