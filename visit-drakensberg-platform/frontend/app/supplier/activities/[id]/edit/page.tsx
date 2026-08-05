@@ -7,12 +7,9 @@ import { getRegionNames } from '@/lib/regions'
 import { GoogleAddressField } from '@/components/maps/GoogleAddressField'
 import { supplierMediaSource } from '@/lib/supplier-media'
 import { MediaGalleryPicker } from '@/components/media/MediaPicker'
+import { CategoryPicker, DifficultyPicker, DurationPicker, MinAgeField, RegionSelect } from '@/components/supplier/ActivityFields'
 
-const CATEGORIES = ['Adventure', 'Nature', 'Water', 'Cultural', 'Wellness', 'Family']
-const DIFFICULTIES = ['Easy', 'Moderate', 'Challenging', 'Extreme']
 const INCLUDED_OPTIONS = ['Helmet & Harness', 'Guide', 'Safety Briefing', 'Refreshments', 'Transport to Site', 'Photos/Video', 'Equipment']
-const HOURS = Array.from({ length: 13 }, (_, i) => i)
-const MINUTES = [0, 15, 30, 45]
 
 type FormState = {
   name: string; category: string; region: string; difficulty: string; durationH: number; durationM: number;
@@ -106,40 +103,18 @@ export default function EditActivityPage() {
       <div className="bg-white rounded-xl border border-black/8 p-6 space-y-5">
         <F label="Activity Name" required><input value={form.name} onChange={e => set('name', e.target.value)} className={inp} /></F>
 
-        <F label="Category">
-          <div className="flex flex-wrap gap-2">
-            {CATEGORIES.map(c => <button key={c} onClick={() => set('category', c)} className={chip(form.category === c)}>{c}</button>)}
-          </div>
-        </F>
+        <CategoryPicker value={form.category} onChange={v => set('category', v)} />
 
-        <F label="Region" required>
-          <select value={form.region} onChange={e => set('region', e.target.value)} className={inp}>
-            <option value="">Select region…</option>
-            {regions.map(r => <option key={r} value={r}>{r}</option>)}
-          </select>
-        </F>
+        <RegionSelect value={form.region} onChange={v => set('region', v)} regions={regions} required />
 
-        <F label="Difficulty">
-          <div className="flex gap-2 flex-wrap">
-            {DIFFICULTIES.map(d => <button key={d} onClick={() => set('difficulty', d)} className={chip(form.difficulty === d)}>{d}</button>)}
-          </div>
-        </F>
+        <DifficultyPicker value={form.difficulty} onChange={v => set('difficulty', v)} />
 
-        <div className="grid grid-cols-2 gap-4">
-          <F label="Duration">
-            <div className="flex gap-2">
-              <select value={form.durationH} onChange={e => set('durationH', +e.target.value)} className={inp}>
-                {HOURS.map(h => <option key={h} value={h}>{h}h</option>)}
-              </select>
-              <select value={form.durationM} onChange={e => set('durationM', +e.target.value)} className={inp}>
-                {MINUTES.map(m => <option key={m} value={m}>{m}m</option>)}
-              </select>
-            </div>
-          </F>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <DurationPicker hours={form.durationH} minutes={form.durationM} onChange={({ hours, minutes }) => setForm(f => ({ ...f, durationH: hours, durationM: minutes }))} />
           <F label="Max Group Size" required><input type="number" value={form.maxGroup} onChange={e => set('maxGroup', +e.target.value)} min="1" className={inp} /></F>
         </div>
 
-        <F label="Min Age"><input type="number" value={form.minAge} onChange={e => set('minAge', +e.target.value)} min="0" className={inp} /></F>
+        <MinAgeField value={form.minAge} onChange={v => set('minAge', v)} />
 
         <GoogleAddressField label="Meeting Point" required value={form.meetingPoint} lat={form.gpsLat} lng={form.gpsLng} placeholder="Start typing the meeting point" inputClassName={inp} labelClassName="font-sans text-sm font-medium text-black/70" onChange={({ address, lat, lng }) => { set('meetingPoint', address); if (lat) set('gpsLat', lat); if (lng) set('gpsLng', lng) }} />
 

@@ -8,9 +8,8 @@ import { getRegionNames } from '@/lib/regions'
 import { GoogleAddressField } from '@/components/maps/GoogleAddressField'
 import { supplierMediaSource } from '@/lib/supplier-media'
 import { MediaGalleryPicker } from '@/components/media/MediaPicker'
+import { CategoryPicker, DifficultyPicker, DurationPicker, MinAgeField, RegionSelect, formatDuration } from '@/components/supplier/ActivityFields'
 
-const CATEGORIES = ['Adventure', 'Nature', 'Water', 'Cultural', 'Wellness', 'Family']
-const DIFFICULTY = ['Easy', 'Moderate', 'Challenging', 'Extreme']
 const INCLUDED = ['Helmet & Harness', 'Guide', 'Safety Briefing', 'Refreshments', 'Transport to Site', 'Photos/Video', 'Equipment']
 const STEPS = ['Activity Details', 'Logistics', 'Inclusions & Safety', 'Pricing', 'Review']
 
@@ -31,7 +30,7 @@ export default function NewActivityPage() {
   const [regions, setRegions] = useState<string[]>([])
   const [form, setForm] = useState({
     name: '', category: '', region: '', description: '', difficulty: '',
-    durationH: '', minAge: '', maxGroupSize: '',
+    durationH: 0, durationM: 0, minAge: 0, maxGroupSize: '',
     meetingPoint: '', gpsLat: '', gpsLng: '', whatToWear: '', photos: [] as string[],
     included: [] as string[], safetyNotes: '',
     pricePerPerson: '', priceGroup: '', depositRequired: false, depositPercent: '30',
@@ -62,9 +61,9 @@ export default function NewActivityPage() {
         region: form.region,
         difficulty: form.difficulty,
         description: form.description,
-        durationH: +form.durationH || 0,
-        durationM: 0,
-        minAge: +form.minAge || 0,
+        durationH: form.durationH,
+        durationM: form.durationM,
+        minAge: form.minAge,
         maxGroup: +form.maxGroupSize || 1,
         meetingPoint: form.meetingPoint,
         gpsLat: form.gpsLat,
@@ -110,25 +109,9 @@ export default function NewActivityPage() {
         {step === 0 && (
           <>
             <F label="Activity Name" required><input value={form.name} onChange={e => set('name', e.target.value)} className={inp} /></F>
-            <F label="Category" required>
-              <select value={form.category} onChange={e => set('category', e.target.value)} className={inp}>
-                <option value="">Select…</option>
-                {CATEGORIES.map(c => <option key={c}>{c}</option>)}
-              </select>
-            </F>
-            <F label="Region" required>
-              <select value={form.region} onChange={e => set('region', e.target.value)} className={inp}>
-                <option value="">Select region…</option>
-                {regions.map(r => <option key={r} value={r}>{r}</option>)}
-              </select>
-            </F>
-            <F label="Difficulty">
-              <div className="flex gap-2 flex-wrap">
-                {DIFFICULTY.map(d => (
-                  <button key={d} onClick={() => set('difficulty', d)} className={`font-sans text-xs px-3 py-1.5 rounded-full border transition-colors ${form.difficulty === d ? 'bg-[#C9A96E] text-white border-[#C9A96E]' : 'border-black/15 text-black/60 hover:border-[#C9A96E]/40'}`}>{d}</button>
-                ))}
-              </div>
-            </F>
+            <CategoryPicker value={form.category} onChange={v => set('category', v)} />
+            <RegionSelect value={form.region} onChange={v => set('region', v)} regions={regions} required />
+            <DifficultyPicker value={form.difficulty} onChange={v => set('difficulty', v)} />
             <F label="Description" required>
               <textarea value={form.description} onChange={e => set('description', e.target.value)} rows={4} className={`${inp} resize-none`} placeholder="What participants will experience…" />
             </F>
@@ -137,9 +120,9 @@ export default function NewActivityPage() {
 
         {step === 1 && (
           <>
-            <div className="grid grid-cols-2 gap-4">
-              <F label="Duration (hours)"><input type="number" value={form.durationH} onChange={e => set('durationH', e.target.value)} min="0" className={inp} /></F>
-              <F label="Min. Age"><input type="number" value={form.minAge} onChange={e => set('minAge', e.target.value)} min="0" placeholder="e.g. 10" className={inp} /></F>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <DurationPicker hours={form.durationH} minutes={form.durationM} onChange={({ hours, minutes }) => setForm(f => ({ ...f, durationH: hours, durationM: minutes }))} />
+              <MinAgeField value={form.minAge} onChange={v => set('minAge', v)} />
             </div>
             <F label="Max Group Size" required><input type="number" value={form.maxGroupSize} onChange={e => set('maxGroupSize', e.target.value)} className={inp} /></F>
             <GoogleAddressField label="Meeting Point / Start Location" required value={form.meetingPoint} lat={form.gpsLat} lng={form.gpsLng} placeholder="Start typing the meeting point" inputClassName={inp} labelClassName="font-sans text-sm font-medium text-black/70" onChange={({ address, lat, lng }) => { set('meetingPoint', address); if (lat) set('gpsLat', lat); if (lng) set('gpsLng', lng) }} />
@@ -190,7 +173,7 @@ export default function NewActivityPage() {
           <div className="space-y-3">
             <p className="font-sans text-sm text-black/60">Review your activity before submitting.</p>
             <div className="rounded-lg bg-black/3 p-4 space-y-2">
-              {[['Name', form.name], ['Category', form.category], ['Region', form.region], ['Difficulty', form.difficulty], ['Duration', form.durationH ? `${form.durationH}h` : ''], ['Max Group', form.maxGroupSize], ['Meeting Point', form.meetingPoint], ['Price/Person', form.pricePerPerson ? `R ${form.pricePerPerson}` : '']].map(([k, v]) => v ? (
+              {[['Name', form.name], ['Category', form.category], ['Region', form.region], ['Difficulty', form.difficulty], ['Duration', formatDuration(form.durationH, form.durationM)], ['Min Age', form.minAge ? `${form.minAge}+ years` : ''], ['Max Group', form.maxGroupSize], ['Meeting Point', form.meetingPoint], ['Price/Person', form.pricePerPerson ? `R ${form.pricePerPerson}` : '']].map(([k, v]) => v ? (
                 <div key={k} className="flex gap-3 font-sans text-sm">
                   <span className="text-black/40 w-32 shrink-0">{k}</span>
                   <span className="text-black/80">{v}</span>
