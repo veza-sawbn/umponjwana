@@ -36,7 +36,7 @@ export default function AboutContent() {
           </Editable>
           <Editable section="about_page" fieldKey="suppliers_cta" value={c.suppliers_cta} label="Suppliers CTA Label" type="text" as="span">
             <Link
-              href="/supplier"
+              href="/list-your-property"
               className="inline-block px-6 py-3 bg-forest text-white font-sans text-sm hover:bg-sage transition-colors"
             >
               {c.suppliers_cta}

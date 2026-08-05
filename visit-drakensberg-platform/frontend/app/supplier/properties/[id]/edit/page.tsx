@@ -2,14 +2,12 @@
 import { useState, useEffect } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { ChevronRight, ChevronLeft } from 'lucide-react'
-import { getPropertyById, updateProperty, PROPERTY_REGIONS } from '@/lib/properties'
+import { getPropertyById, updateProperty, PROPERTY_REGIONS, PROPERTY_TYPES, PROPERTY_AMENITIES } from '@/lib/properties'
 import { getRegionNames } from '@/lib/regions'
 import { GoogleAddressField } from '@/components/maps/GoogleAddressField'
 import { supplierMediaSource } from '@/lib/supplier-media'
 import { MediaGalleryPicker } from '@/components/media/MediaPicker'
 
-const PROPERTY_TYPES = ['Lodge', 'Guesthouse', 'Hotel', 'Self-catering Cottage', 'Campsite', 'Backpackers', 'Boutique Hotel']
-const AMENITIES = ['Swimming Pool', 'Braai Facilities', 'Wi-Fi', 'Restaurant', 'Bar', 'Spa', 'Gym', 'Laundry', 'Pet-Friendly', 'Wheelchair Access', 'Airport Transfers', 'Hiking Trails Access']
 const STEPS = ['Property Details', 'Location & Access', 'Amenities & Policies', 'Photos', 'Review & Submit']
 
 export default function EditPropertyPage() {
@@ -196,7 +194,7 @@ export default function EditPropertyPage() {
             <div>
               <p className="font-sans text-sm font-medium text-black/70 mb-3">Amenities</p>
               <div className="flex flex-wrap gap-2">
-                {AMENITIES.map(a => (
+                {PROPERTY_AMENITIES.map(a => (
                   <button key={a} onClick={() => toggleAmenity(a)} className={`font-sans text-xs px-3 py-1.5 rounded-full border transition-colors ${form.amenities.includes(a) ? 'bg-[#C9A96E] text-white border-[#C9A96E]' : 'border-black/15 text-black/60 hover:border-[#C9A96E]/40'}`}>{a}</button>
                 ))}
               </div>
