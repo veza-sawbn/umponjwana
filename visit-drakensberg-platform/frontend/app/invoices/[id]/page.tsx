@@ -1,12 +1,13 @@
 'use client'
 
-import { useEffect, useState, useCallback, Suspense } from 'react'
+import { useEffect, useState, useCallback, useMemo, Suspense } from 'react'
 import { useParams, useRouter, useSearchParams } from 'next/navigation'
 import { Printer, ArrowLeft, CreditCard, Loader2 } from 'lucide-react'
-import { getInvoiceById, getReceipts, type Invoice, type Receipt } from '@/lib/invoices'
+import { getInvoiceById, getReceipts, getFinanceSettings, type Invoice, type Receipt } from '@/lib/invoices'
 import { getOrderById, type MasterOrder } from '@/lib/orders'
 import { getSiteContent, SITE_CONTENT_DEFAULTS } from '@/lib/site-content'
 import { formatMoney } from '@/lib/allocation'
+import { DEFAULT_TIP_PRESETS, maxTip, tipForPercent, tippableTotal } from '@/lib/tips'
 import Logo from '@/components/Logo'
 
 type BusinessDetails = typeof SITE_CONTENT_DEFAULTS.business_details
@@ -17,6 +18,28 @@ type BusinessDetails = typeof SITE_CONTENT_DEFAULTS.business_details
 
 function fmt(d?: string | null) {
   return d ? new Date(d).toLocaleDateString('en-ZA', { day: 'numeric', month: 'long', year: 'numeric' }) : '—'
+}
+
+function TipOption({ label, sub, selected, onClick }: {
+  label: string
+  sub?: string
+  selected: boolean
+  onClick: () => void
+}) {
+  return (
+    <button
+      onClick={onClick}
+      aria-pressed={selected}
+      className={`px-4 py-2.5 border font-sans text-sm transition-colors ${
+        selected
+          ? 'bg-[#2d6a4f] border-[#2d6a4f] text-white'
+          : 'bg-white border-gray-200 text-gray-600 hover:border-[#2d6a4f] hover:text-[#2d6a4f]'
+      }`}
+    >
+      {label}
+      {sub && <span className={`ml-2 text-xs ${selected ? 'text-white/70' : 'text-gray-400'}`}>{sub}</span>}
+    </button>
+  )
 }
 
 function PrintableInvoiceInner() {
@@ -31,8 +54,15 @@ function PrintableInvoiceInner() {
   const [loading, setLoading] = useState(true)
   const [paying, setPaying] = useState(false)
   const [payError, setPayError] = useState('')
+  const [tipping, setTipping] = useState({ enabled: true, presets: DEFAULT_TIP_PRESETS })
+  // null = no tip yet, a number = that percentage, 'custom' = the guest's own amount
+  const [tipChoice, setTipChoice] = useState<number | 'custom' | null>(null)
+  const [customTip, setCustomTip] = useState('')
 
   useEffect(() => { getSiteContent('business_details').then(setBusiness) }, [])
+  useEffect(() => {
+    getFinanceSettings().then(s => setTipping({ enabled: s.tippingEnabled, presets: s.tipPresets }))
+  }, [])
 
   const load = useCallback((id: string) => {
     return getInvoiceById(decodeURIComponent(id)).then(async inv => {
@@ -64,15 +94,31 @@ function PrintableInvoiceInner() {
     return () => clearInterval(interval)
   }, [paymentResult, params?.id, load])
 
+  // The guided portion of the invoice — a tip is a percentage of what the
+  // guides did, not of the chalet, the permits or the VAT.
+  const tippable = useMemo(() => tippableTotal(invoice?.lines), [invoice])
+  const tipCeiling = maxTip(tippable)
+  const tip = useMemo(() => {
+    if (tipChoice === null) return 0
+    if (tipChoice === 'custom') {
+      const value = Math.round((parseFloat(customTip) || 0) * 100) / 100
+      return value > 0 ? value : 0
+    }
+    return tipForPercent(tippable, tipChoice)
+  }, [tipChoice, customTip, tippable])
+  const tipTooLarge = tip > tipCeiling
+  const payable = !!invoice && Number(invoice.balance) > 0 && invoice.status !== 'void'
+
   async function payNow() {
     if (!invoice) return
+    if (tipTooLarge) return
     setPaying(true)
     setPayError('')
     try {
       const res = await fetch('/api/payments/ikhokha/create', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ invoiceId: invoice.id }),
+        body: JSON.stringify({ invoiceId: invoice.id, tip }),
       })
       const json = await res.json()
       if (!res.ok || !json.paylinkUrl) throw new Error(json.error || 'Could not start payment')
@@ -125,18 +171,75 @@ function PrintableInvoiceInner() {
           </div>
         )}
 
+        {/* Gratuity — only where there is something guided to tip on, and only
+            while the invoice can still be paid. */}
+        {payable && tipping.enabled && tippable > 0 && (
+          <div className="mb-4 print:hidden bg-white border border-gray-200 p-5 sm:p-6">
+            <p className="font-sans text-[10px] tracking-[0.14em] uppercase text-gray-400">Gratuity</p>
+            <h2 className="font-display italic text-xl sm:text-2xl text-[#000000] mt-1">Add a tip for your guide?</h2>
+            <p className="font-sans text-xs text-gray-500 mt-1.5 max-w-xl leading-relaxed">
+              The guided part of this invoice came to {formatMoney(tippable, invoice.currency)}. A tip is entirely
+              optional, and every cent of it goes to the operator who took you out — no commission, no VAT.
+            </p>
+
+            <div className="flex flex-wrap gap-2 mt-4">
+              <TipOption label="No tip" selected={tipChoice === null} onClick={() => { setTipChoice(null); setCustomTip('') }} />
+              {tipping.presets.map(p => (
+                <TipOption
+                  key={p}
+                  label={`${p}%`}
+                  sub={formatMoney(tipForPercent(tippable, p), invoice.currency)}
+                  selected={tipChoice === p}
+                  onClick={() => setTipChoice(p)}
+                />
+              ))}
+              <TipOption label="Other amount" selected={tipChoice === 'custom'} onClick={() => setTipChoice('custom')} />
+            </div>
+
+            {tipChoice === 'custom' && (
+              <div className="mt-3 flex items-center gap-2">
+                <span className="font-sans text-sm text-gray-500">{invoice.currency === 'ZAR' ? 'R' : invoice.currency}</span>
+                <input
+                  value={customTip}
+                  onChange={e => setCustomTip(e.target.value)}
+                  inputMode="decimal"
+                  autoFocus
+                  placeholder="0.00"
+                  aria-label="Tip amount"
+                  className="w-32 border border-gray-200 px-3 py-2.5 font-sans text-base sm:text-sm text-right focus:outline-none focus:border-[#2d6a4f]"
+                />
+              </div>
+            )}
+
+            {tipTooLarge ? (
+              <p className="mt-3 font-sans text-xs text-red-600">
+                A tip can't be more than the guided part of the invoice ({formatMoney(tipCeiling, invoice.currency)}).
+                Enter a smaller amount, or pay this invoice and arrange anything larger with us directly.
+              </p>
+            ) : tip > 0 && (
+              <p className="mt-3 font-sans text-sm text-gray-600">
+                Balance {formatMoney(Number(invoice.balance), invoice.currency)} + tip {formatMoney(tip, invoice.currency)} ={' '}
+                <span className="font-medium text-[#000000]">{formatMoney(Number(invoice.balance) + tip, invoice.currency)}</span>
+              </p>
+            )}
+            <p className="mt-2 font-sans text-[11px] text-gray-400">
+              The tip is added to your invoice only once the payment goes through, and appears on it as its own line.
+            </p>
+          </div>
+        )}
+
         <div className="flex items-center justify-between mb-4 print:hidden">
           <button onClick={() => router.back()} className="inline-flex items-center gap-2 font-sans text-sm text-gray-500 hover:text-[#2d6a4f] transition-colors">
             <ArrowLeft size={14} /> Back
           </button>
           <div className="flex items-center gap-3">
-            {Number(invoice.balance) > 0 && invoice.status !== 'void' && (
+            {payable && (
               <button
                 onClick={payNow}
-                disabled={paying}
+                disabled={paying || tipTooLarge}
                 className="inline-flex items-center gap-2 bg-[#C9A96E] text-[#2d2d2d] px-5 py-2.5 font-sans text-sm font-medium hover:bg-[#b8935e] transition-colors disabled:opacity-60"
               >
-                <CreditCard size={14} /> {paying ? 'Redirecting…' : `Pay Now — ${formatMoney(Number(invoice.balance), invoice.currency)}`}
+                <CreditCard size={14} /> {paying ? 'Redirecting…' : `Pay Now — ${formatMoney(Number(invoice.balance) + tip, invoice.currency)}`}
               </button>
             )}
             <button onClick={() => window.print()} className="inline-flex items-center gap-2 bg-[#2d6a4f] text-white px-5 py-2.5 font-sans text-sm hover:bg-[#245741] transition-colors">

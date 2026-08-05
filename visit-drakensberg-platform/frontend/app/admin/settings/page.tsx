@@ -89,6 +89,8 @@ function TaxSettingsCard() {
   const [vatRate, setVatRate] = useState('15')
   const [serviceFeeRate, setServiceFeeRate] = useState('12')
   const [currency, setCurrency] = useState('ZAR')
+  const [tippingEnabled, setTippingEnabled] = useState(true)
+  const [tipPresets, setTipPresets] = useState('10, 15, 20')
   const [saving, setSaving] = useState(false)
   const [loaded, setLoaded] = useState(false)
 
@@ -97,6 +99,8 @@ function TaxSettingsCard() {
       setVatRate(String(Math.round(s.vatRate * 1000) / 10))
       setServiceFeeRate(String(Math.round(s.serviceFeeRate * 1000) / 10))
       setCurrency(s.currency)
+      setTippingEnabled(s.tippingEnabled)
+      setTipPresets(s.tipPresets.join(', '))
       setLoaded(true)
     })
   }, [])
@@ -104,10 +108,17 @@ function TaxSettingsCard() {
   async function save() {
     setSaving(true)
     try {
+      // Blank or unparseable presets fall back to the stored defaults rather
+      // than saving an empty selector onto the invoice.
+      const presets = tipPresets.split(',')
+        .map(p => parseFloat(p.trim()))
+        .filter(n => Number.isFinite(n) && n > 0 && n <= 100)
       await setFinanceSettings({
         vatRate: (parseFloat(vatRate) || 0) / 100,
         serviceFeeRate: (parseFloat(serviceFeeRate) || 0) / 100,
         currency,
+        tippingEnabled,
+        ...(presets.length > 0 ? { tipPresets: presets } : {}),
       })
       toast.success('Tax & fee settings saved.')
     } catch (e) {
@@ -138,6 +149,32 @@ function TaxSettingsCard() {
         <div>
           <label className="block font-sans text-[10px] tracking-[0.12em] uppercase text-gray-400 mb-1.5">Currency</label>
           <input value={currency} onChange={e => setCurrency(e.target.value.toUpperCase())} maxLength={3} className="w-full border border-gray-200 px-4 py-3 font-sans text-sm focus:outline-none focus:border-[#2d6a4f] bg-[#F7F5F2]" />
+        </div>
+      </div>
+
+      {/* Gratuities — guests tipping guides when they pay an activity invoice online. */}
+      <div className="mt-6 pt-6 border-t border-gray-100">
+        <p className="font-sans text-[10px] tracking-[0.12em] uppercase text-gray-400 mb-1.5">Gratuities</p>
+        <p className="font-sans text-xs text-gray-400 mb-4">
+          Offers guests a tip when they pay an invoice that includes an activity, tour, hike or shuttle online.
+          A tip carries no commission and no VAT — it is allocated in full to the operator and paid out with their next settlement.
+        </p>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-start">
+          <label className="flex items-center gap-3 border border-gray-200 bg-[#F7F5F2] px-4 py-3 cursor-pointer">
+            <input type="checkbox" checked={tippingEnabled} onChange={e => setTippingEnabled(e.target.checked)} className="accent-[#2d6a4f]" />
+            <span className="font-sans text-sm text-gray-700">Allow tips on activity invoices</span>
+          </label>
+          <div className="md:col-span-2">
+            <label className="block font-sans text-[10px] tracking-[0.12em] uppercase text-gray-400 mb-1.5">Suggested Percentages</label>
+            <input
+              value={tipPresets}
+              onChange={e => setTipPresets(e.target.value)}
+              placeholder="10, 15, 20"
+              disabled={!tippingEnabled}
+              className="w-full border border-gray-200 px-4 py-3 font-sans text-sm focus:outline-none focus:border-[#2d6a4f] bg-[#F7F5F2] disabled:text-gray-400"
+            />
+            <p className="font-sans text-[11px] text-gray-400 mt-1.5">Comma separated. Guests can always enter their own amount instead.</p>
+          </div>
         </div>
       </div>
     </div>
