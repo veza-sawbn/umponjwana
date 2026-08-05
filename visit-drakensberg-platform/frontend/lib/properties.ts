@@ -3,6 +3,17 @@ import { listEntities, getEntity, insertEntity, updateEntity, deleteEntity, newE
 
 export const PROPERTY_REGIONS = DEFAULT_REGIONS.map(region => region.name)
 
+// Shared vocabulary for every surface that describes a property: the supplier
+// wizard, the property edit form and the public listing application.
+export const PROPERTY_TYPES = [
+  'Lodge', 'Guesthouse', 'Hotel', 'Self-catering Cottage', 'Campsite', 'Backpackers', 'Boutique Hotel',
+]
+
+export const PROPERTY_AMENITIES = [
+  'Swimming Pool', 'Braai Facilities', 'Wi-Fi', 'Restaurant', 'Bar', 'Spa', 'Gym', 'Laundry',
+  'Pet-Friendly', 'Wheelchair Access', 'Airport Transfers', 'Hiking Trails Access',
+]
+
 export type Property = {
   id: string
   supplierId: string

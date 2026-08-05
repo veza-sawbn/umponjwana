@@ -40,7 +40,7 @@ const COLUMNS = [
     heading: 'Company',
     links: [
       { label: 'About', href: '/about' },
-      { label: 'List Property', href: '/supplier' },
+      { label: 'List Property', href: '/list-your-property' },
       { label: 'Privacy Policy', href: '/privacy' },
       { label: 'Terms of Use', href: '/terms' },
     ],
