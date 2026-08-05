@@ -11,7 +11,108 @@ import { supabase } from './auth'
 
 export type ApplicationActivity = {
   name: string
-  difficulty: 'Easy' | 'Moderate' | 'Strenuous'
+  category: string
+  difficulty: string
+  durationHours: string
+  maxGroup: string
+  minAge: string
+  pricePerPerson: string
+  included: string[]
+  description: string
+}
+
+export function emptyActivity(): ApplicationActivity {
+  return {
+    name: '', category: '', difficulty: 'Moderate',
+    durationHours: '', maxGroup: '', minAge: '', pricePerPerson: '',
+    included: [], description: '',
+  }
+}
+
+/**
+ * Commission ladder offered on the application.
+ *
+ * `rate` is the TOTAL platform fee on a booking, not a surcharge on top of a
+ * base rate — Standard's 12% is the whole of it (10% booking + 2% payment
+ * handling), and it mirrors the seeded `default_commission_rate` in
+ * vd_finance_settings. Keep the two in sync: change one and the other has to
+ * move with it, or an applicant is quoted a rate the ledger will not use.
+ *
+ * Every tier above the floor buys *eligibility* for placement and promotion —
+ * never a guaranteed ranking or booking. Say it that way in any copy that
+ * describes them.
+ *
+ * What an applicant picks here is a preference recorded on the application.
+ * It binds nothing on its own: commission is enforced server-side from
+ * vd_supplier_terms, which only an admin can write, and that happens when an
+ * application is approved.
+ */
+export type CommissionTier = {
+  id: string
+  name: string
+  rate: number          // whole percent
+  elevation: string
+  tagline: string
+  benefits: string[]
+  isFloor?: boolean
+}
+
+export const COMMISSION_TIERS: CommissionTier[] = [
+  {
+    id: 'standard', name: 'Standard', rate: 12, elevation: '1 200 m', tagline: 'Base camp',
+    isFloor: true,
+    benefits: [
+      'Standard listing and normal search visibility',
+      'Includes 10% booking commission + 2% payment handling',
+    ],
+  },
+  {
+    id: 'enhanced', name: 'Enhanced', rate: 15, elevation: '1 800 m', tagline: 'Tree line',
+    benefits: [
+      'Improved placement in relevant search results',
+      'Eligible for selected campaigns and newsletters',
+      'Increased promotional exposure',
+    ],
+  },
+  {
+    id: 'priority', name: 'Priority', rate: 18, elevation: '2 400 m', tagline: 'Escarpment',
+    benefits: [
+      'Priority ranking within category and region',
+      'Inclusion in featured accommodation sections',
+      'Greater access to promotional campaigns',
+    ],
+  },
+  {
+    id: 'premium', name: 'Premium', rate: 22, elevation: '2 900 m', tagline: 'High plateau',
+    benefits: [
+      'Homepage features and seasonal campaigns',
+      'Curated package inclusion',
+      'Dedicated promotional opportunities',
+    ],
+  },
+  {
+    id: 'elite', name: 'Elite', rate: 26, elevation: '3 200 m', tagline: 'Alpine zone',
+    benefits: [
+      'Top-of-category placement',
+      'Cross-platform promotion (social, newsletter takeovers)',
+      'Priority tie-break against lower tiers',
+    ],
+  },
+  {
+    id: 'signature', name: 'Signature', rate: 30, elevation: '3 482 m', tagline: 'Summit',
+    benefits: [
+      'First look at new marketing initiatives',
+      'Dedicated account support',
+      'Maximum promotional allocation',
+    ],
+  },
+]
+
+export const COMMISSION_MIN_RATE = COMMISSION_TIERS[0].rate
+export const COMMISSION_MAX_RATE = COMMISSION_TIERS[COMMISSION_TIERS.length - 1].rate
+
+export function tierById(id: string): CommissionTier {
+  return COMMISSION_TIERS.find(t => t.id === id) ?? COMMISSION_TIERS[0]
 }
 
 export type ListingApplicationStatus = 'new' | 'in_review' | 'approved' | 'declined'
@@ -37,6 +138,10 @@ export type ListingApplication = {
   // Activities they run themselves
   offersActivities: boolean
   activities: ApplicationActivity[]
+  // Commercial terms the applicant asked for (see COMMISSION_TIERS — a
+  // preference, not a binding rate)
+  commissionTier: string
+  commissionAcknowledged: boolean
   createdAt: string
 }
 
@@ -51,8 +156,6 @@ export const APPLICATION_STATUS_LABELS: Record<ListingApplicationStatus, string>
   approved: 'Approved',
   declined: 'Declined',
 }
-
-export const ACTIVITY_DIFFICULTIES: ApplicationActivity['difficulty'][] = ['Easy', 'Moderate', 'Strenuous']
 
 const TABLE = 'vd_listing_applications'
 
@@ -91,6 +194,7 @@ export async function submitListingApplication(draft: ListingApplicationDraft): 
     property_name: application.propertyName,
     contact_email: application.contactEmail,
     region: application.region,
+    commission_tier: application.commissionTier,
     value: application,
   })
 

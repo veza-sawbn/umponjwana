@@ -1,18 +1,19 @@
 'use client'
 
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { Fragment, useCallback, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import {
-  ArrowLeft, ArrowRight, Check, CheckCircle, ChevronRight, ImageIcon, Loader2,
-  Plus, Shield, Trash2, Upload, X,
+  ArrowLeft, ArrowRight, Check, CheckCircle, ChevronRight, ImageIcon, Info, Loader2,
+  Lock, Plus, Shield, Trash2, Upload, X,
 } from 'lucide-react'
 import Footer from '@/components/layout/Footer'
 import { supabase } from '@/lib/auth'
 import { getRegionNames } from '@/lib/regions'
 import { PROPERTY_REGIONS, PROPERTY_TYPES, PROPERTY_AMENITIES } from '@/lib/properties'
+import { ACTIVITY_CATEGORIES, ACTIVITY_DIFFICULTIES, ACTIVITY_INCLUSIONS } from '@/lib/activities'
 import {
-  submitListingApplication, uploadApplicationPhoto,
-  ACTIVITY_DIFFICULTIES, PHOTO_MAX_COUNT,
+  submitListingApplication, uploadApplicationPhoto, emptyActivity, tierById,
+  COMMISSION_TIERS, COMMISSION_MIN_RATE, COMMISSION_MAX_RATE, PHOTO_MAX_COUNT,
   type ApplicationActivity, type ListingApplicationDraft,
 } from '@/lib/listing-applications'
 
@@ -22,7 +23,7 @@ import {
 // (lib/listing-applications.ts), the team reviews it, and only then does a
 // supplier account and a catalog listing get created.
 
-const STEPS = ['Basics', 'Property', 'Activities', 'Review'] as const
+const STEPS = ['Basics', 'Property', 'Activity', 'Review'] as const
 
 const CONTACT_ROLES = ['Owner', 'Manager', 'Marketing / Reservations', 'Appointed agent']
 
@@ -39,6 +40,7 @@ const EMPTY_DRAFT: Draft = {
   propertyName: '', propertyType: '', region: '', elevation: '', description: '',
   amenities: [], photos: [],
   offersActivities: false, activities: [],
+  commissionTier: COMMISSION_TIERS[0].id, commissionAcknowledged: false,
 }
 
 export default function ListYourPropertyPage() {
@@ -57,6 +59,13 @@ export default function ListYourPropertyPage() {
   const set = useCallback(<K extends keyof Draft>(key: K, value: Draft[K]) => {
     setForm(f => ({ ...f, [key]: value }))
   }, [])
+
+  // A validation message names a field; once that field is being edited the
+  // message is stale, so it clears on the next keystroke rather than sitting
+  // there contradicting what the form now says.
+  useEffect(() => {
+    setError(e => (e ? '' : e))
+  }, [form])
 
   /* ── Draft: restore once, then autosave every change ─────────────────── */
   useEffect(() => {
@@ -117,11 +126,21 @@ export default function ListYourPropertyPage() {
   }
 
   function addActivity() {
-    setForm(f => ({ ...f, activities: [...f.activities, { name: '', difficulty: 'Moderate' }] }))
+    setForm(f => ({ ...f, activities: [...f.activities, emptyActivity()] }))
   }
 
   function removeActivity(i: number) {
     setForm(f => ({ ...f, activities: f.activities.filter((_, idx) => idx !== i) }))
+  }
+
+  function toggleIncluded(i: number, item: string) {
+    setForm(f => ({
+      ...f,
+      activities: f.activities.map((a, idx) => idx !== i ? a : {
+        ...a,
+        included: a.included.includes(item) ? a.included.filter(x => x !== item) : [...a.included, item],
+      }),
+    }))
   }
 
   /* ── Step flow ───────────────────────────────────────────────────────── */
@@ -137,9 +156,14 @@ export default function ListYourPropertyPage() {
       if (!form.region) return 'Choose the region your property sits in.'
       if (form.description.trim().length < 40) return 'Give us at least a sentence or two of description.'
     }
-    if (current === 2 && form.offersActivities) {
-      const named = form.activities.filter(a => a.name.trim())
-      if (named.length === 0) return 'Add at least one activity, or switch guided activities off.'
+    if (current === 2) {
+      if (form.offersActivities) {
+        const named = form.activities.filter(a => a.name.trim())
+        if (named.length === 0) return 'Add at least one activity, or switch guided activities off.'
+        const incomplete = named.find(a => !a.category || !a.pricePerPerson.trim())
+        if (incomplete) return `“${incomplete.name}” still needs a category and a price per person.`
+      }
+      if (!form.commissionAcknowledged) return 'Please accept the commission terms for the tier you picked.'
     }
     return ''
   }
@@ -439,7 +463,7 @@ export default function ListYourPropertyPage() {
                   setForm(f => ({
                     ...f,
                     offersActivities: on,
-                    activities: on && f.activities.length === 0 ? [{ name: '', difficulty: 'Moderate' }] : f.activities,
+                    activities: on && f.activities.length === 0 ? [emptyActivity()] : f.activities,
                   }))
                 }}
                 className={`relative w-10 h-[22px] rounded-full shrink-0 mt-0.5 transition-colors ${
@@ -453,26 +477,96 @@ export default function ListYourPropertyPage() {
             </div>
 
             {form.offersActivities && (
-              <div className="space-y-2">
+              <div className="space-y-3">
                 {form.activities.map((activity, i) => (
-                  <div key={i} className="flex items-center gap-3 border border-gray-200 px-3 py-2.5">
-                    <input
-                      value={activity.name}
-                      onChange={e => setActivity(i, { name: e.target.value })}
-                      placeholder="Sentinel Peak chain ladder hike"
-                      className="flex-1 font-sans text-sm text-black placeholder:text-gray-300 focus:outline-none min-w-0"
-                    />
-                    <select
-                      value={activity.difficulty}
-                      onChange={e => setActivity(i, { difficulty: e.target.value as ApplicationActivity['difficulty'] })}
-                      className="border border-gray-200 px-2 py-1.5 font-sans text-xs text-gray-600 focus:outline-none focus:border-[#2d6a4f] shrink-0"
-                    >
-                      {ACTIVITY_DIFFICULTIES.map(d => <option key={d}>{d}</option>)}
-                    </select>
-                    <button type="button" onClick={() => removeActivity(i)}
-                      className="text-gray-300 hover:text-red-500 transition-colors shrink-0" aria-label="Remove activity">
-                      <X size={14} />
-                    </button>
+                  <div key={i} className="border border-gray-200">
+                    <div className="flex items-center gap-3 px-4 py-3 border-b border-gray-100 bg-[#F7F5F2]">
+                      <span className="font-sans text-[10px] tracking-[0.12em] uppercase text-gray-400 shrink-0">
+                        Activity {i + 1}
+                      </span>
+                      <input
+                        value={activity.name}
+                        onChange={e => setActivity(i, { name: e.target.value })}
+                        placeholder="Sentinel Peak chain ladder hike"
+                        className="flex-1 bg-transparent font-sans text-sm text-black placeholder:text-gray-300 focus:outline-none min-w-0"
+                      />
+                      <button type="button" onClick={() => removeActivity(i)}
+                        className="text-gray-300 hover:text-red-500 transition-colors shrink-0" aria-label="Remove activity">
+                        <X size={14} />
+                      </button>
+                    </div>
+
+                    <div className="p-4 space-y-4">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                          <label className={labelCls}>Category</label>
+                          <select value={activity.category} onChange={e => setActivity(i, { category: e.target.value })} className={inputCls}>
+                            <option value="">Select…</option>
+                            {ACTIVITY_CATEGORIES.map(c => <option key={c}>{c}</option>)}
+                          </select>
+                        </div>
+                        <div>
+                          <label className={labelCls}>Difficulty</label>
+                          <select value={activity.difficulty} onChange={e => setActivity(i, { difficulty: e.target.value })} className={inputCls}>
+                            {ACTIVITY_DIFFICULTIES.map(d => <option key={d}>{d}</option>)}
+                          </select>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                        <div>
+                          <label className={labelCls}>Duration (h)</label>
+                          <input inputMode="decimal" value={activity.durationHours}
+                            onChange={e => setActivity(i, { durationHours: e.target.value })}
+                            placeholder="6" className={inputCls} />
+                        </div>
+                        <div>
+                          <label className={labelCls}>Max group</label>
+                          <input inputMode="numeric" value={activity.maxGroup}
+                            onChange={e => setActivity(i, { maxGroup: e.target.value })}
+                            placeholder="12" className={inputCls} />
+                        </div>
+                        <div>
+                          <label className={labelCls}>Min age</label>
+                          <input inputMode="numeric" value={activity.minAge}
+                            onChange={e => setActivity(i, { minAge: e.target.value })}
+                            placeholder="14" className={inputCls} />
+                        </div>
+                        <div>
+                          <label className={labelCls}>Price pp (R)</label>
+                          <input inputMode="decimal" value={activity.pricePerPerson}
+                            onChange={e => setActivity(i, { pricePerPerson: e.target.value })}
+                            placeholder="850" className={inputCls} />
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className={labelCls}>What&apos;s included</label>
+                        <div className="flex flex-wrap gap-2">
+                          {ACTIVITY_INCLUSIONS.map(item => {
+                            const on = activity.included.includes(item)
+                            return (
+                              <button key={item} type="button" onClick={() => toggleIncluded(i, item)}
+                                className={`font-sans text-xs px-3 py-1.5 border transition-colors ${
+                                  on ? 'border-[#C9A96E] bg-[#C9A96E]/10 text-[#8a6f3c]' : 'border-gray-200 text-gray-500 hover:border-[#2d6a4f] hover:text-[#2d6a4f]'
+                                }`}>
+                                {on && <Check size={11} className="inline-block mr-1 -mt-px" />}{item}
+                              </button>
+                            )
+                          })}
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className={labelCls}>
+                          Description <span className="normal-case tracking-normal text-gray-300">optional</span>
+                        </label>
+                        <textarea rows={2} value={activity.description}
+                          onChange={e => setActivity(i, { description: e.target.value })}
+                          placeholder="Pre-dawn start, chain ladder ascent to the Amphitheatre rim, back by mid-afternoon."
+                          className={`${inputCls} resize-none`} />
+                      </div>
+                    </div>
                   </div>
                 ))}
                 <button type="button" onClick={addActivity}
@@ -481,6 +575,44 @@ export default function ListYourPropertyPage() {
                 </button>
               </div>
             )}
+          </div>
+        )}
+
+        {/* ── Step 3 · Commission tier ──────────────────────────────────── */}
+        {step === 2 && (
+          <div className="bg-white border border-gray-200 p-6 lg:p-8 space-y-5">
+            <CardHead
+              title="Choose your commission tier"
+              sub="Think of it as elevation on the mountain: everyone starts at base camp with full visibility. Higher tiers buy eligibility for better placement — never a guaranteed ranking or booking."
+            />
+            <TierLadder
+              selected={form.commissionTier}
+              onSelect={id => set('commissionTier', id)}
+            />
+
+            <div className="flex items-start gap-2.5 bg-[#2d6a4f]/5 border border-[#2d6a4f]/20 px-4 py-3">
+              <Info size={14} className="text-[#2d6a4f] mt-0.5 shrink-0" />
+              <p className="font-sans text-xs text-gray-600 leading-relaxed">
+                <span className="text-black font-medium">
+                  {tierById(form.commissionTier).rate}% is the total platform fee
+                </span>{' '}
+                — not an additional charge on top of a base rate. The lowest selectable rate is {COMMISSION_MIN_RATE}%
+                and the highest is {COMMISSION_MAX_RATE}%. Moving up a tier applies immediately to new bookings.
+                Moving down requires notice, cannot take effect before your 90-day minimum hold ends, and never
+                changes bookings already confirmed.
+              </p>
+            </div>
+
+            <label className="flex items-start gap-3 font-sans text-xs text-gray-500 leading-relaxed cursor-pointer">
+              <input type="checkbox" checked={form.commissionAcknowledged}
+                onChange={e => set('commissionAcknowledged', e.target.checked)}
+                className="mt-0.5 accent-[#2d6a4f] shrink-0" />
+              <span>
+                I understand the {tierById(form.commissionTier).name} tier charges{' '}
+                <span className="text-black">{tierById(form.commissionTier).rate}%</span> as the total platform fee,
+                and I accept the notice period and 90-day minimum hold that apply to changing it.
+              </span>
+            </label>
           </div>
         )}
 
@@ -503,8 +635,16 @@ export default function ListYourPropertyPage() {
               <SummaryRow
                 k="Activities"
                 v={form.offersActivities
-                  ? form.activities.filter(a => a.name.trim()).map(a => `${a.name} (${a.difficulty})`).join(' · ')
+                  ? form.activities.filter(a => a.name.trim()).map(a => {
+                      const bits = [a.category, a.difficulty, a.durationHours && `${a.durationHours}h`,
+                        a.pricePerPerson && `R${a.pricePerPerson} pp`].filter(Boolean)
+                      return `${a.name} — ${bits.join(', ')}`
+                    }).join(' · ')
                   : 'None offered'}
+              />
+              <SummaryRow
+                k="Commission"
+                v={`${tierById(form.commissionTier).name} — ${tierById(form.commissionTier).rate}% total platform fee`}
               />
             </div>
 
@@ -564,6 +704,83 @@ function CardHead({ title, sub }: { title: string; sub: string }) {
     <div className="pb-1">
       <h2 className="font-display italic text-2xl text-black">{title}</h2>
       <p className="font-sans text-xs text-gray-400 mt-1">{sub}</p>
+    </div>
+  )
+}
+
+/**
+ * The commission ladder, drawn as elevation on the escarpment: the rail on the
+ * left is the mountain, one marker per tier, base camp at the bottom. It is
+ * decorative — the cards carry every fact, and the rail is hidden below md.
+ */
+function TierLadder({ selected, onSelect }: { selected: string; onSelect: (id: string) => void }) {
+  return (
+    <div className="relative grid md:grid-cols-[56px_1fr] gap-x-5 gap-y-2.5">
+      {/* The escarpment: one silhouette stretched behind the whole ladder, so a
+          tier's marker always sits level with its own card whatever the card
+          grows to. Summit at the top, base camp at the foot. */}
+      <div className="hidden md:block absolute left-0 top-0 bottom-0 w-14 pointer-events-none" aria-hidden="true">
+        {/* Outline only — the viewBox is stretched to the ladder's height, so
+            any filled detail (a snow cap, say) would smear vertically. */}
+        <svg width="100%" height="100%" viewBox="0 0 56 100" preserveAspectRatio="none">
+          <path d="M28 1 L1 99 L55 99 Z" fill="none" stroke="#E5E1DA" strokeWidth="1"
+            vectorEffect="non-scaling-stroke" />
+        </svg>
+      </div>
+
+      {COMMISSION_TIERS.map(tier => {
+        const on = tier.id === selected
+        return (
+          <Fragment key={tier.id}>
+            <div className="hidden md:flex items-center justify-center relative">
+              <span className={`w-2.5 h-2.5 rounded-full border-2 transition-all ${
+                on ? 'bg-[#C9A96E] border-[#C9A96E] scale-125' : 'bg-white border-gray-300'
+              }`} />
+            </div>
+
+            <button
+              type="button"
+              onClick={() => onSelect(tier.id)}
+              aria-pressed={on}
+              className={`text-left border px-5 py-4 transition-colors ${
+                on ? 'border-[#C9A96E] bg-[#C9A96E]/5' : 'border-gray-200 hover:border-[#2d6a4f]'
+              }`}
+            >
+              <div className="flex items-start justify-between gap-4">
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-3 flex-wrap">
+                    <span className="font-display italic text-lg text-black">{tier.name}</span>
+                    <span className="font-sans text-xs text-gray-400">{tier.elevation} · {tier.tagline}</span>
+                    {tier.isFloor && (
+                      <span className="inline-flex items-center gap-1 font-sans text-[10px] tracking-[0.08em] uppercase text-gray-400 border border-gray-200 px-2 py-0.5">
+                        <Lock size={9} /> Minimum
+                      </span>
+                    )}
+                  </div>
+                  <ul className="mt-2 space-y-1">
+                    {tier.benefits.map(b => (
+                      <li key={b} className="font-sans text-sm text-gray-500 flex gap-2">
+                        <span className="text-[#C9A96E] leading-5">·</span>
+                        <span>{b}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+                <div className="flex flex-col items-end gap-2 shrink-0">
+                  <span className={`font-display italic text-2xl tabular-nums ${on ? 'text-[#C9A96E]' : 'text-black'}`}>
+                    {tier.rate}%
+                  </span>
+                  <span className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${
+                    on ? 'border-[#C9A96E] bg-[#C9A96E]' : 'border-gray-300'
+                  }`}>
+                    {on && <Check size={12} className="text-white" />}
+                  </span>
+                </div>
+              </div>
+            </button>
+          </Fragment>
+        )
+      })}
     </div>
   )
 }

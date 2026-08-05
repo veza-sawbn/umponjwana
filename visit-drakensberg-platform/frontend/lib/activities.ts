@@ -1,5 +1,16 @@
 import { listEntities, getEntity, insertEntity, updateEntity, deleteEntity, newEntityId } from './entities'
 
+// Shared vocabulary for every surface that describes an activity: the supplier
+// wizard, the activity edit form and the public listing application.
+export const ACTIVITY_CATEGORIES = ['Adventure', 'Nature', 'Water', 'Cultural', 'Wellness', 'Family']
+
+export const ACTIVITY_DIFFICULTIES = ['Easy', 'Moderate', 'Challenging', 'Extreme']
+
+export const ACTIVITY_INCLUSIONS = [
+  'Helmet & Harness', 'Guide', 'Safety Briefing', 'Refreshments',
+  'Transport to Site', 'Photos/Video', 'Equipment',
+]
+
 export type Activity = {
   id: string
   supplierId: string
