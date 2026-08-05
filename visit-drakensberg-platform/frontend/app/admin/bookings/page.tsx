@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { Search, DollarSign, CheckCircle, Clock, XCircle, RefreshCw } from 'lucide-react'
 import { getAdminBookings, setAdminBookingStatus } from '@/lib/admin-supabase'
 import type { SavedBooking } from '@/lib/bookings'
+import { useQuickParam } from '@/lib/admin-quick-param'
 
 const BOOKING_STATUS_STYLE: Record<string, string> = {
   confirmed: 'bg-[#2d6a4f]/10 text-[#2d6a4f]',
@@ -59,6 +60,9 @@ export default function AdminBookingsPage() {
 
   useEffect(() => { loadBookings() }, [])
 
+  // Landed here from the mobile quick-action sheet.
+  useQuickParam('filter', v => setFilter(v))
+
   const filtered = useMemo(() => bookings.filter(b => {
     const haystack = `${b.reference} ${b.customerName} ${b.customerEmail} ${listingName(b)} ${supplierName(b)}`.toLowerCase()
     const matchSearch = haystack.includes(search.toLowerCase())
@@ -77,20 +81,20 @@ export default function AdminBookingsPage() {
   }
 
   return (
-    <div className="p-8">
-      <div className="mb-8 flex items-start justify-between">
+    <div className="p-4 sm:p-6 lg:p-8">
+      <div className="mb-6 lg:mb-8 flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
         <div>
           <p className="font-sans text-[10px] tracking-[0.14em] uppercase text-gray-400 mb-1">Admin Console</p>
-          <h1 className="font-display italic text-3xl text-[#000000]">Bookings</h1>
+          <h1 className="font-display italic text-2xl sm:text-3xl text-[#000000]">Bookings</h1>
           <p className="font-sans text-sm text-gray-500 mt-1">Confirmed checkout bookings stored in Supabase.</p>
         </div>
-        <button onClick={loadBookings} className="inline-flex items-center gap-2 border border-gray-200 px-4 py-2 font-sans text-sm text-gray-600 hover:border-[#2d6a4f] hover:text-[#2d6a4f] transition-colors">
+        <button onClick={loadBookings} className="inline-flex items-center justify-center gap-2 border border-gray-200 px-4 py-3 sm:py-2 font-sans text-sm text-gray-600 hover:border-[#2d6a4f] hover:text-[#2d6a4f] transition-colors shrink-0">
           <RefreshCw size={14} /> Refresh
         </button>
       </div>
       {error && <p className="mb-4 text-sm text-red-500">{error}</p>}
 
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4 mb-6 lg:mb-8">
         {[
           { label: 'Total Revenue', value: `R ${totalRevenue.toLocaleString()}`, icon: DollarSign, color: 'text-[#2d6a4f]', bg: 'bg-[#2d6a4f]/8' },
           { label: 'Confirmed', value: confirmed, icon: CheckCircle, color: 'text-[#2d6a4f]', bg: 'bg-[#2d6a4f]/8' },
@@ -102,12 +106,40 @@ export default function AdminBookingsPage() {
         })}
       </div>
 
-      <div className="flex flex-wrap gap-3 mb-6">
-        <div className="flex items-center gap-2 border border-gray-200 bg-white px-3 py-2 flex-1 min-w-[220px]"><Search size={14} className="text-gray-400 shrink-0" /><input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search by guest, listing, supplier, email or booking ref…" className="flex-1 font-sans text-sm focus:outline-none" /></div>
-        <div className="flex gap-0 border border-gray-200 bg-white overflow-hidden">{['all', 'pending', 'confirmed', 'cancelled'].map(f => <button key={f} onClick={() => setFilter(f)} className={`px-4 py-2 font-sans text-xs capitalize transition-colors border-r border-gray-100 last:border-0 ${filter === f ? 'bg-[#2d6a4f] text-white' : 'text-gray-500 hover:bg-[#F7F5F2]'}`}>{f}</button>)}</div>
+      <div className="flex flex-col sm:flex-row sm:flex-wrap gap-3 mb-6">
+        <div className="flex items-center gap-2 border border-gray-200 bg-white px-3 py-2.5 sm:py-2 flex-1 sm:min-w-[220px]"><Search size={14} className="text-gray-400 shrink-0" /><input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search guest, listing, supplier or ref…" className="flex-1 min-w-0 font-sans text-base sm:text-sm focus:outline-none" /></div>
+        <div className="-mx-4 px-4 sm:mx-0 sm:px-0 overflow-x-auto">
+          <div className="flex w-max border border-gray-200 bg-white">{['all', 'pending', 'confirmed', 'cancelled'].map(f => <button key={f} onClick={() => setFilter(f)} className={`px-4 py-2.5 sm:py-2 font-sans text-xs capitalize whitespace-nowrap transition-colors border-r border-gray-100 last:border-0 ${filter === f ? 'bg-[#2d6a4f] text-white' : 'text-gray-500 hover:bg-[#F7F5F2]'}`}>{f}</button>)}</div>
+        </div>
       </div>
 
-      <div className="bg-white border border-gray-200 overflow-x-auto">
+      {/* Phones: a card per booking, with confirm/cancel as full-width taps. */}
+      <div className="md:hidden bg-white border border-gray-200 divide-y divide-gray-100">
+        {filtered.map(b => (
+          <div key={b.id} className="p-4">
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <p className="font-mono text-xs text-gray-400">{b.reference}</p>
+                <p className="font-sans text-sm font-medium truncate mt-0.5">{b.customerName}</p>
+                <p className="font-sans text-xs text-gray-400 truncate">{listingName(b)}</p>
+              </div>
+              <span className={`font-sans text-[10px] tracking-[0.1em] uppercase px-2.5 py-1 shrink-0 ${BOOKING_STATUS_STYLE[b.status] ?? BOOKING_STATUS_STYLE.pending}`}>{b.status}</span>
+            </div>
+            <div className="flex items-end justify-between gap-3 mt-3">
+              <p className="font-sans text-xs text-gray-500">{fmt(b.checkIn)}{b.checkIn !== b.checkOut ? ` — ${fmt(b.checkOut)}` : ''} · {b.guests} {b.guests === 1 ? 'guest' : 'guests'}</p>
+              <p className="font-display italic text-xl text-[#2d6a4f]">R {b.total.toLocaleString()}</p>
+            </div>
+            <div className="flex gap-2 mt-3">
+              {b.status !== 'confirmed' && <button onClick={() => updateStatus(b.id, 'confirmed')} className="flex-1 border border-gray-200 py-2.5 font-sans text-sm text-[#2d6a4f]">Confirm</button>}
+              {b.status !== 'cancelled' && <button onClick={() => updateStatus(b.id, 'cancelled')} className="flex-1 border border-gray-200 py-2.5 font-sans text-sm text-red-400">Cancel</button>}
+            </div>
+          </div>
+        ))}
+        {!loading && filtered.length === 0 && <p className="px-4 py-12 text-center font-sans text-sm text-gray-400">No bookings found.</p>}
+        {loading && <p className="px-4 py-12 text-center font-sans text-sm text-gray-400">Loading bookings…</p>}
+      </div>
+
+      <div className="hidden md:block bg-white border border-gray-200 overflow-x-auto">
         <table className="w-full min-w-[980px]">
           <thead><tr className="border-b border-gray-100">{['Booking Ref', 'Visitor', 'Listing', 'Dates', 'Guests', 'Total', 'Payment', 'Status', 'Actions'].map(h => <th key={h} className="text-left px-5 py-3 font-sans text-[10px] tracking-[0.12em] uppercase text-gray-400">{h}</th>)}</tr></thead>
           <tbody className="divide-y divide-gray-100">
