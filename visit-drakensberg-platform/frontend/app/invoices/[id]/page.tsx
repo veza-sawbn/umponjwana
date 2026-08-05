@@ -54,7 +54,7 @@ function PrintableInvoiceInner() {
   const [loading, setLoading] = useState(true)
   const [paying, setPaying] = useState(false)
   const [payError, setPayError] = useState('')
-  const [tipping, setTipping] = useState({ enabled: true, presets: DEFAULT_TIP_PRESETS })
+  const [tipping, setTipping] = useState({ enabled: false, presets: DEFAULT_TIP_PRESETS })
   // null = no tip yet, a number = that percentage, 'custom' = the guest's own amount
   const [tipChoice, setTipChoice] = useState<number | 'custom' | null>(null)
   const [customTip, setCustomTip] = useState('')
