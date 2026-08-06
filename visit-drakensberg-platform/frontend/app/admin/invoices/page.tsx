@@ -3,8 +3,11 @@
 import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import toast from 'react-hot-toast'
-import { Search, RefreshCw, Plus, Printer, Trash2, X, FileText, Send, Pencil, Wallet, Save } from 'lucide-react'
-import { getInvoices, getFinanceSettings, sendInvoice, type Invoice } from '@/lib/invoices'
+import { Search, RefreshCw, Plus, Printer, Trash2, X, FileText, Send, Pencil, Wallet, Save, Link2, Check, Eye, EyeOff } from 'lucide-react'
+import {
+  getInvoices, getFinanceSettings, sendInvoice, invoiceShareUrl, invoiceViewedLabel,
+  type Invoice,
+} from '@/lib/invoices'
 import { createOrder, updateOrder, getOrderLines, type OrderLineInput, type OrderLine } from '@/lib/orders'
 import {
   getInvoiceDrafts, saveInvoiceDraft, deleteInvoiceDraft,
@@ -15,6 +18,7 @@ import {
   PAYMENT_TYPES, PAYMENT_METHODS,
 } from '@/lib/order-payments'
 import { formatMoney } from '@/lib/allocation'
+import { copyToClipboard } from '@/lib/clipboard'
 import { useQuickParam } from '@/lib/admin-quick-param'
 import { supabase } from '@/lib/auth'
 
@@ -43,6 +47,55 @@ const emptyLine = (): DraftLine => ({ title: '', description: '', category: 'ext
 
 function fmt(d?: string | null) {
   return d ? new Date(d).toLocaleDateString('en-ZA', { day: 'numeric', month: 'short', year: 'numeric' }) : '—'
+}
+
+/**
+ * Copies the customer's invoice link — the one that opens without a login —
+ * ready to paste into WhatsApp, SMS, or wherever the customer actually talks
+ * to us. Emailing it stays available next to this; this is for every other
+ * channel.
+ */
+function CopyLinkButton({ invoice, className, label = 'Copy link' }: {
+  invoice: Invoice
+  className: string
+  label?: string
+}) {
+  const [copied, setCopied] = useState(false)
+  const url = invoiceShareUrl(invoice)
+
+  async function handleCopy() {
+    if (await copyToClipboard(url)) {
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2500)
+      toast.success(invoice.share_token
+        ? 'Invoice link copied — paste it into any conversation.'
+        : 'Invoice link copied. This database has no share links yet, so the customer will be asked to sign in — run migration 20260808_invoice_share_links.sql.')
+    } else {
+      toast.error('Your browser blocked the copy. The link is in this button\'s tooltip.')
+    }
+  }
+
+  return (
+    <button onClick={handleCopy} title={url} className={className}>
+      {copied ? <Check size={13} /> : <Link2 size={13} />} {copied ? 'Copied' : label}
+    </button>
+  )
+}
+
+/** Whether the customer has actually opened the link we sent them. */
+function ViewedBadge({ invoice, className = '' }: { invoice: Invoice; className?: string }) {
+  const seen = !!invoice.first_viewed_at
+  return (
+    <span
+      title={seen
+        ? `First opened ${new Date(invoice.first_viewed_at as string).toLocaleString('en-ZA')}`
+        : 'The customer has not opened their invoice link yet'}
+      className={`inline-flex items-center gap-1.5 font-sans text-xs ${seen ? 'text-[#2d6a4f]' : 'text-gray-400'} ${className}`}
+    >
+      {seen ? <Eye size={12} /> : <EyeOff size={12} />}
+      {invoiceViewedLabel(invoice)}
+    </span>
+  )
 }
 
 /** Create / edit / draft form. `editing` switches it to updating an issued invoice. */
@@ -696,6 +749,7 @@ export default function AdminInvoicesPage() {
                 <div className="min-w-0">
                   <p className="font-mono text-xs text-gray-500">{i.invoice_number}</p>
                   <p className="font-sans text-xs text-gray-400 mt-0.5">Issued {fmt(i.issued_at)}</p>
+                  <ViewedBadge invoice={i} className="mt-1" />
                 </div>
                 <span className={`font-sans text-[10px] tracking-[0.1em] uppercase px-2.5 py-1 shrink-0 ${STATUS_BADGE[i.status] ?? STATUS_BADGE.unpaid}`}>{i.status}</span>
               </div>
@@ -712,6 +766,10 @@ export default function AdminInvoicesPage() {
                 <Link href={`/invoices/${i.id}`} className="inline-flex items-center justify-center gap-1.5 border border-gray-200 py-2.5 font-sans text-sm text-[#2d6a4f]">
                   <Printer size={13} /> View
                 </Link>
+                <CopyLinkButton
+                  invoice={i}
+                  className="inline-flex items-center justify-center gap-1.5 border border-gray-200 py-2.5 font-sans text-sm text-[#2d6a4f]"
+                />
                 <button onClick={() => setPayingInvoice(i)} className="inline-flex items-center justify-center gap-1.5 border border-gray-200 py-2.5 font-sans text-sm text-[#2d6a4f]">
                   <Wallet size={13} /> Payments
                 </button>
@@ -736,7 +794,7 @@ export default function AdminInvoicesPage() {
       <div className="hidden md:block bg-white border border-gray-200 overflow-x-auto">
         <table className="w-full min-w-[980px]">
           <thead><tr className="border-b border-gray-100">
-            {['Invoice', 'Issued', 'Subtotal', 'VAT', 'Total', 'Paid', 'Balance', 'Status', ''].map(h =>
+            {['Invoice', 'Issued', 'Subtotal', 'VAT', 'Total', 'Paid', 'Balance', 'Status', 'Opened', ''].map(h =>
               <th key={h} className="text-left px-5 py-3 font-sans text-[10px] tracking-[0.12em] uppercase text-gray-400">{h}</th>)}
           </tr></thead>
           <tbody className="divide-y divide-gray-100">
@@ -756,11 +814,16 @@ export default function AdminInvoicesPage() {
                   <td className="px-5 py-4">
                     <span className={`font-sans text-[10px] tracking-[0.1em] uppercase px-2.5 py-1 ${STATUS_BADGE[i.status] ?? STATUS_BADGE.unpaid}`}>{i.status}</span>
                   </td>
+                  <td className="px-5 py-4 whitespace-nowrap"><ViewedBadge invoice={i} /></td>
                   <td className="px-5 py-4">
                     <div className="flex items-center gap-3 justify-end">
                       <Link href={`/invoices/${i.id}`} className="inline-flex items-center gap-1.5 font-sans text-xs text-[#2d6a4f] hover:underline">
                         <Printer size={12} /> View
                       </Link>
+                      <CopyLinkButton
+                        invoice={i}
+                        className="inline-flex items-center gap-1.5 font-sans text-xs text-[#2d6a4f] hover:underline"
+                      />
                       <button onClick={() => setPayingInvoice(i)} className="inline-flex items-center gap-1.5 font-sans text-xs text-[#2d6a4f] hover:underline">
                         <Wallet size={12} /> Payments
                       </button>
@@ -779,8 +842,8 @@ export default function AdminInvoicesPage() {
                 </tr>
               )
             })}
-            {!loading && filtered.length === 0 && <tr><td colSpan={9} className="px-5 py-12 text-center font-sans text-sm text-gray-400">No invoices found.</td></tr>}
-            {loading && <tr><td colSpan={9} className="px-5 py-12 text-center font-sans text-sm text-gray-400">Loading invoices…</td></tr>}
+            {!loading && filtered.length === 0 && <tr><td colSpan={10} className="px-5 py-12 text-center font-sans text-sm text-gray-400">No invoices found.</td></tr>}
+            {loading && <tr><td colSpan={10} className="px-5 py-12 text-center font-sans text-sm text-gray-400">Loading invoices…</td></tr>}
           </tbody>
         </table>
       </div>

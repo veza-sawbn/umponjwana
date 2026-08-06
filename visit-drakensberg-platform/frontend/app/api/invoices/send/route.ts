@@ -96,6 +96,13 @@ export async function POST(req: Request) {
   const origin = process.env.NEXT_PUBLIC_SITE_URL || new URL(req.url).origin
   const featured = await getFeaturedExperiences(origin)
 
+  // The share token is what makes this link openable by the person we're
+  // emailing — most of them have no account, and a guest order has no user_id
+  // for RLS to match at all. Absent only on a database that hasn't run
+  // 20260808_invoice_share_links.sql, where the plain link is the old
+  // sign-in-required behaviour rather than a broken one.
+  const invoiceUrl = `${origin}/invoices/${invoice.id}${invoice.share_token ? `?t=${invoice.share_token}` : ''}`
+
   const { sent, error } = await sendMail({
     to: email,
     subject: `Invoice ${invoice.invoice_number} — Visit Drakensberg`,
@@ -109,7 +116,7 @@ export async function POST(req: Request) {
       amountPaid: Number(invoice.amount_paid),
       balance: Number(invoice.balance),
       issuedAt: invoice.issued_at,
-      invoiceUrl: `${origin}/invoices/${invoice.id}`,
+      invoiceUrl,
       origin,
       featured,
     }),

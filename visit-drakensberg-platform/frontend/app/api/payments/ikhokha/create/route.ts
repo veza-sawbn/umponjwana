@@ -33,7 +33,7 @@ function isMissingTipColumn(error: { code?: string; message?: string } | null): 
 // returned paylinkUrl; the actual "mark as paid" happens later, in the
 // webhook route, once iKhokha confirms the payment really went through.
 export async function POST(req: Request) {
-  let body: { invoiceId?: string; bookingId?: string; tip?: unknown }
+  let body: { invoiceId?: string; bookingId?: string; tip?: unknown; shareToken?: unknown }
   try {
     body = await req.json()
   } catch {
@@ -47,16 +47,30 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'Online payment is not set up yet — please contact us to arrange payment.' }, { status: 503 })
   }
 
+  // A customer paying from an emailed/pasted invoice link has no session —
+  // that link's share token is their credential instead. It is only ever
+  // accepted for the one invoice it belongs to.
+  const shareToken = typeof body.shareToken === 'string' && body.shareToken.length >= 32
+    ? body.shareToken : ''
+
   const supabase = createRouteHandlerClient({ cookies })
   const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return NextResponse.json({ error: 'unauthorized' }, { status: 401 })
+  if (!user && !shareToken) return NextResponse.json({ error: 'unauthorized' }, { status: 401 })
 
   // RLS scopes every read below to the caller's own rows, or staff.
   let invoice: {
     id: string; order_id: string; invoice_number: string; balance: unknown
     currency: string; status: string; lines: InvoiceLine[] | null
+    user_id: string | null; share_token?: string | null
   } | null = null
-  if (body.invoiceId) {
+  if (shareToken) {
+    // Resolved by token, not by the id in the body — so a valid token can
+    // never be pointed at somebody else's invoice.
+    const { data } = await supabaseAdmin()
+      .from('vd_invoices').select('*').eq('share_token', shareToken).maybeSingle()
+    invoice = data
+    if (!invoice) return NextResponse.json({ error: 'This invoice link is no longer valid.' }, { status: 404 })
+  } else if (body.invoiceId) {
     const { data } = await supabase.from('vd_invoices').select('*').eq('id', body.invoiceId).maybeSingle()
     invoice = data
   } else {
@@ -92,7 +106,9 @@ export async function POST(req: Request) {
           { status: 400 },
         )
       }
-      const { data: setting } = await supabase
+      // Read with the service client: this is the server enforcing the
+      // setting, and the caller may have no session to read it under.
+      const { data: setting } = await supabaseAdmin()
         .from('vd_finance_settings').select('value').eq('key', 'tipping_enabled').maybeSingle()
       if (setting?.value === false) {
         return NextResponse.json({ error: 'Tipping is currently switched off.' }, { status: 400 })
@@ -111,11 +127,16 @@ export async function POST(req: Request) {
         failurePageUrl: `${origin}/checkout/success?id=${body.bookingId}&payment=failed`,
         cancelUrl: `${origin}/checkout/success?id=${body.bookingId}&payment=cancelled`,
       }
-    : {
-        successPageUrl: `${origin}/invoices/${invoice.id}?payment=success`,
-        failurePageUrl: `${origin}/invoices/${invoice.id}?payment=failed`,
-        cancelUrl: `${origin}/invoices/${invoice.id}?payment=cancelled`,
-      }
+    : (() => {
+        // Carry the share token back through the gateway, or the customer
+        // returns from paying to the access error they started out with.
+        const back = `${origin}/invoices/${invoice.id}?${invoice.share_token ? `t=${invoice.share_token}&` : ''}payment=`
+        return {
+          successPageUrl: `${back}success`,
+          failurePageUrl: `${back}failed`,
+          cancelUrl: `${back}cancelled`,
+        }
+      })()
 
   let link
   try {
@@ -158,7 +179,9 @@ export async function POST(req: Request) {
     id: `plink-${randomUUID()}`,
     order_id: invoice.order_id,
     invoice_id: invoice.id,
-    user_id: user.id,
+    // Null for a guest order — vd_payment_links.user_id is nullable for
+    // exactly that case, and the webhook reconciles off the order either way.
+    user_id: user?.id ?? invoice.user_id ?? null,
     gateway: 'ikhokha',
     mode: process.env.IKHOKHA_MODE === 'live' ? 'live' : 'test',
     paylink_id: link.paylinkID,

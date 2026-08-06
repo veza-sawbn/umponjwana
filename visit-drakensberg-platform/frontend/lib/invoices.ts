@@ -20,7 +20,7 @@ export type Invoice = {
   id: string
   invoice_number: string
   order_id: string
-  user_id: string
+  user_id: string | null
   currency: string
   subtotal: number
   discount: number
@@ -32,6 +32,35 @@ export type Invoice = {
   status: string
   lines: InvoiceLine[]
   issued_at: string
+  /**
+   * Unguessable key that makes the invoice link openable by whoever holds it
+   * — a customer with no account, or one reading mail on a device they've
+   * never signed in on. Optional in the type because a database that hasn't
+   * run 20260808_invoice_share_links.sql yet simply won't return it.
+   */
+  share_token?: string | null
+  first_viewed_at?: string | null
+  last_viewed_at?: string | null
+  view_count?: number | null
+}
+
+/** The order header an invoice document prints — no allocation or payout data. */
+export type InvoiceCustomerOrder = {
+  id: string
+  order_number: string
+  customer_name: string
+  customer_email: string
+  trip_name: string
+  travel_start: string | null
+  travel_end: string | null
+  currency: string
+}
+
+/** Everything the invoice page needs, fetched in one go with a share token. */
+export type SharedInvoice = {
+  invoice: Invoice
+  order: InvoiceCustomerOrder | null
+  receipts: Receipt[]
 }
 
 export type Receipt = {
@@ -76,6 +105,71 @@ export async function getInvoiceById(id: string): Promise<Invoice | null> {
     if (data) return data as Invoice
   } catch {}
   return getInvoiceByOrder(id)
+}
+
+/**
+ * Reads an invoice with its share token, through a SECURITY DEFINER function
+ * rather than the table — so it works with no session at all, which is the
+ * whole point: the customer we emailed usually has no account, and a guest
+ * order has no user_id for RLS to match in the first place.
+ *
+ * Returns null for a token that matches nothing, and for a database that
+ * hasn't run the share-link migration yet (the caller falls back to the
+ * signed-in path).
+ */
+export async function getInvoiceByToken(token: string): Promise<SharedInvoice | null> {
+  try {
+    const { data } = await supabase.rpc('vd_invoice_by_token', { p_token: token })
+    if (data && (data as { invoice?: Invoice }).invoice) {
+      const bundle = data as { invoice: Invoice; order: InvoiceCustomerOrder | null; receipts: Receipt[] }
+      return {
+        invoice: bundle.invoice,
+        order: bundle.order ?? null,
+        receipts: Array.isArray(bundle.receipts) ? bundle.receipts : [],
+      }
+    }
+  } catch {}
+  return null
+}
+
+/**
+ * Records that the customer opened their invoice. Staff opens are discarded
+ * by the function itself, so "viewed" always means the customer.
+ * Fire-and-forget: never let view tracking break the page it is tracking.
+ */
+export async function markInvoiceViewed(opts: { token?: string | null; invoiceId?: string | null }): Promise<void> {
+  try {
+    await supabase.rpc('vd_mark_invoice_viewed', {
+      p_token: opts.token ?? null,
+      p_invoice_id: opts.invoiceId ?? null,
+    })
+  } catch {}
+}
+
+/**
+ * The link to hand a customer over any channel — email, WhatsApp, SMS.
+ *
+ * The token rides in the query string so the invoice opens without a login.
+ * Without one (an old row, or a database still to be migrated) this is still
+ * a valid link — it just needs the customer to be signed in as the account
+ * that owns the invoice, which is the behaviour that prompted all this.
+ */
+export function invoiceShareUrl(invoice: Pick<Invoice, 'id' | 'share_token'>, origin?: string): string {
+  const base = origin
+    ?? (typeof window !== 'undefined' ? window.location.origin : (process.env.NEXT_PUBLIC_SITE_URL || ''))
+  const path = `/invoices/${encodeURIComponent(invoice.id)}${invoice.share_token ? `?t=${invoice.share_token}` : ''}`
+  return `${base}${path}`
+}
+
+/** Human summary of the view tracking, for the staff console. */
+export function invoiceViewedLabel(invoice: Invoice): string {
+  if (!invoice.first_viewed_at) return 'Not opened yet'
+  const when = new Date(invoice.last_viewed_at || invoice.first_viewed_at)
+  const stamp = when.toLocaleString('en-ZA', {
+    day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit',
+  })
+  const times = Number(invoice.view_count ?? 0)
+  return times > 1 ? `${stamp} · ${times}×` : stamp
 }
 
 /**

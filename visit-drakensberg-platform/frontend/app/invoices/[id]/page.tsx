@@ -2,10 +2,16 @@
 
 import { useEffect, useState, useCallback, useMemo, Suspense } from 'react'
 import { useParams, useRouter, useSearchParams } from 'next/navigation'
-import { Printer, ArrowLeft, CreditCard, Loader2 } from 'lucide-react'
-import { getInvoiceById, getReceipts, getFinanceSettings, type Invoice, type Receipt } from '@/lib/invoices'
-import { getOrderById, type MasterOrder } from '@/lib/orders'
+import { Printer, ArrowLeft, CreditCard, Loader2, Copy, Check } from 'lucide-react'
+import {
+  getInvoiceById, getInvoiceByToken, getReceipts, getFinanceSettings,
+  markInvoiceViewed, invoiceShareUrl,
+  type Invoice, type InvoiceCustomerOrder, type Receipt,
+} from '@/lib/invoices'
+import { getOrderById } from '@/lib/orders'
 import { getSiteContent, SITE_CONTENT_DEFAULTS } from '@/lib/site-content'
+import { supabase } from '@/lib/auth'
+import { copyToClipboard } from '@/lib/clipboard'
 import { formatMoney } from '@/lib/allocation'
 import { DEFAULT_TIP_PRESETS, maxTip, tipForPercent, tippableTotal } from '@/lib/tips'
 import Logo from '@/components/Logo'
@@ -13,8 +19,13 @@ import Logo from '@/components/Logo'
 type BusinessDetails = typeof SITE_CONTENT_DEFAULTS.business_details
 
 // Printable customer invoice. One invoice per Master Order — every purchased
-// service on a single document, no supplier payout information. Access is
-// governed by RLS: customers open their own invoices, staff open any.
+// service on a single document, no supplier payout information.
+//
+// Two ways in, because most customers have no account with us:
+//   * ?t=<share token> — the link we email or paste into a chat. Resolved by
+//     vd_invoice_by_token, so it opens with no session at all.
+//   * no token — the signed-in path, governed by RLS: customers open their
+//     own invoices, staff open any.
 
 function fmt(d?: string | null) {
   return d ? new Date(d).toLocaleDateString('en-ZA', { day: 'numeric', month: 'long', year: 'numeric' }) : '—'
@@ -42,16 +53,39 @@ function TipOption({ label, sub, selected, onClick }: {
   )
 }
 
+/** Hands the current invoice link to any channel — email, WhatsApp, SMS. */
+function CopyLinkButton({ url, className = '', label = 'Copy link' }: {
+  url: string
+  className?: string
+  label?: string
+}) {
+  const [state, setState] = useState<'idle' | 'copied' | 'failed'>('idle')
+
+  async function copy() {
+    setState(await copyToClipboard(url) ? 'copied' : 'failed')
+    setTimeout(() => setState('idle'), 2500)
+  }
+
+  return (
+    <button onClick={copy} title={url} className={className}>
+      {state === 'copied' ? <Check size={14} /> : <Copy size={14} />}
+      {state === 'copied' ? 'Link copied' : state === 'failed' ? 'Press ⌘/Ctrl+C' : label}
+    </button>
+  )
+}
+
 function PrintableInvoiceInner() {
   const params = useParams<{ id: string }>()
   const router = useRouter()
   const searchParams = useSearchParams()
   const paymentResult = searchParams.get('payment') // success|failed|cancelled
+  const shareToken = searchParams.get('t')
   const [invoice, setInvoice] = useState<Invoice | null>(null)
-  const [order, setOrder] = useState<MasterOrder | null>(null)
+  const [order, setOrder] = useState<InvoiceCustomerOrder | null>(null)
   const [receipts, setReceipts] = useState<Receipt[]>([])
   const [business, setBusiness] = useState<BusinessDetails>(SITE_CONTENT_DEFAULTS.business_details)
   const [loading, setLoading] = useState(true)
+  const [signedIn, setSignedIn] = useState<boolean | null>(null)
   const [paying, setPaying] = useState(false)
   const [payError, setPayError] = useState('')
   const [tipping, setTipping] = useState({ enabled: false, presets: DEFAULT_TIP_PRESETS })
@@ -63,22 +97,42 @@ function PrintableInvoiceInner() {
   useEffect(() => {
     getFinanceSettings().then(s => setTipping({ enabled: s.tippingEnabled, presets: s.tipPresets }))
   }, [])
-
-  const load = useCallback((id: string) => {
-    return getInvoiceById(decodeURIComponent(id)).then(async inv => {
-      setInvoice(inv)
-      if (inv) {
-        const [o, r] = await Promise.all([getOrderById(inv.order_id), getReceipts(inv.order_id)])
-        setOrder(o); setReceipts(r)
-      }
-      return inv
-    })
+  // Only used to word the failure state — never to gate the token path.
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data }) => setSignedIn(!!data.user)).catch(() => setSignedIn(false))
   }, [])
+
+  const load = useCallback(async (id: string): Promise<Invoice | null> => {
+    if (shareToken) {
+      const shared = await getInvoiceByToken(shareToken)
+      if (shared) {
+        setInvoice(shared.invoice); setOrder(shared.order); setReceipts(shared.receipts)
+        return shared.invoice
+      }
+      // Deliberately falls through. The token may predate this database's
+      // share-link migration, and a staff member or the invoice's own account
+      // holder can still open it the ordinary way.
+    }
+    const inv = await getInvoiceById(decodeURIComponent(id))
+    setInvoice(inv)
+    if (inv) {
+      const [o, r] = await Promise.all([getOrderById(inv.order_id), getReceipts(inv.order_id)])
+      setOrder(o); setReceipts(r)
+    }
+    return inv
+  }, [shareToken])
 
   useEffect(() => {
     if (!params?.id) return
-    load(params.id).finally(() => setLoading(false))
-  }, [params?.id, load])
+    load(params.id)
+      .then(inv => {
+        // Tell the team the customer opened it. Staff opens are dropped by
+        // the database function, so this stays a customer signal.
+        if (inv) markInvoiceViewed({ token: shareToken, invoiceId: inv.id })
+      })
+      .finally(() => setLoading(false))
+    // Runs once per invoice: `load` changes only when the token does.
+  }, [params?.id, load, shareToken])
 
   // A successful gateway redirect can arrive slightly before the webhook has
   // reconciled the payment — poll briefly so the balance updates without a
@@ -118,7 +172,9 @@ function PrintableInvoiceInner() {
       const res = await fetch('/api/payments/ikhokha/create', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ invoiceId: invoice.id, tip }),
+        // The token goes with it: a customer who opened the invoice from a
+        // link has no session for the API to authorise them by.
+        body: JSON.stringify({ invoiceId: invoice.id, tip, shareToken: shareToken || undefined }),
       })
       const json = await res.json()
       if (!res.ok || !json.paylinkUrl) throw new Error(json.error || 'Could not start payment')
@@ -129,17 +185,57 @@ function PrintableInvoiceInner() {
     }
   }
 
-  if (loading) {
+  // Hold the spinner until the session check lands too — the failure state
+  // below is worded from it, and flashing the wrong reason at someone who
+  // just wants their invoice helps nobody.
+  if (loading || (!invoice && signedIn === null)) {
     return <div className="min-h-screen bg-[#F7F5F2] flex items-center justify-center pt-24 font-sans text-sm text-gray-400">Loading invoice…</div>
   }
   if (!invoice) {
+    // Three genuinely different situations, and the old single message
+    // ("Invoice not found, or you don't have access to it") left every one of
+    // them with nothing to do next.
+    const help = shareToken
+      ? "This invoice link isn't valid — chat apps and email clients sometimes cut long links short, so a copy of it may have arrived incomplete."
+      : signedIn
+        ? "This invoice isn't on the account you're signed in with."
+        : 'This address is missing the access key that opens an invoice without signing in — links get truncated by some chat apps and email clients.'
+    const currentPath = typeof window !== 'undefined'
+      ? window.location.pathname + window.location.search
+      : `/invoices/${params?.id ?? ''}`
+
     return (
-      <div className="min-h-screen bg-[#F7F5F2] flex flex-col items-center justify-center pt-24 gap-3">
-        <p className="font-sans text-sm text-gray-500">Invoice not found, or you don't have access to it.</p>
-        <button onClick={() => router.back()} className="font-sans text-sm text-[#2d6a4f] hover:underline">Go back</button>
+      <div className="min-h-screen bg-[#F7F5F2] flex items-center justify-center px-4 pt-24 pb-16">
+        <div className="bg-white border border-gray-200 p-8 sm:p-10 max-w-md w-full text-center">
+          <p className="font-sans text-[10px] tracking-[0.14em] uppercase text-gray-400">Invoice</p>
+          <h1 className="font-display italic text-2xl text-[#000000] mt-1">We couldn&apos;t open this invoice</h1>
+          <p className="font-sans text-sm text-gray-500 mt-3 leading-relaxed">{help}</p>
+          <p className="font-sans text-sm text-gray-500 mt-3 leading-relaxed">
+            Ask us to re-send it{business.email ? <> — <a href={`mailto:${business.email}?subject=${encodeURIComponent('Invoice link')}`} className="text-[#2d6a4f] hover:underline">{business.email}</a></> : null}
+            {business.phone ? <> or {business.phone}</> : null} — and we&apos;ll send a fresh link straight away.
+          </p>
+          <div className="flex flex-col gap-2 mt-6">
+            {!signedIn && (
+              <a
+                href={`/auth/login?redirect=${encodeURIComponent(currentPath)}`}
+                className="bg-[#2d6a4f] text-white px-5 py-2.5 font-sans text-sm hover:bg-[#245741] transition-colors"
+              >
+                Sign in with the email it was sent to
+              </a>
+            )}
+            {/* A link opened from an email has no history to go back to. */}
+            <a href="/" className="font-sans text-sm text-[#2d6a4f] hover:underline py-1">
+              Go to Visit Drakensberg
+            </a>
+          </div>
+        </div>
       </div>
     )
   }
+
+  // Present whenever this database has share links; without one the link
+  // still works, it just needs the customer to be signed in.
+  const shareUrl = invoice.share_token ? invoiceShareUrl(invoice) : ''
 
   return (
     <div className="min-h-screen bg-[#F7F5F2] pt-28 pb-16 px-4">
@@ -228,11 +324,19 @@ function PrintableInvoiceInner() {
           </div>
         )}
 
-        <div className="flex items-center justify-between mb-4 print:hidden">
+        {/* Wraps rather than squeezes: on a phone this row now carries a
+            third action. */}
+        <div className="flex flex-wrap items-center justify-between gap-3 mb-4 print:hidden">
           <button onClick={() => router.back()} className="inline-flex items-center gap-2 font-sans text-sm text-gray-500 hover:text-[#2d6a4f] transition-colors">
             <ArrowLeft size={14} /> Back
           </button>
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+            {shareUrl && (
+              <CopyLinkButton
+                url={shareUrl}
+                className="inline-flex items-center gap-2 border border-gray-200 bg-white text-gray-600 px-4 py-2.5 font-sans text-sm hover:border-[#2d6a4f] hover:text-[#2d6a4f] transition-colors"
+              />
+            )}
             {payable && (
               <button
                 onClick={payNow}
