@@ -233,9 +233,10 @@ function PrintableInvoiceInner() {
     )
   }
 
-  // Present whenever this database has share links; without one the link
-  // still works, it just needs the customer to be signed in.
-  const shareUrl = invoice.share_token ? invoiceShareUrl(invoice) : ''
+  // Present whenever this database has share links and this invoice's has not
+  // been withdrawn. Without one the address still works, it just needs the
+  // customer to be signed in — nothing worth offering to copy and pass on.
+  const shareUrl = invoice.share_token && !invoice.share_revoked_at ? invoiceShareUrl(invoice) : ''
 
   return (
     <div className="min-h-screen bg-[#F7F5F2] pt-28 pb-16 px-4">

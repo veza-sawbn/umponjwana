@@ -39,6 +39,10 @@ export type Invoice = {
    * run 20260808_invoice_share_links.sql yet simply won't return it.
    */
   share_token?: string | null
+  /** When the *current* link was minted — re-issuing moves this forward. */
+  share_issued_at?: string | null
+  /** Set while the link is withdrawn; cleared by re-issuing. */
+  share_revoked_at?: string | null
   first_viewed_at?: string | null
   last_viewed_at?: string | null
   view_count?: number | null
@@ -154,18 +158,52 @@ export async function markInvoiceViewed(opts: { token?: string | null; invoiceId
  * a valid link — it just needs the customer to be signed in as the account
  * that owns the invoice, which is the behaviour that prompted all this.
  */
-export function invoiceShareUrl(invoice: Pick<Invoice, 'id' | 'share_token'>, origin?: string): string {
+export function invoiceShareUrl(
+  invoice: Pick<Invoice, 'id' | 'share_token' | 'share_revoked_at'>,
+  origin?: string,
+): string {
   const base = origin
     ?? (typeof window !== 'undefined' ? window.location.origin : (process.env.NEXT_PUBLIC_SITE_URL || ''))
-  const path = `/invoices/${encodeURIComponent(invoice.id)}${invoice.share_token ? `?t=${invoice.share_token}` : ''}`
+  // A revoked invoice still holds a token — a rotated one nobody was given.
+  // Never put it in a URL, so no path can hand out a link the database will
+  // refuse anyway.
+  const token = invoice.share_revoked_at ? null : invoice.share_token
+  const path = `/invoices/${encodeURIComponent(invoice.id)}${token ? `?t=${token}` : ''}`
   return `${base}${path}`
+}
+
+/**
+ * Withdraws the current link: a copy of it stops opening anything, for
+ * everyone who has one. Staff only — the database refuses anyone else.
+ */
+export async function revokeInvoiceLink(invoiceId: string): Promise<void> {
+  const { error } = await supabase.rpc('vd_revoke_invoice_link', { p_invoice_id: invoiceId })
+  if (error) throw new Error(error.message || 'Could not revoke this invoice link')
+}
+
+/**
+ * Mints a fresh link and returns its token. Any earlier link — revoked or
+ * not — stops working, so this doubles as "replace the one that leaked".
+ */
+export async function reissueInvoiceLink(invoiceId: string): Promise<string> {
+  const { data, error } = await supabase.rpc('vd_reissue_invoice_link', { p_invoice_id: invoiceId })
+  if (error) throw new Error(error.message || 'Could not re-issue this invoice link')
+  if (typeof data !== 'string' || !data) throw new Error('The database returned no new link')
+  return data
 }
 
 /** Human summary of the view tracking, for the staff console. */
 export function invoiceViewedLabel(invoice: Invoice): string {
   if (!invoice.first_viewed_at) return 'Not opened yet'
-  const when = new Date(invoice.last_viewed_at || invoice.first_viewed_at)
-  const stamp = when.toLocaleString('en-ZA', {
+
+  const last = invoice.last_viewed_at || invoice.first_viewed_at
+  // Views of a link that has since been replaced say nothing about whether
+  // the customer has seen the one they hold now.
+  if (invoice.share_issued_at && new Date(last) < new Date(invoice.share_issued_at)) {
+    return 'Not opened since re-issue'
+  }
+
+  const stamp = new Date(last).toLocaleString('en-ZA', {
     day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit',
   })
   const times = Number(invoice.view_count ?? 0)

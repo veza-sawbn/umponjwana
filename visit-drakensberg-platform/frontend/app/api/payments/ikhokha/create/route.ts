@@ -61,7 +61,7 @@ export async function POST(req: Request) {
   let invoice: {
     id: string; order_id: string; invoice_number: string; balance: unknown
     currency: string; status: string; lines: InvoiceLine[] | null
-    user_id: string | null; share_token?: string | null
+    user_id: string | null; share_token?: string | null; share_revoked_at?: string | null
   } | null = null
   if (shareToken) {
     // Resolved by token, not by the id in the body — so a valid token can
@@ -69,7 +69,10 @@ export async function POST(req: Request) {
     const { data } = await supabaseAdmin()
       .from('vd_invoices').select('*').eq('share_token', shareToken).maybeSingle()
     invoice = data
-    if (!invoice) return NextResponse.json({ error: 'This invoice link is no longer valid.' }, { status: 404 })
+    // A revoked link buys nothing, including the right to start a payment.
+    if (!invoice || invoice.share_revoked_at) {
+      return NextResponse.json({ error: 'This invoice link is no longer valid.' }, { status: 404 })
+    }
   } else if (body.invoiceId) {
     const { data } = await supabase.from('vd_invoices').select('*').eq('id', body.invoiceId).maybeSingle()
     invoice = data
@@ -130,7 +133,8 @@ export async function POST(req: Request) {
     : (() => {
         // Carry the share token back through the gateway, or the customer
         // returns from paying to the access error they started out with.
-        const back = `${origin}/invoices/${invoice.id}?${invoice.share_token ? `t=${invoice.share_token}&` : ''}payment=`
+        const token = invoice.share_revoked_at ? null : invoice.share_token
+        const back = `${origin}/invoices/${invoice.id}?${token ? `t=${token}&` : ''}payment=`
         return {
           successPageUrl: `${back}success`,
           failurePageUrl: `${back}failed`,

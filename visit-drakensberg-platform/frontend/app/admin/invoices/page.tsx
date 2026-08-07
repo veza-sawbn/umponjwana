@@ -3,9 +3,10 @@
 import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import toast from 'react-hot-toast'
-import { Search, RefreshCw, Plus, Printer, Trash2, X, FileText, Send, Pencil, Wallet, Save, Link2, Check, Eye, EyeOff } from 'lucide-react'
+import { Search, RefreshCw, Plus, Printer, Trash2, X, FileText, Send, Pencil, Wallet, Save, Link2, Check, Eye, EyeOff, ShieldOff, RotateCw, KeyRound } from 'lucide-react'
 import {
   getInvoices, getFinanceSettings, sendInvoice, invoiceShareUrl, invoiceViewedLabel,
+  revokeInvoiceLink, reissueInvoiceLink,
   type Invoice,
 } from '@/lib/invoices'
 import { createOrder, updateOrder, getOrderLines, type OrderLineInput, type OrderLine } from '@/lib/orders'
@@ -62,14 +63,15 @@ function CopyLinkButton({ invoice, className, label = 'Copy link' }: {
 }) {
   const [copied, setCopied] = useState(false)
   const url = invoiceShareUrl(invoice)
+  const opensWithoutLogin = !!invoice.share_token && !invoice.share_revoked_at
 
   async function handleCopy() {
     if (await copyToClipboard(url)) {
       setCopied(true)
       setTimeout(() => setCopied(false), 2500)
-      toast.success(invoice.share_token
+      toast.success(opensWithoutLogin
         ? 'Invoice link copied — paste it into any conversation.'
-        : 'Invoice link copied. This database has no share links yet, so the customer will be asked to sign in — run migration 20260808_invoice_share_links.sql.')
+        : 'Invoice link copied. It has no share token, so the customer will be asked to sign in — re-issue the link, or run migration 20260808_invoice_share_links.sql.')
     } else {
       toast.error('Your browser blocked the copy. The link is in this button\'s tooltip.')
     }
@@ -79,6 +81,154 @@ function CopyLinkButton({ invoice, className, label = 'Copy link' }: {
     <button onClick={handleCopy} title={url} className={className}>
       {copied ? <Check size={13} /> : <Link2 size={13} />} {copied ? 'Copied' : label}
     </button>
+  )
+}
+
+/**
+ * Share-link manager for one invoice: the link itself, whether the customer
+ * has opened it, and the two ways to take it back.
+ *
+ * A link that opens without a login is what makes invoices reachable over
+ * email and WhatsApp — and is exactly why there has to be an undo when one
+ * lands in the wrong conversation.
+ */
+function LinkModal({ invoice, onClose, onDone }: {
+  invoice: Invoice
+  onClose: () => void
+  onDone: () => void
+}) {
+  const [busy, setBusy] = useState<'revoke' | 'reissue' | null>(null)
+  const [confirmingRevoke, setConfirmingRevoke] = useState(false)
+  const revoked = !!invoice.share_revoked_at
+  const url = invoiceShareUrl(invoice)
+
+  async function handleRevoke() {
+    setBusy('revoke')
+    try {
+      await revokeInvoiceLink(invoice.id)
+      toast.success('Link revoked — any copy of it now opens nothing.')
+      onDone(); onClose()
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Could not revoke this link')
+    } finally { setBusy(null) }
+  }
+
+  async function handleReissue() {
+    setBusy('reissue')
+    try {
+      const token = await reissueInvoiceLink(invoice.id)
+      const fresh = invoiceShareUrl({ id: invoice.id, share_token: token, share_revoked_at: null })
+      // Straight onto the clipboard: re-issuing is only ever a step towards
+      // sending the new link to someone.
+      const copied = await copyToClipboard(fresh)
+      toast.success(copied
+        ? 'New link issued and copied. The previous one no longer works.'
+        : 'New link issued. The previous one no longer works.')
+      onDone(); onClose()
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Could not re-issue this link')
+    } finally { setBusy(null) }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 bg-black/50 flex items-stretch sm:items-center justify-center sm:p-6" onClick={onClose}>
+      <div className="bg-white w-full sm:max-w-lg h-full sm:h-auto sm:max-h-[88vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+        <div className="sticky top-0 z-10 bg-white border-b border-gray-100 px-4 sm:px-6 pt-4 sm:pt-6 pb-3 flex items-start justify-between gap-3">
+          <div>
+            <p className="font-sans text-[10px] tracking-[0.14em] uppercase text-gray-400">Invoice {invoice.invoice_number}</p>
+            <h2 className="font-display italic text-xl sm:text-2xl">Share link</h2>
+            <p className="hidden sm:block font-sans text-xs text-gray-400 mt-1">Opens without a login, so it can be sent over any channel.</p>
+          </div>
+          <button onClick={onClose} aria-label="Close" className="p-1 text-gray-400 hover:text-gray-700"><X size={20} /></button>
+        </div>
+
+        <div className="px-4 sm:px-6 py-4 sm:py-5" style={{ paddingBottom: 'calc(1.25rem + env(safe-area-inset-bottom))' }}>
+          <div className={`flex items-center gap-2 px-3 py-2 mb-4 font-sans text-xs ${
+            revoked ? 'bg-red-50 text-red-500' : 'bg-[#2d6a4f]/8 text-[#2d6a4f]'}`}>
+            {revoked ? <ShieldOff size={14} /> : <Link2 size={14} />}
+            {revoked
+              ? `Revoked ${fmt(invoice.share_revoked_at)} — nobody can open this invoice from a link.`
+              : `Active since ${fmt(invoice.share_issued_at)}`}
+          </div>
+
+          <p className="font-sans text-[10px] tracking-[0.14em] uppercase text-gray-400 mb-1.5">The link</p>
+          <div className="flex gap-2">
+            <input
+              readOnly
+              value={url}
+              onFocus={e => e.currentTarget.select()}
+              aria-label="Invoice link"
+              className="flex-1 min-w-0 border border-gray-200 px-3 py-2.5 font-mono text-xs text-gray-600 bg-[#F7F5F2] focus:outline-none"
+            />
+            {!revoked && (
+              <CopyLinkButton
+                invoice={invoice}
+                className="shrink-0 inline-flex items-center gap-1.5 border border-gray-200 px-4 font-sans text-sm text-[#2d6a4f] hover:border-[#2d6a4f]"
+              />
+            )}
+          </div>
+          {revoked && (
+            <p className="font-sans text-xs text-gray-400 mt-1.5">
+              Without a working link this address asks the customer to sign in — which a walk-in or phone customer cannot do.
+            </p>
+          )}
+
+          <p className="font-sans text-[10px] tracking-[0.14em] uppercase text-gray-400 mt-6 mb-1.5">Opened by the customer</p>
+          <ViewedBadge invoice={invoice} />
+          {invoice.first_viewed_at && (
+            <p className="font-sans text-xs text-gray-400 mt-1">
+              First opened {new Date(invoice.first_viewed_at).toLocaleString('en-ZA')}
+              {Number(invoice.view_count ?? 0) > 1 ? ` · ${invoice.view_count} visits in total` : ''}
+            </p>
+          )}
+
+          <div className="border-t border-gray-100 mt-6 pt-5 space-y-3">
+            <div>
+              <button
+                onClick={handleReissue}
+                disabled={busy !== null}
+                className="w-full inline-flex items-center justify-center gap-2 bg-[#2d6a4f] text-white px-5 py-2.5 font-sans text-sm hover:bg-[#245741] transition-colors disabled:opacity-60"
+              >
+                <RotateCw size={14} /> {busy === 'reissue' ? 'Issuing…' : revoked ? 'Issue a new link' : 'Re-issue link'}
+              </button>
+              <p className="font-sans text-xs text-gray-400 mt-1.5">
+                Mints a fresh link and copies it. Every earlier copy stops working, so send the new one on.
+              </p>
+            </div>
+
+            {!revoked && (
+              <div>
+                {confirmingRevoke ? (
+                  <div className="flex gap-2">
+                    <button
+                      onClick={handleRevoke}
+                      disabled={busy !== null}
+                      className="flex-1 inline-flex items-center justify-center gap-2 bg-red-500 text-white px-5 py-2.5 font-sans text-sm hover:bg-red-600 transition-colors disabled:opacity-60"
+                    >
+                      <ShieldOff size={14} /> {busy === 'revoke' ? 'Revoking…' : 'Yes, revoke it'}
+                    </button>
+                    <button onClick={() => setConfirmingRevoke(false)} className="px-5 py-2.5 border border-gray-200 font-sans text-sm text-gray-500">
+                      Cancel
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    onClick={() => setConfirmingRevoke(true)}
+                    disabled={busy !== null}
+                    className="w-full inline-flex items-center justify-center gap-2 border border-gray-200 px-5 py-2.5 font-sans text-sm text-red-500 hover:border-red-300 transition-colors disabled:opacity-60"
+                  >
+                    <ShieldOff size={14} /> Revoke link
+                  </button>
+                )}
+                <p className="font-sans text-xs text-gray-400 mt-1.5">
+                  Use when a link reached the wrong person. The customer loses access until a new one is issued.
+                </p>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
   )
 }
 
@@ -565,6 +715,7 @@ export default function AdminInvoicesPage() {
   const [editingDraft, setEditingDraft] = useState<InvoiceDraft | undefined>()
   const [editingInvoice, setEditingInvoice] = useState<{ invoice: Invoice; lines: OrderLine[] } | undefined>()
   const [payingInvoice, setPayingInvoice] = useState<Invoice | undefined>()
+  const [linkInvoice, setLinkInvoice] = useState<Invoice | undefined>()
   const [sending, setSending] = useState<string | null>(null)
   const [opening, setOpening] = useState<string | null>(null)
 
@@ -766,16 +917,25 @@ export default function AdminInvoicesPage() {
                 <Link href={`/invoices/${i.id}`} className="inline-flex items-center justify-center gap-1.5 border border-gray-200 py-2.5 font-sans text-sm text-[#2d6a4f]">
                   <Printer size={13} /> View
                 </Link>
-                <CopyLinkButton
-                  invoice={i}
-                  className="inline-flex items-center justify-center gap-1.5 border border-gray-200 py-2.5 font-sans text-sm text-[#2d6a4f]"
-                />
+                {i.share_revoked_at ? (
+                  <button onClick={() => setLinkInvoice(i)} className="inline-flex items-center justify-center gap-1.5 border border-gray-200 py-2.5 font-sans text-sm text-red-500">
+                    <ShieldOff size={13} /> Link revoked
+                  </button>
+                ) : (
+                  <CopyLinkButton
+                    invoice={i}
+                    className="inline-flex items-center justify-center gap-1.5 border border-gray-200 py-2.5 font-sans text-sm text-[#2d6a4f]"
+                  />
+                )}
                 <button onClick={() => setPayingInvoice(i)} className="inline-flex items-center justify-center gap-1.5 border border-gray-200 py-2.5 font-sans text-sm text-[#2d6a4f]">
                   <Wallet size={13} /> Payments
                 </button>
                 <button onClick={() => handleSend(i.id)} disabled={sending === i.id}
                   className={`inline-flex items-center justify-center gap-1.5 border border-gray-200 py-2.5 font-sans text-sm ${sending === i.id ? 'text-gray-300' : 'text-[#2d6a4f]'}`}>
                   <Send size={13} /> {sending === i.id ? 'Sending…' : 'Email'}
+                </button>
+                <button onClick={() => setLinkInvoice(i)} className="inline-flex items-center justify-center gap-1.5 border border-gray-200 py-2.5 font-sans text-sm text-[#2d6a4f]">
+                  <KeyRound size={13} /> Manage link
                 </button>
                 {!locked && (
                   <button onClick={() => handleEdit(i)} disabled={opening === i.id}
@@ -820,10 +980,20 @@ export default function AdminInvoicesPage() {
                       <Link href={`/invoices/${i.id}`} className="inline-flex items-center gap-1.5 font-sans text-xs text-[#2d6a4f] hover:underline">
                         <Printer size={12} /> View
                       </Link>
-                      <CopyLinkButton
-                        invoice={i}
-                        className="inline-flex items-center gap-1.5 font-sans text-xs text-[#2d6a4f] hover:underline"
-                      />
+                      {!i.share_revoked_at && (
+                        <CopyLinkButton
+                          invoice={i}
+                          className="inline-flex items-center gap-1.5 font-sans text-xs text-[#2d6a4f] hover:underline"
+                        />
+                      )}
+                      <button
+                        onClick={() => setLinkInvoice(i)}
+                        title="Share link — copy, revoke or re-issue"
+                        className={`inline-flex items-center gap-1.5 font-sans text-xs hover:underline ${
+                          i.share_revoked_at ? 'text-red-500' : 'text-[#2d6a4f]'}`}
+                      >
+                        {i.share_revoked_at ? <><ShieldOff size={12} /> Revoked</> : <><KeyRound size={12} /> Link</>}
+                      </button>
                       <button onClick={() => setPayingInvoice(i)} className="inline-flex items-center gap-1.5 font-sans text-xs text-[#2d6a4f] hover:underline">
                         <Wallet size={12} /> Payments
                       </button>
@@ -855,6 +1025,14 @@ export default function AdminInvoicesPage() {
           draft={editingDraft}
           editing={editingInvoice}
           onClose={() => { setShowNew(false); setEditingDraft(undefined); setEditingInvoice(undefined) }}
+          onDone={load}
+        />
+      )}
+
+      {linkInvoice && (
+        <LinkModal
+          invoice={linkInvoice}
+          onClose={() => setLinkInvoice(undefined)}
           onDone={load}
         />
       )}
