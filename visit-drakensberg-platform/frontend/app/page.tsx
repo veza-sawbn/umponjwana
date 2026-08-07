@@ -1,5 +1,5 @@
 'use client'
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useRef, useMemo } from 'react'
 import Link from 'next/link'
 import toast from 'react-hot-toast'
 import { ArrowRight, ChevronDown, X } from 'lucide-react'
@@ -84,22 +84,41 @@ const HERO_OVERSCALE = 1.12 // headroom for the pan so it never reveals an edge
 
 function HeroCarousel({ images }: { images: string[] }) {
   const [index, setIndex] = useState(0)
+  // Tracks whether the carousel has cycled at least once. Used to skip the
+  // cross-fade animation on the very first slide — there is nothing to fade
+  // from, so starting at full opacity avoids a needless 1.5 s blank flash.
+  const hasCycledRef = useRef(false)
 
   useEffect(() => {
     setIndex(0)
+    hasCycledRef.current = false
+
+    // Preload every carousel image as soon as the URL list is known so the
+    // browser fetches them in parallel rather than waiting for each slide turn.
+    images.forEach(src => {
+      const preload = new window.Image()
+      preload.src = src
+    })
+
     if (images.length < 2) return
-    const id = setInterval(() => setIndex(i => (i + 1) % images.length), HERO_SLIDE_SECONDS * 1000)
+    const id = setInterval(() => {
+      hasCycledRef.current = true
+      setIndex(i => (i + 1) % images.length)
+    }, HERO_SLIDE_SECONDS * 1000)
     return () => clearInterval(id)
   }, [images])
 
   const panFromLeft = index % 2 === 0
+  // The first slide shown on mount should not animate in from opacity 0 — it
+  // would look like a blank screen. Cross-fade only applies to slide *changes*.
+  const isFirstSlide = !hasCycledRef.current
 
   return (
     <AnimatePresence>
       <motion.div
         key={index}
         className="absolute inset-0 overflow-hidden"
-        initial={{ opacity: 0 }}
+        initial={{ opacity: isFirstSlide ? 1 : 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
         transition={{ duration: HERO_FADE_SECONDS, ease: 'easeInOut' }}
@@ -108,6 +127,10 @@ function HeroCarousel({ images }: { images: string[] }) {
           src={images[index]}
           alt="Drakensberg mountains"
           className="w-full h-full object-cover"
+          // The first hero image is the LCP element — tell the browser to
+          // fetch it at the highest priority and never defer it.
+          fetchPriority={isFirstSlide ? 'high' : 'auto'}
+          loading="eager"
           initial={{ scale: HERO_OVERSCALE, x: panFromLeft ? '-3%' : '3%', y: '-2%' }}
           animate={{ scale: HERO_OVERSCALE, x: panFromLeft ? '3%' : '-3%', y: '2%' }}
           transition={{ duration: HERO_SLIDE_SECONDS + HERO_FADE_SECONDS, ease: 'linear' }}
@@ -128,14 +151,23 @@ function HeroSection({ hero }: { hero: typeof SITE_CONTENT_DEFAULTS.hero }) {
 
   return (
     <EditableSection id="hero" label="Hero" className="relative h-screen min-h-[600px] flex flex-col">
-      <div className="absolute inset-0">
+      {/* Dark background prevents a white void / broken-image icon while the
+          first hero image is still in flight. */}
+      <div className="absolute inset-0 bg-slate-900">
         {hero.video_url ? (
           <video src={hero.video_url} autoPlay muted loop playsInline className="w-full h-full object-cover" />
         ) : carouselImages.length > 1 ? (
           <HeroCarousel images={carouselImages} />
         ) : (
           <Editable section="hero" fieldKey="image_url" value={imageUrl} label="Background Image" type="image">
-            <img src={imageUrl} alt="Drakensberg mountains" className="w-full h-full object-cover" />
+            {/* Single static image is the LCP element — prioritise it. */}
+            <img
+              src={imageUrl}
+              alt="Drakensberg mountains"
+              className="w-full h-full object-cover"
+              fetchPriority="high"
+              loading="eager"
+            />
           </Editable>
         )}
         <div
