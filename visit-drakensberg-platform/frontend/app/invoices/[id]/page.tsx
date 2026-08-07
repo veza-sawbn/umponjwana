@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback, useMemo, Suspense } from 'react'
 import { useParams, useRouter, useSearchParams } from 'next/navigation'
 import { Printer, ArrowLeft, CreditCard, Loader2, Copy, Check } from 'lucide-react'
 import {
-  getInvoiceById, getInvoiceByToken, getReceipts, getFinanceSettings,
+  getInvoiceById, getInvoicePublic, getInvoiceByToken, getReceipts, getFinanceSettings,
   markInvoiceViewed, invoiceShareUrl,
   type Invoice, type InvoiceCustomerOrder, type Receipt,
 } from '@/lib/invoices'
@@ -21,11 +21,15 @@ type BusinessDetails = typeof SITE_CONTENT_DEFAULTS.business_details
 // Printable customer invoice. One invoice per Master Order — every purchased
 // service on a single document, no supplier payout information.
 //
-// Two ways in, because most customers have no account with us:
-//   * ?t=<share token> — the link we email or paste into a chat. Resolved by
-//     vd_invoice_by_token, so it opens with no session at all.
-//   * no token — the signed-in path, governed by RLS: customers open their
-//     own invoices, staff open any.
+// It opens on its own address, with no session: the id in the URL is
+// 'inv-' + a v4 UUID, which vd_invoice_public accepts as the credential.
+// Most customers have no account, and a guest order has no user_id for RLS to
+// match at all, so requiring a login here locked out the very people the
+// invoice is for.
+//
+// Two fallbacks behind that, in order: a ?t= share token (links emailed
+// while the token was the credential), then the signed-in RLS path — which is
+// what lets staff open an invoice by its number rather than its id.
 
 function fmt(d?: string | null) {
   return d ? new Date(d).toLocaleDateString('en-ZA', { day: 'numeric', month: 'long', year: 'numeric' }) : '—'
@@ -102,18 +106,20 @@ function PrintableInvoiceInner() {
     supabase.auth.getUser().then(({ data }) => setSignedIn(!!data.user)).catch(() => setSignedIn(false))
   }, [])
 
-  const load = useCallback(async (id: string): Promise<Invoice | null> => {
-    if (shareToken) {
-      const shared = await getInvoiceByToken(shareToken)
-      if (shared) {
-        setInvoice(shared.invoice); setOrder(shared.order); setReceipts(shared.receipts)
-        return shared.invoice
-      }
-      // Deliberately falls through. The token may predate this database's
-      // share-link migration, and a staff member or the invoice's own account
-      // holder can still open it the ordinary way.
+  const load = useCallback(async (rawId: string): Promise<Invoice | null> => {
+    const id = decodeURIComponent(rawId)
+
+    // The address itself, first — this is the path every customer takes, and
+    // the only one that works when they have no account.
+    const shared = await getInvoicePublic(id) ?? (shareToken ? await getInvoiceByToken(shareToken) : null)
+    if (shared) {
+      setInvoice(shared.invoice); setOrder(shared.order); setReceipts(shared.receipts)
+      return shared.invoice
     }
-    const inv = await getInvoiceById(decodeURIComponent(id))
+
+    // Signed-in fallback: staff, the invoice's own account holder, and
+    // lookups by invoice number, which is never a public credential.
+    const inv = await getInvoiceById(id)
     setInvoice(inv)
     if (inv) {
       const [o, r] = await Promise.all([getOrderById(inv.order_id), getReceipts(inv.order_id)])
@@ -192,14 +198,11 @@ function PrintableInvoiceInner() {
     return <div className="min-h-screen bg-[#F7F5F2] flex items-center justify-center pt-24 font-sans text-sm text-gray-400">Loading invoice…</div>
   }
   if (!invoice) {
-    // Three genuinely different situations, and the old single message
-    // ("Invoice not found, or you don't have access to it") left every one of
-    // them with nothing to do next.
-    const help = shareToken
-      ? "This invoice link isn't valid — chat apps and email clients sometimes cut long links short, so a copy of it may have arrived incomplete."
-      : signedIn
-        ? "This invoice isn't on the account you're signed in with."
-        : 'This address is missing the access key that opens an invoice without signing in — links get truncated by some chat apps and email clients.'
+    // An invoice opens on its own address now, so reaching here means the
+    // address leads nowhere: mistyped, cut short in transit, or withdrawn.
+    // None of that is fixable by signing in — telling customers to was the
+    // complaint — so this asks us for a working link instead, and mentions
+    // signing in only as an aside for the minority who have an account.
     const currentPath = typeof window !== 'undefined'
       ? window.location.pathname + window.location.search
       : `/invoices/${params?.id ?? ''}`
@@ -208,35 +211,39 @@ function PrintableInvoiceInner() {
       <div className="min-h-screen bg-[#F7F5F2] flex items-center justify-center px-4 pt-24 pb-16">
         <div className="bg-white border border-gray-200 p-8 sm:p-10 max-w-md w-full text-center">
           <p className="font-sans text-[10px] tracking-[0.14em] uppercase text-gray-400">Invoice</p>
-          <h1 className="font-display italic text-2xl text-[#000000] mt-1">We couldn&apos;t open this invoice</h1>
-          <p className="font-sans text-sm text-gray-500 mt-3 leading-relaxed">{help}</p>
+          <h1 className="font-display italic text-2xl text-[#000000] mt-1">This invoice link isn&apos;t working</h1>
           <p className="font-sans text-sm text-gray-500 mt-3 leading-relaxed">
-            Ask us to re-send it{business.email ? <> — <a href={`mailto:${business.email}?subject=${encodeURIComponent('Invoice link')}`} className="text-[#2d6a4f] hover:underline">{business.email}</a></> : null}
-            {business.phone ? <> or {business.phone}</> : null} — and we&apos;ll send a fresh link straight away.
+            The address didn&apos;t lead to an invoice. It may have been cut short on its way to you,
+            or replaced with a newer one.
+          </p>
+          <p className="font-sans text-sm text-gray-500 mt-3 leading-relaxed">
+            Send us a message and we&apos;ll get a working link to you right away
+            {business.email ? <> — <a href={`mailto:${business.email}?subject=${encodeURIComponent('Invoice link')}`} className="text-[#2d6a4f] hover:underline">{business.email}</a></> : null}
+            {business.phone ? <> or {business.phone}</> : null}.
           </p>
           <div className="flex flex-col gap-2 mt-6">
+            {/* A link opened from an email has no history to go back to. */}
+            <a href="/" className="bg-[#2d6a4f] text-white px-5 py-2.5 font-sans text-sm hover:bg-[#245741] transition-colors">
+              Go to Visit Drakensberg
+            </a>
             {!signedIn && (
               <a
                 href={`/auth/login?redirect=${encodeURIComponent(currentPath)}`}
-                className="bg-[#2d6a4f] text-white px-5 py-2.5 font-sans text-sm hover:bg-[#245741] transition-colors"
+                className="font-sans text-xs text-gray-400 hover:text-[#2d6a4f] hover:underline py-1"
               >
-                Sign in with the email it was sent to
+                Have an account with us? Sign in
               </a>
             )}
-            {/* A link opened from an email has no history to go back to. */}
-            <a href="/" className="font-sans text-sm text-[#2d6a4f] hover:underline py-1">
-              Go to Visit Drakensberg
-            </a>
           </div>
         </div>
       </div>
     )
   }
 
-  // Present whenever this database has share links and this invoice's has not
-  // been withdrawn. Without one the address still works, it just needs the
-  // customer to be signed in — nothing worth offering to copy and pass on.
-  const shareUrl = invoice.share_token && !invoice.share_revoked_at ? invoiceShareUrl(invoice) : ''
+  // The address in the browser bar is the shareable link, so there is always
+  // one to offer — unless staff have withdrawn it, in which case passing it
+  // on would only send someone to the error above.
+  const shareUrl = invoice.share_revoked_at ? '' : invoiceShareUrl(invoice)
 
   return (
     <div className="min-h-screen bg-[#F7F5F2] pt-28 pb-16 px-4">

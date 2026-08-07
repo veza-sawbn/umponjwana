@@ -63,15 +63,14 @@ function CopyLinkButton({ invoice, className, label = 'Copy link' }: {
 }) {
   const [copied, setCopied] = useState(false)
   const url = invoiceShareUrl(invoice)
-  const opensWithoutLogin = !!invoice.share_token && !invoice.share_revoked_at
 
   async function handleCopy() {
     if (await copyToClipboard(url)) {
       setCopied(true)
       setTimeout(() => setCopied(false), 2500)
-      toast.success(opensWithoutLogin
-        ? 'Invoice link copied — paste it into any conversation.'
-        : 'Invoice link copied. It has no share token, so the customer will be asked to sign in — re-issue the link, or run migration 20260808_invoice_share_links.sql.')
+      toast.success(invoice.share_revoked_at
+        ? 'Link copied, but it is revoked — the customer will not be able to open it. Re-issue it first.'
+        : 'Invoice link copied — paste it into any conversation.')
     } else {
       toast.error('Your browser blocked the copy. The link is in this button\'s tooltip.')
     }
@@ -100,6 +99,11 @@ function LinkModal({ invoice, onClose, onDone }: {
   const [busy, setBusy] = useState<'revoke' | 'reissue' | null>(null)
   const [confirmingRevoke, setConfirmingRevoke] = useState(false)
   const revoked = !!invoice.share_revoked_at
+  // A never-revoked invoice opens on its own address, so there is no separate
+  // secret to rotate — re-issuing it would change nothing the customer sees.
+  // Once revoked, the address is closed for good and the link becomes a
+  // rotatable token, which is what makes re-issue meaningful.
+  const onBareAddress = invoice.share_id_access !== false
   const url = invoiceShareUrl(invoice)
 
   async function handleRevoke() {
@@ -117,13 +121,14 @@ function LinkModal({ invoice, onClose, onDone }: {
     setBusy('reissue')
     try {
       const token = await reissueInvoiceLink(invoice.id)
-      const fresh = invoiceShareUrl({ id: invoice.id, share_token: token, share_revoked_at: null })
-      // Straight onto the clipboard: re-issuing is only ever a step towards
-      // sending the new link to someone.
+      // Built from the token just returned, not from the stale row — and
+      // straight onto the clipboard, since re-issuing is only ever a step
+      // towards sending the new link to someone.
+      const fresh = invoiceShareUrl({ id: invoice.id, share_token: token, share_id_access: false })
       const copied = await copyToClipboard(fresh)
       toast.success(copied
-        ? 'New link issued and copied. The previous one no longer works.'
-        : 'New link issued. The previous one no longer works.')
+        ? 'New link issued and copied. Send it on — the revoked one stays dead.'
+        : 'New link issued. Send it on — the revoked one stays dead.')
       onDone(); onClose()
     } catch (e) {
       toast.error(e instanceof Error ? e.message : 'Could not re-issue this link')
@@ -148,7 +153,9 @@ function LinkModal({ invoice, onClose, onDone }: {
             {revoked ? <ShieldOff size={14} /> : <Link2 size={14} />}
             {revoked
               ? `Revoked ${fmt(invoice.share_revoked_at)} — nobody can open this invoice from a link.`
-              : `Active since ${fmt(invoice.share_issued_at)}`}
+              : onBareAddress
+                ? 'Active — opens on its own address, no login needed.'
+                : `Active since ${fmt(invoice.share_issued_at)} — replacement link, issued after a revoke.`}
           </div>
 
           <p className="font-sans text-[10px] tracking-[0.14em] uppercase text-gray-400 mb-1.5">The link</p>
@@ -169,7 +176,7 @@ function LinkModal({ invoice, onClose, onDone }: {
           </div>
           {revoked && (
             <p className="font-sans text-xs text-gray-400 mt-1.5">
-              Without a working link this address asks the customer to sign in — which a walk-in or phone customer cannot do.
+              This address no longer opens anything. Issue a new link below to give the customer access again.
             </p>
           )}
 
@@ -183,18 +190,23 @@ function LinkModal({ invoice, onClose, onDone }: {
           )}
 
           <div className="border-t border-gray-100 mt-6 pt-5 space-y-3">
-            <div>
-              <button
-                onClick={handleReissue}
-                disabled={busy !== null}
-                className="w-full inline-flex items-center justify-center gap-2 bg-[#2d6a4f] text-white px-5 py-2.5 font-sans text-sm hover:bg-[#245741] transition-colors disabled:opacity-60"
-              >
-                <RotateCw size={14} /> {busy === 'reissue' ? 'Issuing…' : revoked ? 'Issue a new link' : 'Re-issue link'}
-              </button>
-              <p className="font-sans text-xs text-gray-400 mt-1.5">
-                Mints a fresh link and copies it. Every earlier copy stops working, so send the new one on.
-              </p>
-            </div>
+            {/* Re-issuing an invoice that still opens on its own address would
+                change nothing a customer can see — there is no second secret
+                to rotate — so it is offered only where it does something. */}
+            {!onBareAddress && (
+              <div>
+                <button
+                  onClick={handleReissue}
+                  disabled={busy !== null}
+                  className="w-full inline-flex items-center justify-center gap-2 bg-[#2d6a4f] text-white px-5 py-2.5 font-sans text-sm hover:bg-[#245741] transition-colors disabled:opacity-60"
+                >
+                  <RotateCw size={14} /> {busy === 'reissue' ? 'Issuing…' : revoked ? 'Issue a new link' : 'Replace this link'}
+                </button>
+                <p className="font-sans text-xs text-gray-400 mt-1.5">
+                  Mints a different link and copies it. Every earlier copy stays dead, so send the new one on.
+                </p>
+              </div>
+            )}
 
             {!revoked && (
               <div>
@@ -221,7 +233,8 @@ function LinkModal({ invoice, onClose, onDone }: {
                   </button>
                 )}
                 <p className="font-sans text-xs text-gray-400 mt-1.5">
-                  Use when a link reached the wrong person. The customer loses access until a new one is issued.
+                  Use when a link reached the wrong person. The customer loses access until a new one is issued
+                  {onBareAddress && ', and this address never opens the invoice again — the replacement is a different link'}.
                 </p>
               </div>
             )}

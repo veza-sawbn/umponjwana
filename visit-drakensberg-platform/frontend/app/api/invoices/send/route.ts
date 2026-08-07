@@ -106,12 +106,10 @@ export async function POST(req: Request) {
   const origin = process.env.NEXT_PUBLIC_SITE_URL || new URL(req.url).origin
   const featured = await getFeaturedExperiences(origin)
 
-  // The share token is what makes this link openable by the person we're
-  // emailing — most of them have no account, and a guest order has no user_id
-  // for RLS to match at all. Absent only on a database that hasn't run
-  // 20260808_invoice_share_links.sql, where the plain link is the old
-  // sign-in-required behaviour rather than a broken one.
-  const invoiceUrl = `${origin}/invoices/${invoice.id}${invoice.share_token ? `?t=${invoice.share_token}` : ''}`
+  // Just the invoice's address. The id in it is 'inv-' + a v4 UUID, which is
+  // credential enough to open and pay without signing in — so there is no
+  // query string for a mail client or chat app to truncate away.
+  const invoiceUrl = `${origin}/invoices/${invoice.id}`
 
   const { sent, error } = await sendMail({
     to: email,

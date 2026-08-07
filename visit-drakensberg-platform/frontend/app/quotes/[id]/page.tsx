@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { ArrowLeft, Check, X, FileSignature, Printer } from 'lucide-react'
-import { getQuoteById, acceptQuote, declineQuote, getQuoteInvoiceLink, type Quote } from '@/lib/quotes'
+import { getQuoteById, acceptQuote, declineQuote, type Quote } from '@/lib/quotes'
 import { getSiteContent, SITE_CONTENT_DEFAULTS } from '@/lib/site-content'
 import { formatMoney } from '@/lib/allocation'
 import Logo from '@/components/Logo'
@@ -39,10 +39,8 @@ export default function QuotePage() {
     setBusy('accept'); setError('')
     try {
       const { invoiceId } = await acceptQuote(quote.id)
-      // Hand the guest the invoice's own share link — they have no account,
-      // so a plain /invoices/:id would greet them with an access error.
-      const link = await getQuoteInvoiceLink(quote.id)
-      router.push(link ? `/invoices/${link.invoiceId}?t=${link.shareToken}` : `/invoices/${invoiceId}`)
+      // Opens without an account, which is what a guest accepting a quote has.
+      router.push(`/invoices/${invoiceId}`)
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Could not accept this quote')
       setBusy(null)

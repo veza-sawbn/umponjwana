@@ -47,31 +47,34 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'Online payment is not set up yet — please contact us to arrange payment.' }, { status: 503 })
   }
 
-  // A customer paying from an emailed/pasted invoice link has no session —
-  // that link's share token is their credential instead. It is only ever
-  // accepted for the one invoice it belongs to.
-  const shareToken = typeof body.shareToken === 'string' && body.shareToken.length >= 32
-    ? body.shareToken : ''
+  // A customer paying from an emailed or pasted invoice link has no session.
+  // Their credential is the link itself — the invoice id, which is 'inv-'
+  // plus a v4 UUID (or, on older links, the ?t= share token). The database
+  // decides what qualifies, via vd_invoice_payable: it demands a UUID-bearing
+  // reference, so a sequential invoice number buys nothing, and it refuses a
+  // revoked link.
+  const linkRef = typeof body.shareToken === 'string' && body.shareToken.length >= 32
+    ? body.shareToken
+    : (typeof body.invoiceId === 'string' ? body.invoiceId : '')
 
   const supabase = createRouteHandlerClient({ cookies })
   const { data: { user } } = await supabase.auth.getUser()
-  if (!user && !shareToken) return NextResponse.json({ error: 'unauthorized' }, { status: 401 })
+  if (!user && !linkRef) return NextResponse.json({ error: 'unauthorized' }, { status: 401 })
 
   // RLS scopes every read below to the caller's own rows, or staff.
   let invoice: {
     id: string; order_id: string; invoice_number: string; balance: unknown
     currency: string; status: string; lines: InvoiceLine[] | null
-    user_id: string | null; share_token?: string | null; share_revoked_at?: string | null
+    user_id: string | null; share_revoked_at?: string | null
   } | null = null
-  if (shareToken) {
-    // Resolved by token, not by the id in the body — so a valid token can
-    // never be pointed at somebody else's invoice.
-    const { data } = await supabaseAdmin()
-      .from('vd_invoices').select('*').eq('share_token', shareToken).maybeSingle()
-    invoice = data
-    // A revoked link buys nothing, including the right to start a payment.
-    if (!invoice || invoice.share_revoked_at) {
-      return NextResponse.json({ error: 'This invoice link is no longer valid.' }, { status: 404 })
+  if (!user && linkRef) {
+    const { data } = await supabaseAdmin().rpc('vd_invoice_payable', { p_ref: linkRef })
+    invoice = data as typeof invoice
+    if (!invoice) {
+      return NextResponse.json(
+        { error: "We couldn't find that invoice. Ask us to send you a fresh link." },
+        { status: 404 },
+      )
     }
   } else if (body.invoiceId) {
     const { data } = await supabase.from('vd_invoices').select('*').eq('id', body.invoiceId).maybeSingle()
@@ -130,17 +133,13 @@ export async function POST(req: Request) {
         failurePageUrl: `${origin}/checkout/success?id=${body.bookingId}&payment=failed`,
         cancelUrl: `${origin}/checkout/success?id=${body.bookingId}&payment=cancelled`,
       }
-    : (() => {
-        // Carry the share token back through the gateway, or the customer
-        // returns from paying to the access error they started out with.
-        const token = invoice.share_revoked_at ? null : invoice.share_token
-        const back = `${origin}/invoices/${invoice.id}?${token ? `t=${token}&` : ''}payment=`
-        return {
-          successPageUrl: `${back}success`,
-          failurePageUrl: `${back}failed`,
-          cancelUrl: `${back}cancelled`,
-        }
-      })()
+    : {
+        // The invoice's own address, which opens without a session — so the
+        // customer lands back on their paid invoice rather than on an error.
+        successPageUrl: `${origin}/invoices/${invoice.id}?payment=success`,
+        failurePageUrl: `${origin}/invoices/${invoice.id}?payment=failed`,
+        cancelUrl: `${origin}/invoices/${invoice.id}?payment=cancelled`,
+      }
 
   let link
   try {
