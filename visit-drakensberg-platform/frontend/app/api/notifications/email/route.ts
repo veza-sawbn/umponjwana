@@ -5,6 +5,8 @@ import { supabaseAdmin } from '@/lib/supabase-admin'
 import { sendMail } from '@/lib/mailer'
 import { emailShell, ctaButton, esc, getFeaturedExperiences, type FeaturedExperience } from '@/lib/email-layout'
 
+import { siteOrigin } from '@/lib/site-url'
+
 export const dynamic = 'force-dynamic'
 
 // Emails a user/supplier whenever an in-app notification (lib/notifications.ts
@@ -55,7 +57,7 @@ export async function POST(req: Request) {
     .from('profiles').select('email, full_name').eq('id', payload.userId).maybeSingle()
   if (!profile?.email) return NextResponse.json({ sent: false, error: 'recipient has no email on file' })
 
-  const origin = process.env.NEXT_PUBLIC_SITE_URL || new URL(req.url).origin
+  const origin = siteOrigin(req)
   const link = payload.link ? `${origin}${payload.link}` : null
   const featured = await getFeaturedExperiences(origin)
 

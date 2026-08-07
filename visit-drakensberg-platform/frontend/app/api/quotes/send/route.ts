@@ -5,6 +5,8 @@ import { sendMail } from '@/lib/mailer'
 import { formatMoney as money } from '@/lib/allocation'
 import { emailShell, ctaButton, detailTable, esc, getFeaturedExperiences } from '@/lib/email-layout'
 
+import { siteOrigin } from '@/lib/site-url'
+
 export const dynamic = 'force-dynamic'
 
 // Emails the customer their quote link. Same SMTP pattern as
@@ -30,7 +32,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ sent: false, error: 'quote has no customer email' })
   }
 
-  const origin = process.env.NEXT_PUBLIC_SITE_URL || new URL(req.url).origin
+  const origin = siteOrigin(req)
   const quoteUrl = `${origin}/quotes/${quote.id}`
   const featured = await getFeaturedExperiences(origin)
 

@@ -5,6 +5,8 @@ import { sendMail } from '@/lib/mailer'
 import { formatMoney as money } from '@/lib/allocation'
 import { emailShell, ctaButton, detailTable, esc, getFeaturedExperiences, type FeaturedExperience } from '@/lib/email-layout'
 
+import { siteOrigin } from '@/lib/site-url'
+
 export const dynamic = 'force-dynamic'
 
 // Emails a customer their invoice link — the counterpart to
@@ -103,7 +105,7 @@ export async function POST(req: Request) {
     })
   }
 
-  const origin = process.env.NEXT_PUBLIC_SITE_URL || new URL(req.url).origin
+  const origin = siteOrigin(req)
   const featured = await getFeaturedExperiences(origin)
 
   // Just the invoice's address. The id in it is 'inv-' + a v4 UUID, which is

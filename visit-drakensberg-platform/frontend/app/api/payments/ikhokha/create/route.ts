@@ -7,6 +7,8 @@ import { supabaseAdmin } from '@/lib/supabase-admin'
 import { maxTip, tippableTotal } from '@/lib/tips'
 import type { InvoiceLine } from '@/lib/invoices'
 
+import { siteOrigin } from '@/lib/site-url'
+
 export const dynamic = 'force-dynamic'
 
 /**
@@ -124,7 +126,7 @@ export async function POST(req: Request) {
 
   const chargeAmount = Math.round((balance + tip) * 100) / 100
 
-  const origin = process.env.NEXT_PUBLIC_SITE_URL || new URL(req.url).origin
+  const origin = siteOrigin(req)
   const externalTransactionID = `${invoice.id}-${Date.now()}`
 
   const returnUrls = body.bookingId

@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import toast from 'react-hot-toast'
-import { Save, CheckCircle, MessageCircle, ChevronRight } from 'lucide-react'
+import { Save, CheckCircle, MessageCircle, ChevronRight, AlertTriangle } from 'lucide-react'
 import { getSiteContent, setSiteContent, SITE_CONTENT_DEFAULTS } from '@/lib/site-content'
 import { getFinanceSettings, setFinanceSettings } from '@/lib/invoices'
 
@@ -183,6 +183,106 @@ function TaxSettingsCard() {
 
 type PlatformSettings = typeof SITE_CONTENT_DEFAULTS.platform_settings
 
+type PaymentStatus = {
+  configured: boolean
+  mode: 'live' | 'test'
+  rawMode: string | null
+  hasEntityId: boolean
+  hasExternalEntityId: boolean
+  siteUrlSet: boolean
+  origin: string
+}
+
+/**
+ * Whether card payments are taking real money — read-only, because it is
+ * decided by environment variables on the host, not by anything in here.
+ *
+ * It exists because there was no way to tell from inside the product, and a
+ * site stuck in test mode looks identical to a working one: customers get a
+ * payment page, it says "paid", and nothing reaches the bank.
+ */
+function PaymentModeCard() {
+  const [status, setStatus] = useState<PaymentStatus | null>(null)
+  const [failed, setFailed] = useState(false)
+
+  useEffect(() => {
+    fetch('/api/payments/ikhokha/status')
+      .then(r => (r.ok ? r.json() : Promise.reject(new Error(String(r.status)))))
+      .then(setStatus)
+      .catch(() => setFailed(true))
+  }, [])
+
+  const live = status?.mode === 'live'
+  // A value that isn't exactly 'live' but looks like it was meant to be —
+  // 'Live', 'LIVE ', 'production' — is the failure that costs real money.
+  const looksMistyped = !!status && !live && !!status.rawMode && status.rawMode.toLowerCase() !== 'test'
+
+  const warnings = status ? [
+    !status.configured && 'No app credentials — IKHOKHA_APP_ID and IKHOKHA_APP_KEY are unset, so Pay Now is switched off entirely.',
+    looksMistyped && `IKHOKHA_MODE is "${status.rawMode}", which is not the exact string "live" — this site is taking test payments.`,
+    live && !status.hasEntityId && 'IKHOKHA_ENTITY_ID is unset, so the App ID is being sent as the merchant entity. That is a guess — set it explicitly.',
+    !status.siteUrlSet && 'NEXT_PUBLIC_SITE_URL is unset. Links fall back to the request host, which is usually right on Vercel but wrong for anything server-initiated.',
+  ].filter(Boolean) as string[] : []
+
+  return (
+    <div className="bg-white border border-gray-200 p-6">
+      <div className="flex items-center justify-between mb-1">
+        <h2 className="font-display italic text-xl">Card Payments</h2>
+        {status && (
+          <span className={`font-sans text-[10px] tracking-[0.14em] uppercase px-3 py-1 ${
+            !status.configured ? 'bg-gray-100 text-gray-500'
+            : live ? 'bg-[#2d6a4f]/10 text-[#2d6a4f]'
+            : 'bg-[#C9A96E]/20 text-[#8B6914]'}`}>
+            {!status.configured ? 'Not set up' : live ? 'Live — real money' : 'Test mode'}
+          </span>
+        )}
+      </div>
+      <p className="font-sans text-xs text-gray-400 mb-5">
+        Set on the host (Vercel), not here — changing it needs a redeploy to take effect.
+      </p>
+
+      {failed && <p className="font-sans text-sm text-gray-400">Could not read the payment configuration.</p>}
+      {!status && !failed && <p className="font-sans text-sm text-gray-400">Checking…</p>}
+
+      {status && (
+        <>
+          {!live && status.configured && !looksMistyped && (
+            <p className="font-sans text-sm text-gray-600 leading-relaxed mb-4">
+              Payments are in test mode. Customers see a working payment page and invoices are marked paid,
+              but no money moves. Set <code className="font-mono text-xs bg-[#F7F5F2] px-1.5 py-0.5">IKHOKHA_MODE=live</code> and
+              swap in your live iKhokha credentials to go live.
+            </p>
+          )}
+          {live && (
+            <p className="font-sans text-sm text-gray-600 leading-relaxed mb-4">
+              Payments are live. Every Pay Now charges the customer's card for real.
+            </p>
+          )}
+
+          {warnings.length > 0 && (
+            <ul className="space-y-2 mb-4">
+              {warnings.map(w => (
+                <li key={w} className="flex gap-2 bg-amber-50 border border-amber-200 px-3 py-2 font-sans text-xs text-amber-800 leading-relaxed">
+                  <AlertTriangle size={14} className="shrink-0 mt-0.5" /> {w}
+                </li>
+              ))}
+            </ul>
+          )}
+
+          <dl className="grid grid-cols-[auto,1fr] gap-x-6 gap-y-1.5 font-sans text-xs">
+            <dt className="text-gray-400">App credentials</dt>
+            <dd className={status.configured ? 'text-gray-700' : 'text-red-500'}>{status.configured ? 'Set' : 'Missing'}</dd>
+            <dt className="text-gray-400">Merchant entity</dt>
+            <dd className="text-gray-700">{status.hasEntityId ? 'Set' : 'Falling back to App ID'}</dd>
+            <dt className="text-gray-400">Links & callbacks use</dt>
+            <dd className="text-gray-700 break-all">{status.origin || '—'}</dd>
+          </dl>
+        </>
+      )}
+    </div>
+  )
+}
+
 export default function AdminSettingsPage() {
   const [saved, setSaved] = useState(false)
   const [saving, setSaving] = useState(false)
@@ -226,6 +326,7 @@ export default function AdminSettingsPage() {
       <div className="max-w-2xl space-y-8">
         <BusinessDetailsCard />
         <TaxSettingsCard />
+        <PaymentModeCard />
 
         {/* Integrations */}
         <Link href="/admin/settings/channels" className="block bg-white border border-gray-200 p-6 hover:border-[#2d6a4f] transition-colors group">

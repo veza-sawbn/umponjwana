@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server'
 import { getPaymentLinkStatus } from '@/lib/ikhokha'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 
+import { siteOrigin } from '@/lib/site-url'
+
 export const dynamic = 'force-dynamic'
 
 // iKhokha calls this URL when a payment link's status changes. The callback
@@ -118,7 +120,7 @@ export async function POST(req: Request) {
     // Fire-and-forget the same receipt email + in-app notification a manual
     // payment gets, authenticating as a trusted internal caller since there's
     // no customer session here.
-    const origin = process.env.NEXT_PUBLIC_SITE_URL || new URL(req.url).origin
+    const origin = siteOrigin(req)
     fetch(`${origin}/api/receipts/send`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${process.env.SUPABASE_SERVICE_ROLE_KEY}` },
