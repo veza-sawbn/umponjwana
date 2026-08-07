@@ -165,6 +165,17 @@ begin
 end;
 $$;
 
+-- Links already emailed with '?t=' keep working, through the same lookup —
+-- vd_invoice_public's token branch is what 20260808's function did, so this
+-- is now a thin alias rather than a second copy of the payload builder.
+create or replace function public.vd_invoice_by_token(p_token text)
+returns jsonb language plpgsql stable security definer set search_path = public as $$
+begin
+  if p_token is null or length(p_token) < 32 then return null; end if;
+  return vd_invoice_public(p_token);
+end;
+$$;
+
 -- ────────────────────────────────────────────────────────────────────────────
 -- 3. Paying it. The gateway call is made server-side by the API route, which
 --    needs the invoice's payable state without a session behind it. Same
@@ -305,6 +316,7 @@ $$;
 
 grant execute on function public.vd_is_unguessable_ref(text)        to anon, authenticated;
 grant execute on function public.vd_invoice_public(text)            to anon, authenticated;
+grant execute on function public.vd_invoice_by_token(text)          to anon, authenticated;
 grant execute on function public.vd_mark_invoice_viewed(text, text) to anon, authenticated;
 
 -- Service-role only (see section 3).
