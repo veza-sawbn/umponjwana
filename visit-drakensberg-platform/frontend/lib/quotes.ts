@@ -152,6 +152,27 @@ export async function acceptQuote(id: string): Promise<{ orderId: string; invoic
   return { orderId: data.orderId, invoiceId: data.invoiceId }
 }
 
+/**
+ * The share token for the invoice a quote turned into.
+ *
+ * A guest accepting a quote has no account, so the invoice they were just
+ * redirected to would be unopenable to them — the quote link they already
+ * hold is traded for the invoice's own link instead. Returns null on a
+ * database that predates 20260808_invoice_share_links.sql.
+ */
+export async function getQuoteInvoiceLink(
+  id: string,
+): Promise<{ invoiceId: string; shareToken: string } | null> {
+  try {
+    const { data } = await supabase.rpc('vd_quote_invoice_link', { p_quote_id: id })
+    const link = data as { invoiceId?: string; shareToken?: string } | null
+    if (link?.invoiceId && link.shareToken) {
+      return { invoiceId: link.invoiceId, shareToken: link.shareToken }
+    }
+  } catch {}
+  return null
+}
+
 export async function declineQuote(id: string): Promise<void> {
   const { error } = await supabase.rpc('vd_decline_quote', { p_quote_id: id })
   if (error) throw new Error(error.message || 'Could not decline quote')

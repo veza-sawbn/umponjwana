@@ -113,7 +113,12 @@ export async function POST(req: Request) {
   const email = order.customer_email as string
   const isRefund = Number(receipt.amount) < 0
   const origin = process.env.NEXT_PUBLIC_SITE_URL || new URL(req.url).origin
-  const invoiceUrl = `${origin}/invoices/${invoice?.id ?? order.id}`
+  // Same share token as the invoice email: the customer we're thanking for a
+  // payment is usually the one who never had an account to sign in with. A
+  // revoked link is simply left off — a receipt still goes out, it just
+  // doesn't hand back access someone deliberately withdrew.
+  const shareToken = invoice?.share_revoked_at ? null : invoice?.share_token
+  const invoiceUrl = `${origin}/invoices/${invoice?.id ?? order.id}${shareToken ? `?t=${shareToken}` : ''}`
 
   let sent = false
   let sendError: string | null = null
