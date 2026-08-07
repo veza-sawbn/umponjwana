@@ -43,6 +43,12 @@ export type Invoice = {
   share_issued_at?: string | null
   /** Set while the link is withdrawn; cleared by re-issuing. */
   share_revoked_at?: string | null
+  /**
+   * Whether the invoice still opens on its bare address. False once it has
+   * been revoked — permanently, so that re-issuing hands out a fresh token
+   * link rather than reviving the URL that leaked.
+   */
+  share_id_access?: boolean | null
   first_viewed_at?: string | null
   last_viewed_at?: string | null
   view_count?: number | null
@@ -111,27 +117,48 @@ export async function getInvoiceById(id: string): Promise<Invoice | null> {
   return getInvoiceByOrder(id)
 }
 
+function asSharedInvoice(data: unknown): SharedInvoice | null {
+  if (!data || !(data as { invoice?: Invoice }).invoice) return null
+  const bundle = data as { invoice: Invoice; order: InvoiceCustomerOrder | null; receipts: Receipt[] }
+  return {
+    invoice: bundle.invoice,
+    order: bundle.order ?? null,
+    receipts: Array.isArray(bundle.receipts) ? bundle.receipts : [],
+  }
+}
+
 /**
- * Reads an invoice with its share token, through a SECURITY DEFINER function
- * rather than the table — so it works with no session at all, which is the
+ * Opens an invoice from its own link, with no session at all — which is the
  * whole point: the customer we emailed usually has no account, and a guest
  * order has no user_id for RLS to match in the first place.
  *
- * Returns null for a token that matches nothing, and for a database that
- * hasn't run the share-link migration yet (the caller falls back to the
- * signed-in path).
+ * `ref` is whatever the URL carries: the invoice id, its order's id, or a
+ * share token from a link sent before ids alone were enough. The database
+ * decides what qualifies as a credential (it requires an embedded UUID, so a
+ * sequential invoice number is refused) and whether the link is still live.
+ *
+ * Returns null for a reference that matches nothing, and on a database that
+ * hasn't run the migration yet — the caller then falls back to the signed-in
+ * path.
+ */
+export async function getInvoicePublic(ref: string): Promise<SharedInvoice | null> {
+  try {
+    const { data } = await supabase.rpc('vd_invoice_public', { p_ref: ref })
+    const shared = asSharedInvoice(data)
+    if (shared) return shared
+  } catch {}
+  return null
+}
+
+/**
+ * The pre-20260810 lookup, kept for databases that have run the share-link
+ * migrations but not yet the one that made ids sufficient.
  */
 export async function getInvoiceByToken(token: string): Promise<SharedInvoice | null> {
   try {
     const { data } = await supabase.rpc('vd_invoice_by_token', { p_token: token })
-    if (data && (data as { invoice?: Invoice }).invoice) {
-      const bundle = data as { invoice: Invoice; order: InvoiceCustomerOrder | null; receipts: Receipt[] }
-      return {
-        invoice: bundle.invoice,
-        order: bundle.order ?? null,
-        receipts: Array.isArray(bundle.receipts) ? bundle.receipts : [],
-      }
-    }
+    const shared = asSharedInvoice(data)
+    if (shared) return shared
   } catch {}
   return null
 }
@@ -153,23 +180,26 @@ export async function markInvoiceViewed(opts: { token?: string | null; invoiceId
 /**
  * The link to hand a customer over any channel — email, WhatsApp, SMS.
  *
- * The token rides in the query string so the invoice opens without a login.
- * Without one (an old row, or a database still to be migrated) this is still
- * a valid link — it just needs the customer to be signed in as the account
- * that owns the invoice, which is the behaviour that prompted all this.
+ * Normally just the invoice's own address: the id it already contains is
+ * 'inv-' plus a v4 UUID, credential enough to open and pay without signing
+ * in, so there is no second secret to append and nothing for a chat client to
+ * truncate off the end.
+ *
+ * The exception is an invoice whose link was once revoked. Its id stops
+ * opening it permanently — otherwise re-issuing would revive the copy that
+ * leaked — so those carry a rotatable token instead.
  */
 export function invoiceShareUrl(
-  invoice: Pick<Invoice, 'id' | 'share_token' | 'share_revoked_at'>,
+  invoice: Pick<Invoice, 'id' | 'share_token' | 'share_id_access'>,
   origin?: string,
 ): string {
   const base = origin
     ?? (typeof window !== 'undefined' ? window.location.origin : (process.env.NEXT_PUBLIC_SITE_URL || ''))
-  // A revoked invoice still holds a token — a rotated one nobody was given.
-  // Never put it in a URL, so no path can hand out a link the database will
-  // refuse anyway.
-  const token = invoice.share_revoked_at ? null : invoice.share_token
-  const path = `/invoices/${encodeURIComponent(invoice.id)}${token ? `?t=${token}` : ''}`
-  return `${base}${path}`
+  const path = `/invoices/${encodeURIComponent(invoice.id)}`
+  // share_id_access is undefined on a database that hasn't run 20260810 —
+  // treat that as the plain link, which is what those databases understand.
+  const needsToken = invoice.share_id_access === false && !!invoice.share_token
+  return `${base}${path}${needsToken ? `?t=${invoice.share_token}` : ''}`
 }
 
 /**
