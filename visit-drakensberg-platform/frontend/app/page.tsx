@@ -1,15 +1,15 @@
 'use client'
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useRef, useMemo } from 'react'
 import Link from 'next/link'
 import toast from 'react-hot-toast'
-import { ArrowRight, X } from 'lucide-react'
+import { ArrowRight, ChevronDown, X } from 'lucide-react'
 import { supabase } from '@/lib/auth'
-import { motion } from 'framer-motion'
+import { motion, AnimatePresence } from 'framer-motion'
 import BergSearch from '@/components/search/BergSearch'
 import Footer from '@/components/layout/Footer'
 import { getAllSiteContent, SITE_CONTENT_DEFAULTS, type HomeCard } from '@/lib/site-content'
 import { useSiteSection } from '@/lib/use-site-section'
-import { staggerContainer, staggerChild } from '@/lib/motion'
+import { staggerContainer, staggerChild, fadeUp } from '@/lib/motion'
 import { useEditMode } from '@/lib/edit-mode-context'
 import Editable from '@/components/editor/Editable'
 import EditableSection from '@/components/editor/EditableSection'
@@ -70,6 +70,122 @@ function cardDimClass(card: HomeCard, inEditor: boolean) {
   return inEditor && card.visible === false ? 'opacity-35' : ''
 }
 
+/* ─── Hero ───────────────────────────────────────────────────────────────────── */
+
+const HERO_SLIDE_SECONDS = 7
+const HERO_FADE_SECONDS = 1.5
+const HERO_OVERSCALE = 1.12
+
+function HeroCarousel({ images }: { images: string[] }) {
+  const [index, setIndex] = useState(0)
+  const hasCycledRef = useRef(false)
+
+  useEffect(() => {
+    setIndex(0)
+    hasCycledRef.current = false
+    images.forEach(src => { const img = new window.Image(); img.src = src })
+    if (images.length < 2) return
+    const id = setInterval(() => {
+      hasCycledRef.current = true
+      setIndex(i => (i + 1) % images.length)
+    }, HERO_SLIDE_SECONDS * 1000)
+    return () => clearInterval(id)
+  }, [images])
+
+  const panFromLeft = index % 2 === 0
+  const isFirstSlide = !hasCycledRef.current
+
+  return (
+    <AnimatePresence>
+      <motion.div
+        key={index}
+        className="absolute inset-0 overflow-hidden"
+        initial={{ opacity: isFirstSlide ? 1 : 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        transition={{ duration: HERO_FADE_SECONDS, ease: 'easeInOut' }}
+      >
+        <motion.img
+          src={images[index]}
+          alt="Drakensberg mountains"
+          className="w-full h-full object-cover"
+          fetchPriority={isFirstSlide ? 'high' : 'auto'}
+          loading="eager"
+          initial={{ scale: HERO_OVERSCALE, x: panFromLeft ? '-3%' : '3%', y: '-2%' }}
+          animate={{ scale: HERO_OVERSCALE, x: panFromLeft ? '3%' : '-3%', y: '2%' }}
+          transition={{ duration: HERO_SLIDE_SECONDS + HERO_FADE_SECONDS, ease: 'linear' }}
+        />
+      </motion.div>
+    </AnimatePresence>
+  )
+}
+
+function HeroSection({ hero }: { hero: typeof SITE_CONTENT_DEFAULTS.hero }) {
+  const editMode = useEditMode()
+  const headline = editMode?.getValue('hero', 'headline', hero.headline) ?? hero.headline
+  const subheadline = editMode?.getValue('hero', 'subheadline', hero.subheadline) ?? hero.subheadline
+  const locationLabel = editMode?.getValue('hero', 'location_label', hero.location_label) ?? hero.location_label
+  const imageUrl = String(editMode?.getValue('hero', 'image_url', hero.image_url) ?? hero.image_url)
+  const carouselImages = (editMode?.getValue('hero', 'images', hero.images) ?? hero.images) as string[]
+  const overlayOpacity = Number(editMode?.getValue('hero', 'overlay_opacity', hero.overlay_opacity) ?? hero.overlay_opacity)
+
+  return (
+    <EditableSection id="hero" label="Hero" className="relative h-screen min-h-[600px] flex flex-col">
+      <div className="absolute inset-0 bg-slate-900">
+        {hero.video_url ? (
+          <video src={hero.video_url} autoPlay muted loop playsInline className="w-full h-full object-cover" />
+        ) : carouselImages.length > 1 ? (
+          <HeroCarousel images={carouselImages} />
+        ) : (
+          <Editable section="hero" fieldKey="image_url" value={imageUrl} label="Background Image" type="image">
+            <img
+              src={imageUrl}
+              alt="Drakensberg mountains"
+              className="w-full h-full object-cover"
+              fetchPriority="high"
+              loading="eager"
+            />
+          </Editable>
+        )}
+        <div
+          className="absolute inset-0 bg-gradient-to-b from-black/50 via-black/20 to-black/60"
+          style={{ opacity: overlayOpacity / 100 + 0.3 }}
+        />
+      </div>
+
+      <motion.div
+        className="relative flex-1 flex flex-col justify-end pb-20 pt-32 lg:pt-0 px-6 lg:px-20 max-w-[1440px] mx-auto w-full"
+        variants={staggerContainer(0.12, 0.2)}
+        initial="hidden"
+        animate="show"
+      >
+        <Editable section="hero" fieldKey="location_label" value={locationLabel} label="Location Label" type="text">
+          <motion.p variants={fadeUp} className="font-sans text-xs tracking-[0.2em] uppercase text-gold mb-4">
+            {locationLabel}
+          </motion.p>
+        </Editable>
+        <Editable section="hero" fieldKey="headline" value={headline} label="Headline" type="textarea">
+          <motion.h1 variants={fadeUp} className="font-display text-4xl sm:text-7xl lg:text-8xl text-white leading-[0.9] mb-6 max-w-3xl" style={{ whiteSpace: 'pre-line' }}>
+            {headline}
+          </motion.h1>
+        </Editable>
+        <Editable section="hero" fieldKey="subheadline" value={subheadline} label="Subheadline" type="textarea">
+          <motion.p variants={fadeUp} className="font-sans text-base text-white/70 max-w-md mb-10 font-light leading-relaxed">
+            {subheadline}
+          </motion.p>
+        </Editable>
+        <motion.div variants={fadeUp} className="w-full">
+          <BergSearch />
+        </motion.div>
+      </motion.div>
+
+      <div className="absolute bottom-6 left-1/2 -translate-x-1/2 flex flex-col items-center gap-1 text-white/40">
+        <ChevronDown className="w-5 h-5 animate-bounce-slow" />
+      </div>
+    </EditableSection>
+  )
+}
+
 /* ─── Events & Experiences columns ──────────────────────────────────────────── */
 
 function MiniListItem({ item }: { item: MiniListItemData }) {
@@ -113,6 +229,7 @@ function ExperienceColumn({ title, viewAllHref, items, emptyText }: { title: str
 /* ─── Component ─────────────────────────────────────────────────────────────── */
 
 export default function HomePage() {
+  const [hero, setHero] = useState(SITE_CONTENT_DEFAULTS.hero)
   const [promos, setPromos] = useState(SITE_CONTENT_DEFAULTS.promotions)
   const hs = useSiteSection('home_sections') as unknown as Record<string, string>
   const cards = useSiteSection('home_cards')
@@ -156,6 +273,7 @@ export default function HomePage() {
 
   useEffect(() => {
     getAllSiteContent().then(content => {
+      setHero(content.hero)
       setPromos(content.promotions)
     })
     getTrails().then(all => setTrails(all.filter(t => t.status === 'published')))
@@ -524,7 +642,7 @@ export default function HomePage() {
       )}
 
       {/* ── Hero ── */}
-      <BergSearch />
+      <HeroSection hero={hero} />
 
       {/* ── Reorderable sections ── */}
       {orderedSections}
