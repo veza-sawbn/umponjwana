@@ -121,13 +121,13 @@ export default function BergSearch() {
       {/* ── pill search bar ── */}
       <div className={`
         flex items-center gap-3
-        bg-black/30 backdrop-blur-md
+        bg-black/40 backdrop-blur-lg
         border rounded-full
         px-4 py-2.5
         transition-all duration-300
         ${focused
-          ? 'border-gold shadow-[0_0_0_3px_rgba(201,169,110,0.25),0_12px_40px_rgba(0,0,0,0.45)]'
-          : 'border-white/25 shadow-[0_8px_32px_rgba(0,0,0,0.4)]'}
+          ? 'border-gold shadow-[0_0_0_3px_rgba(201,169,110,0.22),0_16px_48px_rgba(0,0,0,0.55)]'
+          : 'border-white/20 shadow-[0_8px_36px_rgba(0,0,0,0.5)]'}
       `}>
         {/* star mark */}
         <span
@@ -150,7 +150,7 @@ export default function BergSearch() {
           onKeyDown={e => e.key === 'Enter' && run(null)}
           placeholder={PLACEHOLDERS[phIndex]}
           aria-label="Ask about the Drakensberg"
-          className="flex-1 min-w-0 bg-transparent border-0 outline-none font-sans text-sm text-white placeholder:text-white/45 caret-gold"
+          className="flex-1 min-w-0 bg-transparent border-0 outline-none font-sans text-[15px] text-white placeholder:text-white/50 caret-gold"
         />
 
         {/* mic */}
@@ -187,12 +187,12 @@ export default function BergSearch() {
               onKeyDown={e => e.key === 'Enter' && run(chip)}
               className="
                 inline-flex items-center gap-1.5
-                bg-black/30 backdrop-blur-sm
+                bg-black/35 backdrop-blur-md
                 border border-white/20 rounded-full
                 px-3.5 py-2
-                font-sans text-[12.5px] font-light text-white/80
+                font-sans text-[12.5px] font-light text-white/85
                 cursor-pointer select-none
-                hover:border-gold/60 hover:text-white hover:bg-black/40
+                hover:border-gold/55 hover:text-white hover:bg-black/50
                 transition-all duration-200
               "
             >
