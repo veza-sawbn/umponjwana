@@ -37,12 +37,32 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: false }, { status: 502 })
   }
 
-  const paid = /success|paid|complete/i.test(String(status?.status ?? status?.responseCode ?? ''))
+  // Use word-boundary matching so "complete" never matches "completed".
+  // iKhokha sets the payment link's lifecycle status to "completed" when the
+  // customer finishes the payment flow — regardless of whether the card was
+  // approved or declined. The previous substring pattern /success|paid|complete/i
+  // therefore matched "completed" for both outcomes, causing declined payments
+  // to be recorded as paid. \b anchors require the matched word to stand alone,
+  // so "completed", "uncompleted", "unpaid", etc. are all rejected.
+  const paid = /\b(success|paid|complete)\b/i.test(
+    String(status?.status ?? status?.responseCode ?? ''),
+  )
 
   if (!paid) {
     await admin.from('vd_payment_links')
       .update({ status: 'failed', raw_status_response: status, updated_at: new Date().toISOString() })
       .eq('id', link.id)
+
+    // Stamp the decline on the invoice itself so the customer sees accurate
+    // status when they return to the invoice page later — not only via the
+    // ?payment=failed redirect that disappears after the first page load.
+    if (link.invoice_id) {
+      await admin.from('vd_invoices')
+        .update({ payment_declined_at: new Date().toISOString(), updated_at: new Date().toISOString() })
+        .eq('id', link.invoice_id)
+        .neq('status', 'paid') // never overwrite an already-settled invoice
+    }
+
     return NextResponse.json({ ok: true })
   }
 

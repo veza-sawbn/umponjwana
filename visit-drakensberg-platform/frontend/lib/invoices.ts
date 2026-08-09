@@ -52,6 +52,14 @@ export type Invoice = {
   first_viewed_at?: string | null
   last_viewed_at?: string | null
   view_count?: number | null
+  /**
+   * Set by the webhook when iKhokha reports a non-success payment outcome
+   * (declined, failed). Null when no online payment attempt has been declined,
+   * or once the invoice has been fully paid. Used to show a persistent "payment
+   * was declined" banner on the invoice page even after the ?payment=failed
+   * redirect param has been lost.
+   */
+  payment_declined_at?: string | null
 }
 
 /** The order header an invoice document prints — no allocation or payout data. */
