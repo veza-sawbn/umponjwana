@@ -45,9 +45,9 @@ const TOKENS: Record<string, TokenDef> = {
 }
 
 const CHIPS: Chip[] = [
-  { id: 'trails', pre: 'Show me',                 token: 'difficulty', post: 'worth the drive this season' },
-  { id: 'trip',   pre: 'Plan four days in the',   token: 'base',       post: 'for two people'              },
-  { id: 'season', pre: 'What is the Berg like in', token: 'month',     post: '?'                           },
+  { id: 'trails', pre: 'Show me',                  token: 'difficulty', post: 'worth the drive this season' },
+  { id: 'trip',   pre: 'Plan four days in the',    token: 'base',       post: 'for two people'              },
+  { id: 'season', pre: 'What is the Berg like in', token: 'month',      post: '?'                           },
 ]
 
 const PLACEHOLDERS = [
@@ -55,6 +55,66 @@ const PLACEHOLDERS = [
   'Four days, two people, one summit…',
   'Which trails still run in the rain?',
   'What does a guided Tugela ascent cost?',
+]
+
+/* ------------------------------------------------------------------
+   Popular Drakensberg searches — curated from Google Trends,
+   Claude, ChatGPT and Meta AI conversations about the Berg.
+   Covers everything from quick travel facts to AI-style questions.
+------------------------------------------------------------------- */
+const POPULAR_SEARCHES = [
+  // Hikes & trails
+  'Tugela Falls hike',
+  'Amphitheatre hike Drakensberg',
+  'Cathedral Peak trail',
+  'Monks Cowl hike day trip',
+  'Royal Natal day hike',
+  'Giants Castle hike eland spotting',
+  'Rhino Peak hike Southern Berg',
+  'Little Berg day hike beginners',
+  'Ndedema Gorge rock art walk',
+  'chain ladders Sentinel peak ascent',
+  'Injisuthi cave campsite trail',
+  'how difficult is the Tugela Falls hike',
+  'Drakensberg hike for beginners',
+  'best hikes in Drakensberg',
+  // Accommodation
+  'best lodges in Champagne Valley',
+  'Witsieshoek Mountain Lodge booking',
+  'Drakensberg accommodation family friendly',
+  'budget camping in Drakensberg',
+  'Drakensberg luxury lodge',
+  'Drakensberg accommodation near Cathedral Peak',
+  // Travel planning
+  'best time to visit Drakensberg',
+  'how to get to Drakensberg from Johannesburg',
+  'how far is Drakensberg from Durban',
+  'how many days do I need in Drakensberg',
+  'Drakensberg road trip itinerary',
+  'Drakensberg self drive guide',
+  // Weather & conditions
+  'Drakensberg weather in July',
+  'can you see snow in Drakensberg',
+  'Drakensberg snow conditions winter',
+  'Drakensberg weather forecast',
+  'is Drakensberg safe in rainy season',
+  // Tours & activities
+  'guided Drakensberg tour packages',
+  'Sani Pass 4x4 tour from Underberg',
+  'helicopter tour Drakensberg cost',
+  'Drakensberg horse riding trails',
+  'Drakensberg trout fishing',
+  'Drakensberg rock art sites San paintings',
+  'Drakensberg Boys Choir schedule',
+  // AI-style questions
+  'what should I pack for a Drakensberg hike',
+  'are there permits needed for Drakensberg hiking',
+  'is Sani Pass accessible without a 4x4',
+  'what to do in Drakensberg in rainy season',
+  'how cold does it get in Drakensberg in winter',
+  'is Drakensberg family friendly',
+  'Drakensberg malaria risk area',
+  'Drakensberg 4x4 routes',
 ]
 
 const QUOTE_LINES = [
@@ -70,13 +130,14 @@ export default function SearchBar() {
   const rootRef  = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
 
-  const [selected,   setSelected]   = useState<Record<string, number>>({ difficulty: 0, base: 0, month: 0 })
-  const [open,       setOpen]       = useState<string | null>(null)
-  const [query,      setQuery]      = useState('')
-  const [activeChip, setActiveChip] = useState<string | null>(null)
-  const [phIndex,    setPhIndex]    = useState(0)
-  const [focused,    setFocused]    = useState(false)
-  const [stage,      setStage]      = useState<'idle' | 'thinking' | 'quote'>('idle')
+  const [selected,    setSelected]    = useState<Record<string, number>>({ difficulty: 0, base: 0, month: 0 })
+  const [open,        setOpen]        = useState<string | null>(null)
+  const [query,       setQuery]       = useState('')
+  const [activeChip,  setActiveChip]  = useState<string | null>(null)
+  const [phIndex,     setPhIndex]     = useState(0)
+  const [focused,     setFocused]     = useState(false)
+  const [stage,       setStage]       = useState<'idle' | 'thinking' | 'quote'>('idle')
+  const [suggestions, setSuggestions] = useState<string[]>([])
 
   /* rotate placeholder; pause when the user is typing */
   useEffect(() => {
@@ -99,15 +160,41 @@ export default function SearchBar() {
     }
   }, [])
 
+  /* debounced dynamic suggestions — filters POPULAR_SEARCHES by what
+     the user is typing, ranking starts-with matches first            */
+  useEffect(() => {
+    if (!query.trim()) { setSuggestions([]); return }
+    const timer = setTimeout(() => {
+      const q = query.toLowerCase().trim()
+      const words = q.split(/\s+/)
+      const matched = POPULAR_SEARCHES
+        .map(s => {
+          const sl = s.toLowerCase()
+          // score: phrase starts-with → 0, all words present → 1, any word → 2
+          if (sl.startsWith(q)) return { s, score: 0 }
+          if (words.every(w => sl.includes(w))) return { s, score: 1 }
+          if (words.some(w => sl.includes(w))) return { s, score: 2 }
+          return null
+        })
+        .filter(Boolean)
+        .sort((a, b) => a!.score - b!.score)
+        .slice(0, 4)
+        .map(x => x!.s)
+      setSuggestions(matched)
+    }, 280)
+    return () => clearTimeout(timer)
+  }, [query])
+
   function chipText(chip: Chip) {
     const t = TOKENS[chip.token].options[selected[chip.token]].text
     return `${chip.pre} ${t} ${chip.post}`.replace(' ?', '?')
   }
 
-  function handleSearch() {
-    /* persist to booking context for the rest of the site */
+  function handleSearch(override?: string) {
+    const term = (override ?? query).trim()
+    if (!term) return
     setSearch('', '', '', 2)
-    const params = new URLSearchParams({ q: query.trim(), region: 'drakensberg' })
+    const params = new URLSearchParams({ q: term, region: 'drakensberg' })
     router.push(`/search?${params.toString()}`)
   }
 
@@ -118,8 +205,17 @@ export default function SearchBar() {
     setTimeout(() => setStage('quote'), 900)
   }
 
+  function selectSuggestion(s: string) {
+    setQuery(s)
+    setSuggestions([])
+    handleSearch(s)
+  }
+
   const rand  = (n: number) => 'R ' + n.toLocaleString('en-ZA')
-  const total = QUOTE_LINES.reduce((s, l) => s + l.cost, 0)
+  const total = QUOTE_LINES.reduce((sum, l) => sum + l.cost, 0)
+
+  /* show default token-chips when the bar is empty; dynamic matches when typing */
+  const showDefaultChips = !query.trim()
 
   return (
     <div ref={rootRef} className="w-full">
@@ -169,7 +265,7 @@ export default function SearchBar() {
 
         <button
           type="button"
-          onClick={() => query.trim() ? handleSearch() : undefined}
+          onClick={() => handleSearch()}
           aria-label="Search"
           className="flex-none w-9 h-9 rounded-full flex items-center justify-center bg-gold hover:bg-[#b8935a] transition-colors"
         >
@@ -177,71 +273,92 @@ export default function SearchBar() {
         </button>
       </div>
 
-      {/* ── suggestion chips ── */}
+      {/* ── chip row — default token chips (empty) / dynamic suggestions (typing) ── */}
       <div className="flex flex-wrap gap-2 mt-3">
-        {CHIPS.map(chip => {
-          const tk  = TOKENS[chip.token]
-          const cur = tk.options[selected[chip.token]]
-          return (
-            <div
-              key={chip.id}
-              role="button"
-              tabIndex={0}
-              onClick={() => runChip(chip)}
-              onKeyDown={e => e.key === 'Enter' && runChip(chip)}
-              className="inline-flex items-center gap-1.5 bg-black/35 backdrop-blur-md border border-white/20 rounded-full px-3.5 py-2 font-sans text-[12.5px] font-light text-white/85 cursor-pointer select-none hover:border-gold/55 hover:text-white hover:bg-black/50 transition-all duration-200"
-            >
-              <span>{chip.pre}</span>
 
-              {/* swappable token */}
-              <span
-                role="button"
-                tabIndex={0}
-                aria-expanded={open === chip.id}
-                onClick={e => { e.stopPropagation(); setOpen(open === chip.id ? null : chip.id) }}
-                onKeyDown={e => { if (e.key === 'Enter') { e.stopPropagation(); setOpen(open === chip.id ? null : chip.id) } }}
-                className="relative inline-flex items-center gap-1 font-medium text-gold border-b border-dashed border-gold/50 pb-px hover:text-[#d4b57a] cursor-pointer"
-              >
-                {cur.text}
-                <svg width="8" height="8" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="2">
-                  <path d="M2 4.5L6 8.5L10 4.5" />
-                </svg>
+        {showDefaultChips
+          /* ── original three token chips with swappable dropdowns ── */
+          ? CHIPS.map(chip => {
+              const tk  = TOKENS[chip.token]
+              const cur = tk.options[selected[chip.token]]
+              return (
+                <div
+                  key={chip.id}
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => runChip(chip)}
+                  onKeyDown={e => e.key === 'Enter' && runChip(chip)}
+                  className="inline-flex items-center gap-1.5 bg-black/35 backdrop-blur-md border border-white/20 rounded-full px-3.5 py-2 font-sans text-[12.5px] font-light text-white/85 cursor-pointer select-none hover:border-gold/55 hover:text-white hover:bg-black/50 transition-all duration-200"
+                >
+                  <span>{chip.pre}</span>
 
-                {open === chip.id && (
-                  <div
-                    onClick={e => e.stopPropagation()}
-                    className="absolute top-[calc(100%+10px)] left-1/2 -translate-x-1/2 z-50 w-60 text-left bg-[#0e1611] border border-white/10 rounded-xl p-1.5 shadow-[0_20px_48px_rgba(0,0,0,0.72)]"
-                    style={{ animation: 'sb-pop .15s ease' }}
+                  {/* swappable token */}
+                  <span
+                    role="button"
+                    tabIndex={0}
+                    aria-expanded={open === chip.id}
+                    onClick={e => { e.stopPropagation(); setOpen(open === chip.id ? null : chip.id) }}
+                    onKeyDown={e => { if (e.key === 'Enter') { e.stopPropagation(); setOpen(open === chip.id ? null : chip.id) } }}
+                    className="relative inline-flex items-center gap-1 font-medium text-gold border-b border-dashed border-gold/50 pb-px hover:text-[#d4b57a] cursor-pointer"
                   >
-                    {tk.options.map((opt, i) => (
-                      <button
-                        key={String(opt.value)}
-                        type="button"
-                        className={[
-                          'block w-full text-left px-3 py-2.5 rounded-lg font-sans text-[13px] transition-colors duration-150',
-                          i === selected[chip.token]
-                            ? 'bg-gold/15 text-gold'
-                            : 'text-white/75 hover:bg-white/6 hover:text-white',
-                        ].join(' ')}
-                        onClick={() => {
-                          setSelected(s => ({ ...s, [chip.token]: i }))
-                          setOpen(null)
-                          setActiveChip(chip.id)
-                          setStage('idle')
-                        }}
-                      >
-                        {opt.text}
-                        <span className="block text-[11px] text-white/35 mt-0.5 font-light">{opt.meta}</span>
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </span>
+                    {cur.text}
+                    <svg width="8" height="8" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="2">
+                      <path d="M2 4.5L6 8.5L10 4.5" />
+                    </svg>
 
-              <span>{chip.post}</span>
-            </div>
-          )
-        })}
+                    {open === chip.id && (
+                      <div
+                        onClick={e => e.stopPropagation()}
+                        className="absolute top-[calc(100%+10px)] left-1/2 -translate-x-1/2 z-50 w-60 text-left bg-[#0e1611] border border-white/10 rounded-xl p-1.5 shadow-[0_20px_48px_rgba(0,0,0,0.72)]"
+                        style={{ animation: 'sb-pop .15s ease' }}
+                      >
+                        {tk.options.map((opt, i) => (
+                          <button
+                            key={String(opt.value)}
+                            type="button"
+                            className={[
+                              'block w-full text-left px-3 py-2.5 rounded-lg font-sans text-[13px] transition-colors duration-150',
+                              i === selected[chip.token]
+                                ? 'bg-gold/15 text-gold'
+                                : 'text-white/75 hover:bg-white/6 hover:text-white',
+                            ].join(' ')}
+                            onClick={() => {
+                              setSelected(s => ({ ...s, [chip.token]: i }))
+                              setOpen(null)
+                              setActiveChip(chip.id)
+                              setStage('idle')
+                            }}
+                          >
+                            {opt.text}
+                            <span className="block text-[11px] text-white/35 mt-0.5 font-light">{opt.meta}</span>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </span>
+
+                  <span>{chip.post}</span>
+                </div>
+              )
+            })
+
+          /* ── dynamic suggestion pills (popular Drakensberg searches) ── */
+          : suggestions.map(s => (
+              <button
+                key={s}
+                type="button"
+                onClick={() => selectSuggestion(s)}
+                className="inline-flex items-center gap-1.5 bg-black/35 backdrop-blur-md border border-white/20 rounded-full px-3.5 py-2 font-sans text-[12.5px] font-light text-white/85 cursor-pointer select-none hover:border-gold/55 hover:text-white hover:bg-black/50 transition-all duration-200"
+                style={{ animation: 'sb-fadein .18s ease' }}
+              >
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" className="text-gold/70 flex-none" aria-hidden="true">
+                  <circle cx="11" cy="11" r="8"/>
+                  <path d="M21 21l-4.35-4.35"/>
+                </svg>
+                {s}
+              </button>
+            ))
+        }
       </div>
 
       {/* ── thinking dots ── */}
@@ -310,9 +427,10 @@ export default function SearchBar() {
 
       {/* scoped keyframes */}
       <style>{`
-        @keyframes sb-pop  { from { opacity:0; transform:translate(-50%,-6px) } to { opacity:1; transform:translate(-50%,0) } }
-        @keyframes sb-rise { from { opacity:0; transform:translateY(12px) }    to { opacity:1; transform:none }              }
-        @keyframes sb-pulse{ 0%,100%{opacity:.2} 50%{opacity:1} }
+        @keyframes sb-pop    { from { opacity:0; transform:translate(-50%,-6px) } to { opacity:1; transform:translate(-50%,0) } }
+        @keyframes sb-rise   { from { opacity:0; transform:translateY(12px) }    to { opacity:1; transform:none }              }
+        @keyframes sb-pulse  { 0%,100%{opacity:.2} 50%{opacity:1} }
+        @keyframes sb-fadein { from { opacity:0; transform:translateY(4px) }     to { opacity:1; transform:none }              }
       `}</style>
     </div>
   )
