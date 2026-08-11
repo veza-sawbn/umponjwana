@@ -5,7 +5,7 @@ import toast from 'react-hot-toast'
 import { ArrowRight, ChevronDown, X } from 'lucide-react'
 import { supabase } from '@/lib/auth'
 import { motion, AnimatePresence } from 'framer-motion'
-import BergSearch from '@/components/search/BergSearch'
+import SearchBar from '@/components/search/SearchBar'
 import Footer from '@/components/layout/Footer'
 import { getAllSiteContent, SITE_CONTENT_DEFAULTS, type HomeCard } from '@/lib/site-content'
 import { useSiteSection } from '@/lib/use-site-section'
@@ -175,7 +175,7 @@ function HeroSection({ hero }: { hero: typeof SITE_CONTENT_DEFAULTS.hero }) {
           </motion.p>
         </Editable>
         <motion.div variants={fadeUp} className="w-full">
-          <BergSearch />
+          <SearchBar />
         </motion.div>
       </motion.div>
 
