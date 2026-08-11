@@ -330,13 +330,6 @@ export default function Navbar() {
               </Link>
             )}
 
-            {/* Book Now CTA */}
-            <Link
-              href="/plan"
-              className="hidden lg:inline-flex items-center font-sans text-[11px] tracking-[0.14em] uppercase font-semibold px-5 py-2.5 bg-gold text-[#0D0D0D] hover:bg-[#b8934a] transition-colors whitespace-nowrap"
-            >
-              Book Now
-            </Link>
           </div>
         </div>
       </header>
@@ -447,10 +440,6 @@ export default function Navbar() {
                   <Link href="/list-your-property" onClick={() => setMenuOpen(false)}
                     className="font-sans text-[11px] text-white/25 hover:text-white/60 transition-colors tracking-wide">
                     List Your Property
-                  </Link>
-                  <Link href="/plan" onClick={() => setMenuOpen(false)}
-                    className="font-sans text-[11px] tracking-[0.14em] uppercase font-semibold text-gold hover:text-gold/80 transition-colors">
-                    Book Now →
                   </Link>
                 </div>
               </motion.div>
