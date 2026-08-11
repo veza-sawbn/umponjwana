@@ -266,12 +266,21 @@ function PrintableInvoiceInner() {
         )}
         {paymentResult === 'failed' && (
           <div className="mb-4 print:hidden bg-red-50 border border-red-200 text-red-600 font-sans text-sm px-4 py-3">
-            The payment didn't go through. You can try again below.
+            The payment didn't go through — your card was declined. Please check your card details and try again below.
           </div>
         )}
         {paymentResult === 'cancelled' && (
           <div className="mb-4 print:hidden bg-amber-50 border border-amber-200 text-amber-700 font-sans text-sm px-4 py-3">
             Payment cancelled — your invoice balance is unchanged.
+          </div>
+        )}
+        {/* Persistent decline notice: shown when the gateway declined a previous
+            payment attempt and the invoice is still unpaid, but the customer is
+            not arriving directly from that declined attempt (which shows the
+            more specific ?payment=failed banner above). */}
+        {!paymentResult && invoice.payment_declined_at && invoice.status !== 'paid' && (
+          <div className="mb-4 print:hidden bg-red-50 border border-red-200 text-red-600 font-sans text-sm px-4 py-3">
+            A recent payment attempt was declined. Please check your card details and try again below, or contact us if you need help.
           </div>
         )}
 
