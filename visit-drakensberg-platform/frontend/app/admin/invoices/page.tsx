@@ -3,10 +3,10 @@
 import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import toast from 'react-hot-toast'
-import { Search, RefreshCw, Plus, Printer, Trash2, X, FileText, Send, Pencil, Wallet, Save, Link2, Check, Eye, EyeOff, ShieldOff, RotateCw, KeyRound } from 'lucide-react'
+import { Search, RefreshCw, Plus, Printer, Trash2, X, FileText, Send, Pencil, Wallet, Save, Link2, Check, Eye, EyeOff, ShieldOff, RotateCw, KeyRound, Ban, RotateCcw } from 'lucide-react'
 import {
   getInvoices, getFinanceSettings, sendInvoice, invoiceShareUrl, invoiceViewedLabel,
-  revokeInvoiceLink, reissueInvoiceLink,
+  revokeInvoiceLink, reissueInvoiceLink, voidInvoice, reissueInvoice,
   type Invoice,
 } from '@/lib/invoices'
 import { createOrder, updateOrder, getOrderLines, type OrderLineInput, type OrderLine } from '@/lib/orders'
@@ -717,6 +717,109 @@ function PaymentsModal({ invoice, onClose, onDone }: {
   )
 }
 
+/**
+ * Two-step confirmation for voiding an invoice that was erroneously recorded
+ * as paid. Reverses the iKhokha payment records, resets balances, and marks
+ * the invoice 'void'. The staff member must provide a reason — it is stored
+ * in the audit trail and on the reversed payment rows.
+ *
+ * After voiding, a "Reissue" action becomes available on the void row so
+ * the customer can receive a fresh, correctly-numbered invoice to pay.
+ */
+function VoidModal({ invoice, onClose, onDone }: {
+  invoice: Invoice
+  onClose: () => void
+  onDone: () => void
+}) {
+  const [reason, setReason] = useState('')
+  const [confirming, setConfirming] = useState(false)
+  const [busy, setBusy] = useState(false)
+
+  async function handleVoid() {
+    if (!reason.trim()) { toast.error('Please enter a reason before voiding.'); return }
+    setBusy(true)
+    try {
+      await voidInvoice(invoice.id, reason.trim())
+      toast.success(`Invoice ${invoice.invoice_number} voided. Use Reissue to send the customer a corrected invoice.`)
+      onDone(); onClose()
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Could not void this invoice')
+    } finally { setBusy(false) }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 bg-black/50 flex items-stretch sm:items-center justify-center sm:p-6" onClick={onClose}>
+      <div className="bg-white w-full sm:max-w-lg h-full sm:h-auto sm:max-h-[88vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+        <div className="sticky top-0 z-10 bg-white border-b border-gray-100 px-4 sm:px-6 pt-4 sm:pt-6 pb-3 flex items-start justify-between gap-3">
+          <div>
+            <p className="font-sans text-[10px] tracking-[0.14em] uppercase text-gray-400">Invoice {invoice.invoice_number}</p>
+            <h2 className="font-display italic text-xl sm:text-2xl">Void invoice</h2>
+            <p className="hidden sm:block font-sans text-xs text-gray-400 mt-1">Reverses erroneous payments and resets balances to pre-payment state.</p>
+          </div>
+          <button onClick={onClose} aria-label="Close" className="p-1 text-gray-400 hover:text-gray-700"><X size={20} /></button>
+        </div>
+
+        <div className="px-4 sm:px-6 py-4 sm:py-5" style={{ paddingBottom: 'calc(1.25rem + env(safe-area-inset-bottom))' }}>
+          {/* Summary of what will be reversed */}
+          <div className="bg-red-50 border border-red-200 p-4 mb-5">
+            <p className="font-sans text-sm font-semibold text-red-700 mb-1">What this does</p>
+            <ul className="font-sans text-xs text-red-600 space-y-1 list-disc ml-4">
+              <li>Marks all inbound payments on this order as <strong>reversed</strong></li>
+              <li>Resets the invoice balance back to <strong>{formatMoney(Number(invoice.total), invoice.currency)} outstanding</strong></li>
+              <li>Restores the order to <strong>unpaid</strong> status</li>
+              <li>Marks the invoice itself as <strong>void</strong></li>
+              <li>Writes reversal entries in the double-entry ledger</li>
+            </ul>
+            <p className="font-sans text-xs text-red-500 mt-2">
+              After voiding, use <strong>Reissue</strong> to create a fresh invoice the customer can pay.
+            </p>
+          </div>
+
+          <p className="font-sans text-[10px] tracking-[0.14em] uppercase text-gray-400 mb-1.5">Reason (required — stored in audit trail)</p>
+          <textarea
+            value={reason}
+            onChange={e => setReason(e.target.value)}
+            rows={3}
+            placeholder="e.g. iKhokha declined the card but the webhook erroneously recorded the payment as paid"
+            className="w-full border border-gray-200 px-3 py-2.5 font-sans text-sm focus:outline-none focus:border-red-300 resize-none"
+          />
+
+          <div className="border-t border-gray-100 mt-5 pt-5 space-y-3">
+            {confirming ? (
+              <div className="space-y-2">
+                <p className="font-sans text-sm text-red-600 font-semibold">Are you sure? This reversal cannot be undone automatically.</p>
+                <div className="flex gap-2">
+                  <button
+                    onClick={handleVoid}
+                    disabled={busy || !reason.trim()}
+                    className="flex-1 inline-flex items-center justify-center gap-2 bg-red-500 text-white px-5 py-2.5 font-sans text-sm hover:bg-red-600 transition-colors disabled:opacity-60"
+                  >
+                    <Ban size={14} /> {busy ? 'Voiding…' : 'Yes, void this invoice'}
+                  </button>
+                  <button onClick={() => setConfirming(false)} className="px-5 py-2.5 border border-gray-200 font-sans text-sm text-gray-500">
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <button
+                onClick={() => {
+                  if (!reason.trim()) { toast.error('Please enter a reason before voiding.'); return }
+                  setConfirming(true)
+                }}
+                disabled={busy}
+                className="w-full inline-flex items-center justify-center gap-2 border border-red-300 px-5 py-2.5 font-sans text-sm text-red-500 hover:bg-red-50 transition-colors disabled:opacity-60"
+              >
+                <Ban size={14} /> Void invoice
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export default function AdminInvoicesPage() {
   const [invoices, setInvoices] = useState<Invoice[]>([])
   const [drafts, setDrafts] = useState<InvoiceDraft[]>([])
@@ -729,8 +832,10 @@ export default function AdminInvoicesPage() {
   const [editingInvoice, setEditingInvoice] = useState<{ invoice: Invoice; lines: OrderLine[] } | undefined>()
   const [payingInvoice, setPayingInvoice] = useState<Invoice | undefined>()
   const [linkInvoice, setLinkInvoice] = useState<Invoice | undefined>()
+  const [voidingInvoice, setVoidingInvoice] = useState<Invoice | undefined>()
   const [sending, setSending] = useState<string | null>(null)
   const [opening, setOpening] = useState<string | null>(null)
+  const [reissuing, setReissuing] = useState<string | null>(null)
 
   async function load() {
     setLoading(true)
@@ -769,6 +874,17 @@ export default function AdminInvoicesPage() {
     } catch (e) {
       toast.error(e instanceof Error ? e.message : 'Could not load invoice lines')
     } finally { setOpening(null) }
+  }
+
+  async function handleReissue(invoice: Invoice) {
+    setReissuing(invoice.id)
+    try {
+      await reissueInvoice(invoice.id)
+      toast.success(`Replacement invoice created. Send the customer their new invoice link.`)
+      load()
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Could not reissue this invoice')
+    } finally { setReissuing(null) }
   }
 
   async function handleDeleteDraft(id: string) {
@@ -907,6 +1023,7 @@ export default function AdminInvoicesPage() {
       <div className="md:hidden bg-white border border-gray-200 divide-y divide-gray-100">
         {filtered.map(i => {
           const locked = Number(i.amount_paid) !== 0 || i.status === 'void'
+          const voidable = (i.status === 'paid' || i.status === 'partial')
           return (
             <div key={i.id} className="p-4">
               <div className="flex items-start justify-between gap-3">
@@ -956,6 +1073,18 @@ export default function AdminInvoicesPage() {
                     <Pencil size={13} /> {opening === i.id ? 'Opening…' : 'Edit'}
                   </button>
                 )}
+                {voidable && (
+                  <button onClick={() => setVoidingInvoice(i)}
+                    className="inline-flex items-center justify-center gap-1.5 border border-red-200 py-2.5 font-sans text-sm text-red-500 hover:bg-red-50 transition-colors">
+                    <Ban size={13} /> Void
+                  </button>
+                )}
+                {i.status === 'void' && (
+                  <button onClick={() => handleReissue(i)} disabled={reissuing === i.id}
+                    className={`inline-flex items-center justify-center gap-1.5 border border-gray-200 py-2.5 font-sans text-sm ${reissuing === i.id ? 'text-gray-300' : 'text-[#2d6a4f]'}`}>
+                    <RotateCcw size={13} /> {reissuing === i.id ? 'Reissuing…' : 'Reissue'}
+                  </button>
+                )}
               </div>
             </div>
           )
@@ -975,6 +1104,7 @@ export default function AdminInvoicesPage() {
               // vd_update_order refuses an edit once anything has been paid;
               // hide the action rather than surface a server error.
               const locked = Number(i.amount_paid) !== 0 || i.status === 'void'
+              const voidable = (i.status === 'paid' || i.status === 'partial')
               return (
                 <tr key={i.id} className="hover:bg-[#F7F5F2] transition-colors">
                   <td className="px-5 py-4 font-mono text-xs text-gray-500">{i.invoice_number}</td>
@@ -1020,6 +1150,25 @@ export default function AdminInvoicesPage() {
                         className={`inline-flex items-center gap-1.5 font-sans text-xs ${sending === i.id ? 'text-gray-300 cursor-not-allowed' : 'text-[#2d6a4f] hover:underline'}`}>
                         <Send size={12} /> {sending === i.id ? 'Sending…' : 'Email'}
                       </button>
+                      {voidable && (
+                        <button
+                          onClick={() => setVoidingInvoice(i)}
+                          title="Void this invoice — reverses erroneous payments and resets balances"
+                          className="inline-flex items-center gap-1.5 font-sans text-xs text-red-400 hover:text-red-600 hover:underline"
+                        >
+                          <Ban size={12} /> Void
+                        </button>
+                      )}
+                      {i.status === 'void' && (
+                        <button
+                          onClick={() => handleReissue(i)}
+                          disabled={reissuing === i.id}
+                          title="Create a replacement invoice on the same order"
+                          className={`inline-flex items-center gap-1.5 font-sans text-xs ${reissuing === i.id ? 'text-gray-300 cursor-not-allowed' : 'text-[#2d6a4f] hover:underline'}`}
+                        >
+                          <RotateCcw size={12} /> {reissuing === i.id ? 'Reissuing…' : 'Reissue'}
+                        </button>
+                      )}
                     </div>
                   </td>
                 </tr>
@@ -1054,6 +1203,14 @@ export default function AdminInvoicesPage() {
         <PaymentsModal
           invoice={payingInvoice}
           onClose={() => setPayingInvoice(undefined)}
+          onDone={load}
+        />
+      )}
+
+      {voidingInvoice && (
+        <VoidModal
+          invoice={voidingInvoice}
+          onClose={() => setVoidingInvoice(undefined)}
           onDone={load}
         />
       )}
