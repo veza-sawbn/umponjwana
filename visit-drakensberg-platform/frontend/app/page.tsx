@@ -70,36 +70,20 @@ function cardDimClass(card: HomeCard, inEditor: boolean) {
   return inEditor && card.visible === false ? 'opacity-35' : ''
 }
 
-/* ─── Edit-mode hero ─────────────────────────────────────────────────────────── */
+/* ─── Hero ───────────────────────────────────────────────────────────────────── */
 
-// Crossfades through a list of images, each with its own slow continuous
-// parallax drift (a fixed slight overscale panning slowly side to side —
-// not a zoom, the scale never changes) that restarts from scratch every
-// time a slide comes back around. Below two images this is indistinguishable
-// from a static hero image, so callers only reach for it once there's an
-// actual carousel to show.
 const HERO_SLIDE_SECONDS = 7
 const HERO_FADE_SECONDS = 1.5
-const HERO_OVERSCALE = 1.12 // headroom for the pan so it never reveals an edge
+const HERO_OVERSCALE = 1.12
 
 function HeroCarousel({ images }: { images: string[] }) {
   const [index, setIndex] = useState(0)
-  // Tracks whether the carousel has cycled at least once. Used to skip the
-  // cross-fade animation on the very first slide — there is nothing to fade
-  // from, so starting at full opacity avoids a needless 1.5 s blank flash.
   const hasCycledRef = useRef(false)
 
   useEffect(() => {
     setIndex(0)
     hasCycledRef.current = false
-
-    // Preload every carousel image as soon as the URL list is known so the
-    // browser fetches them in parallel rather than waiting for each slide turn.
-    images.forEach(src => {
-      const preload = new window.Image()
-      preload.src = src
-    })
-
+    images.forEach(src => { const img = new window.Image(); img.src = src })
     if (images.length < 2) return
     const id = setInterval(() => {
       hasCycledRef.current = true
@@ -109,8 +93,6 @@ function HeroCarousel({ images }: { images: string[] }) {
   }, [images])
 
   const panFromLeft = index % 2 === 0
-  // The first slide shown on mount should not animate in from opacity 0 — it
-  // would look like a blank screen. Cross-fade only applies to slide *changes*.
   const isFirstSlide = !hasCycledRef.current
 
   return (
@@ -127,8 +109,6 @@ function HeroCarousel({ images }: { images: string[] }) {
           src={images[index]}
           alt="Drakensberg mountains"
           className="w-full h-full object-cover"
-          // The first hero image is the LCP element — tell the browser to
-          // fetch it at the highest priority and never defer it.
           fetchPriority={isFirstSlide ? 'high' : 'auto'}
           loading="eager"
           initial={{ scale: HERO_OVERSCALE, x: panFromLeft ? '-3%' : '3%', y: '-2%' }}
@@ -151,8 +131,6 @@ function HeroSection({ hero }: { hero: typeof SITE_CONTENT_DEFAULTS.hero }) {
 
   return (
     <EditableSection id="hero" label="Hero" className="relative h-screen min-h-[600px] flex flex-col">
-      {/* Dark background prevents a white void / broken-image icon while the
-          first hero image is still in flight. */}
       <div className="absolute inset-0 bg-slate-900">
         {hero.video_url ? (
           <video src={hero.video_url} autoPlay muted loop playsInline className="w-full h-full object-cover" />
@@ -160,7 +138,6 @@ function HeroSection({ hero }: { hero: typeof SITE_CONTENT_DEFAULTS.hero }) {
           <HeroCarousel images={carouselImages} />
         ) : (
           <Editable section="hero" fieldKey="image_url" value={imageUrl} label="Background Image" type="image">
-            {/* Single static image is the LCP element — prioritise it. */}
             <img
               src={imageUrl}
               alt="Drakensberg mountains"
@@ -664,7 +641,7 @@ export default function HomePage() {
         </div>
       )}
 
-      {/* ── Hero (fixed at the top) ── */}
+      {/* ── Hero ── */}
       <HeroSection hero={hero} />
 
       {/* ── Reorderable sections ── */}
