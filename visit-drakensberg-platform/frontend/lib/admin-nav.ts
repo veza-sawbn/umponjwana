@@ -3,7 +3,7 @@ import {
   FileText, BarChart2, Search, Settings, Mountain,
   Globe, MapPin, Image, Store, Package, ShieldCheck,
   Receipt, Landmark, Banknote, ClipboardList, MessageSquare, Bus,
-  TreePine, Building2, FileSignature, UserCog, Wallet, Send,
+  TreePine, Building2, FileSignature, UserCog, Wallet, Send, Briefcase,
 } from 'lucide-react'
 
 // Single source of truth for admin navigation. The desktop sidebar renders
@@ -31,6 +31,7 @@ export const ADMIN_NAV: AdminNavItem[] = [
   { href: '/admin/finance', label: 'Finance', icon: Landmark },
   { href: '/admin/settlements', label: 'Settlements', icon: Banknote },
   { href: '/admin/operations', label: 'Operations', icon: ClipboardList },
+  { href: '/admin/operations/managed-suppliers', label: 'Managed Suppliers', icon: Briefcase },
   { href: '/admin/transport', label: 'Transport', icon: Bus },
   { href: '/admin/messages', label: 'Communications', icon: MessageSquare },
   { href: '/admin/marketplace', label: 'Marketplace', icon: Store },
@@ -63,6 +64,7 @@ export const ADMIN_NAV_GROUPS = [
   group('Daily Work', [
     '/admin', '/admin/invoices', '/admin/quotes', '/admin/orders',
     '/admin/bookings', '/admin/messages', '/admin/operations', '/admin/transport',
+    '/admin/operations/managed-suppliers',
   ]),
   group('Money', ['/admin/finance', '/admin/settlements']),
   group('Supply', ['/admin/listings', '/admin/suppliers', '/admin/verification', '/admin/marketplace', '/admin/packages']),
