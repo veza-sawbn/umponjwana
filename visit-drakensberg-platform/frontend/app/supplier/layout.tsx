@@ -4,13 +4,30 @@ import { usePathname, useRouter } from 'next/navigation'
 import { LogOut, Mountain } from 'lucide-react'
 import { signOut } from '@/lib/auth'
 import { SupplierProvider, useSupplier } from '@/lib/supplier-context'
+import { ManagedSupplierProvider, useManagedSupplier } from '@/lib/managed-supplier-context'
 import Logo from '@/components/Logo'
 import NotificationsBell from '@/components/ui/NotificationsBell'
+import ManagedSupplierBanner from '@/components/operations/ManagedSupplierBanner'
 
 function SidebarNav() {
   const pathname = usePathname()
   const router = useRouter()
-  const { nav, config, supplierType, fullName, isApproved, loading } = useSupplier()
+
+  // For normal suppliers, use the standard SupplierContext.
+  // For VD Operations employees acting-as a managed supplier, use the
+  // ManagedSupplierContext which provides nav based on the managed supplier's type.
+  const supplierCtx = useSupplier()
+  const managedCtx = useManagedSupplier()
+
+  // If the user is an ops employee acting-as a supplier, use the managed context's nav.
+  // Otherwise fall back to the normal supplier context.
+  const isActingAs = managedCtx.isActingAs
+  const nav = isActingAs ? managedCtx.nav : supplierCtx.nav
+  const config = isActingAs ? managedCtx.activeSupplierConfig : supplierCtx.config
+  const supplierType = isActingAs ? (managedCtx.activeSupplierType ?? null) : supplierCtx.supplierType
+  const fullName = supplierCtx.fullName
+  const isApproved = isActingAs ? true : supplierCtx.isApproved  // ops employees don't need approval
+  const loading = supplierCtx.loading || managedCtx.loading
 
   async function handleSignOut() {
     await signOut()
@@ -29,13 +46,17 @@ function SidebarNav() {
         <Link href="/" className="flex flex-col gap-2">
           <Logo className="h-4 w-auto text-[#C9A96E]" />
           <p className="font-sans text-[10px] tracking-[0.14em] uppercase text-white/30">
-            {loading ? 'Supplier' : (config?.label ?? 'Supplier')} Portal
+            {loading
+              ? 'Portal'
+              : isActingAs
+                ? `${config?.label ?? 'Supplier'} · Operations`
+                : `${config?.label ?? 'Supplier'} Portal`}
           </p>
         </Link>
       </div>
 
-      {/* Approval warning */}
-      {!loading && !isApproved && (
+      {/* Approval warning — not shown when operating as an ops employee */}
+      {!loading && !isApproved && !isActingAs && (
         <div className="mx-3 mt-3 px-3 py-2.5 rounded bg-amber-500/10 border border-amber-500/20">
           <p className="font-sans text-[11px] text-amber-400 leading-snug">
             Your account is pending approval. Some features are limited.
@@ -71,7 +92,12 @@ function SidebarNav() {
           <div className="px-3 py-2 mb-1">
             <p className="font-sans text-xs text-white/60 truncate">{fullName}</p>
             {supplierType && (
-              <p className="font-sans text-[10px] text-white/30 mt-0.5">{supplierType}</p>
+              <p className="font-sans text-[10px] text-white/30 mt-0.5">
+                {supplierType}
+                {isActingAs && (
+                  <span className="ml-1 text-[#C9A96E]/60"> · VD Operations</span>
+                )}
+              </p>
             )}
           </div>
         )}
@@ -92,15 +118,19 @@ function SidebarNav() {
 export default function SupplierLayout({ children }: { children: React.ReactNode }) {
   return (
     <SupplierProvider>
-      <div className="min-h-screen bg-[#0a0a0a] flex">
-        <SidebarNav />
-        <div className="ml-60 flex-1 min-h-screen bg-[#F7F5F2]">
-          <div className="flex items-center justify-end px-8 pt-4 -mb-4">
-            <NotificationsBell />
+      <ManagedSupplierProvider>
+        <div className="min-h-screen bg-[#0a0a0a] flex">
+          <SidebarNav />
+          <div className="ml-60 flex-1 min-h-screen bg-[#F7F5F2]">
+            {/* Contextual banner shown when a VD Operations employee is managing a supplier */}
+            <ManagedSupplierBanner />
+            <div className="flex items-center justify-end px-8 pt-4 -mb-4">
+              <NotificationsBell />
+            </div>
+            {children}
           </div>
-          {children}
         </div>
-      </div>
+      </ManagedSupplierProvider>
     </SupplierProvider>
   )
 }
