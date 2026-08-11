@@ -42,10 +42,20 @@ const TOKENS: Record<string, TokenDef> = {
       { text: 'July',    value: 7,  meta: 'Snow on the escarpment, frozen dawns'   },
     ],
   },
+  stays: {
+    field: 'stay_type',
+    options: [
+      { text: 'mountain lodge',  value: 'lodge',    meta: 'Full board, guided hikes, epic views'  },
+      { text: 'self-catering',   value: 'selfcater', meta: 'Kitchen, braai, great for families'   },
+      { text: 'campsite',        value: 'camp',      meta: 'Stargazing, under R300/night'          },
+      { text: 'boutique hotel',  value: 'boutique',  meta: 'Spa, fine dining, couples retreat'     },
+    ],
+  },
 }
 
 const CHIPS: Chip[] = [
   { id: 'trails', pre: 'Show me',                  token: 'difficulty', post: 'worth the drive this season' },
+  { id: 'stays',  pre: 'Find me a',                token: 'stays',      post: 'in the Drakensberg'          },
   { id: 'trip',   pre: 'Plan four days in the',    token: 'base',       post: 'for two people'              },
   { id: 'season', pre: 'What is the Berg like in', token: 'month',      post: '?'                           },
 ]
@@ -78,13 +88,17 @@ const POPULAR_SEARCHES = [
   'how difficult is the Tugela Falls hike',
   'Drakensberg hike for beginners',
   'best hikes in Drakensberg',
-  // Accommodation
+  // Stays & accommodation
   'best lodges in Champagne Valley',
   'Witsieshoek Mountain Lodge booking',
   'Drakensberg accommodation family friendly',
   'budget camping in Drakensberg',
-  'Drakensberg luxury lodge',
-  'Drakensberg accommodation near Cathedral Peak',
+  'Drakensberg luxury lodge stays',
+  'Drakensberg self-catering cottages',
+  'boutique stays near Cathedral Peak',
+  'Drakensberg mountain lodge with guided hikes',
+  'Drakensberg campsites with power',
+  'Drakensberg stays near Sani Pass',
   // Travel planning
   'best time to visit Drakensberg',
   'how to get to Drakensberg from Johannesburg',
@@ -130,7 +144,7 @@ export default function SearchBar() {
   const rootRef  = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
 
-  const [selected,    setSelected]    = useState<Record<string, number>>({ difficulty: 0, base: 0, month: 0 })
+  const [selected,    setSelected]    = useState<Record<string, number>>({ difficulty: 0, base: 0, month: 0, stays: 0 })
   const [open,        setOpen]        = useState<string | null>(null)
   const [query,       setQuery]       = useState('')
   const [activeChip,  setActiveChip]  = useState<string | null>(null)
