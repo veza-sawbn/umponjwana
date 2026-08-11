@@ -1,59 +1,163 @@
 'use client'
 import { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
+import Image from 'next/image'
 import { usePathname, useRouter } from 'next/navigation'
 import {
-  X, Menu, ChevronDown, LogOut, LayoutDashboard, CalendarDays,
-  Bell, User, Heart, Gift, Star, Settings, MapPin, ChevronRight,
+  X, Search, ChevronDown, LogOut, LayoutDashboard, CalendarDays,
+  Bell, User, Heart, Gift, Star, Settings, MapPin, ArrowRight,
 } from 'lucide-react'
 import { supabase, signOut } from '@/lib/auth'
 import type { User as SupabaseUser } from '@supabase/supabase-js'
 import { AnimatePresence, motion } from 'framer-motion'
-import { scaleFade, fade, staggerContainer, staggerChild } from '@/lib/motion'
 import Logo from '@/components/Logo'
 
-type NavChild = { label: string; href: string }
-type NavLink = { label: string; href: string; children?: NavChild[] }
+// ── Types ─────────────────────────────────────────────────────────────────────
 
-const NAV_LINKS: NavLink[] = [
-  { label: 'Stays', href: '/stays' },
-  { label: 'Hikes', href: '/hikes' },
-  { label: 'Activities', href: '/activities' },
-  { label: 'Shuttles', href: '/shuttles' },
+type NavChild = { label: string; href: string }
+type NavItem  = {
+  label:    string
+  href:     string
+  image:    string
+  imageAlt: string
+  sublabel: string
+  children: NavChild[]
+}
+
+// ── Navigation data ───────────────────────────────────────────────────────────
+
+const NAV_ITEMS: NavItem[] = [
   {
-    label: 'Regions',
-    href: '/regions',
+    label:    'Stays',
+    href:     '/stays',
+    image:    'https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=1200&q=80',
+    imageAlt: 'Mountain lodge in the Drakensberg',
+    sublabel: 'Mountain lodges, guesthouses & glamping',
     children: [
-      { label: 'All Regions', href: '/regions' },
-      { label: 'Nature Reserves', href: '/nature-reserves' },
-      { label: 'Towns & Cities', href: '/towns' },
+      { label: 'Mountain Lodges',        href: '/stays?type=lodge' },
+      { label: 'Boutique Guesthouses',   href: '/stays?type=guesthouse' },
+      { label: 'Self-Catering Cottages', href: '/stays?type=cottage' },
+      { label: 'Camping & Glamping',     href: '/stays?type=camping' },
+      { label: 'Backpacker Hostels',     href: '/stays?type=hostel' },
     ],
   },
-  { label: 'Stories', href: '/mydrakensberg' },
-  { label: 'Plan', href: '/plan' },
+  {
+    label:    'Hikes',
+    href:     '/hikes',
+    image:    'https://images.unsplash.com/photo-1551632811-561732d1e306?w=1200&q=80',
+    imageAlt: 'Hiker on a Drakensberg trail',
+    sublabel: 'From easy walks to world-class summit trails',
+    children: [
+      { label: 'Easy Walks',       href: '/hikes?difficulty=easy' },
+      { label: 'Moderate Trails',  href: '/hikes?difficulty=moderate' },
+      { label: 'Strenuous Hikes',  href: '/hikes?difficulty=strenuous' },
+      { label: 'Multi-Day Routes', href: '/hikes?type=multiday' },
+      { label: 'Guided Hikes',     href: '/hikes?feature=guided' },
+    ],
+  },
+  {
+    label:    'Activities',
+    href:     '/activities',
+    image:    'https://images.unsplash.com/photo-1533130061792-64b345e4a833?w=1200&q=80',
+    imageAlt: 'Activities in the Drakensberg',
+    sublabel: 'Horse riding, rock climbing, fly fishing & more',
+    children: [
+      { label: 'Horse Riding',      href: '/activities?cat=horse-riding' },
+      { label: 'Rock Climbing',     href: '/activities?cat=rock-climbing' },
+      { label: 'Fly Fishing',       href: '/activities?cat=fly-fishing' },
+      { label: 'Bird Watching',     href: '/activities?cat=birding' },
+      { label: 'Spa & Wellness',    href: '/activities?cat=wellness' },
+    ],
+  },
+  {
+    label:    'Shuttles',
+    href:     '/shuttles',
+    image:    'https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?w=1200&q=80',
+    imageAlt: 'Mountain road in the Drakensberg',
+    sublabel: 'Transfers & transport to the Berg',
+    children: [],
+  },
+  {
+    label:    'Regions',
+    href:     '/regions',
+    image:    'https://images.unsplash.com/photo-1516026672322-bc52d61a55d5?w=1200&q=80',
+    imageAlt: 'Drakensberg mountain panorama',
+    sublabel: "Explore the Berg's distinct landscapes",
+    children: [
+      { label: 'Royal Natal',      href: '/regions?area=royal-natal' },
+      { label: 'Champagne Valley', href: '/regions?area=champagne-valley' },
+      { label: 'Giants Castle',    href: '/regions?area=giants-castle' },
+      { label: 'Sani Pass',        href: '/regions?area=sani-pass' },
+      { label: 'Cathedral Peak',   href: '/regions?area=cathedral-peak' },
+    ],
+  },
+  {
+    label:    'Stories',
+    href:     '/mydrakensberg',
+    image:    'https://images.unsplash.com/photo-1501854140801-50d01698950b?w=1200&q=80',
+    imageAlt: 'Drakensberg sunset landscape',
+    sublabel: 'Travel inspiration, tips & local knowledge',
+    children: [],
+  },
+  {
+    label:    'Plan',
+    href:     '/plan',
+    image:    'https://images.unsplash.com/photo-1441974231531-c6227db76b6e?w=1200&q=80',
+    imageAlt: 'Forest trail in the Drakensberg',
+    sublabel: 'Build your perfect Drakensberg itinerary',
+    children: [],
+  },
 ]
 
 const VISITOR_LINKS = [
-  { label: 'My Account', href: '/account/settings', icon: User },
-  { label: 'Bookings & Trips', href: '/account', icon: CalendarDays },
-  { label: 'Rewards & Wallet', href: '/account/loyalty', icon: Gift },
-  { label: 'Recommendations', href: '/account/recommendations', icon: Star },
-  { label: 'Saved', href: '/account/saved', icon: Heart },
+  { label: 'My Account',       href: '/account/settings',       icon: User },
+  { label: 'Bookings & Trips', href: '/account',                icon: CalendarDays },
+  { label: 'Rewards & Wallet', href: '/account/loyalty',        icon: Gift },
+  { label: 'Recommendations',  href: '/account/recommendations', icon: Star },
+  { label: 'Saved',            href: '/account/saved',          icon: Heart },
 ]
 
 function initials(name: string) {
   return name.split(' ').map((n) => n[0]).join('').toUpperCase().slice(0, 2)
 }
 
+// ── Animations ────────────────────────────────────────────────────────────────
+
+const overlayAnim = {
+  hidden: { opacity: 0 },
+  show:   { opacity: 1, transition: { duration: 0.28, ease: [0.4, 0, 0.2, 1] as number[] } },
+  exit:   { opacity: 0, transition: { duration: 0.22, ease: [0.4, 0, 1,   1] as number[] } },
+}
+
+const leftPanelAnim = {
+  hidden: { x: -32, opacity: 0 },
+  show:   { x: 0, opacity: 1, transition: { duration: 0.32, ease: [0.4, 0, 0.2, 1] as number[], delay: 0.06 } },
+  exit:   { x: -20, opacity: 0, transition: { duration: 0.18 } },
+}
+
+const imgAnim = {
+  hidden: { opacity: 0, scale: 1.04 },
+  show:   { opacity: 1, scale: 1, transition: { duration: 0.38, ease: [0.4, 0, 0.2, 1] as number[] } },
+  exit:   { opacity: 0, transition: { duration: 0.18 } },
+}
+
+const dropAnim = {
+  hidden: { opacity: 0, y: -4 },
+  show:   { opacity: 1, y: 0, transition: { duration: 0.14, ease: [0.4, 0, 0.2, 1] as number[] } },
+  exit:   { opacity: 0, y: -4, transition: { duration: 0.1 } },
+}
+
+// ── Component ─────────────────────────────────────────────────────────────────
+
 export default function Navbar() {
-  const [scrolled, setScrolled] = useState(false)
-  const [mobileOpen, setMobileOpen] = useState(false)
+  const [scrolled,     setScrolled]     = useState(false)
+  const [menuOpen,     setMenuOpen]     = useState(false)
+  const [hoveredItem,  setHoveredItem]  = useState(NAV_ITEMS[0].href)
   const [dropdownOpen, setDropdownOpen] = useState(false)
-  const [profileExpanded, setProfileExpanded] = useState(false)
-  const [user, setUser] = useState<SupabaseUser | null>(null)
+  const [user,         setUser]         = useState<SupabaseUser | null>(null)
   const dropdownRef = useRef<HTMLDivElement>(null)
-  const pathname = usePathname()
-  const router = useRouter()
+  const pathname    = usePathname()
+  const router      = useRouter()
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => setUser(data.user))
@@ -62,13 +166,10 @@ export default function Navbar() {
     })
     const onScroll = () => setScrolled(window.scrollY >= 50)
     window.addEventListener('scroll', onScroll, { passive: true })
-    return () => {
-      sub.subscription.unsubscribe()
-      window.removeEventListener('scroll', onScroll)
-    }
+    return () => { sub.subscription.unsubscribe(); window.removeEventListener('scroll', onScroll) }
   }, [])
 
-  useEffect(() => { setMobileOpen(false); setProfileExpanded(false) }, [pathname])
+  useEffect(() => { setMenuOpen(false) }, [pathname])
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
@@ -81,89 +182,89 @@ export default function Navbar() {
   }, [])
 
   useEffect(() => {
-    document.body.style.overflow = mobileOpen ? 'hidden' : ''
+    document.body.style.overflow = menuOpen ? 'hidden' : ''
     return () => { document.body.style.overflow = '' }
-  }, [mobileOpen])
+  }, [menuOpen])
 
   const handleSignOut = async () => {
     await signOut()
     setDropdownOpen(false)
-    setMobileOpen(false)
+    setMenuOpen(false)
     router.push('/')
   }
 
-  const transparent = !scrolled && !mobileOpen
-  // Menu items stay black at all times so they remain visible on light backgrounds
-  const textColor = 'text-black'
-  const logoColor = transparent ? 'text-gold' : 'text-forest'
+  const transparent = !scrolled && !menuOpen
+  const activeItem  = NAV_ITEMS.find(i => i.href === hoveredItem) ?? NAV_ITEMS[0]
 
-  const userName = user?.user_metadata?.full_name ?? user?.email?.split('@')[0] ?? 'My Account'
-  const userEmail = user?.email ?? ''
-  const role = user?.app_metadata?.role ?? user?.user_metadata?.role
+  const userName   = user?.user_metadata?.full_name ?? user?.email?.split('@')[0] ?? 'My Account'
+  const role       = user?.app_metadata?.role ?? user?.user_metadata?.role
   const isSupplier = role === 'supplier'
-  const isAdmin = role === 'admin'
+  const isAdmin    = role === 'admin'
 
+  // ── Render ──────────────────────────────────────────────────────────────────
   return (
     <>
+      {/* ═══ HEADER BAR ═══════════════════════════════════════════════════════ */}
       <header
         className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
-          transparent ? 'bg-transparent' : 'bg-white border-b border-black/10'
+          transparent
+            ? 'bg-transparent'
+            : 'bg-white border-b border-black/10'
         }`}
       >
-        <div className="max-w-[1440px] mx-auto px-6 lg:px-12 h-16 flex items-center justify-between">
-          {/* Logo */}
+        {/* Three-column grid:  [☰ MENU]  [Logo]  [Search · SignIn · Book Now] */}
+        <div className="max-w-[1440px] mx-auto px-6 lg:px-12 h-16 grid grid-cols-[1fr_auto_1fr] items-center">
+
+          {/* ── Col 1: Menu trigger ── */}
+          <div>
+            <button
+              onClick={() => setMenuOpen(true)}
+              aria-label="Open navigation menu"
+              className={`flex items-center gap-3 group transition-colors ${
+                transparent ? 'text-white' : 'text-black'
+              } hover:text-gold`}
+            >
+              {/* Three-line hamburger */}
+              <div className="flex flex-col gap-[5px]" aria-hidden>
+                <span className="block h-px bg-current transition-all duration-200 w-[20px]" />
+                <span className="block h-px bg-current transition-all duration-200 w-[20px]" />
+                <span className="block h-px bg-current transition-all duration-200 w-[13px] group-hover:w-[20px]" />
+              </div>
+              <span className="hidden lg:block font-sans text-[11px] tracking-[0.2em] uppercase font-semibold">
+                Menu
+              </span>
+            </button>
+          </div>
+
+          {/* ── Col 2: Centred logo ── */}
           <Link href="/" aria-label="Visit Drakensberg — Home">
-            <Logo className={`h-3 lg:h-8 w-auto transition-colors duration-300 ${logoColor}`} />
+            <Logo className={`h-8 w-auto transition-colors duration-300 ${
+              transparent ? 'text-gold' : 'text-forest'
+            }`} />
           </Link>
 
-          {/* Desktop nav */}
-          <nav className="hidden lg:flex items-center gap-7">
-            {NAV_LINKS.map((link) => (
-              link.children ? (
-                <div key={link.href} className="relative group">
-                  <Link
-                    href={link.href}
-                    className={`flex items-center gap-1 font-sans text-sm tracking-wide transition-colors duration-200 ${textColor} hover:text-gold`}
-                  >
-                    {link.label}
-                    <ChevronDown className="w-3.5 h-3.5" />
-                  </Link>
-                  {/* Hover dropdown — pt-3 keeps the trigger and menu hover-contiguous */}
-                  <div className="absolute left-1/2 -translate-x-1/2 top-full pt-3 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-150">
-                    <div className="bg-white border border-black/8 shadow-card py-1 min-w-[190px]">
-                      {link.children.map((child) => (
-                        <Link
-                          key={child.href}
-                          href={child.href}
-                          className="block px-4 py-2.5 font-sans text-sm text-forest hover:bg-mist hover:text-gold transition-colors whitespace-nowrap"
-                        >
-                          {child.label}
-                        </Link>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              ) : (
-                <Link
-                  key={link.href}
-                  href={link.href}
-                  className={`font-sans text-sm tracking-wide transition-colors duration-200 ${textColor} hover:text-gold`}
-                >
-                  {link.label}
-                </Link>
-              )
-            ))}
-          </nav>
+          {/* ── Col 3: Search · Auth · CTA ── */}
+          <div className="flex items-center justify-end gap-4">
 
-          {/* Desktop right */}
-          <div className="hidden lg:flex items-center gap-5">
+            {/* Search */}
+            <Link
+              href="/search"
+              aria-label="Search"
+              className={`p-1 transition-colors ${transparent ? 'text-white' : 'text-black'} hover:text-gold`}
+            >
+              <Search className="w-5 h-5" />
+            </Link>
+
+            {/* Auth — desktop */}
             {user ? (
-              <div className="relative" ref={dropdownRef}>
+              <div className="relative hidden lg:block" ref={dropdownRef}>
                 <button
-                  onClick={() => setDropdownOpen((v) => !v)}
-                  className={`flex items-center gap-2 font-sans text-sm ${textColor}`}
+                  onClick={() => setDropdownOpen(v => !v)}
+                  className={`flex items-center gap-2 font-sans text-sm transition-colors ${
+                    transparent ? 'text-white' : 'text-black'
+                  }`}
                 >
-                  <span className="w-8 h-8 rounded-full bg-gold flex items-center justify-center text-forest text-xs font-bold">
+                  <span className="w-7 h-7 rounded-full bg-gold flex items-center justify-center text-white text-xs font-bold shrink-0">
                     {initials(userName)}
                   </span>
                   <ChevronDown className={`w-3.5 h-3.5 transition-transform ${dropdownOpen ? 'rotate-180' : ''}`} />
@@ -173,23 +274,17 @@ export default function Navbar() {
                   {dropdownOpen && (
                     <motion.div
                       className="absolute right-0 top-full mt-2 w-56 bg-white border border-black/8 shadow-card py-1 z-50"
-                      variants={scaleFade}
-                      initial="hidden"
-                      animate="show"
-                      exit="exit"
-                      style={{ originX: 1, originY: 0 }}
+                      variants={dropAnim} initial="hidden" animate="show" exit="exit"
                     >
                       <p className="px-4 py-2 font-sans text-xs text-forest/40 border-b border-black/6 truncate">
                         {userName}
                       </p>
-
                       {isAdmin && (
                         <Link href="/admin" prefetch={false} onClick={() => setDropdownOpen(false)}
                           className="flex items-center gap-2 px-4 py-2.5 font-sans text-sm text-forest hover:bg-mist transition-colors">
                           <LayoutDashboard className="w-4 h-4" /> Admin Panel
                         </Link>
                       )}
-
                       {isSupplier ? (
                         <>
                           <Link href="/supplier" prefetch={false} onClick={() => setDropdownOpen(false)}
@@ -216,7 +311,6 @@ export default function Navbar() {
                           )
                         })
                       )}
-
                       <button onClick={handleSignOut}
                         className="flex items-center gap-2 w-full px-4 py-2.5 font-sans text-sm text-red-500 hover:bg-mist transition-colors border-t border-black/6">
                         <LogOut className="w-4 h-4" /> Sign Out
@@ -228,212 +322,163 @@ export default function Navbar() {
             ) : (
               <Link
                 href="/auth/login"
-                className="font-sans text-sm px-5 py-2 border border-forest text-forest hover:bg-forest hover:text-white transition-all duration-200"
+                className={`hidden lg:block font-sans text-sm transition-colors ${
+                  transparent ? 'text-white/75 hover:text-white' : 'text-black hover:text-gold'
+                }`}
               >
                 Sign In
               </Link>
             )}
-          </div>
 
-          {/* Mobile hamburger */}
-          <button
-            onClick={() => setMobileOpen((v) => !v)}
-            className={`lg:hidden p-2 transition-colors ${textColor}`}
-            aria-label="Toggle menu"
-          >
-            {mobileOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
-          </button>
+          </div>
         </div>
       </header>
 
-      {/* Mobile overlay */}
+      {/* ═══ SUPER MENU OVERLAY ═══════════════════════════════════════════════ */}
       <AnimatePresence>
-        {mobileOpen && (
+        {menuOpen && (
           <motion.div
-            className="fixed inset-0 z-40 bg-white flex flex-col overflow-y-auto"
-            variants={fade}
-            initial="hidden"
-            animate="show"
-            exit="exit"
+            className="fixed inset-0 z-50 bg-[#0D0D0D] flex flex-col"
+            variants={overlayAnim}
+            initial="hidden" animate="show" exit="exit"
           >
-            {/* Mobile header bar */}
-            <div className="h-16 flex items-center justify-between px-6 border-b border-black/8 shrink-0">
-              <Link href="/" aria-label="Visit Drakensberg — Home">
-                <Logo className="h-3 w-auto text-forest" />
+            {/* Top bar */}
+            <div className="h-16 flex items-center justify-between px-6 lg:px-12 shrink-0 border-b border-white/[0.06]">
+              <Link href="/" onClick={() => setMenuOpen(false)} aria-label="Home">
+                <Logo className="h-7 w-auto text-gold" />
               </Link>
-              <motion.button
-                onClick={() => setMobileOpen(false)}
-                className="p-2 text-forest"
-                whileTap={{ scale: 0.9 }}
+              <button
+                onClick={() => setMenuOpen(false)}
+                className="flex items-center gap-2.5 text-white/40 hover:text-white transition-colors"
+                aria-label="Close menu"
               >
-                <X className="w-6 h-6" />
-              </motion.button>
+                <span className="hidden lg:block font-sans text-[11px] tracking-[0.2em] uppercase font-semibold">
+                  Close
+                </span>
+                <X className="w-5 h-5" />
+              </button>
             </div>
 
-            <div className="flex flex-col flex-1 px-6 py-6 gap-0">
+            {/* Body */}
+            <div className="flex flex-1 overflow-hidden">
 
-              {/* ── Profile section (logged-in visitor) ── */}
-              {user && !isSupplier && (
-                <motion.div
-                  variants={staggerChild}
-                  initial="hidden"
-                  animate="show"
-                  className="mb-6"
-                >
-                  {/* Profile header tap target */}
-                  <button
-                    className="w-full flex items-center gap-4 bg-[#F7F5F2] px-4 py-4 border border-black/8"
-                    onClick={() => setProfileExpanded(v => !v)}
-                  >
-                    <div className="w-12 h-12 rounded-full bg-[#C9A96E] flex items-center justify-center text-white font-bold text-lg shrink-0">
-                      {initials(userName)}
-                    </div>
-                    <div className="flex-1 text-left min-w-0">
-                      <p className="font-display italic text-lg text-[#000000] leading-tight truncate">{userName}</p>
-                      <p className="font-sans text-xs text-gray-400 truncate">{userEmail}</p>
-                    </div>
-                    <ChevronDown
-                      className={`w-5 h-5 text-gray-400 shrink-0 transition-transform duration-200 ${profileExpanded ? 'rotate-180' : ''}`}
-                    />
-                  </button>
-
-                  {/* Visitor sub-items */}
-                  <AnimatePresence>
-                    {profileExpanded && (
-                      <motion.div
-                        initial={{ height: 0, opacity: 0 }}
-                        animate={{ height: 'auto', opacity: 1 }}
-                        exit={{ height: 0, opacity: 0 }}
-                        transition={{ duration: 0.2 }}
-                        className="overflow-hidden border border-t-0 border-black/8"
-                      >
-                        {VISITOR_LINKS.map((item) => {
-                          const Icon = item.icon
-                          return (
-                            <Link
-                              key={item.href}
-                              href={item.href}
-                              className="flex items-center justify-between px-5 py-3.5 font-sans text-sm text-gray-700 hover:bg-[#F7F5F2] border-b border-black/5 last:border-0 transition-colors"
-                            >
-                              <span className="flex items-center gap-3">
-                                <Icon size={16} className="text-[#C9A96E]" />
-                                {item.label}
-                              </span>
-                              <ChevronRight size={14} className="text-gray-300" />
-                            </Link>
-                          )
-                        })}
-                        <button
-                          onClick={handleSignOut}
-                          className="w-full flex items-center gap-3 px-5 py-3.5 font-sans text-sm text-red-500 hover:bg-red-50 transition-colors"
-                        >
-                          <LogOut size={16} />
-                          Sign Out
-                        </button>
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
-                </motion.div>
-              )}
-
-              {/* ── Supplier profile ── */}
-              {user && isSupplier && (
-                <motion.div
-                  variants={staggerChild}
-                  initial="hidden"
-                  animate="show"
-                  className="mb-6 border border-black/8"
-                >
-                  <div className="flex items-center gap-4 bg-[#F7F5F2] px-4 py-4 border-b border-black/8">
-                    <div className="w-12 h-12 rounded-full bg-[#2d6a4f] flex items-center justify-center text-white font-bold text-lg shrink-0">
-                      {initials(userName)}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="font-display italic text-lg leading-tight truncate">{userName}</p>
-                      <p className="font-sans text-xs text-gray-400">Supplier account</p>
-                    </div>
-                  </div>
-                  {[
-                    { label: 'Dashboard', href: '/supplier', icon: LayoutDashboard },
-                    { label: 'My Listings', href: '/supplier/listings', icon: MapPin },
-                    { label: 'Bookings', href: '/supplier/bookings', icon: CalendarDays },
-                    { label: 'Settings', href: '/supplier/settings', icon: Settings },
-                  ].map(item => {
-                    const Icon = item.icon
-                    return (
-                      <Link
-                        key={item.href}
-                        href={item.href}
-                        prefetch={false}
-                        className="flex items-center justify-between px-5 py-3.5 font-sans text-sm text-gray-700 hover:bg-[#F7F5F2] border-b border-black/5 last:border-0 transition-colors"
-                      >
-                        <span className="flex items-center gap-3">
-                          <Icon size={16} className="text-[#2d6a4f]" />
-                          {item.label}
-                        </span>
-                        <ChevronRight size={14} className="text-gray-300" />
-                      </Link>
-                    )
-                  })}
-                  <button
-                    onClick={handleSignOut}
-                    className="w-full flex items-center gap-3 px-5 py-3.5 font-sans text-sm text-red-500 hover:bg-red-50 transition-colors"
-                  >
-                    <LogOut size={16} /> Sign Out
-                  </button>
-                </motion.div>
-              )}
-
-              {/* ── Main nav links ── */}
-              <motion.nav
-                className="flex flex-col gap-1"
-                variants={staggerContainer(0.04, 0.05)}
-                initial="hidden"
-                animate="show"
-              >
-                {NAV_LINKS.map((link) => (
-                  <motion.div key={link.href} variants={staggerChild}>
-                    <Link
-                      href={link.href}
-                      className="flex items-center justify-between py-3 border-b border-black/6 font-display italic text-2xl text-forest hover:text-gold transition-colors"
-                    >
-                      {link.label}
-                      <ChevronRight size={18} className="text-gray-200" />
-                    </Link>
-                    {link.children && (
-                      <div className="flex flex-col border-b border-black/6">
-                        {link.children.filter(c => c.href !== link.href).map((child) => (
-                          <Link
-                            key={child.href}
-                            href={child.href}
-                            className="flex items-center justify-between py-2.5 pl-4 font-sans text-base text-forest/60 hover:text-gold transition-colors"
-                          >
-                            {child.label}
-                            <ChevronRight size={15} className="text-gray-200" />
-                          </Link>
-                        ))}
-                      </div>
-                    )}
-                  </motion.div>
-                ))}
-              </motion.nav>
-
-              {/* ── Bottom actions ── */}
+              {/* ── Left: editorial nav links ── */}
               <motion.div
-                variants={staggerChild}
-                initial="hidden"
-                animate="show"
-                className="mt-6 flex flex-col gap-3"
+                className="flex flex-col justify-center px-8 lg:px-16 py-10 overflow-y-auto w-full lg:w-[45%] shrink-0"
+                variants={leftPanelAnim}
+                initial="hidden" animate="show" exit="exit"
               >
-                {!user && (
-                  <Link
-                    href="/auth/login"
-                    className="font-sans text-sm px-8 py-3 border border-forest text-forest hover:bg-forest hover:text-white transition-all text-center"
-                  >
-                    Sign In
+                <nav className="flex flex-col">
+                  {NAV_ITEMS.map((item) => (
+                    <div key={item.href} onMouseEnter={() => setHoveredItem(item.href)}>
+                      {/* Main label */}
+                      <div className="flex items-baseline gap-3">
+                        <Link
+                          href={item.href}
+                          onClick={() => setMenuOpen(false)}
+                          className={`font-display italic leading-tight py-[0.3em] transition-colors duration-200 text-[2.6rem] lg:text-[3.2rem] xl:text-[3.6rem] ${
+                            hoveredItem === item.href
+                              ? 'text-white'
+                              : 'text-white/25 hover:text-white/60'
+                          }`}
+                        >
+                          {item.label}
+                        </Link>
+                        {hoveredItem === item.href && (
+                          <ArrowRight className="w-5 h-5 text-gold shrink-0 mb-0.5" aria-hidden />
+                        )}
+                      </div>
+
+                      {/* Sub-links — expand on hover */}
+                      <AnimatePresence initial={false}>
+                        {hoveredItem === item.href && item.children.length > 0 && (
+                          <motion.div
+                            className="overflow-hidden"
+                            initial={{ height: 0, opacity: 0 }}
+                            animate={{ height: 'auto', opacity: 1, transition: { duration: 0.22, ease: [0.4, 0, 0.2, 1] } }}
+                            exit={{ height: 0, opacity: 0, transition: { duration: 0.16 } }}
+                          >
+                            <div className="flex flex-wrap gap-x-1 gap-y-0.5 pb-3 pt-0.5">
+                              {item.children.map((child, ci) => (
+                                <span key={child.href} className="flex items-center">
+                                  {ci > 0 && <span className="text-white/10 px-1.5 text-sm select-none">·</span>}
+                                  <Link
+                                    href={child.href}
+                                    onClick={() => setMenuOpen(false)}
+                                    className="font-sans text-[11px] tracking-wide text-white/35 hover:text-gold transition-colors"
+                                  >
+                                    {child.label}
+                                  </Link>
+                                </span>
+                              ))}
+                            </div>
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
+                    </div>
+                  ))}
+                </nav>
+
+                {/* Footer utility links */}
+                <div className="mt-10 pt-6 border-t border-white/[0.06] flex flex-wrap gap-x-6 gap-y-2">
+                  {!user && (
+                    <Link href="/auth/login" onClick={() => setMenuOpen(false)}
+                      className="font-sans text-[11px] text-white/25 hover:text-white/60 transition-colors tracking-wide">
+                      Sign In
+                    </Link>
+                  )}
+                  {user && (
+                    <button onClick={handleSignOut}
+                      className="font-sans text-[11px] text-white/25 hover:text-white/60 transition-colors tracking-wide">
+                      Sign Out
+                    </button>
+                  )}
+                  <Link href="/about" onClick={() => setMenuOpen(false)}
+                    className="font-sans text-[11px] text-white/25 hover:text-white/60 transition-colors tracking-wide">
+                    About Us
                   </Link>
-                )}
+                  <Link href="/list-your-property" onClick={() => setMenuOpen(false)}
+                    className="font-sans text-[11px] text-white/25 hover:text-white/60 transition-colors tracking-wide">
+                    List Your Property
+                  </Link>
+                </div>
               </motion.div>
+
+              {/* ── Right: changing hero image (desktop only) ── */}
+              <div className="hidden lg:block flex-1 relative overflow-hidden">
+                <AnimatePresence mode="wait">
+                  <motion.div
+                    key={activeItem.href}
+                    className="absolute inset-0"
+                    variants={imgAnim}
+                    initial="hidden" animate="show" exit="exit"
+                  >
+                    <Image
+                      src={activeItem.image}
+                      alt={activeItem.imageAlt}
+                      fill
+                      sizes="55vw"
+                      className="object-cover"
+                      priority
+                    />
+                    {/* Left fade — blends into the dark left panel */}
+                    <div className="absolute inset-0 bg-gradient-to-r from-[#0D0D0D]/70 via-[#0D0D0D]/10 to-transparent pointer-events-none" />
+                    {/* Bottom vignette */}
+                    <div className="absolute inset-0 bg-gradient-to-t from-[#0D0D0D]/50 via-transparent to-transparent pointer-events-none" />
+
+                    {/* Caption */}
+                    <div className="absolute bottom-10 right-10 text-right max-w-xs">
+                      <p className="font-display italic text-white text-[1.6rem] leading-snug">
+                        {activeItem.label}
+                      </p>
+                      <p className="font-sans text-[13px] text-white/50 mt-1.5 leading-relaxed">
+                        {activeItem.sublabel}
+                      </p>
+                    </div>
+                  </motion.div>
+                </AnimatePresence>
+              </div>
+
             </div>
           </motion.div>
         )}
