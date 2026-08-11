@@ -21,9 +21,9 @@ type MegaFeatured = { src: string; alt: string; label: string; sublabel: string;
 type NavMega      = { featured: MegaFeatured; columns: MegaColumn[] }
 type NavLink      = { label: string; href: string; mega?: NavMega }
 
-// ── Nav data ──────────────────────────────────────────────────────────────────
+// ── Nav data — all items on the left ─────────────────────────────────────────
 
-const LEFT_NAV: NavLink[] = [
+const NAV_LINKS: NavLink[] = [
   {
     label: 'Stays',
     href: '/stays',
@@ -39,29 +39,29 @@ const LEFT_NAV: NavLink[] = [
         {
           heading: 'By Category',
           links: [
-            { label: 'Mountain Lodges', href: '/stays?type=lodge' },
-            { label: 'Boutique Guesthouses', href: '/stays?type=guesthouse' },
-            { label: 'Self-Catering Cottages', href: '/stays?type=cottage' },
-            { label: 'Camping & Glamping', href: '/stays?type=camping' },
-            { label: 'Backpacker Hostels', href: '/stays?type=hostel' },
+            { label: 'Mountain Lodges',       href: '/stays?type=lodge' },
+            { label: 'Boutique Guesthouses',  href: '/stays?type=guesthouse' },
+            { label: 'Self-Catering Cottages',href: '/stays?type=cottage' },
+            { label: 'Camping & Glamping',    href: '/stays?type=camping' },
+            { label: 'Backpacker Hostels',    href: '/stays?type=hostel' },
           ],
         },
         {
           heading: 'By Region',
           links: [
             { label: 'Northern Berg', href: '/stays?region=northern' },
-            { label: 'Central Berg', href: '/stays?region=central' },
+            { label: 'Central Berg',  href: '/stays?region=central' },
             { label: 'Southern Berg', href: '/stays?region=southern' },
-            { label: 'Royal Natal', href: '/stays?region=royal-natal' },
+            { label: 'Royal Natal',   href: '/stays?region=royal-natal' },
           ],
         },
         {
           heading: 'Travel Styles',
           links: [
-            { label: 'Family Getaways', href: '/stays?style=family' },
-            { label: 'Romantic Escapes', href: '/stays?style=couples' },
+            { label: 'Family Getaways',      href: '/stays?style=family' },
+            { label: 'Romantic Escapes',     href: '/stays?style=couples' },
             { label: 'Adventure Base Camps', href: '/stays?style=adventure' },
-            { label: 'Luxury Retreats', href: '/stays?style=luxury' },
+            { label: 'Luxury Retreats',      href: '/stays?style=luxury' },
           ],
         },
       ],
@@ -82,28 +82,28 @@ const LEFT_NAV: NavLink[] = [
         {
           heading: 'By Difficulty',
           links: [
-            { label: 'Easy Walks', href: '/hikes?difficulty=easy' },
-            { label: 'Moderate Trails', href: '/hikes?difficulty=moderate' },
-            { label: 'Strenuous Hikes', href: '/hikes?difficulty=strenuous' },
+            { label: 'Easy Walks',       href: '/hikes?difficulty=easy' },
+            { label: 'Moderate Trails',  href: '/hikes?difficulty=moderate' },
+            { label: 'Strenuous Hikes',  href: '/hikes?difficulty=strenuous' },
             { label: 'Multi-Day Routes', href: '/hikes?type=multiday' },
           ],
         },
         {
           heading: 'Iconic Routes',
           links: [
-            { label: 'Tugela Falls', href: '/hikes?trail=tugela-falls' },
-            { label: 'The Amphitheatre', href: '/hikes?trail=amphitheatre' },
-            { label: 'Giants Castle', href: '/hikes?trail=giants-castle' },
-            { label: 'Injasuti Dome', href: '/hikes?trail=injasuti' },
+            { label: 'Tugela Falls',    href: '/hikes?trail=tugela-falls' },
+            { label: 'The Amphitheatre',href: '/hikes?trail=amphitheatre' },
+            { label: 'Giants Castle',   href: '/hikes?trail=giants-castle' },
+            { label: 'Injasuti Dome',   href: '/hikes?trail=injasuti' },
           ],
         },
         {
           heading: 'Trail Features',
           links: [
             { label: 'Waterfall Hikes', href: '/hikes?feature=waterfalls' },
-            { label: 'Summit Peaks', href: '/hikes?feature=peaks' },
-            { label: 'San Rock Art', href: '/hikes?feature=rock-art' },
-            { label: 'Guided Hikes', href: '/hikes?feature=guided' },
+            { label: 'Summit Peaks',    href: '/hikes?feature=peaks' },
+            { label: 'San Rock Art',    href: '/hikes?feature=rock-art' },
+            { label: 'Guided Hikes',    href: '/hikes?feature=guided' },
           ],
         },
       ],
@@ -124,37 +124,34 @@ const LEFT_NAV: NavLink[] = [
         {
           heading: 'Outdoor Adventure',
           links: [
-            { label: 'Horse Riding', href: '/activities?cat=horse-riding' },
-            { label: 'Rock Climbing', href: '/activities?cat=rock-climbing' },
-            { label: 'Fly Fishing', href: '/activities?cat=fly-fishing' },
+            { label: 'Horse Riding',    href: '/activities?cat=horse-riding' },
+            { label: 'Rock Climbing',   href: '/activities?cat=rock-climbing' },
+            { label: 'Fly Fishing',     href: '/activities?cat=fly-fishing' },
             { label: 'Mountain Biking', href: '/activities?cat=mountain-biking' },
           ],
         },
         {
           heading: 'Nature & Culture',
           links: [
-            { label: 'Bird Watching', href: '/activities?cat=birding' },
+            { label: 'Bird Watching',      href: '/activities?cat=birding' },
             { label: 'San Heritage Tours', href: '/activities?cat=heritage' },
-            { label: 'Botanical Walks', href: '/activities?cat=botany' },
-            { label: 'Photography Tours', href: '/activities?cat=photography' },
+            { label: 'Botanical Walks',    href: '/activities?cat=botany' },
+            { label: 'Photography Tours',  href: '/activities?cat=photography' },
           ],
         },
         {
           heading: 'Family & Wellness',
           links: [
             { label: 'Kids Activities', href: '/activities?cat=kids' },
-            { label: 'Spa & Wellness', href: '/activities?cat=wellness' },
-            { label: '4x4 Off-Road', href: '/activities?cat=4x4' },
-            { label: 'Star Gazing', href: '/activities?cat=stargazing' },
+            { label: 'Spa & Wellness',  href: '/activities?cat=wellness' },
+            { label: '4x4 Off-Road',    href: '/activities?cat=4x4' },
+            { label: 'Star Gazing',     href: '/activities?cat=stargazing' },
           ],
         },
       ],
     },
   },
   { label: 'Shuttles', href: '/shuttles' },
-]
-
-const RIGHT_NAV: NavLink[] = [
   {
     label: 'Regions',
     href: '/regions',
@@ -170,44 +167,42 @@ const RIGHT_NAV: NavLink[] = [
         {
           heading: 'Northern Berg',
           links: [
-            { label: 'Royal Natal', href: '/regions?area=royal-natal' },
-            { label: 'Monks Cowl', href: '/regions?area=monks-cowl' },
-            { label: 'Champagne Valley', href: '/regions?area=champagne-valley' },
-            { label: 'Cathedral Peak', href: '/regions?area=cathedral-peak' },
+            { label: 'Royal Natal',       href: '/regions?area=royal-natal' },
+            { label: 'Monks Cowl',        href: '/regions?area=monks-cowl' },
+            { label: 'Champagne Valley',  href: '/regions?area=champagne-valley' },
+            { label: 'Cathedral Peak',    href: '/regions?area=cathedral-peak' },
           ],
         },
         {
           heading: 'Central & Southern',
           links: [
             { label: 'Giants Castle', href: '/regions?area=giants-castle' },
-            { label: 'Injasuti', href: '/regions?area=injasuti' },
-            { label: 'Sani Pass', href: '/regions?area=sani-pass' },
-            { label: 'Underberg', href: '/regions?area=underberg' },
+            { label: 'Injasuti',      href: '/regions?area=injasuti' },
+            { label: 'Sani Pass',     href: '/regions?area=sani-pass' },
+            { label: 'Underberg',     href: '/regions?area=underberg' },
           ],
         },
         {
           heading: 'Nature Reserves',
           links: [
-            { label: 'All Reserves', href: '/nature-reserves' },
-            { label: 'uKhahlamba-Drakensberg', href: '/nature-reserves?park=ukhahlamba' },
-            { label: 'Maloti-Drakensberg', href: '/nature-reserves?park=maloti' },
+            { label: 'All Reserves',         href: '/nature-reserves' },
+            { label: 'uKhahlamba-Drakensberg',href: '/nature-reserves?park=ukhahlamba' },
+            { label: 'Maloti-Drakensberg',   href: '/nature-reserves?park=maloti' },
           ],
         },
       ],
     },
   },
   { label: 'Stories', href: '/mydrakensberg' },
-  { label: 'Plan', href: '/plan' },
+  { label: 'Plan',    href: '/plan' },
 ]
 
-const ALL_NAV = [...LEFT_NAV, ...RIGHT_NAV]
-
 const VISITOR_LINKS = [
-  { label: 'My Account',       href: '/account/settings',        icon: User },
-  { label: 'Bookings & Trips', href: '/account',                  icon: CalendarDays },
-  { label: 'Rewards & Wallet', href: '/account/loyalty',          icon: Gift },
-  { label: 'Recommendations',  href: '/account/recommendations',  icon: Star },
-  { label: 'Saved',            href: '/account/saved',            icon: Heart },
+  { label: 'My Account',       href: '/account/settings',       icon: User },
+  { label: 'Bookings & Trips', href: '/account',                icon: CalendarDays },
+  { label: 'Rewards & Wallet', href: '/account/loyalty',        icon: Gift },
+  { label: 'Recommendations',  href: '/account/recommendations', icon: Star },
+  { label: 'Saved',            href: '/account/saved',          icon: Heart },
 ]
 
 function initials(name: string) {
@@ -223,7 +218,7 @@ const megaVariants = {
 }
 
 const dropVariants = {
-  hidden: { opacity: 0, scale: 0.97, originX: 1, originY: 0 },
+  hidden: { opacity: 0, scale: 0.97 },
   show:   { opacity: 1, scale: 1,    transition: { duration: 0.15, ease: [0.4, 0, 0.2, 1] as number[] } },
   exit:   { opacity: 0, scale: 0.97, transition: { duration: 0.1,  ease: [0.4, 0, 1,   1] as number[] } },
 }
@@ -278,10 +273,9 @@ export default function Navbar() {
     router.push('/')
   }
 
-  const hasActiveMenu  = activeMenu !== null
-  const transparent    = !scrolled && !mobileOpen && !hasActiveMenu
-  const textColor      = 'text-black'
-  const logoColor      = transparent ? 'text-gold' : 'text-forest'
+  const hasActiveMenu = activeMenu !== null
+  const transparent   = !scrolled && !mobileOpen && !hasActiveMenu
+  const logoColor     = transparent ? 'text-gold' : 'text-forest'
 
   const userName   = user?.user_metadata?.full_name ?? user?.email?.split('@')[0] ?? 'My Account'
   const userEmail  = user?.email ?? ''
@@ -289,7 +283,7 @@ export default function Navbar() {
   const isSupplier = role === 'supplier'
   const isAdmin    = role === 'admin'
 
-  const activeMega = ALL_NAV.find(l => l.href === activeMenu)?.mega ?? null
+  const activeMega = NAV_LINKS.find(l => l.href === activeMenu)?.mega ?? null
 
   // ── Render ──────────────────────────────────────────────────────────────────
   return (
@@ -301,24 +295,25 @@ export default function Navbar() {
         }`}
         onMouseLeave={() => setActiveMenu(null)}
       >
-        {/* ── Nav bar ── */}
+        {/* ── Nav bar ───────────────────────────────────────────────────────── */}
+        {/*  Three-column grid:  [nav (1fr)]  [logo (auto)]  [auth (1fr)]      */}
         <div className="max-w-[1440px] mx-auto px-6 lg:px-12 h-16 flex items-center justify-between lg:grid lg:grid-cols-[1fr_auto_1fr]">
 
-          {/* ── Col 1: mobile logo · desktop left nav ── */}
+          {/* Col 1 — mobile: logo · desktop: all nav links (left-aligned) */}
           <div className="flex items-center">
-            {/* Mobile-only logo */}
+            {/* Mobile logo */}
             <Link href="/" className="lg:hidden" aria-label="Visit Drakensberg — Home">
               <Logo className="h-3 w-auto text-forest" />
             </Link>
 
-            {/* Desktop left nav */}
-            <nav className="hidden lg:flex items-center gap-7">
-              {LEFT_NAV.map((link) =>
+            {/* Desktop nav */}
+            <nav className="hidden lg:flex items-center gap-5">
+              {NAV_LINKS.map((link) =>
                 link.mega ? (
                   <button
                     key={link.href}
                     onMouseEnter={() => setActiveMenu(link.href)}
-                    className={`flex items-center gap-1 font-sans text-sm tracking-wide transition-colors duration-200 ${textColor} hover:text-gold ${activeMenu === link.href ? '!text-gold' : ''}`}
+                    className={`flex items-center gap-1 font-sans text-sm tracking-wide transition-colors duration-200 text-black hover:text-gold ${activeMenu === link.href ? '!text-gold' : ''}`}
                   >
                     {link.label}
                     <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-200 ${activeMenu === link.href ? 'rotate-180' : ''}`} />
@@ -328,7 +323,7 @@ export default function Navbar() {
                     key={link.href}
                     href={link.href}
                     onMouseEnter={() => setActiveMenu(null)}
-                    className={`font-sans text-sm tracking-wide transition-colors duration-200 ${textColor} hover:text-gold`}
+                    className="font-sans text-sm tracking-wide transition-colors duration-200 text-black hover:text-gold"
                   >
                     {link.label}
                   </Link>
@@ -337,44 +332,20 @@ export default function Navbar() {
             </nav>
           </div>
 
-          {/* ── Col 2: centred logo (desktop only) ── */}
+          {/* Col 2 — centred logo (desktop only) */}
           <Link href="/" className="hidden lg:block" aria-label="Visit Drakensberg — Home">
             <Logo className={`h-8 w-auto transition-colors duration-300 ${logoColor}`} />
           </Link>
 
-          {/* ── Col 3: desktop right nav + auth · mobile hamburger ── */}
-          <div className="flex items-center justify-end gap-5">
-            {/* Desktop right nav */}
-            <nav className="hidden lg:flex items-center gap-7">
-              {RIGHT_NAV.map((link) =>
-                link.mega ? (
-                  <button
-                    key={link.href}
-                    onMouseEnter={() => setActiveMenu(link.href)}
-                    className={`flex items-center gap-1 font-sans text-sm tracking-wide transition-colors duration-200 ${textColor} hover:text-gold ${activeMenu === link.href ? '!text-gold' : ''}`}
-                  >
-                    {link.label}
-                    <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-200 ${activeMenu === link.href ? 'rotate-180' : ''}`} />
-                  </button>
-                ) : (
-                  <Link
-                    key={link.href}
-                    href={link.href}
-                    onMouseEnter={() => setActiveMenu(null)}
-                    className={`font-sans text-sm tracking-wide transition-colors duration-200 ${textColor} hover:text-gold`}
-                  >
-                    {link.label}
-                  </Link>
-                )
-              )}
-            </nav>
+          {/* Col 3 — desktop: auth (right-aligned) · mobile: hamburger */}
+          <div className="flex items-center justify-end gap-4">
 
             {/* Desktop auth */}
             {user ? (
               <div className="hidden lg:block relative" ref={dropdownRef}>
                 <button
                   onClick={() => setDropdownOpen((v) => !v)}
-                  className={`flex items-center gap-2 font-sans text-sm ${textColor}`}
+                  className="flex items-center gap-2 font-sans text-sm text-black"
                 >
                   <span className="w-8 h-8 rounded-full bg-gold flex items-center justify-center text-forest text-xs font-bold">
                     {initials(userName)}
@@ -447,7 +418,7 @@ export default function Navbar() {
             {/* Mobile hamburger */}
             <button
               onClick={() => setMobileOpen((v) => !v)}
-              className={`lg:hidden p-2 transition-colors ${textColor}`}
+              className="lg:hidden p-2 transition-colors text-black"
               aria-label="Toggle menu"
             >
               {mobileOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
@@ -477,9 +448,7 @@ export default function Navbar() {
                     className="object-cover"
                     priority
                   />
-                  {/* gradient overlay */}
                   <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/30 to-black/10 pointer-events-none" />
-                  {/* Text content */}
                   <div className="absolute inset-0 flex flex-col justify-end p-7">
                     <p className="font-display italic text-[1.55rem] leading-tight text-white">
                       {activeMega.featured.label}
@@ -647,7 +616,7 @@ export default function Navbar() {
                 initial="hidden"
                 animate="show"
               >
-                {ALL_NAV.map((link) => (
+                {NAV_LINKS.map((link) => (
                   <motion.div key={link.href} variants={staggerChild}>
                     <Link
                       href={link.href}
@@ -671,7 +640,7 @@ export default function Navbar() {
                 ))}
               </motion.nav>
 
-              {/* Sign in button */}
+              {/* Sign in */}
               <motion.div variants={staggerChild} initial="hidden" animate="show" className="mt-6 flex flex-col gap-3">
                 {!user && (
                   <Link href="/auth/login"
@@ -680,7 +649,6 @@ export default function Navbar() {
                   </Link>
                 )}
               </motion.div>
-
             </div>
           </motion.div>
         )}
