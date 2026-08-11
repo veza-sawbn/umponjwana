@@ -6,11 +6,14 @@ import { usePathname, useRouter } from 'next/navigation'
 import {
   X, Search, ChevronDown, LogOut, LayoutDashboard, CalendarDays,
   Bell, User, Heart, Gift, Star, Settings, MapPin, ArrowRight,
+  MessageCircle, Map, Receipt,
 } from 'lucide-react'
 import { supabase, signOut } from '@/lib/auth'
 import type { User as SupabaseUser } from '@supabase/supabase-js'
 import { AnimatePresence, motion } from 'framer-motion'
 import Logo from '@/components/Logo'
+import { getUnreadCount } from '@/lib/notifications'
+import { getThreadsByCustomer } from '@/lib/messages'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -84,11 +87,10 @@ const NAV_ITEMS: NavItem[] = [
     imageAlt: 'Drakensberg mountain panorama',
     sublabel: "Explore the Berg's distinct landscapes",
     children: [
-      { label: 'Royal Natal',      href: '/regions?area=royal-natal' },
-      { label: 'Champagne Valley', href: '/regions?area=champagne-valley' },
-      { label: 'Giants Castle',    href: '/regions?area=giants-castle' },
-      { label: 'Sani Pass',        href: '/regions?area=sani-pass' },
-      { label: 'Cathedral Peak',   href: '/regions?area=cathedral-peak' },
+      { label: 'North Berg',       href: '/regions/north-berg' },
+      { label: 'Central Berg',     href: '/regions/central-berg' },
+      { label: 'South Berg',       href: '/regions/south-berg' },
+      { label: 'All Regions',      href: '/regions' },
     ],
   },
   {
@@ -110,11 +112,13 @@ const NAV_ITEMS: NavItem[] = [
 ]
 
 const VISITOR_LINKS = [
-  { label: 'My Account',       href: '/account/settings',       icon: User },
   { label: 'Bookings & Trips', href: '/account',                icon: CalendarDays },
-  { label: 'Rewards & Wallet', href: '/account/loyalty',        icon: Gift },
-  { label: 'Recommendations',  href: '/account/recommendations', icon: Star },
+  { label: 'Itinerary',        href: '/account/itinerary',      icon: Map },
+  { label: 'Messages',         href: '/account/messages',       icon: MessageCircle, badge: 'messages' as const },
+  { label: 'Notifications',    href: '/account',                icon: Bell,          badge: 'notifications' as const },
   { label: 'Saved',            href: '/account/saved',          icon: Heart },
+  { label: 'Orders',           href: '/account/orders',         icon: Receipt },
+  { label: 'Settings',         href: '/account/settings',       icon: Settings },
 ]
 
 function initials(name: string) {
@@ -150,19 +154,32 @@ const dropAnim = {
 // ── Component ─────────────────────────────────────────────────────────────────
 
 export default function Navbar() {
-  const [scrolled,     setScrolled]     = useState(false)
-  const [menuOpen,     setMenuOpen]     = useState(false)
-  const [hoveredItem,  setHoveredItem]  = useState(NAV_ITEMS[0].href)
-  const [dropdownOpen, setDropdownOpen] = useState(false)
-  const [user,         setUser]         = useState<SupabaseUser | null>(null)
+  const [scrolled,       setScrolled]       = useState(false)
+  const [menuOpen,       setMenuOpen]       = useState(false)
+  const [hoveredItem,    setHoveredItem]    = useState(NAV_ITEMS[0].href)
+  const [dropdownOpen,   setDropdownOpen]   = useState(false)
+  const [user,           setUser]           = useState<SupabaseUser | null>(null)
+  const [unreadNotifs,   setUnreadNotifs]   = useState(0)
+  const [unreadMessages, setUnreadMessages] = useState(0)
   const dropdownRef = useRef<HTMLDivElement>(null)
   const pathname    = usePathname()
   const router      = useRouter()
 
   useEffect(() => {
-    supabase.auth.getUser().then(({ data }) => setUser(data.user))
+    supabase.auth.getUser().then(({ data }) => {
+      setUser(data.user)
+      if (data.user) {
+        // Load badge counts after auth — fire and forget
+        getUnreadCount().then(setUnreadNotifs).catch(() => {})
+        getThreadsByCustomer(data.user.id).then(threads => {
+          // Count threads with at least one supplier message (any activity = "unread")
+          setUnreadMessages(threads.filter(t => t.messages.some(m => m.from === 'supplier')).length)
+        }).catch(() => {})
+      }
+    })
     const { data: sub } = supabase.auth.onAuthStateChange((_, session) => {
       setUser(session?.user ?? null)
+      if (!session?.user) { setUnreadNotifs(0); setUnreadMessages(0) }
     })
     const onScroll = () => setScrolled(window.scrollY >= 50)
     window.addEventListener('scroll', onScroll, { passive: true })
@@ -273,46 +290,61 @@ export default function Navbar() {
                 <AnimatePresence>
                   {dropdownOpen && (
                     <motion.div
-                      className="absolute right-0 top-full mt-2 w-56 bg-white border border-black/8 shadow-card py-1 z-50"
+                      className="absolute right-0 top-full mt-2 w-64 bg-white border border-black/8 shadow-card z-50 overflow-hidden"
                       variants={dropAnim} initial="hidden" animate="show" exit="exit"
                     >
-                      <p className="px-4 py-2 font-sans text-xs text-forest/40 border-b border-black/6 truncate">
-                        {userName}
-                      </p>
-                      {isAdmin && (
-                        <Link href="/admin" prefetch={false} onClick={() => setDropdownOpen(false)}
-                          className="flex items-center gap-2 px-4 py-2.5 font-sans text-sm text-forest hover:bg-mist transition-colors">
-                          <LayoutDashboard className="w-4 h-4" /> Admin Panel
-                        </Link>
-                      )}
-                      {isSupplier ? (
-                        <>
-                          <Link href="/supplier" prefetch={false} onClick={() => setDropdownOpen(false)}
-                            className="flex items-center gap-2 px-4 py-2.5 font-sans text-sm text-forest hover:bg-mist transition-colors">
-                            <LayoutDashboard className="w-4 h-4" /> Dashboard
+                      {/* Profile header */}
+                      <div className="px-4 py-3 bg-forest flex items-center gap-3 border-b border-white/10">
+                        <div className="w-9 h-9 rounded-full bg-gold flex items-center justify-center text-white text-sm font-bold shrink-0">
+                          {initials(userName)}
+                        </div>
+                        <div className="min-w-0">
+                          <p className="font-display italic text-white text-base leading-tight truncate">{userName}</p>
+                          <p className="font-sans text-[10px] text-white/40 truncate">{user?.email}</p>
+                        </div>
+                      </div>
+
+                      <div className="py-1">
+                        {isAdmin && (
+                          <Link href="/admin" prefetch={false} onClick={() => setDropdownOpen(false)}
+                            className="flex items-center gap-2.5 px-4 py-2.5 font-sans text-sm text-forest hover:bg-mist transition-colors">
+                            <LayoutDashboard className="w-4 h-4 text-forest/40" /> Admin Panel
                           </Link>
-                          <Link href="/supplier/listings" onClick={() => setDropdownOpen(false)}
-                            className="flex items-center gap-2 px-4 py-2.5 font-sans text-sm text-forest hover:bg-mist transition-colors">
-                            <CalendarDays className="w-4 h-4" /> My Listings
-                          </Link>
-                          <Link href="/supplier/listings/new" onClick={() => setDropdownOpen(false)}
-                            className="flex items-center gap-2 px-4 py-2.5 font-sans text-sm text-forest hover:bg-mist transition-colors">
-                            <Bell className="w-4 h-4" /> Add Listing
-                          </Link>
-                        </>
-                      ) : (
-                        VISITOR_LINKS.map(item => {
-                          const Icon = item.icon
-                          return (
-                            <Link key={item.href} href={item.href} onClick={() => setDropdownOpen(false)}
-                              className="flex items-center gap-2 px-4 py-2.5 font-sans text-sm text-forest hover:bg-mist transition-colors">
-                              <Icon className="w-4 h-4" /> {item.label}
+                        )}
+                        {isSupplier ? (
+                          <>
+                            <Link href="/supplier" prefetch={false} onClick={() => setDropdownOpen(false)}
+                              className="flex items-center gap-2.5 px-4 py-2.5 font-sans text-sm text-forest hover:bg-mist transition-colors">
+                              <LayoutDashboard className="w-4 h-4 text-forest/40" /> Dashboard
                             </Link>
-                          )
-                        })
-                      )}
+                            <Link href="/supplier/listings" onClick={() => setDropdownOpen(false)}
+                              className="flex items-center gap-2.5 px-4 py-2.5 font-sans text-sm text-forest hover:bg-mist transition-colors">
+                              <CalendarDays className="w-4 h-4 text-forest/40" /> My Listings
+                            </Link>
+                          </>
+                        ) : (
+                          VISITOR_LINKS.map(item => {
+                            const Icon = item.icon
+                            const count = item.badge === 'notifications' ? unreadNotifs
+                              : item.badge === 'messages' ? unreadMessages : 0
+                            return (
+                              <Link key={`${item.href}-${item.label}`} href={item.href} onClick={() => setDropdownOpen(false)}
+                                className="flex items-center gap-2.5 px-4 py-2.5 font-sans text-sm text-forest hover:bg-mist transition-colors">
+                                <Icon className="w-4 h-4 text-forest/40 shrink-0" />
+                                <span className="flex-1">{item.label}</span>
+                                {count > 0 && (
+                                  <span className="min-w-[18px] h-[18px] px-1 rounded-full bg-gold text-white text-[9px] font-bold flex items-center justify-center">
+                                    {count > 9 ? '9+' : count}
+                                  </span>
+                                )}
+                              </Link>
+                            )
+                          })
+                        )}
+                      </div>
+
                       <button onClick={handleSignOut}
-                        className="flex items-center gap-2 w-full px-4 py-2.5 font-sans text-sm text-red-500 hover:bg-mist transition-colors border-t border-black/6">
+                        className="flex items-center gap-2.5 w-full px-4 py-2.5 font-sans text-sm text-red-400 hover:bg-mist transition-colors border-t border-black/6">
                         <LogOut className="w-4 h-4" /> Sign Out
                       </button>
                     </motion.div>
@@ -428,10 +460,25 @@ export default function Navbar() {
                     </Link>
                   )}
                   {user && (
-                    <button onClick={handleSignOut}
-                      className="font-sans text-[11px] text-white/25 hover:text-white/60 transition-colors tracking-wide">
-                      Sign Out
-                    </button>
+                    <>
+                      <Link href="/account" onClick={() => setMenuOpen(false)}
+                        className="font-sans text-[11px] text-white/25 hover:text-white/60 transition-colors tracking-wide flex items-center gap-1.5">
+                        <User size={10} /> My Profile
+                      </Link>
+                      <Link href="/account/messages" onClick={() => setMenuOpen(false)}
+                        className="font-sans text-[11px] text-white/25 hover:text-white/60 transition-colors tracking-wide flex items-center gap-1.5">
+                        <MessageCircle size={10} /> Messages
+                        {unreadMessages > 0 && (
+                          <span className="bg-gold text-black text-[8px] font-bold px-1 rounded-full">
+                            {unreadMessages}
+                          </span>
+                        )}
+                      </Link>
+                      <button onClick={handleSignOut}
+                        className="font-sans text-[11px] text-white/25 hover:text-white/60 transition-colors tracking-wide">
+                        Sign Out
+                      </button>
+                    </>
                   )}
                   <Link href="/about" onClick={() => setMenuOpen(false)}
                     className="font-sans text-[11px] text-white/25 hover:text-white/60 transition-colors tracking-wide">

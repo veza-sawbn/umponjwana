@@ -74,6 +74,19 @@ export async function getAllThreads(): Promise<MessageThread[]> {
   return []
 }
 
+/** Customer inbox — all threads where the signed-in user is the customer. */
+export async function getThreadsByCustomer(userId: string): Promise<MessageThread[]> {
+  try {
+    const { data } = await supabase
+      .from('vd_message_threads')
+      .select('*')
+      .eq('customer_user_id', userId)
+      .order('updated_at', { ascending: false })
+    if (Array.isArray(data)) return (data as Row[]).map(rowToThread)
+  } catch {}
+  return []
+}
+
 export async function getThreadsBySupplier(supplierId: string, _fallbackNames?: string[]): Promise<MessageThread[]> {
   try {
     const { data } = await supabase
