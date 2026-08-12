@@ -440,11 +440,26 @@ export default function ManagedSuppliersPage() {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) { setLoading(false); return }
 
-    const { data: profile } = await supabase
+    // Try the full profile query (requires the delegated-management migration).
+    // If ops_role / organisation columns don't exist yet (42703), fall back to
+    // the pre-migration columns so the admin page still loads.
+    let profile: { role?: string; staff_role?: string; ops_role?: string; organisation?: string } | null = null
+    const { data: fullProfile, error: profileError } = await supabase
       .from('profiles')
       .select('role, staff_role, ops_role, organisation')
       .eq('id', user.id)
       .maybeSingle()
+    if (profileError) {
+      // Likely 42703 (undefined column) — migration not yet applied
+      const { data: basicProfile } = await supabase
+        .from('profiles')
+        .select('role, staff_role')
+        .eq('id', user.id)
+        .maybeSingle()
+      profile = basicProfile
+    } else {
+      profile = fullProfile
+    }
 
     const admin = profile?.role === 'admin'
     // An ops employee is anyone with staff_role='operations' who isn't a full admin.

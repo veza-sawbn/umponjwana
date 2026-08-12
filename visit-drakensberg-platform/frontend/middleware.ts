@@ -121,14 +121,17 @@ export async function middleware(req: NextRequest) {
         // lightweight check — the heavy per-supplier RLS is in the DB itself.
         // We fetch ops_role here to confirm they are a VD ops employee, not just
         // any user with staff_role='operations' that predates the ops system.
-        const { data: opsProfile } = await supabase
+        // ops_role and organisation were added by the delegated-management migration.
+        // If those columns don't exist yet (42703), treat the employee as having
+        // no ops access rather than crashing the middleware.
+        const { data: opsProfile, error: opsProfileError } = await supabase
           .from('profiles')
           .select('ops_role, organisation')
           .eq('id', session.user.id)
           .maybeSingle()
 
-        if (!opsProfile?.ops_role || opsProfile.organisation !== 'vd_operations') {
-          // Legacy operations collaborator (pre-delegated-management) — no supplier access
+        if (opsProfileError || !opsProfile?.ops_role || opsProfile.organisation !== 'vd_operations') {
+          // Either migration not yet applied, or legacy operations collaborator
           return redirectTo('/account')
         }
 
