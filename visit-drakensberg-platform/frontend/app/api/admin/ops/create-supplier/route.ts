@@ -8,40 +8,73 @@ export const dynamic = 'force-dynamic'
 const VALID_SUPPLIER_TYPES = ['Accommodation', 'Activity', 'Guided Tours', 'Shuttle', 'Experience']
 
 /**
+ * Generates an internal email alias for VD-managed supplier accounts.
+ *
+ * Format: ops+{slug}-{random}@{domain}
+ *   where domain comes from VD_OPS_EMAIL_DOMAIN (e.g. visitdrakensberg.co.za).
+ *
+ * Using plus-addressing means all emails land in one ops inbox and VD fully
+ * controls the addresses — no external email required at creation time.
+ * When the account is transferred to a property owner, the auth email is
+ * updated to the owner's real address via /api/admin/supplier/[id]/transfer.
+ */
+function internalAlias(businessName: string): string {
+  const domain = process.env.VD_OPS_EMAIL_DOMAIN ?? 'visitdrakensberg.co.za'
+  const base = process.env.VD_OPS_EMAIL_LOCAL ?? 'ops'
+  const slug = businessName
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 36)
+  // 4-char random suffix prevents collisions on similarly named suppliers
+  const suffix = Math.random().toString(36).slice(2, 6)
+  return `${base}+${slug}-${suffix}@${domain}`
+}
+
+/**
  * POST /api/admin/ops/create-supplier
  *
  * Creates an internally-managed supplier profile. Accessible to:
  *   - Platform admins (role = 'admin')
  *   - VD Operations administrators (ops_role = 'ops_administrator')
  *
- * Flow:
- *   1. Creates an auth user with role='supplier' in user_metadata so that
- *      the handle_new_user() DB trigger seeds the profile row automatically.
- *   2. Updates the profile with supplier_type and is_approved=true.
- *   3. If the caller is an ops_administrator (not a full platform admin),
- *      creates an initial vd_ops_assignments row so they can immediately
- *      manage the supplier they just created.
+ * No external email address is required. A VD-controlled internal alias is
+ * generated automatically so all VD-managed supplier accounts live under the
+ * same domain. When the property owner is ready to take over, use
+ * POST /api/admin/supplier/[id]/transfer to update the login email.
  *
- * The property owner can later claim the account via a password-reset link
- * and take over management — ownership transfer is handled in the UI.
+ * An optional ownerContactEmail can be stored in metadata from the start so
+ * the transfer destination is recorded before it's needed.
+ *
+ * Flow:
+ *   1. Generate internal alias email.
+ *   2. Create auth user with alias + role='supplier' + vd_managed=true.
+ *   3. Update profile with supplier_type, is_approved=true.
+ *   4. If caller is ops_administrator (not full admin), auto-create assignment.
  */
 export async function POST(req: Request) {
-  let body: { businessName?: string; email?: string; supplierType?: string }
+  let body: {
+    businessName?: string
+    supplierType?: string
+    ownerContactEmail?: string
+  }
   try {
     body = await req.json()
   } catch {
     return NextResponse.json({ error: 'invalid body' }, { status: 400 })
   }
 
-  const email = body.email?.trim().toLowerCase()
-  if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-    return NextResponse.json({ error: 'A valid email address is required.' }, { status: 400 })
-  }
   if (!body.businessName?.trim()) {
     return NextResponse.json({ error: 'Business name is required.' }, { status: 400 })
   }
   if (!body.supplierType || !VALID_SUPPLIER_TYPES.includes(body.supplierType)) {
     return NextResponse.json({ error: 'A valid supplier type is required.' }, { status: 400 })
+  }
+
+  // Validate optional owner contact email if provided
+  const ownerContactEmail = body.ownerContactEmail?.trim().toLowerCase() || null
+  if (ownerContactEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(ownerContactEmail)) {
+    return NextResponse.json({ error: 'Invalid owner contact email address.' }, { status: 400 })
   }
 
   // Auth check: must be platform admin or ops_administrator
@@ -63,16 +96,22 @@ export async function POST(req: Request) {
   }
 
   const admin = supabaseAdmin()
+  const alias = internalAlias(body.businessName.trim())
 
-  // Create the auth user with email_confirm=true so no verification email is
-  // sent. The property owner receives access via a password-reset link later.
-  // user_metadata seeds handle_new_user() which creates the profile row.
+  // Create the auth user using the internal alias.
+  // email_confirm=true skips verification — VD owns this alias, no inbox check needed.
+  // vd_managed=true in app_metadata flags it as internally managed so the UI
+  // can distinguish VD-managed accounts from self-registered ones.
   const { data: newUser, error: createError } = await admin.auth.admin.createUser({
-    email,
+    email: alias,
     email_confirm: true,
+    app_metadata: {
+      vd_managed: true,
+    },
     user_metadata: {
       full_name: body.businessName.trim(),
       role: 'supplier',
+      ...(ownerContactEmail ? { owner_contact_email: ownerContactEmail } : {}),
     },
   })
 
@@ -100,13 +139,10 @@ export async function POST(req: Request) {
 
   if (profileError) {
     console.error('[ops/create-supplier] profile update error:', profileError)
-    // Non-fatal: the auth user exists; an admin can fix the profile manually.
+    // Non-fatal: auth user exists; admin can correct the profile.
   }
 
-  // Ops administrators are automatically assigned to the supplier they create
-  // so they can start managing it immediately without waiting for a platform
-  // admin to configure the assignment. Full platform admins manage assignments
-  // through the Assign Supplier modal instead.
+  // Ops administrators are automatically assigned to the supplier they create.
   if (isOpsAdministrator && !isPlatformAdmin) {
     const { error: assignError } = await admin
       .from('vd_ops_assignments')
@@ -122,11 +158,10 @@ export async function POST(req: Request) {
         ],
         is_active: true,
       })
-
     if (assignError) {
       console.error('[ops/create-supplier] assignment error:', assignError)
     }
   }
 
-  return NextResponse.json({ supplierId })
+  return NextResponse.json({ supplierId, alias })
 }

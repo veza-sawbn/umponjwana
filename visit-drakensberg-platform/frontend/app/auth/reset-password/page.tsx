@@ -28,15 +28,25 @@ export default function ResetPasswordPage() {
     resolver: zodResolver(schema),
   })
 
-  // Supabase delivers the recovery/invite token in the URL hash; the client
-  // exchanges it for a session automatically. We wait for either:
-  //   a) onAuthStateChange fires PASSWORD_RECOVERY or SIGNED_IN  ← normal path
-  //   b) getSession() already has a session (token was exchanged synchronously)
-  //   c) 10 s timeout elapses with no session → declare the link invalid
+  // Supabase delivers the auth token in one of three formats depending on the
+  // project's auth flow setting. We handle all three:
   //
-  // 10 s gives slow mobile connections enough time. The OTP expiry is
-  // configured to 3600 s in Supabase Auth settings; the link itself lasts
-  // 60 minutes — the timeout here is only a UI safety net, not expiry logic.
+  //   1. PKCE auth-code  → ?code=AUTH_CODE
+  //      Call exchangeCodeForSession(code) — onAuthStateChange fires on success.
+  //
+  //   2. PKCE token-hash → ?token_hash=HASH&type=invite|recovery
+  //      Call verifyOtp({ token_hash, type }) — onAuthStateChange fires on success.
+  //
+  //   3. Implicit (legacy) → #access_token=…&type=invite|recovery (URL hash)
+  //      The client picks it up automatically; onAuthStateChange fires on its own.
+  //
+  // In all cases the form is gated behind onAuthStateChange firing with
+  // PASSWORD_RECOVERY or SIGNED_IN. A 3600 s safety-net timeout is only
+  // started when no URL token is found (implicit flow fallback).
+  //
+  // Edge case: user refreshes the page after a successful exchange — the URL
+  // still has the (now-consumed) token. We check for an existing session first
+  // and set ready immediately, avoiding a spurious "link expired" screen.
   useEffect(() => {
     let timeout: ReturnType<typeof setTimeout>
 
@@ -48,21 +58,57 @@ export default function ResetPasswordPage() {
       }
     })
 
-    supabase.auth.getSession().then(({ data }) => {
-      if (data.session) {
-        // Token already exchanged (e.g. returning to the tab)
+    async function bootstrap() {
+      // ── Already have a session? (page refresh / returning tab) ───────────────
+      const { data: { session } } = await supabase.auth.getSession()
+      if (session) {
         setReady(true)
-      } else {
-        // Give the auth helper time to exchange the hash token.
-        // 10 000 ms handles slow connections; the real expiry is server-side.
-        timeout = setTimeout(() => {
-          setReady(r => {
-            if (!r) setInvalidLink(true)
-            return r
-          })
-        }, 3_600_000)
+        return
       }
-    })
+
+      const params = new URLSearchParams(window.location.search)
+      const code      = params.get('code')
+      const tokenHash = params.get('token_hash')
+      const type      = params.get('type') as 'invite' | 'recovery' | 'email' | null
+
+      // ── Format 1: PKCE auth-code (?code=…) ──────────────────────────────────
+      if (code) {
+        const { error } = await supabase.auth.exchangeCodeForSession(code)
+        if (error) {
+          // May have already been exchanged — check for an active session
+          const { data: { session: s } } = await supabase.auth.getSession()
+          if (s) { setReady(true); return }
+          setInvalidLink(true)
+        }
+        // Success: onAuthStateChange fires with SIGNED_IN / PASSWORD_RECOVERY
+        return
+      }
+
+      // ── Format 2: PKCE token-hash (?token_hash=…&type=…) ────────────────────
+      if (tokenHash && type) {
+        const { error } = await supabase.auth.verifyOtp({ token_hash: tokenHash, type })
+        if (error) {
+          // Token consumed on a previous load — check for an active session
+          const { data: { session: s } } = await supabase.auth.getSession()
+          if (s) { setReady(true); return }
+          setInvalidLink(true)
+        }
+        // Success: onAuthStateChange fires
+        return
+      }
+
+      // ── Format 3: Implicit flow (#access_token=… hash) ──────────────────────
+      // The client exchanges the hash automatically; we just wait for the event.
+      // Start the 3600 s safety-net in case no token is present at all.
+      timeout = setTimeout(() => {
+        setReady(r => {
+          if (!r) setInvalidLink(true)
+          return r
+        })
+      }, 3_600_000)
+    }
+
+    bootstrap()
 
     return () => {
       sub.subscription.unsubscribe()
