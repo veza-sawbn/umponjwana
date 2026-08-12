@@ -15,7 +15,7 @@
 
 import { useEffect, useState, useCallback } from 'react'
 import Link from 'next/link'
-import { Building2, Users, Plus, RefreshCw, ChevronRight, UserPlus, Settings } from 'lucide-react'
+import { Building2, Users, Plus, RefreshCw, ChevronRight, UserPlus, Settings, AlertCircle, Check } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { supabase } from '@/lib/auth'
 import {
@@ -170,6 +170,61 @@ function InviteEmployeeModal({ onClose, onInvited }: { onClose: () => void; onIn
   )
 }
 
+// ─── Set Ops Role (inline, for profiles that are missing ops_role) ─────────────
+
+function SetOpsRoleRow({
+  userId,
+  currentRole,
+  onSaved,
+}: {
+  userId: string
+  currentRole: OpsRole | null
+  onSaved: () => void
+}) {
+  const [role, setRole] = useState<OpsRole>(currentRole ?? 'reservation_agent')
+  const [busy, setBusy] = useState(false)
+
+  async function save() {
+    setBusy(true)
+    try {
+      const res = await fetch('/api/admin/ops/profile', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId, opsRole: role }),
+      })
+      const json = await res.json()
+      if (!res.ok) throw new Error(json.error || 'Could not set role')
+      toast.success('Operational role configured.')
+      onSaved()
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Could not set role')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <div className="flex items-center gap-2 mt-1">
+      <select
+        value={role}
+        onChange={e => setRole(e.target.value as OpsRole)}
+        className="border border-gray-200 bg-white px-2 py-1 font-sans text-xs focus:outline-none"
+      >
+        {OPS_ROLES.map(r => (
+          <option key={r.value} value={r.value}>{r.label}</option>
+        ))}
+      </select>
+      <button
+        onClick={save}
+        disabled={busy}
+        className="inline-flex items-center gap-1 px-2 py-1 font-sans text-xs bg-[#2d6a4f] text-white hover:bg-[#245741] disabled:opacity-50 transition-colors"
+      >
+        <Check size={10} /> {busy ? 'Saving…' : 'Set Role'}
+      </button>
+    </div>
+  )
+}
+
 // ─── Assign Supplier Modal ─────────────────────────────────────────────────────
 
 function AssignSupplierModal({
@@ -177,11 +232,12 @@ function AssignSupplierModal({
   onClose,
   onAssigned,
 }: {
-  employees: { id: string; full_name: string | null; email: string | null; ops_role: OpsRole | null }[]
+  employees: { id: string; full_name: string | null; email: string | null; ops_role: OpsRole | null; setup_complete: boolean }[]
   onClose: () => void
   onAssigned: () => void
 }) {
-  const [employeeId, setEmployeeId] = useState(employees[0]?.id ?? '')
+  const readyEmployees = employees.filter(e => e.setup_complete)
+  const [employeeId, setEmployeeId] = useState(readyEmployees[0]?.id ?? '')
   const [suppliers, setSuppliers] = useState<{ id: string; full_name: string | null; supplier_type: string | null }[]>([])
   const [supplierId, setSupplierId] = useState('')
   const [permissions, setPermissions] = useState<string[]>([])
@@ -204,11 +260,11 @@ function AssignSupplierModal({
 
   // Pre-populate permissions based on selected employee's ops_role
   useEffect(() => {
-    const emp = employees.find(e => e.id === employeeId)
+    const emp = readyEmployees.find(e => e.id === employeeId)
     if (emp?.ops_role) {
       setPermissions(DEFAULT_PERMISSIONS_BY_ROLE[emp.ops_role] ?? [])
     }
-  }, [employeeId, employees])
+  }, [employeeId, readyEmployees])
 
   function togglePermission(key: string) {
     setPermissions(p => p.includes(key) ? p.filter(k => k !== key) : [...p, key])
@@ -245,7 +301,7 @@ function AssignSupplierModal({
               onChange={e => setEmployeeId(e.target.value)}
               className="w-full border border-gray-200 px-3 py-2.5 font-sans text-sm bg-white focus:outline-none"
             >
-              {employees.map(e => (
+              {readyEmployees.map(e => (
                 <option key={e.id} value={e.id}>
                   {e.full_name || e.email} · {e.ops_role ? OPS_ROLE_LABEL[e.ops_role] : ''}
                 </option>
@@ -333,12 +389,16 @@ export default function ManagedSuppliersPage() {
 
     const { data: profile } = await supabase
       .from('profiles')
-      .select('role, ops_role, organisation')
+      .select('role, staff_role, ops_role, organisation')
       .eq('id', user.id)
       .maybeSingle()
 
     const admin = profile?.role === 'admin'
-    const opsEmp = !admin && profile?.organisation === 'vd_operations' && profile?.ops_role != null
+    // An ops employee is anyone with staff_role='operations' who isn't a full admin.
+    // This includes users whose ops_role hasn't been configured yet — they still
+    // land on this page (via the middleware redirect) and see their assigned suppliers
+    // once setup is complete.
+    const opsEmp = !admin && profile?.staff_role === 'operations'
 
     setIsAdmin(admin)
     setIsOpsEmployee(opsEmp)
@@ -382,10 +442,16 @@ export default function ManagedSuppliersPage() {
         </div>
 
         {mySuppliers.length === 0 ? (
-          <div className="bg-white border border-gray-200 p-10 text-center">
-            <Building2 size={32} className="mx-auto mb-3 text-gray-300" />
-            <p className="font-sans text-sm text-gray-500">No suppliers assigned to you yet.</p>
-            <p className="font-sans text-xs text-gray-400 mt-1">Contact a platform administrator to have suppliers assigned to your account.</p>
+          <div className="flex items-start gap-3 border border-amber-200 bg-amber-50 px-4 py-4 max-w-xl">
+            <AlertCircle size={16} className="text-amber-600 shrink-0 mt-0.5" />
+            <div>
+              <p className="font-sans text-sm font-medium text-amber-800">No suppliers assigned yet</p>
+              <p className="font-sans text-xs text-amber-700 mt-1 leading-relaxed">
+                Your account is active. A platform administrator needs to assign suppliers to your account before you can manage them.
+                Once assigned, your suppliers will appear here. Sign in at{' '}
+                <span className="font-mono bg-amber-100 px-1">/auth/login</span> and return here after you&apos;ve been notified.
+              </p>
+            </div>
           </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
@@ -508,28 +574,43 @@ export default function ManagedSuppliersPage() {
                 {employees.map(emp => {
                   const empAssignments = allAssignments.filter(a => a.employee_id === emp.id && a.is_active)
                   return (
-                    <tr key={emp.id} className="hover:bg-[#F7F5F2]">
+                    <tr key={emp.id} className={`hover:bg-[#F7F5F2] ${!emp.setup_complete ? 'opacity-80' : ''}`}>
                       <td className="px-5 py-4 font-sans text-sm">{emp.full_name || '—'}</td>
                       <td className="px-5 py-4 font-sans text-xs text-gray-500">{emp.email}</td>
                       <td className="px-5 py-4">
-                        {emp.ops_role && (
+                        {emp.setup_complete && emp.ops_role ? (
                           <span className="font-sans text-[10px] tracking-[0.1em] uppercase px-2 py-0.5 bg-[#2d6a4f]/10 text-[#2d6a4f]">
                             {OPS_ROLE_LABEL[emp.ops_role]}
                           </span>
+                        ) : (
+                          <div>
+                            <div className="inline-flex items-center gap-1 font-sans text-[10px] tracking-[0.1em] uppercase px-2 py-0.5 bg-amber-50 text-amber-700 border border-amber-200">
+                              <AlertCircle size={10} /> Setup Required
+                            </div>
+                            <SetOpsRoleRow
+                              userId={emp.id}
+                              currentRole={emp.ops_role}
+                              onSaved={load}
+                            />
+                          </div>
                         )}
                       </td>
                       <td className="px-5 py-4 font-sans text-sm text-gray-600">
-                        {empAssignments.length === 0
-                          ? <span className="text-gray-400 text-xs">None</span>
-                          : empAssignments.map(a => a.supplier_name || a.supplier_id).join(', ')}
+                        {!emp.setup_complete
+                          ? <span className="text-gray-300 text-xs">—</span>
+                          : empAssignments.length === 0
+                            ? <span className="text-gray-400 text-xs">None</span>
+                            : empAssignments.map(a => a.supplier_name || a.supplier_id).join(', ')}
                       </td>
                       <td className="px-5 py-4">
-                        <button
-                          onClick={() => setShowAssign(true)}
-                          className="font-sans text-xs text-[#2d6a4f] hover:underline"
-                        >
-                          <Settings size={12} className="inline mr-1" />Manage
-                        </button>
+                        {emp.setup_complete && (
+                          <button
+                            onClick={() => setShowAssign(true)}
+                            className="font-sans text-xs text-[#2d6a4f] hover:underline"
+                          >
+                            <Settings size={12} className="inline mr-1" />Manage
+                          </button>
+                        )}
                       </td>
                     </tr>
                   )
