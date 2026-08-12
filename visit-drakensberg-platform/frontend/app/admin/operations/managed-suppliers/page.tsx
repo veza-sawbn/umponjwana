@@ -15,7 +15,7 @@
 
 import { useEffect, useState, useCallback } from 'react'
 import Link from 'next/link'
-import { Building2, Users, Plus, RefreshCw, ChevronRight, UserPlus, Settings, AlertCircle, Check } from 'lucide-react'
+import { Building2, Users, Plus, RefreshCw, ChevronRight, UserPlus, Settings, AlertCircle, Check, Mail } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { supabase } from '@/lib/auth'
 import {
@@ -224,6 +224,59 @@ function SetOpsRoleRow({
     </div>
   )
 }
+
+// ─── Resend Invite / Setup Email Button ───────────────────────────────────────
+
+/**
+ * Resends the invite email (if the user never accepted) or a password-reset /
+ * account-setup email (if they already confirmed but need to sign in).
+ */
+function ResendButton({ userId }: { userId: string }) {
+  const [busy, setBusy] = useState(false)
+  const [sent, setSent] = useState(false)
+
+  async function resend() {
+    setBusy(true)
+    try {
+      const res = await fetch('/api/admin/ops/resend-invite', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId }),
+      })
+      const json = await res.json()
+      if (!res.ok) throw new Error(json.error || 'Could not resend')
+      const label = json.type === 'invite_resent' ? 'Invite resent.' : 'Setup email sent.'
+      toast.success(label)
+      setSent(true)
+      // Reset the "sent" indicator after 30 s so the admin can resend again
+      setTimeout(() => setSent(false), 30_000)
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Could not resend email')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  if (sent) {
+    return (
+      <span className="inline-flex items-center gap-1 font-sans text-xs text-emerald-600">
+        <Check size={11} /> Sent
+      </span>
+    )
+  }
+
+  return (
+    <button
+      onClick={resend}
+      disabled={busy}
+      title="Resend invite / account setup email"
+      className="inline-flex items-center gap-1 font-sans text-xs text-gray-400 hover:text-[#2d6a4f] disabled:opacity-40 transition-colors"
+    >
+      <Mail size={12} /> {busy ? 'Sending…' : 'Resend'}
+    </button>
+  )
+}
+
 
 // ─── Assign Supplier Modal ─────────────────────────────────────────────────────
 
@@ -565,7 +618,7 @@ export default function ManagedSuppliersPage() {
             <table className="w-full min-w-[640px]">
               <thead>
                 <tr className="border-b border-gray-100">
-                  {['Name', 'Email', 'Role', 'Assigned Suppliers', ''].map(h => (
+                  {['Name', 'Email', 'Role', 'Assigned Suppliers', 'Actions'].map(h => (
                     <th key={h} className="text-left px-5 py-3 font-sans text-[10px] tracking-[0.12em] uppercase text-gray-400">{h}</th>
                   ))}
                 </tr>
@@ -603,14 +656,17 @@ export default function ManagedSuppliersPage() {
                             : empAssignments.map(a => a.supplier_name || a.supplier_id).join(', ')}
                       </td>
                       <td className="px-5 py-4">
-                        {emp.setup_complete && (
-                          <button
-                            onClick={() => setShowAssign(true)}
-                            className="font-sans text-xs text-[#2d6a4f] hover:underline"
-                          >
-                            <Settings size={12} className="inline mr-1" />Manage
-                          </button>
-                        )}
+                        <div className="flex items-center gap-3">
+                          {emp.setup_complete && (
+                            <button
+                              onClick={() => setShowAssign(true)}
+                              className="inline-flex items-center gap-1 font-sans text-xs text-[#2d6a4f] hover:underline"
+                            >
+                              <Settings size={12} /> Manage
+                            </button>
+                          )}
+                          <ResendButton userId={emp.id} />
+                        </div>
                       </td>
                     </tr>
                   )

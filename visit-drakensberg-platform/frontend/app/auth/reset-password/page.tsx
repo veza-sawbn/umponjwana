@@ -104,7 +104,7 @@ export default function ResetPasswordPage() {
         ) : (
           <>
             <p className="font-sans text-xs tracking-[0.2em] uppercase text-forest/40 mb-2">Almost there</p>
-            <h1 className="font-display text-4xl text-forest mb-8">Set a new password</h1>
+            <h1 className="font-display text-4xl text-forest mb-8">Create your password</h1>
 
             {authError && (
               <div className="mb-6 px-4 py-3 bg-red-50 border border-red-200 font-sans text-sm text-red-700">
