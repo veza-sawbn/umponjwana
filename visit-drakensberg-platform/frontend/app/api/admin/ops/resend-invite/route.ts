@@ -50,7 +50,12 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'admin only' }, { status: 403 })
   }
 
-  const origin = process.env.NEXT_PUBLIC_SITE_URL || new URL(req.url).origin
+  // NEXT_PUBLIC_SITE_URL is the most reliable source. Fall back to the
+  // x-forwarded-host header that Vercel always sets on server-side requests
+  // (req.url in App Router route handlers may resolve to an internal URL).
+  const host = req.headers.get('x-forwarded-host') ?? new URL(req.url).host
+  const proto = req.headers.get('x-forwarded-proto') ?? 'https'
+  const origin = process.env.NEXT_PUBLIC_SITE_URL || `${proto}://${host}`
   const admin = supabaseAdmin()
 
   // Fetch the target user so we know their confirmation status and metadata
