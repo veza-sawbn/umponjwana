@@ -15,7 +15,7 @@
 
 import { useEffect, useState, useCallback } from 'react'
 import Link from 'next/link'
-import { Building2, Users, Plus, RefreshCw, ChevronRight, UserPlus, Settings } from 'lucide-react'
+import { Building2, Users, Plus, RefreshCw, ChevronRight, UserPlus, Settings, AlertCircle, Check, Mail, PlusCircle } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { supabase } from '@/lib/auth'
 import {
@@ -170,6 +170,232 @@ function InviteEmployeeModal({ onClose, onInvited }: { onClose: () => void; onIn
   )
 }
 
+// ─── Set Ops Role (inline, for profiles that are missing ops_role) ─────────────
+
+function SetOpsRoleRow({
+  userId,
+  currentRole,
+  onSaved,
+}: {
+  userId: string
+  currentRole: OpsRole | null
+  onSaved: () => void
+}) {
+  const [role, setRole] = useState<OpsRole>(currentRole ?? 'reservation_agent')
+  const [busy, setBusy] = useState(false)
+
+  async function save() {
+    setBusy(true)
+    try {
+      const res = await fetch('/api/admin/ops/profile', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId, opsRole: role }),
+      })
+      const json = await res.json()
+      if (!res.ok) throw new Error(json.error || 'Could not set role')
+      toast.success('Operational role configured.')
+      onSaved()
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Could not set role')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <div className="flex items-center gap-2 mt-1">
+      <select
+        value={role}
+        onChange={e => setRole(e.target.value as OpsRole)}
+        className="border border-gray-200 bg-white px-2 py-1 font-sans text-xs focus:outline-none"
+      >
+        {OPS_ROLES.map(r => (
+          <option key={r.value} value={r.value}>{r.label}</option>
+        ))}
+      </select>
+      <button
+        onClick={save}
+        disabled={busy}
+        className="inline-flex items-center gap-1 px-2 py-1 font-sans text-xs bg-[#2d6a4f] text-white hover:bg-[#245741] disabled:opacity-50 transition-colors"
+      >
+        <Check size={10} /> {busy ? 'Saving…' : 'Set Role'}
+      </button>
+    </div>
+  )
+}
+
+// ─── Resend Invite / Setup Email Button ───────────────────────────────────────
+
+/**
+ * Resends the invite email (if the user never accepted) or a password-reset /
+ * account-setup email (if they already confirmed but need to sign in).
+ */
+function ResendButton({ userId }: { userId: string }) {
+  const [busy, setBusy] = useState(false)
+  const [sent, setSent] = useState(false)
+
+  async function resend() {
+    setBusy(true)
+    try {
+      const res = await fetch('/api/admin/ops/resend-invite', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId }),
+      })
+      const json = await res.json()
+      if (!res.ok) throw new Error(json.error || 'Could not resend')
+      const label = json.type === 'invite_resent' ? 'Invite resent.' : 'Setup email sent.'
+      toast.success(label)
+      setSent(true)
+      // Reset the "sent" indicator after 30 s so the admin can resend again
+      setTimeout(() => setSent(false), 30_000)
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Could not resend email')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  if (sent) {
+    return (
+      <span className="inline-flex items-center gap-1 font-sans text-xs text-emerald-600">
+        <Check size={11} /> Sent
+      </span>
+    )
+  }
+
+  return (
+    <button
+      onClick={resend}
+      disabled={busy}
+      title="Resend invite / account setup email"
+      className="inline-flex items-center gap-1 font-sans text-xs text-gray-400 hover:text-[#2d6a4f] disabled:opacity-40 transition-colors"
+    >
+      <Mail size={12} /> {busy ? 'Sending…' : 'Resend'}
+    </button>
+  )
+}
+
+
+// ─── Create Supplier Modal ─────────────────────────────────────────────────────
+
+const SUPPLIER_TYPES = ['Accommodation', 'Activity', 'Guided Tours', 'Shuttle', 'Experience'] as const
+
+/**
+ * Allows platform admins and ops_administrators to create an internally-managed
+ * supplier profile that can later be transferred to the property owner.
+ */
+function CreateSupplierModal({ onClose, onCreated }: { onClose: () => void; onCreated: (supplierId: string) => void }) {
+  const [businessName, setBusinessName] = useState('')
+  const [ownerContactEmail, setOwnerContactEmail] = useState('')
+  const [supplierType, setSupplierType] = useState<string>(SUPPLIER_TYPES[0])
+  const [busy, setBusy] = useState(false)
+
+  async function submit() {
+    if (!businessName.trim()) { toast.error('Business name is required.'); return }
+    const contactEmail = ownerContactEmail.trim().toLowerCase()
+    if (contactEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(contactEmail)) {
+      toast.error('Enter a valid owner contact email address.')
+      return
+    }
+    setBusy(true)
+    try {
+      const res = await fetch('/api/admin/ops/create-supplier', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          businessName: businessName.trim(),
+          supplierType,
+          ...(contactEmail ? { ownerContactEmail: contactEmail } : {}),
+        }),
+      })
+      const json = await res.json()
+      if (!res.ok) throw new Error(json.error || 'Could not create supplier')
+      toast.success(`Supplier "${businessName.trim()}" created under VD alias.`)
+      onCreated(json.supplierId)
+      onClose()
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Could not create supplier')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-6" onClick={onClose}>
+      <div className="bg-white max-w-md w-full p-6" onClick={e => e.stopPropagation()}>
+        <div className="mb-5">
+          <p className="font-sans text-[10px] tracking-[0.14em] uppercase text-gray-400">VD Operations</p>
+          <h2 className="font-display italic text-2xl">Create Supplier</h2>
+          <p className="font-sans text-sm text-gray-500 mt-1">
+            Creates an internally-managed supplier under a VD alias address. Assign staff and transfer to
+            the property owner later via the supplier profile panel.
+          </p>
+        </div>
+        <div className="space-y-4">
+          <div>
+            <label className="block font-sans text-[10px] tracking-[0.12em] uppercase text-gray-400 mb-1.5">
+              Business / Property Name
+            </label>
+            <input
+              value={businessName}
+              onChange={e => setBusinessName(e.target.value)}
+              className="w-full border border-gray-200 px-3 py-2.5 font-sans text-sm focus:outline-none focus:border-[#2d6a4f] transition-colors"
+              placeholder="Drakensberg Mountain Lodge"
+            />
+          </div>
+          <div>
+            <label className="block font-sans text-[10px] tracking-[0.12em] uppercase text-gray-400 mb-1.5">
+              Property owner's email{' '}
+              <span className="normal-case tracking-normal font-normal text-gray-300">optional · for transfer later</span>
+            </label>
+            <input
+              type="email"
+              value={ownerContactEmail}
+              onChange={e => setOwnerContactEmail(e.target.value)}
+              className="w-full border border-gray-200 px-3 py-2.5 font-sans text-sm focus:outline-none focus:border-[#2d6a4f] transition-colors"
+              placeholder="owner@property.co.za"
+            />
+            <p className="font-sans text-[10px] text-gray-400 mt-1 leading-relaxed">
+              Stored for reference only. The account uses an internal VD alias until you transfer it to the owner.
+            </p>
+          </div>
+          <div>
+            <label className="block font-sans text-[10px] tracking-[0.12em] uppercase text-gray-400 mb-1.5">
+              Supplier Type
+            </label>
+            <select
+              value={supplierType}
+              onChange={e => setSupplierType(e.target.value)}
+              className="w-full border border-gray-200 px-3 py-2.5 font-sans text-sm bg-white focus:outline-none focus:border-[#2d6a4f] transition-colors"
+            >
+              {SUPPLIER_TYPES.map(t => (
+                <option key={t} value={t}>{t}</option>
+              ))}
+            </select>
+          </div>
+        </div>
+        <div className="flex gap-3 mt-6">
+          <button
+            onClick={onClose}
+            className="flex-1 py-2.5 font-sans text-sm border border-gray-200 text-gray-600 hover:border-gray-400 transition-colors"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={submit}
+            disabled={busy}
+            className={`flex-1 py-2.5 font-sans text-sm transition-colors ${busy ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : 'bg-[#2d6a4f] text-white hover:bg-[#245741]'}`}
+          >
+            {busy ? 'Creating…' : 'Create Supplier'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ─── Assign Supplier Modal ─────────────────────────────────────────────────────
 
 function AssignSupplierModal({
@@ -177,11 +403,12 @@ function AssignSupplierModal({
   onClose,
   onAssigned,
 }: {
-  employees: { id: string; full_name: string | null; email: string | null; ops_role: OpsRole | null }[]
+  employees: { id: string; full_name: string | null; email: string | null; ops_role: OpsRole | null; setup_complete: boolean }[]
   onClose: () => void
   onAssigned: () => void
 }) {
-  const [employeeId, setEmployeeId] = useState(employees[0]?.id ?? '')
+  const readyEmployees = employees.filter(e => e.setup_complete)
+  const [employeeId, setEmployeeId] = useState(readyEmployees[0]?.id ?? '')
   const [suppliers, setSuppliers] = useState<{ id: string; full_name: string | null; supplier_type: string | null }[]>([])
   const [supplierId, setSupplierId] = useState('')
   const [permissions, setPermissions] = useState<string[]>([])
@@ -204,11 +431,11 @@ function AssignSupplierModal({
 
   // Pre-populate permissions based on selected employee's ops_role
   useEffect(() => {
-    const emp = employees.find(e => e.id === employeeId)
+    const emp = readyEmployees.find(e => e.id === employeeId)
     if (emp?.ops_role) {
       setPermissions(DEFAULT_PERMISSIONS_BY_ROLE[emp.ops_role] ?? [])
     }
-  }, [employeeId, employees])
+  }, [employeeId, readyEmployees])
 
   function togglePermission(key: string) {
     setPermissions(p => p.includes(key) ? p.filter(k => k !== key) : [...p, key])
@@ -245,7 +472,7 @@ function AssignSupplierModal({
               onChange={e => setEmployeeId(e.target.value)}
               className="w-full border border-gray-200 px-3 py-2.5 font-sans text-sm bg-white focus:outline-none"
             >
-              {employees.map(e => (
+              {readyEmployees.map(e => (
                 <option key={e.id} value={e.id}>
                   {e.full_name || e.email} · {e.ops_role ? OPS_ROLE_LABEL[e.ops_role] : ''}
                 </option>
@@ -314,6 +541,8 @@ function AssignSupplierModal({
 export default function ManagedSuppliersPage() {
   const [isAdmin, setIsAdmin] = useState(false)
   const [isOpsEmployee, setIsOpsEmployee] = useState(false)
+  // opsRole is the granular VD ops role; used to gate the "Create Supplier" button
+  const [opsRole, setOpsRole] = useState<string | null>(null)
 
   // Admin view: all assignments across all employees
   const [allAssignments, setAllAssignments] = useState<OpsAssignmentDetails[]>([])
@@ -325,23 +554,44 @@ export default function ManagedSuppliersPage() {
   const [loading, setLoading] = useState(true)
   const [showInvite, setShowInvite] = useState(false)
   const [showAssign, setShowAssign] = useState(false)
+  const [showCreateSupplier, setShowCreateSupplier] = useState(false)
 
   const load = useCallback(async () => {
     setLoading(true)
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) { setLoading(false); return }
 
-    const { data: profile } = await supabase
+    // Try the full profile query (requires the delegated-management migration).
+    // If ops_role / organisation columns don't exist yet (42703), fall back to
+    // the pre-migration columns so the admin page still loads.
+    let profile: { role?: string; staff_role?: string; ops_role?: string; organisation?: string } | null = null
+    const { data: fullProfile, error: profileError } = await supabase
       .from('profiles')
-      .select('role, ops_role, organisation')
+      .select('role, staff_role, ops_role, organisation')
       .eq('id', user.id)
       .maybeSingle()
+    if (profileError) {
+      // Likely 42703 (undefined column) — migration not yet applied
+      const { data: basicProfile } = await supabase
+        .from('profiles')
+        .select('role, staff_role')
+        .eq('id', user.id)
+        .maybeSingle()
+      profile = basicProfile
+    } else {
+      profile = fullProfile
+    }
 
     const admin = profile?.role === 'admin'
-    const opsEmp = !admin && profile?.organisation === 'vd_operations' && profile?.ops_role != null
+    // An ops employee is anyone with staff_role='operations' who isn't a full admin.
+    // This includes users whose ops_role hasn't been configured yet — they still
+    // land on this page (via the middleware redirect) and see their assigned suppliers
+    // once setup is complete.
+    const opsEmp = !admin && profile?.staff_role === 'operations'
 
     setIsAdmin(admin)
     setIsOpsEmployee(opsEmp)
+    setOpsRole(profile?.ops_role ?? null)
 
     if (admin) {
       const [assignments, emps] = await Promise.all([
@@ -369,23 +619,49 @@ export default function ManagedSuppliersPage() {
 
   // ── VD Operations employee view ──────────────────────────────────────────────
   if (isOpsEmployee) {
+    const canCreateSupplier = opsRole === 'ops_administrator'
     return (
       <div className="p-8">
-        <div className="mb-8">
-          <p className="font-sans text-[10px] tracking-[0.14em] uppercase text-gray-400 mb-1">
-            Visit Drakensberg Operations
-          </p>
-          <h1 className="font-display italic text-3xl text-[#000000]">Managed Suppliers</h1>
-          <p className="font-sans text-sm text-gray-500 mt-1">
-            Select a supplier to enter their management tools.
-          </p>
+        <div className="mb-8 flex items-start justify-between flex-wrap gap-4">
+          <div>
+            <p className="font-sans text-[10px] tracking-[0.14em] uppercase text-gray-400 mb-1">
+              Visit Drakensberg Operations
+            </p>
+            <h1 className="font-display italic text-3xl text-[#000000]">Managed Suppliers</h1>
+            <p className="font-sans text-sm text-gray-500 mt-1">
+              Select a supplier to enter their management tools.
+              {mySuppliers.length > 1 && (
+                <span className="ml-1 font-medium text-gray-700">({mySuppliers.length} suppliers assigned)</span>
+              )}
+            </p>
+          </div>
+          {canCreateSupplier && (
+            <button
+              onClick={() => setShowCreateSupplier(true)}
+              className="inline-flex items-center gap-2 bg-[#2d6a4f] text-white px-4 py-2 font-sans text-sm hover:bg-[#245741] transition-colors"
+            >
+              <PlusCircle size={14} /> Create Supplier
+            </button>
+          )}
         </div>
+        {showCreateSupplier && (
+          <CreateSupplierModal
+            onClose={() => setShowCreateSupplier(false)}
+            onCreated={() => { setShowCreateSupplier(false); load() }}
+          />
+        )}
 
         {mySuppliers.length === 0 ? (
-          <div className="bg-white border border-gray-200 p-10 text-center">
-            <Building2 size={32} className="mx-auto mb-3 text-gray-300" />
-            <p className="font-sans text-sm text-gray-500">No suppliers assigned to you yet.</p>
-            <p className="font-sans text-xs text-gray-400 mt-1">Contact a platform administrator to have suppliers assigned to your account.</p>
+          <div className="flex items-start gap-3 border border-amber-200 bg-amber-50 px-4 py-4 max-w-xl">
+            <AlertCircle size={16} className="text-amber-600 shrink-0 mt-0.5" />
+            <div>
+              <p className="font-sans text-sm font-medium text-amber-800">No suppliers assigned yet</p>
+              <p className="font-sans text-xs text-amber-700 mt-1 leading-relaxed">
+                Your account is active. A platform administrator needs to assign suppliers to your account before you can manage them.
+                Once assigned, your suppliers will appear here. Sign in at{' '}
+                <span className="font-mono bg-amber-100 px-1">/auth/login</span> and return here after you&apos;ve been notified.
+              </p>
+            </div>
           </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
@@ -460,7 +736,7 @@ export default function ManagedSuppliersPage() {
             Visit Drakensberg Operations team and their supplier assignments.
           </p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 flex-wrap">
           <button
             onClick={load}
             className="inline-flex items-center gap-2 border border-gray-200 px-3 py-2 font-sans text-sm text-gray-600 hover:border-[#2d6a4f] transition-colors"
@@ -475,6 +751,12 @@ export default function ManagedSuppliersPage() {
               <Plus size={14} /> Assign Supplier
             </button>
           )}
+          <button
+            onClick={() => setShowCreateSupplier(true)}
+            className="inline-flex items-center gap-2 border border-gray-200 px-3 py-2 font-sans text-sm text-gray-600 hover:border-[#2d6a4f] transition-colors"
+          >
+            <PlusCircle size={14} /> Create Supplier
+          </button>
           <button
             onClick={() => setShowInvite(true)}
             className="inline-flex items-center gap-2 bg-[#2d6a4f] text-white px-4 py-2 font-sans text-sm hover:bg-[#245741] transition-colors"
@@ -499,7 +781,7 @@ export default function ManagedSuppliersPage() {
             <table className="w-full min-w-[640px]">
               <thead>
                 <tr className="border-b border-gray-100">
-                  {['Name', 'Email', 'Role', 'Assigned Suppliers', ''].map(h => (
+                  {['Name', 'Email', 'Role', 'Assigned Suppliers', 'Actions'].map(h => (
                     <th key={h} className="text-left px-5 py-3 font-sans text-[10px] tracking-[0.12em] uppercase text-gray-400">{h}</th>
                   ))}
                 </tr>
@@ -508,28 +790,46 @@ export default function ManagedSuppliersPage() {
                 {employees.map(emp => {
                   const empAssignments = allAssignments.filter(a => a.employee_id === emp.id && a.is_active)
                   return (
-                    <tr key={emp.id} className="hover:bg-[#F7F5F2]">
+                    <tr key={emp.id} className={`hover:bg-[#F7F5F2] ${!emp.setup_complete ? 'opacity-80' : ''}`}>
                       <td className="px-5 py-4 font-sans text-sm">{emp.full_name || '—'}</td>
                       <td className="px-5 py-4 font-sans text-xs text-gray-500">{emp.email}</td>
                       <td className="px-5 py-4">
-                        {emp.ops_role && (
+                        {emp.setup_complete && emp.ops_role ? (
                           <span className="font-sans text-[10px] tracking-[0.1em] uppercase px-2 py-0.5 bg-[#2d6a4f]/10 text-[#2d6a4f]">
                             {OPS_ROLE_LABEL[emp.ops_role]}
                           </span>
+                        ) : (
+                          <div>
+                            <div className="inline-flex items-center gap-1 font-sans text-[10px] tracking-[0.1em] uppercase px-2 py-0.5 bg-amber-50 text-amber-700 border border-amber-200">
+                              <AlertCircle size={10} /> Setup Required
+                            </div>
+                            <SetOpsRoleRow
+                              userId={emp.id}
+                              currentRole={emp.ops_role}
+                              onSaved={load}
+                            />
+                          </div>
                         )}
                       </td>
                       <td className="px-5 py-4 font-sans text-sm text-gray-600">
-                        {empAssignments.length === 0
-                          ? <span className="text-gray-400 text-xs">None</span>
-                          : empAssignments.map(a => a.supplier_name || a.supplier_id).join(', ')}
+                        {!emp.setup_complete
+                          ? <span className="text-gray-300 text-xs">—</span>
+                          : empAssignments.length === 0
+                            ? <span className="text-gray-400 text-xs">None</span>
+                            : empAssignments.map(a => a.supplier_name || a.supplier_id).join(', ')}
                       </td>
                       <td className="px-5 py-4">
-                        <button
-                          onClick={() => setShowAssign(true)}
-                          className="font-sans text-xs text-[#2d6a4f] hover:underline"
-                        >
-                          <Settings size={12} className="inline mr-1" />Manage
-                        </button>
+                        <div className="flex items-center gap-3">
+                          {emp.setup_complete && (
+                            <button
+                              onClick={() => setShowAssign(true)}
+                              className="inline-flex items-center gap-1 font-sans text-xs text-[#2d6a4f] hover:underline"
+                            >
+                              <Settings size={12} /> Manage
+                            </button>
+                          )}
+                          <ResendButton userId={emp.id} />
+                        </div>
                       </td>
                     </tr>
                   )
@@ -596,6 +896,12 @@ export default function ManagedSuppliersPage() {
           employees={employees}
           onClose={() => setShowAssign(false)}
           onAssigned={load}
+        />
+      )}
+      {showCreateSupplier && (
+        <CreateSupplierModal
+          onClose={() => setShowCreateSupplier(false)}
+          onCreated={() => { setShowCreateSupplier(false); load() }}
         />
       )}
     </div>

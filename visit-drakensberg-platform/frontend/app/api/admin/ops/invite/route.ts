@@ -55,7 +55,12 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'admin only' }, { status: 403 })
   }
 
-  const origin = process.env.NEXT_PUBLIC_SITE_URL || new URL(req.url).origin
+  // NEXT_PUBLIC_SITE_URL is the most reliable source. Fall back to the
+  // x-forwarded-host header that Vercel always sets on server-side requests
+  // (req.url in App Router route handlers may resolve to an internal URL).
+  const host = req.headers.get('x-forwarded-host') ?? new URL(req.url).host
+  const proto = req.headers.get('x-forwarded-proto') ?? 'https'
+  const origin = process.env.NEXT_PUBLIC_SITE_URL || `${proto}://${host}`
 
   // Invite the user with ops metadata. handle_new_user() will seed these into
   // profiles.ops_role, profiles.organisation, and profiles.staff_role.
@@ -67,7 +72,13 @@ export async function POST(req: Request) {
       ops_role: body.opsRole,           // granular operational role
       organisation: 'vd_operations',   // VD internal organisation
     },
-    redirectTo: `${origin}/admin/operations/managed-suppliers`,
+    // Redirect to /auth/reset-password — confirmed in Supabase's allowed redirect
+    // URL list (the same URL the forgot-password flow uses). Supabase delivers the
+    // invite token in the URL hash; the reset-password page listens for SIGNED_IN,
+    // shows the password-creation form, and redirects to /auth/login when done.
+    // The login page then routes ops employees (staff_role='operations') to /admin,
+    // and middleware redirects /admin → /admin/operations/managed-suppliers.
+    redirectTo: `${origin}/auth/reset-password`,
   })
 
   if (error) {

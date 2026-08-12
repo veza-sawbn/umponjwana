@@ -168,11 +168,11 @@ const dropAnim = {
 // ── Component ─────────────────────────────────────────────────────────────────
 
 export default function Navbar() {
-  const [scrolled,        setScrolled]        = useState(false)
-  const [menuOpen,        setMenuOpen]        = useState(false)
-  const [hoveredItem,     setHoveredItem]     = useState(NAV_ITEMS[0].href)
-  const [dropdownOpen,    setDropdownOpen]    = useState(false)
-  const [user,            setUser]            = useState<SupabaseUser | null>(null)
+  const [scrolled,          setScrolled]          = useState(false)
+  const [menuOpen,          setMenuOpen]          = useState(false)
+  const [hoveredItem,       setHoveredItem]       = useState(NAV_ITEMS[0].href)
+  const [dropdownOpen,      setDropdownOpen]      = useState(false)
+  const [user,              setUser]              = useState<SupabaseUser | null>(null)
   const [navImageOverrides, setNavImageOverrides] = useState<Record<string, string>>({})
   const dropdownRef = useRef<HTMLDivElement>(null)
   const pathname    = usePathname()
@@ -422,7 +422,7 @@ export default function Navbar() {
                         )}
                       </div>
 
-                      {/* Sub-links: mobile only (always visible, no accordion) */}
+                      {/* Sub-links: mobile only (always visible flat list) */}
                       {item.children.length > 0 && (
                         <div className="lg:hidden flex flex-wrap gap-x-1 gap-y-0.5 pb-2.5 pt-0.5">
                           {item.children.map((child, ci) => (
