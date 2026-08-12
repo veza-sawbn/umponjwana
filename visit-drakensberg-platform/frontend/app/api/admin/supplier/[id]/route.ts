@@ -92,29 +92,19 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
   if (body.isApproved !== undefined) profilePatch.is_approved = body.isApproved
   if (body.ownerContactEmail !== undefined) metaPatch.owner_contact_email = body.ownerContactEmail
 
-  const updates: Promise<unknown>[] = []
-
-  if (Object.keys(profilePatch).length > 0) {
-    updates.push(
-      admin.from('profiles').update(profilePatch).eq('id', params.id).then(r => {
-        if (r.error) throw r.error
-      }),
-    )
-  }
-
-  if (Object.keys(metaPatch).length > 0) {
-    updates.push(
-      admin.auth.admin.updateUserById(params.id, { user_metadata: metaPatch }).then(r => {
-        if (r.error) throw r.error
-      }),
-    )
-  }
-
   try {
-    await Promise.all(updates)
-  } catch (e: any) {
+    if (Object.keys(profilePatch).length > 0) {
+      const { error } = await admin.from('profiles').update(profilePatch).eq('id', params.id)
+      if (error) throw error
+    }
+    if (Object.keys(metaPatch).length > 0) {
+      const { error } = await admin.auth.admin.updateUserById(params.id, { user_metadata: metaPatch })
+      if (error) throw error
+    }
+  } catch (e: unknown) {
+    const msg = e instanceof Error ? e.message : 'Update failed'
     console.error('[admin/supplier/patch]', e)
-    return NextResponse.json({ error: e.message || 'Update failed' }, { status: 500 })
+    return NextResponse.json({ error: msg }, { status: 500 })
   }
 
   return NextResponse.json({ ok: true })
