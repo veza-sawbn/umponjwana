@@ -288,23 +288,31 @@ const SUPPLIER_TYPES = ['Accommodation', 'Activity', 'Guided Tours', 'Shuttle', 
  */
 function CreateSupplierModal({ onClose, onCreated }: { onClose: () => void; onCreated: (supplierId: string) => void }) {
   const [businessName, setBusinessName] = useState('')
-  const [email, setEmail] = useState('')
+  const [ownerContactEmail, setOwnerContactEmail] = useState('')
   const [supplierType, setSupplierType] = useState<string>(SUPPLIER_TYPES[0])
   const [busy, setBusy] = useState(false)
 
   async function submit() {
     if (!businessName.trim()) { toast.error('Business name is required.'); return }
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) { toast.error('Enter a valid email address.'); return }
+    const contactEmail = ownerContactEmail.trim().toLowerCase()
+    if (contactEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(contactEmail)) {
+      toast.error('Enter a valid owner contact email address.')
+      return
+    }
     setBusy(true)
     try {
       const res = await fetch('/api/admin/ops/create-supplier', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ businessName: businessName.trim(), email: email.trim(), supplierType }),
+        body: JSON.stringify({
+          businessName: businessName.trim(),
+          supplierType,
+          ...(contactEmail ? { ownerContactEmail: contactEmail } : {}),
+        }),
       })
       const json = await res.json()
       if (!res.ok) throw new Error(json.error || 'Could not create supplier')
-      toast.success(`Supplier "${businessName.trim()}" created.`)
+      toast.success(`Supplier "${businessName.trim()}" created under VD alias.`)
       onCreated(json.supplierId)
       onClose()
     } catch (e) {
@@ -321,7 +329,8 @@ function CreateSupplierModal({ onClose, onCreated }: { onClose: () => void; onCr
           <p className="font-sans text-[10px] tracking-[0.14em] uppercase text-gray-400">VD Operations</p>
           <h2 className="font-display italic text-2xl">Create Supplier</h2>
           <p className="font-sans text-sm text-gray-500 mt-1">
-            Create an internally-managed supplier. Assign staff and optionally transfer to the property owner later.
+            Creates an internally-managed supplier under a VD alias address. Assign staff and transfer to
+            the property owner later via the supplier profile panel.
           </p>
         </div>
         <div className="space-y-4">
@@ -338,17 +347,18 @@ function CreateSupplierModal({ onClose, onCreated }: { onClose: () => void; onCr
           </div>
           <div>
             <label className="block font-sans text-[10px] tracking-[0.12em] uppercase text-gray-400 mb-1.5">
-              Contact Email
+              Property owner's email{' '}
+              <span className="normal-case tracking-normal font-normal text-gray-300">optional · for transfer later</span>
             </label>
             <input
               type="email"
-              value={email}
-              onChange={e => setEmail(e.target.value)}
+              value={ownerContactEmail}
+              onChange={e => setOwnerContactEmail(e.target.value)}
               className="w-full border border-gray-200 px-3 py-2.5 font-sans text-sm focus:outline-none focus:border-[#2d6a4f] transition-colors"
-              placeholder="info@property.co.za"
+              placeholder="owner@property.co.za"
             />
             <p className="font-sans text-[10px] text-gray-400 mt-1 leading-relaxed">
-              This will become the supplier's login email. The property owner can set their password when you're ready to transfer the account.
+              Stored for reference only. The account uses an internal VD alias until you transfer it to the owner.
             </p>
           </div>
           <div>
