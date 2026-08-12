@@ -28,30 +28,42 @@ export default function ResetPasswordPage() {
     resolver: zodResolver(schema),
   })
 
-  // Supabase delivers the recovery token in the URL; the client exchanges it
-  // for a session automatically. Wait until we know whether that succeeded.
+  // Supabase delivers the recovery/invite token in the URL hash; the client
+  // exchanges it for a session automatically. We wait for either:
+  //   a) onAuthStateChange fires PASSWORD_RECOVERY or SIGNED_IN  ← normal path
+  //   b) getSession() already has a session (token was exchanged synchronously)
+  //   c) 10 s timeout elapses with no session → declare the link invalid
+  //
+  // 10 s gives slow mobile connections enough time. The OTP expiry is
+  // configured to 3600 s in Supabase Auth settings; the link itself lasts
+  // 60 minutes — the timeout here is only a UI safety net, not expiry logic.
   useEffect(() => {
     let timeout: ReturnType<typeof setTimeout>
+
     const { data: sub } = supabase.auth.onAuthStateChange((event) => {
       if (event === 'PASSWORD_RECOVERY' || event === 'SIGNED_IN') {
         setReady(true)
         setInvalidLink(false)
+        clearTimeout(timeout)
       }
     })
+
     supabase.auth.getSession().then(({ data }) => {
       if (data.session) {
+        // Token already exchanged (e.g. returning to the tab)
         setReady(true)
       } else {
-        // Give the auth helper a moment to process the URL hash before
-        // declaring the link invalid.
+        // Give the auth helper time to exchange the hash token.
+        // 10 000 ms handles slow connections; the real expiry is server-side.
         timeout = setTimeout(() => {
           setReady(r => {
             if (!r) setInvalidLink(true)
             return r
           })
-        }, 2500)
+        }, 10_000)
       }
     })
+
     return () => {
       sub.subscription.unsubscribe()
       clearTimeout(timeout)
@@ -92,7 +104,7 @@ export default function ResetPasswordPage() {
             <p className="font-sans text-xs tracking-[0.2em] uppercase text-forest/40 mb-2">Link expired</p>
             <h1 className="font-display text-3xl text-forest mb-4">This link is no longer valid</h1>
             <p className="font-sans text-sm text-forest/60 leading-relaxed mb-8">
-              Password reset links expire after a short time. Request a new one and try again.
+              This link has expired or has already been used. Request a new one and try again — new links are valid for 60 minutes.
             </p>
             <Link
               href="/auth/forgot-password"
