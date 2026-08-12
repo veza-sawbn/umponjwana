@@ -52,6 +52,21 @@ export type Invoice = {
   first_viewed_at?: string | null
   last_viewed_at?: string | null
   view_count?: number | null
+  /**
+   * Set by the webhook when iKhokha reports a non-success payment outcome
+   * (declined, failed). Null when no online payment attempt has been declined,
+   * or once the invoice has been fully paid. Used to show a persistent "payment
+   * was declined" banner on the invoice page even after the ?payment=failed
+   * redirect param has been lost.
+   */
+  payment_declined_at?: string | null
+  /**
+   * Set when a finance user voids the invoice via vd_void_invoice.
+   * Null on invoices that have never been voided.
+   */
+  voided_at?: string | null
+  /** The reason the staff member supplied when voiding the invoice. */
+  void_reason?: string | null
 }
 
 /** The order header an invoice document prints — no allocation or payout data. */
@@ -332,6 +347,38 @@ export async function sendInvoice(invoiceId: string): Promise<{ sent: boolean; e
   } catch (e) {
     return { sent: false, error: e instanceof Error ? e.message : 'Email request failed' }
   }
+}
+
+/**
+ * Voids an erroneously-paid invoice. Reverses the inbound payments on the
+ * order, resets balances to their pre-payment state, and marks the invoice
+ * 'void'. Finance staff only — the database enforces this.
+ *
+ * `reason` is shown in the audit trail and stamped on the reversed payment
+ * rows. Provide a clear explanation ("iKhokha webhook bug — card was declined")
+ * so the paper trail is useful if audited later.
+ */
+export async function voidInvoice(invoiceId: string, reason: string): Promise<void> {
+  const { error } = await supabase.rpc('vd_void_invoice', {
+    p_invoice_id: invoiceId,
+    p_reason: reason,
+  })
+  if (error) throw new Error(error.message || 'Could not void this invoice')
+}
+
+/**
+ * Creates a replacement invoice for the same order as a voided invoice.
+ * The new invoice starts unpaid (amount_paid=0, balance=total) with a fresh
+ * invoice number and today's date, so it can be sent to the customer.
+ * Returns the new invoice's id.
+ *
+ * Only callable on a void invoice — the database enforces this.
+ */
+export async function reissueInvoice(invoiceId: string): Promise<string> {
+  const { data, error } = await supabase.rpc('vd_reissue_invoice', { p_invoice_id: invoiceId })
+  if (error) throw new Error(error.message || 'Could not reissue this invoice')
+  if (typeof data !== 'string' || !data) throw new Error('The database returned no new invoice id')
+  return data
 }
 
 export async function getReceipts(orderId?: string): Promise<Receipt[]> {

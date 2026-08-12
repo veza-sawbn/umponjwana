@@ -92,8 +92,66 @@ export async function middleware(req: NextRequest) {
     if (ADMIN_ROUTES.some(r => pathname.startsWith(r)) && !isStaff) {
       return redirectTo('/account')
     }
-    if (SUPPLIER_ROUTES.some(r => pathname.startsWith(r)) && !['supplier', 'admin'].includes(role as string)) {
-      return redirectTo('/account')
+
+    // Redirect operations employees from the generic /admin root to their
+    // dedicated Managed Suppliers dashboard. This covers both the post-invite
+    // landing (redirectTo was set to /admin) and direct /admin visits.
+    // Full platform admins are not redirected — they use the whole console.
+    if (pathname === '/admin' && staffRole === 'operations' && role !== 'admin') {
+      return redirectTo('/admin/operations/managed-suppliers')
+    }
+
+    // Supplier routes: normal suppliers and admins get unconditional access.
+    // VD Operations employees (staff_role='operations' with ops_role set) may
+    // also enter supplier routes IF they have at least one active management
+    // assignment — the DB-level RLS policies verify the specific supplier they
+    // are trying to access, so URL manipulation still cannot bypass security.
+    if (SUPPLIER_ROUTES.some(r => pathname.startsWith(r))) {
+      const isSupplierOrAdmin = ['supplier', 'admin'].includes(role as string)
+      const isOpsWithAssignments =
+        staffRole === 'operations' &&
+        !isSupplierOrAdmin // avoid a redundant DB query for normal suppliers
+
+      if (!isSupplierOrAdmin && !isOpsWithAssignments) {
+        return redirectTo('/account')
+      }
+
+      if (isOpsWithAssignments) {
+        // Verify the employee has at least one active assignment. This is a
+        // lightweight check — the heavy per-supplier RLS is in the DB itself.
+        // We fetch ops_role here to confirm they are a VD ops employee, not just
+        // any user with staff_role='operations' that predates the ops system.
+        // ops_role and organisation were added by the delegated-management migration.
+        // If those columns don't exist yet (42703), treat the employee as having
+        // no ops access rather than crashing the middleware.
+        const { data: opsProfile, error: opsProfileError } = await supabase
+          .from('profiles')
+          .select('ops_role, organisation')
+          .eq('id', session.user.id)
+          .maybeSingle()
+
+        if (opsProfileError || !opsProfile?.ops_role || opsProfile.organisation !== 'vd_operations') {
+          // Either migration not yet applied, or legacy operations collaborator
+          return redirectTo('/account')
+        }
+
+        const { data: assignments } = await supabase
+          .from('vd_ops_assignments')
+          .select('id')
+          .eq('employee_id', session.user.id)
+          .eq('is_active', true)
+          .limit(1)
+
+        if (!assignments || assignments.length === 0) {
+          // No active assignments → no supplier tool access
+          return redirectTo('/admin/operations/managed-suppliers')
+        }
+
+        // Pass the ops context as a response header so the supplier layout can
+        // detect it without an extra DB round-trip. The actual data is fetched
+        // client-side with proper auth; this is just a routing hint.
+        res.headers.set('x-vd-ops-context', '1')
+      }
     }
   }
 
