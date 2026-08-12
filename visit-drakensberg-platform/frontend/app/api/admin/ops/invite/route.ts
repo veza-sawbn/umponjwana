@@ -67,7 +67,10 @@ export async function POST(req: Request) {
       ops_role: body.opsRole,           // granular operational role
       organisation: 'vd_operations',   // VD internal organisation
     },
-    redirectTo: `${origin}/admin/operations/managed-suppliers`,
+    // Redirect to /admin (already in Supabase's allowed-redirect-URL list).
+    // The admin console's nav takes the employee to Managed Suppliers from there;
+    // they cannot access /supplier/* until they have an active assignment anyway.
+    redirectTo: `${origin}/admin`,
   })
 
   if (error) {
