@@ -262,23 +262,35 @@ export async function setAssignment(params: {
   return json.assignmentId as string
 }
 
-/** Get all VD Operations employees — for the assignment form. */
+/**
+ * Get all VD Operations employees — for the Operations Team table and assignment form.
+ *
+ * Queries by staff_role='operations' rather than ops_role/organisation so that
+ * users who were invited before the migration (or whose profile was already
+ * present and skipped by ON CONFLICT DO NOTHING) are still visible.
+ * The UI shows these as "Setup Required" and lets the admin set their ops_role.
+ */
 export async function getOpsEmployees(): Promise<{
   id: string
   full_name: string | null
   email: string | null
+  staff_role: string | null
   ops_role: OpsRole | null
   organisation: string | null
   created_at: string
+  /** True when ops_role + organisation are both set — false means profile needs configuration */
+  setup_complete: boolean
 }[]> {
   try {
     const { data } = await supabase
       .from('profiles')
-      .select('id, full_name, email, ops_role, organisation, created_at')
-      .eq('organisation', 'vd_operations')
-      .not('ops_role', 'is', null)
+      .select('id, full_name, email, staff_role, ops_role, organisation, created_at')
+      .eq('staff_role', 'operations')
       .order('full_name', { ascending: true })
-    return (data ?? []) as any[]
+    return (data ?? []).map((row: any) => ({
+      ...row,
+      setup_complete: !!(row.ops_role && row.organisation === 'vd_operations'),
+    })) as any[]
   } catch {
     return []
   }

@@ -93,6 +93,14 @@ export async function middleware(req: NextRequest) {
       return redirectTo('/account')
     }
 
+    // Redirect operations employees from the generic /admin root to their
+    // dedicated Managed Suppliers dashboard. This covers both the post-invite
+    // landing (redirectTo was set to /admin) and direct /admin visits.
+    // Full platform admins are not redirected — they use the whole console.
+    if (pathname === '/admin' && staffRole === 'operations' && role !== 'admin') {
+      return redirectTo('/admin/operations/managed-suppliers')
+    }
+
     // Supplier routes: normal suppliers and admins get unconditional access.
     // VD Operations employees (staff_role='operations' with ops_role set) may
     // also enter supplier routes IF they have at least one active management
