@@ -67,10 +67,13 @@ export async function POST(req: Request) {
       ops_role: body.opsRole,           // granular operational role
       organisation: 'vd_operations',   // VD internal organisation
     },
-    // Redirect to /admin (already in Supabase's allowed-redirect-URL list).
-    // The admin console's nav takes the employee to Managed Suppliers from there;
-    // they cannot access /supplier/* until they have an active assignment anyway.
-    redirectTo: `${origin}/admin`,
+    // Redirect to /auth/reset-password — confirmed in Supabase's allowed redirect
+    // URL list (the same URL the forgot-password flow uses). Supabase delivers the
+    // invite token in the URL hash; the reset-password page listens for SIGNED_IN,
+    // shows the password-creation form, and redirects to /auth/login when done.
+    // The login page then routes ops employees (staff_role='operations') to /admin,
+    // and middleware redirects /admin → /admin/operations/managed-suppliers.
+    redirectTo: `${origin}/auth/reset-password`,
   })
 
   if (error) {
