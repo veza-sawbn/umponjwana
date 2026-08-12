@@ -15,7 +15,7 @@
 
 import { useEffect, useState, useCallback } from 'react'
 import Link from 'next/link'
-import { Building2, Users, Plus, RefreshCw, ChevronRight, UserPlus, Settings, AlertCircle, Check, Mail } from 'lucide-react'
+import { Building2, Users, Plus, RefreshCw, ChevronRight, UserPlus, Settings, AlertCircle, Check, Mail, PlusCircle } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { supabase } from '@/lib/auth'
 import {
@@ -278,6 +278,114 @@ function ResendButton({ userId }: { userId: string }) {
 }
 
 
+// ─── Create Supplier Modal ─────────────────────────────────────────────────────
+
+const SUPPLIER_TYPES = ['Accommodation', 'Activity', 'Guided Tours', 'Shuttle', 'Experience'] as const
+
+/**
+ * Allows platform admins and ops_administrators to create an internally-managed
+ * supplier profile that can later be transferred to the property owner.
+ */
+function CreateSupplierModal({ onClose, onCreated }: { onClose: () => void; onCreated: (supplierId: string) => void }) {
+  const [businessName, setBusinessName] = useState('')
+  const [email, setEmail] = useState('')
+  const [supplierType, setSupplierType] = useState<string>(SUPPLIER_TYPES[0])
+  const [busy, setBusy] = useState(false)
+
+  async function submit() {
+    if (!businessName.trim()) { toast.error('Business name is required.'); return }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) { toast.error('Enter a valid email address.'); return }
+    setBusy(true)
+    try {
+      const res = await fetch('/api/admin/ops/create-supplier', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ businessName: businessName.trim(), email: email.trim(), supplierType }),
+      })
+      const json = await res.json()
+      if (!res.ok) throw new Error(json.error || 'Could not create supplier')
+      toast.success(`Supplier "${businessName.trim()}" created.`)
+      onCreated(json.supplierId)
+      onClose()
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Could not create supplier')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-6" onClick={onClose}>
+      <div className="bg-white max-w-md w-full p-6" onClick={e => e.stopPropagation()}>
+        <div className="mb-5">
+          <p className="font-sans text-[10px] tracking-[0.14em] uppercase text-gray-400">VD Operations</p>
+          <h2 className="font-display italic text-2xl">Create Supplier</h2>
+          <p className="font-sans text-sm text-gray-500 mt-1">
+            Create an internally-managed supplier. Assign staff and optionally transfer to the property owner later.
+          </p>
+        </div>
+        <div className="space-y-4">
+          <div>
+            <label className="block font-sans text-[10px] tracking-[0.12em] uppercase text-gray-400 mb-1.5">
+              Business / Property Name
+            </label>
+            <input
+              value={businessName}
+              onChange={e => setBusinessName(e.target.value)}
+              className="w-full border border-gray-200 px-3 py-2.5 font-sans text-sm focus:outline-none focus:border-[#2d6a4f] transition-colors"
+              placeholder="Drakensberg Mountain Lodge"
+            />
+          </div>
+          <div>
+            <label className="block font-sans text-[10px] tracking-[0.12em] uppercase text-gray-400 mb-1.5">
+              Contact Email
+            </label>
+            <input
+              type="email"
+              value={email}
+              onChange={e => setEmail(e.target.value)}
+              className="w-full border border-gray-200 px-3 py-2.5 font-sans text-sm focus:outline-none focus:border-[#2d6a4f] transition-colors"
+              placeholder="info@property.co.za"
+            />
+            <p className="font-sans text-[10px] text-gray-400 mt-1 leading-relaxed">
+              This will become the supplier's login email. The property owner can set their password when you're ready to transfer the account.
+            </p>
+          </div>
+          <div>
+            <label className="block font-sans text-[10px] tracking-[0.12em] uppercase text-gray-400 mb-1.5">
+              Supplier Type
+            </label>
+            <select
+              value={supplierType}
+              onChange={e => setSupplierType(e.target.value)}
+              className="w-full border border-gray-200 px-3 py-2.5 font-sans text-sm bg-white focus:outline-none focus:border-[#2d6a4f] transition-colors"
+            >
+              {SUPPLIER_TYPES.map(t => (
+                <option key={t} value={t}>{t}</option>
+              ))}
+            </select>
+          </div>
+        </div>
+        <div className="flex gap-3 mt-6">
+          <button
+            onClick={onClose}
+            className="flex-1 py-2.5 font-sans text-sm border border-gray-200 text-gray-600 hover:border-gray-400 transition-colors"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={submit}
+            disabled={busy}
+            className={`flex-1 py-2.5 font-sans text-sm transition-colors ${busy ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : 'bg-[#2d6a4f] text-white hover:bg-[#245741]'}`}
+          >
+            {busy ? 'Creating…' : 'Create Supplier'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ─── Assign Supplier Modal ─────────────────────────────────────────────────────
 
 function AssignSupplierModal({
@@ -423,6 +531,8 @@ function AssignSupplierModal({
 export default function ManagedSuppliersPage() {
   const [isAdmin, setIsAdmin] = useState(false)
   const [isOpsEmployee, setIsOpsEmployee] = useState(false)
+  // opsRole is the granular VD ops role; used to gate the "Create Supplier" button
+  const [opsRole, setOpsRole] = useState<string | null>(null)
 
   // Admin view: all assignments across all employees
   const [allAssignments, setAllAssignments] = useState<OpsAssignmentDetails[]>([])
@@ -434,6 +544,7 @@ export default function ManagedSuppliersPage() {
   const [loading, setLoading] = useState(true)
   const [showInvite, setShowInvite] = useState(false)
   const [showAssign, setShowAssign] = useState(false)
+  const [showCreateSupplier, setShowCreateSupplier] = useState(false)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -470,6 +581,7 @@ export default function ManagedSuppliersPage() {
 
     setIsAdmin(admin)
     setIsOpsEmployee(opsEmp)
+    setOpsRole(profile?.ops_role ?? null)
 
     if (admin) {
       const [assignments, emps] = await Promise.all([
@@ -497,17 +609,37 @@ export default function ManagedSuppliersPage() {
 
   // ── VD Operations employee view ──────────────────────────────────────────────
   if (isOpsEmployee) {
+    const canCreateSupplier = opsRole === 'ops_administrator'
     return (
       <div className="p-8">
-        <div className="mb-8">
-          <p className="font-sans text-[10px] tracking-[0.14em] uppercase text-gray-400 mb-1">
-            Visit Drakensberg Operations
-          </p>
-          <h1 className="font-display italic text-3xl text-[#000000]">Managed Suppliers</h1>
-          <p className="font-sans text-sm text-gray-500 mt-1">
-            Select a supplier to enter their management tools.
-          </p>
+        <div className="mb-8 flex items-start justify-between flex-wrap gap-4">
+          <div>
+            <p className="font-sans text-[10px] tracking-[0.14em] uppercase text-gray-400 mb-1">
+              Visit Drakensberg Operations
+            </p>
+            <h1 className="font-display italic text-3xl text-[#000000]">Managed Suppliers</h1>
+            <p className="font-sans text-sm text-gray-500 mt-1">
+              Select a supplier to enter their management tools.
+              {mySuppliers.length > 1 && (
+                <span className="ml-1 font-medium text-gray-700">({mySuppliers.length} suppliers assigned)</span>
+              )}
+            </p>
+          </div>
+          {canCreateSupplier && (
+            <button
+              onClick={() => setShowCreateSupplier(true)}
+              className="inline-flex items-center gap-2 bg-[#2d6a4f] text-white px-4 py-2 font-sans text-sm hover:bg-[#245741] transition-colors"
+            >
+              <PlusCircle size={14} /> Create Supplier
+            </button>
+          )}
         </div>
+        {showCreateSupplier && (
+          <CreateSupplierModal
+            onClose={() => setShowCreateSupplier(false)}
+            onCreated={() => { setShowCreateSupplier(false); load() }}
+          />
+        )}
 
         {mySuppliers.length === 0 ? (
           <div className="flex items-start gap-3 border border-amber-200 bg-amber-50 px-4 py-4 max-w-xl">
@@ -594,7 +726,7 @@ export default function ManagedSuppliersPage() {
             Visit Drakensberg Operations team and their supplier assignments.
           </p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 flex-wrap">
           <button
             onClick={load}
             className="inline-flex items-center gap-2 border border-gray-200 px-3 py-2 font-sans text-sm text-gray-600 hover:border-[#2d6a4f] transition-colors"
@@ -609,6 +741,12 @@ export default function ManagedSuppliersPage() {
               <Plus size={14} /> Assign Supplier
             </button>
           )}
+          <button
+            onClick={() => setShowCreateSupplier(true)}
+            className="inline-flex items-center gap-2 border border-gray-200 px-3 py-2 font-sans text-sm text-gray-600 hover:border-[#2d6a4f] transition-colors"
+          >
+            <PlusCircle size={14} /> Create Supplier
+          </button>
           <button
             onClick={() => setShowInvite(true)}
             className="inline-flex items-center gap-2 bg-[#2d6a4f] text-white px-4 py-2 font-sans text-sm hover:bg-[#245741] transition-colors"
@@ -748,6 +886,12 @@ export default function ManagedSuppliersPage() {
           employees={employees}
           onClose={() => setShowAssign(false)}
           onAssigned={load}
+        />
+      )}
+      {showCreateSupplier && (
+        <CreateSupplierModal
+          onClose={() => setShowCreateSupplier(false)}
+          onCreated={() => { setShowCreateSupplier(false); load() }}
         />
       )}
     </div>
