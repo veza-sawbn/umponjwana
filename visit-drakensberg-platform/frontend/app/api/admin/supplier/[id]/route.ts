@@ -38,22 +38,22 @@ export async function GET(req: Request, { params }: { params: { id: string } }) 
     return NextResponse.json({ error: 'Supplier not found' }, { status: 404 })
   }
 
-  const p = profileRes.data ?? {}
-  const u = authRes.data?.user ?? {}
+  const p = profileRes.data
+  const u = authRes.data?.user
 
   return NextResponse.json({
     id: params.id,
-    businessName: p.full_name ?? u.user_metadata?.full_name ?? '',
-    email: u.email ?? p.email ?? '',
-    ownerContactEmail: u.user_metadata?.owner_contact_email ?? null,
-    supplierType: p.supplier_type ?? null,
-    bio: p.bio ?? '',
-    website: p.website ?? null,
-    isApproved: Boolean(p.is_approved),
-    isVdManaged: Boolean(u.app_metadata?.vd_managed),
-    createdAt: p.created_at ?? u.created_at ?? '',
-    lastSignIn: u.last_sign_in_at ?? null,
-    emailConfirmedAt: u.email_confirmed_at ?? null,
+    businessName: p?.full_name ?? u?.user_metadata?.full_name ?? '',
+    email: u?.email ?? p?.email ?? '',
+    ownerContactEmail: u?.user_metadata?.owner_contact_email ?? null,
+    supplierType: p?.supplier_type ?? null,
+    bio: p?.bio ?? '',
+    website: p?.website ?? null,
+    isApproved: Boolean(p?.is_approved),
+    isVdManaged: Boolean(u?.app_metadata?.vd_managed),
+    createdAt: p?.created_at ?? u?.created_at ?? '',
+    lastSignIn: u?.last_sign_in_at ?? null,
+    emailConfirmedAt: u?.email_confirmed_at ?? null,
   })
 }
 
@@ -96,16 +96,16 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
 
   if (Object.keys(profilePatch).length > 0) {
     updates.push(
-      admin.from('profiles').update(profilePatch).eq('id', params.id).then(({ error }) => {
-        if (error) throw error
+      admin.from('profiles').update(profilePatch).eq('id', params.id).then(r => {
+        if (r.error) throw r.error
       }),
     )
   }
 
   if (Object.keys(metaPatch).length > 0) {
     updates.push(
-      admin.auth.admin.updateUserById(params.id, { user_metadata: metaPatch }).then(({ error }) => {
-        if (error) throw error
+      admin.auth.admin.updateUserById(params.id, { user_metadata: metaPatch }).then(r => {
+        if (r.error) throw r.error
       }),
     )
   }
