@@ -1,7 +1,7 @@
 import {
   LayoutDashboard, List, Building2, BedDouble, Zap, Map, Users, Truck,
   Sparkles, CalendarDays, Tag, BarChart2, Image, MessageSquare, Star, Clock,
-  Calculator, CalendarPlus, Wallet,
+  Calculator, CalendarPlus, Wallet, FileSignature,
   type LucideIcon,
 } from 'lucide-react'
 
@@ -50,6 +50,7 @@ export const SUPPLIER_CONFIG: Record<SupplierType, SupplierTypeConfig> = {
     nav: [
       { href: '/supplier',            label: 'Overview',      icon: LayoutDashboard },
       { href: '/supplier/activities', label: 'Activities',    icon: Zap },
+      { href: '/supplier/waivers',    label: 'Waivers',       icon: FileSignature },
       ...SHARED_NAV,
     ],
   },
@@ -65,6 +66,7 @@ export const SUPPLIER_CONFIG: Record<SupplierType, SupplierTypeConfig> = {
       { href: '/supplier/requests',   label: 'Trip Requests', icon: CalendarPlus },
       { href: '/supplier/company',    label: 'Company Profile', icon: Building2 },
       { href: '/supplier/staff',      label: 'Staff',         icon: List },
+      { href: '/supplier/waivers',    label: 'Waivers',       icon: FileSignature },
       ...SHARED_NAV,
     ],
   },
