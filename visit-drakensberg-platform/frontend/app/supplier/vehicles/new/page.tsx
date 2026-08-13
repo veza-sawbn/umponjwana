@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { ChevronLeft, Truck } from 'lucide-react'
 import { supabase } from '@/lib/auth'
+import { effectiveSupplierId } from '@/lib/effective-supplier'
 import { addSupplierEntity } from '@/lib/supplier-entities'
 import { GoogleAddressField, type GooglePlaceSelection } from '@/components/maps/GoogleAddressField'
 
@@ -29,7 +30,7 @@ export default function NewVehiclePage() {
       if (!user) { alert('Not signed in'); return }
       await addSupplierEntity('vehicles', {
         ...form,
-        supplierId: user.id,
+        supplierId: effectiveSupplierId(user.id),
         seats: Number(form.seats) || 0,
         capacity: Number(form.seats) || 0,
         status: 'active',

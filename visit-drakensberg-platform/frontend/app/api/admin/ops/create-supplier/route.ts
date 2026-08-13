@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { cookies } from 'next/headers'
 import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs'
 import { supabaseAdmin } from '@/lib/supabase-admin'
+import { DEFAULT_PERMISSIONS_BY_ROLE } from '@/lib/ops-assignments'
 
 export const dynamic = 'force-dynamic'
 
@@ -160,19 +161,22 @@ export async function POST(req: Request) {
   }
 
   // Ops administrators are automatically assigned to the supplier they create.
+  // Uses the role's own canonical permission set (the same one
+  // AssignSupplierModal pre-fills when an admin assigns staff manually) —
+  // not an ad hoc list. A hand-picked subset here previously included
+  // 'manage_listings', which matches no key in ALL_PERMISSIONS and so
+  // unlocked nothing: not a single supplier-portal tool checks for it, and
+  // no RLS policy on vd_entities does either. It also omitted
+  // 'view_supplier', which every unmapped route (including the portal's own
+  // Overview page) falls back to — so a supplier created this way looked
+  // almost entirely empty to the ops administrator who had just created it.
   if (isOpsAdministrator && !isPlatformAdmin) {
     const { error: assignError } = await admin
       .from('vd_ops_assignments')
       .insert({
         employee_id: user.id,
         supplier_id: supplierId,
-        permissions: [
-          'view_bookings',
-          'manage_listings',
-          'view_financials',
-          'manage_availability',
-          'manage_rates',
-        ],
+        permissions: DEFAULT_PERMISSIONS_BY_ROLE.ops_administrator,
         is_active: true,
       })
     if (assignError) {

@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { ChevronLeft, ChevronRight, Plus, Trash2 } from 'lucide-react'
 import { supabase } from '@/lib/auth'
+import { effectiveSupplierId } from '@/lib/effective-supplier'
 import { addActivity } from '@/lib/activities'
 import { getRegionNames } from '@/lib/regions'
 import { GoogleAddressField } from '@/components/maps/GoogleAddressField'
@@ -55,7 +56,7 @@ export default function NewActivityPage() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) { setError('Not signed in'); return }
       await addActivity({
-        supplierId: user.id,
+        supplierId: effectiveSupplierId(user.id),
         supplierName: user.user_metadata?.full_name || user.email || '',
         name: form.name,
         category: form.category,

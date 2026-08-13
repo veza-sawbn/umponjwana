@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { ChevronLeft, Map } from 'lucide-react'
 import { supabase } from '@/lib/auth'
+import { effectiveSupplierId } from '@/lib/effective-supplier'
 import { addSupplierEntity } from '@/lib/supplier-entities'
 import { GoogleAddressField, useAutoDrivingDistance } from '@/components/maps/GoogleAddressField'
 
@@ -31,7 +32,7 @@ export default function NewRoutePage() {
     }))
   }, [autoDistance])
 
-  async function handleSubmit(e: React.FormEvent) { e.preventDefault(); setSaving(true); try { const { data: { user } } = await supabase.auth.getUser(); if (!user) { alert('Not signed in'); return } await addSupplierEntity('routes', { ...form, supplierId: user.id, durationH: Number(form.durationH) || 0, durationM: Number(form.durationM) || 0, duration: `${Number(form.durationH) || 0}h ${Number(form.durationM) || 0}m`, distanceKm: Number(form.distanceKm) || 0, pricePerPerson: Number(form.pricePerPerson) || 0, price: Number(form.pricePerPerson) || 0 }); router.push('/supplier/routes') } finally { setSaving(false) } }
+  async function handleSubmit(e: React.FormEvent) { e.preventDefault(); setSaving(true); try { const { data: { user } } = await supabase.auth.getUser(); if (!user) { alert('Not signed in'); return } await addSupplierEntity('routes', { ...form, supplierId: effectiveSupplierId(user.id), durationH: Number(form.durationH) || 0, durationM: Number(form.durationM) || 0, duration: `${Number(form.durationH) || 0}h ${Number(form.durationM) || 0}m`, distanceKm: Number(form.distanceKm) || 0, pricePerPerson: Number(form.pricePerPerson) || 0, price: Number(form.pricePerPerson) || 0 }); router.push('/supplier/routes') } finally { setSaving(false) } }
   return <div className="p-8 max-w-2xl"><button onClick={() => router.back()} className="font-sans text-sm text-black/40 hover:text-black/70 mb-3 flex items-center gap-1"><ChevronLeft size={14} /> Routes</button><div className="flex items-center gap-3 mb-6"><Map size={20} className="text-[#C9A96E]" /><h1 className="font-display italic text-2xl text-black/90">Add Route</h1></div><form onSubmit={handleSubmit} className="bg-white rounded-xl border border-black/8 p-6 space-y-5">
     <GoogleAddressField label="From" required value={form.from} lat={form.fromLat} lng={form.fromLng} placeholder="Pickup address or area" inputClassName={input} labelClassName="font-sans text-sm font-medium text-black/70" onChange={({ address, lat, lng }) => { setField('from', address); if (lat) setField('fromLat', lat); if (lng) setField('fromLng', lng) }} />
     <GoogleAddressField label="To" required value={form.to} lat={form.toLat} lng={form.toLng} placeholder="Drop-off address or area" inputClassName={input} labelClassName="font-sans text-sm font-medium text-black/70" onChange={({ address, lat, lng }) => { setField('to', address); if (lat) setField('toLat', lat); if (lng) setField('toLng', lng) }} />
