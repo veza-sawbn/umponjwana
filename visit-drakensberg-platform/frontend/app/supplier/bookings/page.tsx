@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import toast from 'react-hot-toast'
 import { CalendarDays, Search, Phone, Mail, Users, MessageSquare, XCircle } from 'lucide-react'
 import { getMyOrders, cancelOrderAsSupplier, type SupplierOrder } from '@/lib/booking-orders'
-import { getDepartures, releaseDepartureSeats } from '@/lib/departures'
+import { getMyDepartures, releaseDepartureSeats } from '@/lib/departures'
 import { supabase } from '@/lib/auth'
 
 type Status = 'all' | 'confirmed' | 'cancelled'
@@ -41,7 +41,7 @@ export default function BookingsPage() {
     try {
       await cancelOrderAsSupplier(o)
       // Free any tour departure seats this order held.
-      const deps = await getDepartures()
+      const deps = await getMyDepartures()
       await Promise.all(
         o.items
           .filter(i => deps.some(d => d.id === i.id))

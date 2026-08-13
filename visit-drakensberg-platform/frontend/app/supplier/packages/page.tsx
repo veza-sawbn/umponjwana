@@ -23,6 +23,7 @@ interface TourPackage {
 }
 
 import { supabase } from '@/lib/auth'
+import { effectiveSupplierId } from '@/lib/effective-supplier'
 import {
   getSupplierEntities, addSupplierEntity, updateSupplierEntity, deleteSupplierEntity,
 } from '@/lib/supplier-entities'
@@ -35,7 +36,7 @@ export default function PackagesPage() {
 
   useEffect(() => {
     supabase.auth.getUser().then(async ({ data: { user } }) => {
-      if (user) setPackages(await getSupplierEntities<any>(ENTITY, user.id) as unknown as TourPackage[])
+      if (user) setPackages(await getSupplierEntities<any>(ENTITY, effectiveSupplierId(user.id)) as unknown as TourPackage[])
       setLoading(false)
     })
   }, [])
@@ -58,7 +59,7 @@ export default function PackagesPage() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) throw new Error('no session')
       const saved = await addSupplierEntity<any>(ENTITY, {
-        supplierId: user.id,
+        supplierId: effectiveSupplierId(user.id),
         title: form.title,
         description: form.description,
         price: parseFloat(form.price),

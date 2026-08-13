@@ -51,12 +51,12 @@ export default function SupplierWorkspacePage() {
   }
 
   if (loading) {
-    return <div className="p-8"><p className="font-sans text-sm text-gray-400">Loading…</p></div>
+    return <div className="p-4 sm:p-6 lg:p-8"><p className="font-sans text-sm text-gray-400">Loading…</p></div>
   }
 
   if (!supplier) {
     return (
-      <div className="p-8">
+      <div className="p-4 sm:p-6 lg:p-8">
         <Link
           href="/operations"
           className="inline-flex items-center gap-2 font-sans text-sm text-gray-500 hover:text-[#2d6a4f] mb-6 transition-colors"
@@ -80,7 +80,7 @@ export default function SupplierWorkspacePage() {
   const permissions = supplier.permissions ?? []
 
   return (
-    <div className="p-8">
+    <div className="p-4 sm:p-6 lg:p-8">
       <Link
         href="/operations"
         className="inline-flex items-center gap-2 font-sans text-sm text-gray-500 hover:text-[#2d6a4f] mb-6 transition-colors"

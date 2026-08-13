@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import { ChevronRight, ChevronLeft, Plus, Trash2 } from 'lucide-react'
 import { supabase } from '@/lib/auth'
+import { effectiveSupplierId } from '@/lib/effective-supplier'
 import { getPropertiesBySupplier, type Property } from '@/lib/properties'
 import { getRoomById, updateRoom, type Room } from '@/lib/rooms'
 import { supplierMediaSource } from '@/lib/supplier-media'
@@ -103,7 +104,7 @@ export default function EditRoomPage() {
       if (!user) { setLoading(false); return }
       const [room, props] = await Promise.all([
         getRoomById(id),
-        getPropertiesBySupplier(user.id),
+        getPropertiesBySupplier(effectiveSupplierId(user.id)),
       ])
       setProperties(props)
       if (room) {

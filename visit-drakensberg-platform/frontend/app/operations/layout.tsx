@@ -17,6 +17,7 @@ import { OperationsProvider, useOperations } from '@/lib/operations-context'
 import { OPS_ROLE_LABEL } from '@/lib/ops-assignments'
 import Logo from '@/components/Logo'
 import NotificationsBell from '@/components/ui/NotificationsBell'
+import PortalShell from '@/components/layout/PortalShell'
 
 function Sidebar() {
   const pathname = usePathname()
@@ -32,7 +33,9 @@ function Sidebar() {
     href === '/operations' ? pathname === '/operations' : pathname.startsWith(href)
 
   return (
-    <aside className="w-60 shrink-0 bg-[#111111] border-r border-white/8 flex flex-col fixed inset-y-0 left-0 z-40">
+    // Positioning is owned by PortalShell (fixed rail on desktop, drawer on
+    // mobile); this element just fills whatever box it is given.
+    <aside className="h-full w-full bg-[#111111] border-r border-white/8 flex flex-col overflow-hidden">
       <div className="px-6 py-5 border-b border-white/8">
         <Link href="/operations" className="flex flex-col gap-2">
           <Logo className="h-4 w-auto text-[#C9A96E]" />
@@ -158,12 +161,12 @@ function Guard({ children }: { children: React.ReactNode }) {
   const { loading, isOpsEmployee } = useOperations()
 
   if (loading) {
-    return <div className="p-8"><p className="font-sans text-sm text-gray-400">Loading…</p></div>
+    return <div className="p-4 sm:p-6 lg:p-8"><p className="font-sans text-sm text-gray-400">Loading…</p></div>
   }
 
   if (!isOpsEmployee) {
     return (
-      <div className="p-8">
+      <div className="p-4 sm:p-6 lg:p-8">
         <div className="flex items-start gap-3 border border-amber-200 bg-amber-50 px-4 py-4 max-w-xl">
           <AlertCircle size={16} className="text-amber-600 shrink-0 mt-0.5" />
           <div>
@@ -186,15 +189,15 @@ function Guard({ children }: { children: React.ReactNode }) {
 export default function OperationsLayout({ children }: { children: React.ReactNode }) {
   return (
     <OperationsProvider>
-      <div className="min-h-screen bg-[#0a0a0a] flex">
-        <Sidebar />
-        <div className="ml-60 flex-1 min-h-screen bg-[#F7F5F2]">
-          <div className="flex items-center justify-end px-8 pt-4 -mb-4">
-            <NotificationsBell />
-          </div>
-          <Guard>{children}</Guard>
-        </div>
-      </div>
+      <PortalShell
+        sidebar={<Sidebar />}
+        label="Operations"
+        homeHref="/operations"
+        mobileActions={<NotificationsBell />}
+        desktopActions={<NotificationsBell />}
+      >
+        <Guard>{children}</Guard>
+      </PortalShell>
     </OperationsProvider>
   )
 }

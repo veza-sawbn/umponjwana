@@ -4,10 +4,11 @@ import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { CalendarDays, Plus, Users, Trash2, ChevronLeft, X, Settings2 } from 'lucide-react'
 import { supabase } from '@/lib/auth'
+import { effectiveSupplierId } from '@/lib/effective-supplier'
 import { getSupplierEntities, type SupplierEntity } from '@/lib/supplier-entities'
-import { getTours, type Tour } from '@/lib/tours'
+import { getMyTours, type Tour } from '@/lib/tours'
 import {
-  getDepartures, addDeparture, updateDeparture, deleteDeparture, newDeparturePackageId,
+  getMyDepartures, addDeparture, updateDeparture, deleteDeparture, newDeparturePackageId,
   type Departure, type DeparturePackage,
 } from '@/lib/departures'
 
@@ -201,7 +202,8 @@ function DeparturesInner() {
   })
 
   useEffect(() => {
-    getTours().then(all => {
+    // Both reads are supplier-scoped; the unscoped variants are public-catalog only.
+    getMyTours().then(all => {
       const active = all.filter(t => t.status === 'active')
       setTours(active)
       if (tourFilter) {
@@ -209,9 +211,9 @@ function DeparturesInner() {
         if (t) setForm(f => ({ ...f, tourId: t.id }))
       }
     })
-    getDepartures().then(setRows)
+    getMyDepartures().then(setRows)
     supabase.auth.getUser().then(async ({ data: { user } }) => {
-      if (user) setGuides(await getSupplierEntities<Guide>('guides', user.id))
+      if (user) setGuides(await getSupplierEntities<Guide>('guides', effectiveSupplierId(user.id)))
     })
   }, [tourFilter])
 

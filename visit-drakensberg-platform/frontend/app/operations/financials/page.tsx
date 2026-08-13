@@ -81,12 +81,12 @@ export default function ConsolidatedFinancialsPage() {
   }), { gross: 0, commission: 0, supplierShare: 0, unsettled: 0 }), [rows])
 
   if (ctxLoading) {
-    return <div className="p-8"><p className="font-sans text-sm text-gray-400">Loading…</p></div>
+    return <div className="p-4 sm:p-6 lg:p-8"><p className="font-sans text-sm text-gray-400">Loading…</p></div>
   }
 
   if (scoped.length === 0) {
     return (
-      <div className="p-8">
+      <div className="p-4 sm:p-6 lg:p-8">
         <div className="flex items-start gap-3 border border-amber-200 bg-amber-50 px-4 py-4 max-w-xl">
           <AlertCircle size={16} className="text-amber-600 shrink-0 mt-0.5" />
           <div>
@@ -101,7 +101,7 @@ export default function ConsolidatedFinancialsPage() {
   }
 
   return (
-    <div className="p-8">
+    <div className="p-4 sm:p-6 lg:p-8">
       <div className="mb-6 flex items-start justify-between flex-wrap gap-4">
         <div>
           <p className="font-sans text-[10px] tracking-[0.14em] uppercase text-gray-400 mb-1">

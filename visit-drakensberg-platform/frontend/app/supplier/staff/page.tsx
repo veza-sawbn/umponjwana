@@ -4,7 +4,8 @@ import toast from 'react-hot-toast'
 import Link from 'next/link'
 import { Users, CalendarDays, Bell, CheckCircle, Clock, Send } from 'lucide-react'
 import { supabase } from '@/lib/auth'
-import { getDepartures, updateDeparture, type Departure } from '@/lib/departures'
+import { effectiveSupplierId } from '@/lib/effective-supplier'
+import { getMyDepartures, updateDeparture, type Departure } from '@/lib/departures'
 import {
   getSupplierEntities, updateSupplierEntity, type SupplierEntity,
 } from '@/lib/supplier-entities'
@@ -38,8 +39,8 @@ export default function StaffPage() {
       if (!user) { setLoading(false); return }
       const today = new Date().toISOString().slice(0, 10)
       const [roster, deps] = await Promise.all([
-        getSupplierEntities<Guide>(GUIDE_ENTITY, user.id),
-        getDepartures(),
+        getSupplierEntities<Guide>(GUIDE_ENTITY, effectiveSupplierId(user.id)),
+        getMyDepartures(),
       ])
       setGuides(roster)
       setDepartures(
