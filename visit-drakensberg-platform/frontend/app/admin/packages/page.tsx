@@ -10,12 +10,13 @@ import { supabase } from '@/lib/auth'
 import {
   getPackages, addPackage, updatePackage, duplicatePackage, deletePackage,
   setPackageStatus, packageTotals, componentMargin,
-  PACKAGE_STATUS_LABELS, COMPONENT_TYPE_LABELS,
+  PACKAGE_STATUS_LABELS, COMPONENT_TYPE_LABELS, PACKAGE_CATEGORIES, PACKAGE_CATEGORY_LABELS,
+  GALLERY_COMPONENT_TYPES,
   type MarketplacePackage, type PackageComponent, type PackageComponentType, type PackageStatus,
 } from '@/lib/packages'
 import { getAdminSuppliers, adminMediaSource, type AdminSupplier } from '@/lib/admin-supabase'
 import { getTrails, type Trail } from '@/lib/trails'
-import { MediaPicker } from '@/components/media/MediaPicker'
+import { MediaPicker, MediaGalleryPicker } from '@/components/media/MediaPicker'
 
 // Admin Package Builder: packages are curated by Visit Drakensberg from
 // services supplied by multiple businesses. Each component keeps its own
@@ -43,14 +44,14 @@ type Draft = Omit<MarketplacePackage, 'id' | 'status' | 'createdAt' | 'updatedAt
 const EMPTY_DRAFT: Draft = {
   title: '', summary: '', description: '', image: '', region: '',
   durationNights: 2, maxGuests: 8, pricePerPerson: 0, originalPrice: undefined,
-  tag: '', featured: false, trailIds: [], components: [],
+  tag: '', featured: false, categories: [], trailIds: [], components: [],
   packageStatus: 'draft', publishFrom: '', publishTo: '',
 }
 
 const EMPTY_COMPONENT: Omit<PackageComponent, 'id'> = {
   type: 'accommodation', title: '', supplierId: '', supplierName: '', supplierContact: '',
   costPrice: 0, sellingPrice: 0, commissionPct: 10, availability: '',
-  bookingRules: '', cancellationRules: '', notes: '', trailId: '',
+  bookingRules: '', cancellationRules: '', notes: '', trailId: '', gallery: [],
 }
 
 function ComponentEditor({
@@ -62,6 +63,7 @@ function ComponentEditor({
   onChange: (c: PackageComponent) => void
   onRemove: () => void
 }) {
+  const showGallery = GALLERY_COMPONENT_TYPES.includes(component.type)
   const [open, setOpen] = useState(!component.title)
   const set = (k: keyof PackageComponent, v: unknown) => onChange({ ...component, [k]: v })
 
@@ -161,6 +163,12 @@ function ComponentEditor({
             <label className={labelCls}>Operational Notes (sent to the supplier with the booking)</label>
             <input value={component.notes} onChange={e => set('notes', e.target.value)} className={inputCls} />
           </div>
+          {showGallery && (
+            <div className="col-span-2 lg:col-span-3">
+              <label className={labelCls}>Gallery Images (shown on the public package page)</label>
+              <MediaGalleryPicker value={component.gallery ?? []} onChange={urls => set('gallery', urls)} source={adminMediaSource} />
+            </div>
+          )}
         </div>
       )}
     </div>
@@ -334,6 +342,21 @@ export default function AdminPackagesPage() {
                 <input type="date" value={draft.publishTo ?? ''} onChange={e => set('publishTo', e.target.value)} className={inputCls} />
               </div>
               <div className="col-span-2">
+                <label className={labelCls}>Trip Categories (shown as filter tabs on /packages)</label>
+                <div className="flex flex-wrap gap-2">
+                  {PACKAGE_CATEGORIES.map(c => {
+                    const on = draft.categories.includes(c)
+                    return (
+                      <button key={c} type="button"
+                        onClick={() => set('categories', on ? draft.categories.filter(x => x !== c) : [...draft.categories, c])}
+                        className={`font-sans text-xs px-3 py-1.5 border transition-colors ${on ? 'bg-[#C9A96E] border-[#C9A96E] text-[#2d2d2d]' : 'border-gray-200 text-gray-600 hover:border-[#C9A96E]'}`}>
+                        {PACKAGE_CATEGORY_LABELS[c]}
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+              <div className="col-span-2">
                 <label className={labelCls}>Hiking Trails in this Package</label>
                 <div className="flex flex-wrap gap-2">
                   {trails.map(t => {
@@ -461,6 +484,15 @@ export default function AdminPackagesPage() {
                       <p className="font-sans text-xs text-gray-500 mt-1.5 truncate">
                         {p.components.map(c => c.title || COMPONENT_TYPE_LABELS[c.type]).join(' · ')}
                       </p>
+                    )}
+                    {(p.categories ?? []).length > 0 && (
+                      <div className="flex flex-wrap gap-1.5 mt-2">
+                        {(p.categories ?? []).map(c => (
+                          <span key={c} className="font-sans text-[10px] tracking-[0.06em] uppercase px-2 py-0.5 bg-[#F7F5F2] text-gray-500 border border-gray-200">
+                            {PACKAGE_CATEGORY_LABELS[c]}
+                          </span>
+                        ))}
+                      </div>
                     )}
                   </div>
                   <div className="text-right shrink-0">
