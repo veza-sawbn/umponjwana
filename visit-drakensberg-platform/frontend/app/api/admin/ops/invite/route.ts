@@ -68,7 +68,7 @@ export async function POST(req: Request) {
     data: {
       full_name: body.fullName || '',
       role: 'visitor',                  // not a supplier; not a platform admin
-      staff_role: 'operations',         // grants is_ops() / admin console access
+      staff_role: 'operations',         // grants is_ops() + /operations access
       ops_role: body.opsRole,           // granular operational role
       organisation: 'vd_operations',   // VD internal organisation
     },
@@ -76,8 +76,8 @@ export async function POST(req: Request) {
     // URL list (the same URL the forgot-password flow uses). Supabase delivers the
     // invite token in the URL hash; the reset-password page listens for SIGNED_IN,
     // shows the password-creation form, and redirects to /auth/login when done.
-    // The login page then routes ops employees (staff_role='operations') to /admin,
-    // and middleware redirects /admin → /admin/operations/managed-suppliers.
+    // The login page then routes ops employees (staff_role='operations') to
+    // their own /operations environment.
     redirectTo: `${origin}/auth/reset-password`,
   })
 

@@ -27,12 +27,12 @@ export default function LoginPage() {
       const role = result?.user?.app_metadata?.role ?? result?.user?.user_metadata?.role
       const staffRole = result?.user?.app_metadata?.staff_role ?? result?.user?.user_metadata?.staff_role
       const redirect = new URLSearchParams(window.location.search).get('redirect')
-      // Operations employees have role='visitor' but need the admin console.
-      // Middleware then redirects /admin → /admin/operations/managed-suppliers for them.
+      // Operations employees have role='visitor' but belong in their own
+      // /operations environment — not the admin console.
       const defaultPath =
         role === 'supplier' ? '/supplier'
         : role === 'admin' ? '/admin'
-        : staffRole === 'operations' ? '/admin'
+        : staffRole === 'operations' ? '/operations'
         : '/account'
       const targetPath = redirect?.startsWith('/') && !redirect.startsWith('//') ? redirect : defaultPath
       // Hard navigation: guarantees the middleware sees the fresh session
