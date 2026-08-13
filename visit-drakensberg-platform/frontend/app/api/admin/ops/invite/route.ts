@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { cookies } from 'next/headers'
 import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs'
 import { supabaseAdmin } from '@/lib/supabase-admin'
+import { getSiteOrigin } from '@/lib/origin'
 import type { OpsRole } from '@/lib/ops-assignments'
 
 export const dynamic = 'force-dynamic'
@@ -55,12 +56,10 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'admin only' }, { status: 403 })
   }
 
-  // NEXT_PUBLIC_SITE_URL is the most reliable source. Fall back to the
-  // x-forwarded-host header that Vercel always sets on server-side requests
-  // (req.url in App Router route handlers may resolve to an internal URL).
-  const host = req.headers.get('x-forwarded-host') ?? new URL(req.url).host
-  const proto = req.headers.get('x-forwarded-proto') ?? 'https'
-  const origin = process.env.NEXT_PUBLIC_SITE_URL || `${proto}://${host}`
+  // Always derive the origin from request headers first (most reliable on
+  // Vercel/Render), falling back to NEXT_PUBLIC_SITE_URL only when headers
+  // are absent. See lib/origin.ts for the rationale.
+  const origin = getSiteOrigin(req)
 
   // Invite the user with ops metadata. handle_new_user() will seed these into
   // profiles.ops_role, profiles.organisation, and profiles.staff_role.

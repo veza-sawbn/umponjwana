@@ -42,10 +42,29 @@ export async function getUser() {
 }
 
 export async function resetPassword(email: string) {
-  const { error } = await supabase.auth.resetPasswordForEmail(email, {
-    redirectTo: `${process.env.NEXT_PUBLIC_SITE_URL}/auth/reset-password`,
+  // Delegate to the server-side API route so that:
+  //   1. The redirectTo URL is built from reliable request headers (x-forwarded-host
+  //      / x-forwarded-proto), not the NEXT_PUBLIC_SITE_URL env var which may be
+  //      missing the "https://" scheme or point to a wrong host.
+  //   2. The admin client (service-role key) is used, removing any dependency on
+  //      the browser-side anon key being correctly injected at build time.
+  // Without this fix, a misconfigured NEXT_PUBLIC_SITE_URL causes Supabase to
+  // redirect the password-reset link to an invalid URL (often the Supabase REST
+  // endpoint itself), which responds with
+  //   {"message":"No API key found in request",...}
+  const res = await fetch('/api/auth/request-password-reset', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email }),
   })
-  if (error) throw error
+  if (!res.ok) {
+    let message = 'Failed to send reset email'
+    try {
+      const data = await res.json()
+      if (data?.error) message = data.error
+    } catch { /* ignore parse error */ }
+    throw new Error(message)
+  }
 }
 
 export function onAuthStateChange(callback: Parameters<typeof supabase.auth.onAuthStateChange>[0]) {

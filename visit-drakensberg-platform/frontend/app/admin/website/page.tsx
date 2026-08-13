@@ -14,7 +14,7 @@ const SECTIONS: { id: Section; label: string; desc: string }[] = [
   { id: 'featured', label: 'Homepage Featured', desc: 'Featured listings section config' },
   { id: 'promos', label: 'Promotions & Offers', desc: 'Promotional banner and deals section' },
   { id: 'footer', label: 'Footer Content', desc: 'Tagline, copyright, social links, contact' },
-  { id: 'nav', label: 'Navigation Links', desc: 'Main site navigation items' },
+  { id: 'nav', label: 'Navigation & Menu Images', desc: 'Nav items + super menu photos' },
   { id: 'about', label: 'About / Platform Copy', desc: 'Platform description and about text' },
 ]
 
@@ -59,6 +59,7 @@ export default function AdminWebsitePage() {
   const [about, setAbout] = useState(SITE_CONTENT_DEFAULTS.about)
   const [navItems, setNavItems] = useState<NavItem[]>(DEFAULT_NAV)
   const [newNavItem, setNewNavItem] = useState({ label: '', href: '' })
+  const [navImages, setNavImages] = useState(SITE_CONTENT_DEFAULTS.nav_menu)
 
   useEffect(() => {
     getAllSiteContent().then(content => {
@@ -67,6 +68,7 @@ export default function AdminWebsitePage() {
       setPromos(content.promotions)
       setFooter(content.footer)
       setAbout(content.about)
+      setNavImages(content.nav_menu)
       setLoading(false)
     })
   }, [])
@@ -79,7 +81,7 @@ export default function AdminWebsitePage() {
     if (activeSection === 'promos') saves.push(setSiteContent('promotions', promos))
     if (activeSection === 'footer') saves.push(setSiteContent('footer', footer))
     if (activeSection === 'about') saves.push(setSiteContent('about', about))
-    // nav: store as homepage_featured for now (would need its own key in production)
+    if (activeSection === 'nav') saves.push(setSiteContent('nav_menu', navImages))
     await Promise.all(saves)
     setSaving(false)
     setSavedSection(activeSection)
@@ -319,11 +321,11 @@ export default function AdminWebsitePage() {
               </div>
             )}
 
-            {/* ── Navigation Links ── */}
+            {/* ── Navigation Links + Super Menu Images ── */}
             {activeSection === 'nav' && (
               <div className="space-y-5">
-                <h2 className="font-display italic text-2xl text-[#000000] mb-2">Navigation Links</h2>
-                <p className="font-sans text-sm text-gray-500 mb-6">These reflect the actual nav items in the Navbar component. Edit the order and visibility here, then update the Navbar if needed.</p>
+                <h2 className="font-display italic text-2xl text-[#000000] mb-2">Navigation &amp; Menu Images</h2>
+                <p className="font-sans text-sm text-gray-500 mb-6">Edit nav item order and visibility, and set the background photo shown in the super menu for each section.</p>
 
                 <div className="border border-gray-200 overflow-hidden">
                   <table className="w-full">
@@ -390,7 +392,32 @@ export default function AdminWebsitePage() {
                     <Plus size={14} /> Add
                   </button>
                 </div>
-                <p className="font-sans text-xs text-gray-400">Note: visibility changes here are for reference. To make nav changes live, the Navbar component also needs updating.</p>
+                <p className="font-sans text-xs text-gray-400">Note: label/visibility changes here are for reference. To make nav label changes live, the Navbar component also needs updating.</p>
+
+                {/* ── Super menu images ── */}
+                <div className="mt-8 pt-8 border-t border-gray-100">
+                  <h3 className="font-display italic text-xl text-[#000000] mb-1">Super Menu Images</h3>
+                  <p className="font-sans text-sm text-gray-500 mb-6">Background photo shown in the right panel of the super menu when each nav item is hovered. Changes save to Supabase and go live immediately.</p>
+                  <div className="grid grid-cols-1 gap-5">
+                    {([
+                      { key: 'stays_image',      label: 'Stays' },
+                      { key: 'hikes_image',       label: 'Hikes' },
+                      { key: 'activities_image',  label: 'Activities' },
+                      { key: 'shuttles_image',    label: 'Shuttles' },
+                      { key: 'regions_image',     label: 'Regions' },
+                      { key: 'stories_image',     label: 'Stories' },
+                      { key: 'plan_image',        label: 'Plan' },
+                    ] as const).map(({ key, label }) => (
+                      <Field key={key} label={`${label} — super menu background`}>
+                        <MediaPicker
+                          value={(navImages as Record<string, string>)[key]}
+                          onChange={url => setNavImages(prev => ({ ...prev, [key]: url }))}
+                          source={adminMediaSource}
+                        />
+                      </Field>
+                    ))}
+                  </div>
+                </div>
               </div>
             )}
 

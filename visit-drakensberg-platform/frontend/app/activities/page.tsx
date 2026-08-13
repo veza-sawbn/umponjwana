@@ -5,6 +5,7 @@ import Footer from '@/components/layout/Footer'
 import EditablePageHeader from '@/components/editor/EditablePageHeader'
 import { getActivities, type Activity } from '@/lib/activities'
 import { StayDistance } from '@/lib/stay-distance'
+import { regionsMatch } from '@/lib/regions'
 
 const CATEGORIES = [
   { label: 'All', slug: '' },
@@ -19,16 +20,20 @@ export default function ActivitiesPage() {
   const [activities, setActivities] = useState<Activity[]>([])
   const [loading, setLoading] = useState(true)
   const [category, setCategory] = useState('')
+  const [regionFilter, setRegionFilter] = useState('')
 
   useEffect(() => {
+    const regionParam = new URLSearchParams(window.location.search).get('region')
+    if (regionParam) setRegionFilter(regionParam)
     getActivities()
       .then(items => setActivities(items.filter(a => a.status === 'active')))
       .finally(() => setLoading(false))
   }, [])
 
-  const filtered = category
-    ? activities.filter(a => a.category.toLowerCase() === category.toLowerCase())
-    : activities
+  const filtered = activities.filter(a =>
+    (!category || a.category.toLowerCase() === category.toLowerCase()) &&
+    (!regionFilter || regionsMatch(a.region, regionFilter))
+  )
 
   return (
     <main className="bg-mist min-h-screen pt-16">

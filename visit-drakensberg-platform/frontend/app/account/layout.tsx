@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import {
-  CalendarDays, Heart, Star, Gift, Map, Settings, LogOut, User, ChevronDown, Receipt,
+  CalendarDays, Heart, Star, Gift, Map, Settings, LogOut, User, ChevronDown, Receipt, MessageCircle,
 } from 'lucide-react'
 import Footer from '@/components/layout/Footer'
 import NotificationsBell from '@/components/ui/NotificationsBell'
@@ -12,11 +12,12 @@ import { supabase, signOut } from '@/lib/auth'
 
 const NAV = [
   { href: '/account', label: 'Bookings & Trips', icon: CalendarDays, exact: true },
+  { href: '/account/itinerary', label: 'Itinerary', icon: Star },
+  { href: '/account/messages', label: 'Messages', icon: MessageCircle },
   { href: '/account/orders', label: 'Orders & Invoices', icon: Receipt },
   { href: '/account/saved', label: 'Saved', icon: Heart },
   { href: '/account/loyalty', label: 'Rewards & Wallet', icon: Gift },
   { href: '/account/recommendations', label: 'Planning', icon: Map },
-  { href: '/account/itinerary', label: 'Itinerary', icon: Star },
   { href: '/account/settings', label: 'Settings', icon: Settings },
 ]
 

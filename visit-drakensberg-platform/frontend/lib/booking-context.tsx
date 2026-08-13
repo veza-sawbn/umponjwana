@@ -58,8 +58,31 @@ export type ShuttleOption = {
   durationText?: string
 }
 
+// ── Destination intelligence ──────────────────────────────────────────────────
+
+/** A previous destination search — persisted to power contextual recommendations. */
+export type TripSearch = {
+  region: string
+  checkIn: string
+  checkOut: string
+  guests: number
+  searchedAt: string
+}
+
+/** A listing the visitor has saved or recently viewed. */
+export type TrackedListing = {
+  id: string
+  title: string
+  type: string
+  region?: string
+  viewedAt?: string
+}
+
 export type BookingState = {
   region: string
+  /** The active destination hub (slug) resolved from the current stay/region — used
+   *  by SmartRecommendations, the Navbar context strip, and the trip planner. */
+  currentDestination: string
   checkIn: string
   checkOut: string
   guests: number
@@ -68,16 +91,29 @@ export type BookingState = {
   /** Every private-shuttle leg the guest has added — one per far-apart
    *  activity/stay transfer, all carried into the same booking. */
   shuttles: ShuttleOption[]
+  /** Up to 8 most-recent destination searches — drives "previous searches" UX. */
+  previousSearches: TripSearch[]
+  /** Listings the visitor has explicitly saved. */
+  savedListings: TrackedListing[]
+  /** Listings viewed in the current session — used for recency signals. */
+  recentlyViewedListings: TrackedListing[]
 }
 
 type BookingActions = {
   setSearch: (region: string, checkIn: string, checkOut: string, guests: number) => void
+  setCurrentDestination: (destination: string) => void
   setStay: (stay: BookingStay | null) => void
   addAddon: (addon: BookingAddon) => void
   removeAddon: (id: string) => void
   addShuttle: (shuttle: ShuttleOption) => void
   removeShuttle: (id: string) => void
   updateShuttle: (id: string, patch: Partial<ShuttleOption>) => void
+  /** Save a listing to the visitor's saved list (de-duplicated by id). */
+  saveListing: (listing: TrackedListing) => void
+  /** Remove a previously-saved listing. */
+  removeSavedListing: (id: string) => void
+  /** Record that the visitor viewed a listing (kept as last 20). */
+  trackListingView: (listing: TrackedListing) => void
   clearBooking: () => void
   hasActiveSearch: boolean
   nights: number
@@ -89,23 +125,31 @@ type BookingActions = {
 
 const EMPTY: BookingState = {
   region: '',
+  currentDestination: '',
   checkIn: '',
   checkOut: '',
   guests: 2,
   stay: null,
   addons: [],
   shuttles: [],
+  previousSearches: [],
+  savedListings: [],
+  recentlyViewedListings: [],
 }
 
 const BookingContext = createContext<BookingState & BookingActions>({
   ...EMPTY,
   setSearch: () => {},
+  setCurrentDestination: () => {},
   setStay: () => {},
   addAddon: () => {},
   removeAddon: () => {},
   addShuttle: () => {},
   removeShuttle: () => {},
   updateShuttle: () => {},
+  saveListing: () => {},
+  removeSavedListing: () => {},
+  trackListingView: () => {},
   clearBooking: () => {},
   hasActiveSearch: false,
   nights: 0,
@@ -153,7 +197,49 @@ export function BookingProvider({ children }: { children: React.ReactNode }) {
   }, [state, hydrated])
 
   const setSearch = useCallback((region: string, checkIn: string, checkOut: string, guests: number) => {
-    setState(s => ({ ...s, region, checkIn, checkOut, guests }))
+    setState(s => ({
+      ...s,
+      region,
+      checkIn,
+      checkOut,
+      guests,
+      // Seed currentDestination from region on first search if not already set
+      currentDestination: s.currentDestination || region,
+      // Record search history (capped at 8, de-duplicated by region+dates)
+      previousSearches: [
+        { region, checkIn, checkOut, guests, searchedAt: new Date().toISOString() },
+        ...s.previousSearches.filter(
+          ps => !(ps.region === region && ps.checkIn === checkIn && ps.checkOut === checkOut)
+        ),
+      ].slice(0, 8),
+    }))
+  }, [])
+
+  const setCurrentDestination = useCallback((destination: string) => {
+    setState(s => ({ ...s, currentDestination: destination }))
+  }, [])
+
+  const saveListing = useCallback((listing: TrackedListing) => {
+    setState(s => ({
+      ...s,
+      savedListings: s.savedListings.some(l => l.id === listing.id)
+        ? s.savedListings
+        : [...s.savedListings, listing],
+    }))
+  }, [])
+
+  const removeSavedListing = useCallback((id: string) => {
+    setState(s => ({ ...s, savedListings: s.savedListings.filter(l => l.id !== id) }))
+  }, [])
+
+  const trackListingView = useCallback((listing: TrackedListing) => {
+    setState(s => ({
+      ...s,
+      recentlyViewedListings: [
+        { ...listing, viewedAt: new Date().toISOString() },
+        ...s.recentlyViewedListings.filter(l => l.id !== listing.id),
+      ].slice(0, 20),
+    }))
   }, [])
 
   const setStay = useCallback((stay: BookingStay | null) => {
@@ -210,12 +296,16 @@ export function BookingProvider({ children }: { children: React.ReactNode }) {
     <BookingContext.Provider value={{
       ...state,
       setSearch,
+      setCurrentDestination,
       setStay,
       addAddon,
       removeAddon,
       addShuttle,
       removeShuttle,
       updateShuttle,
+      saveListing,
+      removeSavedListing,
+      trackListingView,
       clearBooking,
       hasActiveSearch,
       nights,
