@@ -28,30 +28,106 @@ export default function ResetPasswordPage() {
     resolver: zodResolver(schema),
   })
 
-  // Supabase delivers the recovery token in the URL; the client exchanges it
-  // for a session automatically. Wait until we know whether that succeeded.
+  // Supabase delivers the auth token in one of four ways depending on the
+  // project's auth flow setting and which route the email linked to:
+  //
+  //   0. Server-side callback (preferred new path)
+  //      POST /api/auth/request-password-reset sets redirectTo to
+  //      /api/auth/callback, which exchanges the PKCE code server-side and
+  //      redirects here with the session cookie already set.
+  //      → getSession() returns a session immediately; or onAuthStateChange
+  //        fires PASSWORD_RECOVERY / SIGNED_IN.
+  //      → ?error=link_expired is appended when the code exchange fails.
+  //
+  //   1. PKCE auth-code  → ?code=AUTH_CODE (direct link to this page)
+  //      Call exchangeCodeForSession(code) — onAuthStateChange fires on success.
+  //
+  //   2. PKCE token-hash → ?token_hash=HASH&type=invite|recovery
+  //      Call verifyOtp({ token_hash, type }) — onAuthStateChange fires on success.
+  //
+  //   3. Implicit (legacy) → #access_token=…&type=invite|recovery (URL hash)
+  //      The client picks it up automatically; onAuthStateChange fires on its own.
+  //
+  // In all cases the form is gated behind onAuthStateChange firing with
+  // PASSWORD_RECOVERY or SIGNED_IN, or an existing session being found.
+  // A 3600 s safety-net timeout is only started when no URL token is found
+  // (implicit flow fallback — the timeout is intentionally long to give
+  // the hash exchange time to complete before showing "link expired").
+  //
+  // Edge case: user refreshes the page after a successful exchange — the URL
+  // still has the (now-consumed) token. We check for an existing session first
+  // and set ready immediately, avoiding a spurious "link expired" screen.
   useEffect(() => {
     let timeout: ReturnType<typeof setTimeout>
+
+    // ── Case 0b: server-side callback signalled a failed exchange ─────────────
+    const params = new URLSearchParams(window.location.search)
+    if (params.get('error') === 'link_expired') {
+      setInvalidLink(true)
+      return
+    }
+
     const { data: sub } = supabase.auth.onAuthStateChange((event) => {
       if (event === 'PASSWORD_RECOVERY' || event === 'SIGNED_IN') {
         setReady(true)
         setInvalidLink(false)
+        clearTimeout(timeout)
       }
     })
-    supabase.auth.getSession().then(({ data }) => {
-      if (data.session) {
+
+    async function bootstrap() {
+      // ── Case 0a / page-refresh: already have a session ────────────────────
+      // This covers both the server-side callback flow (session set in cookies
+      // before redirect here) and refreshing the page after a successful exchange.
+      const { data: { session } } = await supabase.auth.getSession()
+      if (session) {
         setReady(true)
-      } else {
-        // Give the auth helper a moment to process the URL hash before
-        // declaring the link invalid.
-        timeout = setTimeout(() => {
-          setReady(r => {
-            if (!r) setInvalidLink(true)
-            return r
-          })
-        }, 2500)
+        return
       }
-    })
+
+      const code      = params.get('code')
+      const tokenHash = params.get('token_hash')
+      const type      = params.get('type') as 'invite' | 'recovery' | 'email' | null
+
+      // ── Case 1: PKCE auth-code (?code=…) ────────────────────────────────────
+      if (code) {
+        const { error } = await supabase.auth.exchangeCodeForSession(code)
+        if (error) {
+          // May have already been exchanged — check for an active session
+          const { data: { session: s } } = await supabase.auth.getSession()
+          if (s) { setReady(true); return }
+          setInvalidLink(true)
+        }
+        // Success: onAuthStateChange fires with SIGNED_IN / PASSWORD_RECOVERY
+        return
+      }
+
+      // ── Case 2: PKCE token-hash (?token_hash=…&type=…) ──────────────────────
+      if (tokenHash && type) {
+        const { error } = await supabase.auth.verifyOtp({ token_hash: tokenHash, type })
+        if (error) {
+          // Token consumed on a previous load — check for an active session
+          const { data: { session: s } } = await supabase.auth.getSession()
+          if (s) { setReady(true); return }
+          setInvalidLink(true)
+        }
+        // Success: onAuthStateChange fires
+        return
+      }
+
+      // ── Case 3: Implicit flow (#access_token=… hash) ─────────────────────────
+      // The client exchanges the hash automatically; we just wait for the event.
+      // Start the 3600 s safety-net in case no token is present at all.
+      timeout = setTimeout(() => {
+        setReady(r => {
+          if (!r) setInvalidLink(true)
+          return r
+        })
+      }, 3_600_000)
+    }
+
+    bootstrap()
+
     return () => {
       sub.subscription.unsubscribe()
       clearTimeout(timeout)
@@ -92,7 +168,7 @@ export default function ResetPasswordPage() {
             <p className="font-sans text-xs tracking-[0.2em] uppercase text-forest/40 mb-2">Link expired</p>
             <h1 className="font-display text-3xl text-forest mb-4">This link is no longer valid</h1>
             <p className="font-sans text-sm text-forest/60 leading-relaxed mb-8">
-              Password reset links expire after a short time. Request a new one and try again.
+              This link has expired or has already been used. Request a new one and try again — new links are valid for 60 minutes.
             </p>
             <Link
               href="/auth/forgot-password"
@@ -104,7 +180,7 @@ export default function ResetPasswordPage() {
         ) : (
           <>
             <p className="font-sans text-xs tracking-[0.2em] uppercase text-forest/40 mb-2">Almost there</p>
-            <h1 className="font-display text-4xl text-forest mb-8">Set a new password</h1>
+            <h1 className="font-display text-4xl text-forest mb-8">Create your password</h1>
 
             {authError && (
               <div className="mb-6 px-4 py-3 bg-red-50 border border-red-200 font-sans text-sm text-red-700">

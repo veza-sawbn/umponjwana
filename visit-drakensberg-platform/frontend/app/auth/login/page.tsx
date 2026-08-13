@@ -25,8 +25,15 @@ export default function LoginPage() {
     try {
       const result = await signIn(data.email, data.password)
       const role = result?.user?.app_metadata?.role ?? result?.user?.user_metadata?.role
+      const staffRole = result?.user?.app_metadata?.staff_role ?? result?.user?.user_metadata?.staff_role
       const redirect = new URLSearchParams(window.location.search).get('redirect')
-      const defaultPath = role === 'supplier' ? '/supplier' : role === 'admin' ? '/admin' : '/account'
+      // Operations employees have role='visitor' but need the admin console.
+      // Middleware then redirects /admin → /admin/operations/managed-suppliers for them.
+      const defaultPath =
+        role === 'supplier' ? '/supplier'
+        : role === 'admin' ? '/admin'
+        : staffRole === 'operations' ? '/admin'
+        : '/account'
       const targetPath = redirect?.startsWith('/') && !redirect.startsWith('//') ? redirect : defaultPath
       // Hard navigation: guarantees the middleware sees the fresh session
       // cookie and bypasses any prefetched redirect cached by the router.

@@ -216,6 +216,17 @@ export const SITE_CONTENT_DEFAULTS = {
     contact_heading: 'Contact',
     contact_email: 'hello@visitdrakensberg.com',
   },
+  // Hero images shown in the right panel of the super menu overlay.
+  // Editable from Admin → Website → Navigation & Menu Images.
+  nav_menu: {
+    stays_image:      'https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=1200&q=80',
+    hikes_image:      'https://images.unsplash.com/photo-1551632811-561732d1e306?w=1200&q=80',
+    activities_image: 'https://images.unsplash.com/photo-1533130061792-64b345e4a833?w=1200&q=80',
+    shuttles_image:   'https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?w=1200&q=80',
+    regions_image:    'https://images.unsplash.com/photo-1516026672322-bc52d61a55d5?w=1200&q=80',
+    stories_image:    'https://images.unsplash.com/photo-1501854140801-50d01698950b?w=1200&q=80',
+    plan_image:       'https://images.unsplash.com/photo-1441974231531-c6227db76b6e?w=1200&q=80',
+  },
 }
 
 export type SiteContentKey = keyof typeof SITE_CONTENT_DEFAULTS

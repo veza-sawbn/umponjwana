@@ -93,6 +93,14 @@ export async function middleware(req: NextRequest) {
       return redirectTo('/account')
     }
 
+    // Redirect operations employees from the generic /admin root to their
+    // dedicated Managed Suppliers dashboard. This covers both the post-invite
+    // landing (redirectTo was set to /admin) and direct /admin visits.
+    // Full platform admins are not redirected — they use the whole console.
+    if (pathname === '/admin' && staffRole === 'operations' && role !== 'admin') {
+      return redirectTo('/admin/operations/managed-suppliers')
+    }
+
     // Supplier routes: normal suppliers and admins get unconditional access.
     // VD Operations employees (staff_role='operations' with ops_role set) may
     // also enter supplier routes IF they have at least one active management
@@ -113,14 +121,17 @@ export async function middleware(req: NextRequest) {
         // lightweight check — the heavy per-supplier RLS is in the DB itself.
         // We fetch ops_role here to confirm they are a VD ops employee, not just
         // any user with staff_role='operations' that predates the ops system.
-        const { data: opsProfile } = await supabase
+        // ops_role and organisation were added by the delegated-management migration.
+        // If those columns don't exist yet (42703), treat the employee as having
+        // no ops access rather than crashing the middleware.
+        const { data: opsProfile, error: opsProfileError } = await supabase
           .from('profiles')
           .select('ops_role, organisation')
           .eq('id', session.user.id)
           .maybeSingle()
 
-        if (!opsProfile?.ops_role || opsProfile.organisation !== 'vd_operations') {
-          // Legacy operations collaborator (pre-delegated-management) — no supplier access
+        if (opsProfileError || !opsProfile?.ops_role || opsProfile.organisation !== 'vd_operations') {
+          // Either migration not yet applied, or legacy operations collaborator
           return redirectTo('/account')
         }
 

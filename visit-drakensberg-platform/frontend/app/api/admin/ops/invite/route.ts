@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { cookies } from 'next/headers'
 import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs'
 import { supabaseAdmin } from '@/lib/supabase-admin'
+import { getSiteOrigin } from '@/lib/origin'
 import type { OpsRole } from '@/lib/ops-assignments'
 
 export const dynamic = 'force-dynamic'
@@ -55,7 +56,10 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'admin only' }, { status: 403 })
   }
 
-  const origin = process.env.NEXT_PUBLIC_SITE_URL || new URL(req.url).origin
+  // Always derive the origin from request headers first (most reliable on
+  // Vercel/Render), falling back to NEXT_PUBLIC_SITE_URL only when headers
+  // are absent. See lib/origin.ts for the rationale.
+  const origin = getSiteOrigin(req)
 
   // Invite the user with ops metadata. handle_new_user() will seed these into
   // profiles.ops_role, profiles.organisation, and profiles.staff_role.
@@ -67,7 +71,13 @@ export async function POST(req: Request) {
       ops_role: body.opsRole,           // granular operational role
       organisation: 'vd_operations',   // VD internal organisation
     },
-    redirectTo: `${origin}/admin/operations/managed-suppliers`,
+    // Redirect to /auth/reset-password — confirmed in Supabase's allowed redirect
+    // URL list (the same URL the forgot-password flow uses). Supabase delivers the
+    // invite token in the URL hash; the reset-password page listens for SIGNED_IN,
+    // shows the password-creation form, and redirects to /auth/login when done.
+    // The login page then routes ops employees (staff_role='operations') to /admin,
+    // and middleware redirects /admin → /admin/operations/managed-suppliers.
+    redirectTo: `${origin}/auth/reset-password`,
   })
 
   if (error) {
