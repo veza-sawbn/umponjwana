@@ -8,7 +8,7 @@ import RouteArtwork from '@/components/trails/RouteArtwork'
 import { MediaPicker, MediaGalleryPicker } from '@/components/media/MediaPicker'
 import { adminMediaSource } from '@/lib/admin-supabase'
 
-const REGIONS = ['Northern Berg', 'Central Berg', 'Southern Berg', 'Royal Natal National Park', 'Champagne Valley', "Giant's Castle", 'Sani Pass']
+const REGIONS = ['Northern Drakensberg', 'Central Drakensberg', 'Southern Drakensberg', 'Royal Natal National Park', 'Champagne Valley', "Giant's Castle", 'Sani Pass']
 const DIFFICULTIES = ['Easy', 'Moderate', 'Strenuous', 'Extreme'] as const
 
 const TRAIL_CATEGORIES: { value: TrailCategory; label: string }[] = [
@@ -371,7 +371,7 @@ function TrailForm({ trail, onChange, onSave, onCancel, saveLabel, saving }: {
 }
 
 const BLANK_TRAIL: Trail = {
-  id: '', name: '', region: 'Northern Berg', difficulty: 'Moderate', distance: '', duration: '', elevation: '',
+  id: '', name: '', region: 'Northern Drakensberg', difficulty: 'Moderate', distance: '', duration: '', elevation: '',
   status: 'draft', featured: false, image: '', gallery: [], description: '', trailhead: '', slug: '', park: '', visibility: 'public', trail_type: 'Out and back',
   permit_required: false, permit_cost: 0, what_to_bring: [], highlights: [], is_multi_day: false, days: [], category: 'day_hike',
 }

@@ -58,7 +58,7 @@ export const DEFAULT_RESERVES: Reserve[] = [
     regionSlug: 'north-berg',
     name: 'Royal Natal National Park',
     shortName: 'Royal Natal',
-    tagline: 'Home of the Amphitheatre · Northern Berg',
+    tagline: 'Home of the Amphitheatre · Northern Drakensberg',
     description:
       "Famous for the iconic Amphitheatre — a 5-kilometre curved basalt cliff wall rising 1,200 metres from the valley floor — Royal Natal National Park is arguably the most dramatic landscape in the Drakensberg. Tugela Falls, the world's second highest waterfall at 947 metres, plunges from the escarpment in five separate cascades. The park encompasses 8,094 hectares of pristine mountain terrain with exceptional hiking opportunities for all levels.",
     image: 'https://images.unsplash.com/photo-1439853949212-36589f9df9d7?w=1400&q=85',
@@ -81,7 +81,7 @@ export const DEFAULT_RESERVES: Reserve[] = [
     regionSlug: 'central-berg',
     name: "Giant's Castle Reserve",
     shortName: "Giant's Castle",
-    tagline: 'San Rock Art & Bearded Vultures · Central Berg',
+    tagline: 'San Rock Art & Bearded Vultures · Central Drakensberg',
     description:
       "Giant's Castle Reserve protects one of the Drakensberg's most significant San rock art sites — the Main Caves shelter contains over 550 individual paintings. The reserve is also the only place in South Africa where the endangered Bearded Vulture (Lammergeier) can be reliably seen, with a supplementary feeding hide drawing these magnificent birds from November to April. At 3,314 metres, Giant's Castle Peak dominates the reserve skyline.",
     image: 'https://images.unsplash.com/photo-1523805009345-7448845a9e53?w=1400&q=85',
@@ -103,7 +103,7 @@ export const DEFAULT_RESERVES: Reserve[] = [
     regionSlug: 'central-berg',
     name: 'Injisuthi',
     shortName: 'Injisuthi',
-    tagline: 'Remote wilderness & Battle Cave · Northern Central Berg',
+    tagline: 'Remote wilderness & Battle Cave · Northern Central Drakensberg',
     description:
       'One of the most remote and least-visited of the major Drakensberg reserves, Injisuthi rewards those who seek it out with pristine wilderness, exceptional San rock art at Battle Cave (over 700 individual figures), and some of the best multi-day hiking in the range. The reserve encompasses the headwaters of the Injisuthi River and offers access to Champagne Castle from the north — a dramatic contrast to the southern approach.',
     image: 'https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=1400&q=85',

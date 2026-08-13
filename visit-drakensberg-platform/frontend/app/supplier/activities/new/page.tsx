@@ -3,13 +3,13 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { ChevronLeft, ChevronRight, Plus, Trash2 } from 'lucide-react'
 import { supabase } from '@/lib/auth'
-import { addActivity } from '@/lib/activities'
+import { addActivity, ACTIVITY_CATEGORIES } from '@/lib/activities'
 import { getRegionNames } from '@/lib/regions'
 import { GoogleAddressField } from '@/components/maps/GoogleAddressField'
 import { supplierMediaSource } from '@/lib/supplier-media'
 import { MediaGalleryPicker } from '@/components/media/MediaPicker'
 
-const CATEGORIES = ['Adventure', 'Nature', 'Water', 'Cultural', 'Wellness', 'Family']
+const CATEGORIES: readonly string[] = ACTIVITY_CATEGORIES
 const DIFFICULTY = ['Easy', 'Moderate', 'Challenging', 'Extreme']
 const INCLUDED = ['Helmet & Harness', 'Guide', 'Safety Briefing', 'Refreshments', 'Transport to Site', 'Photos/Video', 'Equipment']
 const STEPS = ['Activity Details', 'Logistics', 'Inclusions & Safety', 'Pricing', 'Review']

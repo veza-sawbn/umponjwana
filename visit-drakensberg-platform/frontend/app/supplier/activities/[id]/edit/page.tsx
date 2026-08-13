@@ -2,13 +2,13 @@
 import { useState, useEffect } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { ChevronLeft, Plus, Trash2 } from 'lucide-react'
-import { getActivityById, updateActivity } from '@/lib/activities'
+import { getActivityById, updateActivity, ACTIVITY_CATEGORIES } from '@/lib/activities'
 import { getRegionNames } from '@/lib/regions'
 import { GoogleAddressField } from '@/components/maps/GoogleAddressField'
 import { supplierMediaSource } from '@/lib/supplier-media'
 import { MediaGalleryPicker } from '@/components/media/MediaPicker'
 
-const CATEGORIES = ['Adventure', 'Nature', 'Water', 'Cultural', 'Wellness', 'Family']
+const CATEGORIES: readonly string[] = ACTIVITY_CATEGORIES
 const DIFFICULTIES = ['Easy', 'Moderate', 'Challenging', 'Extreme']
 const INCLUDED_OPTIONS = ['Helmet & Harness', 'Guide', 'Safety Briefing', 'Refreshments', 'Transport to Site', 'Photos/Video', 'Equipment']
 const HOURS = Array.from({ length: 13 }, (_, i) => i)

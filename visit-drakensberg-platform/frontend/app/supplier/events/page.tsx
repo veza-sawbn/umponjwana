@@ -6,8 +6,18 @@ import Link from 'next/link'
 import Navbar from '@/components/layout/Navbar'
 import Footer from '@/components/layout/Footer'
 import { ArrowLeft, Plus, Trash2, CalendarDays, Ticket, MapPin, Star } from 'lucide-react'
+import { getRegionNames } from '@/lib/regions'
+import { GoogleAddressField } from '@/components/maps/GoogleAddressField'
+import type { Event as VdEvent } from '@/lib/events'
 
-interface SupplierEvent {
+// SupplierEvent mirrors lib/events.ts's Event type — kept local to this form
+// rather than imported directly so the create/edit state shape (which
+// includes string-typed numeric inputs before parsing) doesn't have to match
+// the persisted type exactly. `region` and `gpsLat`/`gpsLng` were added so
+// events can participate in the destination graph the same way activities
+// and trails do (region-scoped listings, distance-based recommendations) —
+// see lib/graph-fields.ts and docs/destination-graph/PHASE_A.md.
+interface SupplierEvent extends Pick<VdEvent, 'region' | 'gpsLat' | 'gpsLng'> {
   id: string
   title: string
   description: string
@@ -31,12 +41,14 @@ const ENTITY = 'events'
 export default function EventsManagePage() {
   const [events, setEvents] = useState<SupplierEvent[]>([])
   const [loading, setLoading] = useState(true)
+  const [regions, setRegions] = useState<string[]>([])
 
   useEffect(() => {
     supabase.auth.getUser().then(async ({ data: { user } }) => {
       if (user) setEvents(await getSupplierEntities<any>(ENTITY, user.id) as unknown as SupplierEvent[])
       setLoading(false)
     })
+    getRegionNames().then(setRegions)
   }, [])
   const [showForm, setShowForm] = useState(false)
   const [form, setForm] = useState({
@@ -44,6 +56,9 @@ export default function EventsManagePage() {
     description: '',
     event_type: 'event' as 'event' | 'special',
     location: '',
+    region: '',
+    gpsLat: '',
+    gpsLng: '',
     starts_at: '',
     ends_at: '',
     ticket_price: '',
@@ -61,6 +76,9 @@ export default function EventsManagePage() {
         description: form.description,
         event_type: form.event_type,
         location: form.location,
+        region: form.region,
+        gpsLat: form.gpsLat,
+        gpsLng: form.gpsLng,
         starts_at: form.starts_at,
         ends_at: form.ends_at,
         ticket_price: parseFloat(form.ticket_price),
@@ -70,7 +88,7 @@ export default function EventsManagePage() {
         status: 'active',
       })
       setEvents(prev => [...prev, saved as unknown as SupplierEvent])
-      setForm({ title: '', description: '', event_type: 'event', location: '', starts_at: '', ends_at: '', ticket_price: '', total_tickets: '' })
+      setForm({ title: '', description: '', event_type: 'event', location: '', region: '', gpsLat: '', gpsLng: '', starts_at: '', ends_at: '', ticket_price: '', total_tickets: '' })
       setShowForm(false)
       toast.success('Event created.')
     } catch {
@@ -169,12 +187,26 @@ export default function EventsManagePage() {
                 />
               </div>
               <div>
-                <label className="block font-sans text-xs tracking-[0.12em] uppercase text-gray-500 mb-2">Location</label>
-                <input
+                <label className="block font-sans text-xs tracking-[0.12em] uppercase text-gray-500 mb-2">Region</label>
+                <select
+                  value={form.region}
+                  onChange={e => setForm(f => ({ ...f, region: e.target.value }))}
+                  className="w-full border border-gray-300 px-4 py-3 font-sans text-sm focus:outline-none focus:border-[#2d6a4f] bg-white"
+                >
+                  <option value="">Select region…</option>
+                  {regions.map(r => <option key={r} value={r}>{r}</option>)}
+                </select>
+              </div>
+              <div className="md:col-span-2">
+                <GoogleAddressField
+                  label="Venue / Location"
                   value={form.location}
-                  onChange={e => setForm(f => ({ ...f, location: e.target.value }))}
-                  className="w-full border border-gray-300 px-4 py-3 font-sans text-sm focus:outline-none focus:border-[#2d6a4f]"
-                  placeholder="Venue / trail name"
+                  lat={form.gpsLat}
+                  lng={form.gpsLng}
+                  placeholder="Start typing the venue or trail name"
+                  inputClassName="w-full border border-gray-300 px-4 py-3 font-sans text-sm focus:outline-none focus:border-[#2d6a4f]"
+                  labelClassName="block font-sans text-xs tracking-[0.12em] uppercase text-gray-500 mb-2"
+                  onChange={({ address, lat, lng }) => setForm(f => ({ ...f, location: address, gpsLat: lat || f.gpsLat, gpsLng: lng || f.gpsLng }))}
                 />
               </div>
               <div>

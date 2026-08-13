@@ -1,5 +1,6 @@
 import { listEntities, insertEntity, updateEntity, deleteEntity, newEntityId } from './entities'
 import { deleteDeparturesByTour } from './departures'
+import type { GraphFields } from './graph-fields'
 
 export type Tour = {
   id: string
@@ -34,7 +35,7 @@ export type Tour = {
   rating?: number
   reviewCount?: number
   featured?: boolean
-}
+} & GraphFields
 
 const KIND = 'tour'
 

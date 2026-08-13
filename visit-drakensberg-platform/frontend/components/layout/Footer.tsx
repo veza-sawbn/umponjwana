@@ -21,9 +21,9 @@ const COLUMNS = [
   {
     heading: 'Regions',
     links: [
-      { label: 'Northern Berg', href: '/regions#northern' },
-      { label: 'Central Berg', href: '/regions#central' },
-      { label: 'Southern Berg', href: '/regions#southern' },
+      { label: 'Northern Drakensberg', href: '/regions#northern' },
+      { label: 'Central Drakensberg', href: '/regions#central' },
+      { label: 'Southern Drakensberg', href: '/regions#southern' },
       { label: 'Royal Natal', href: '/regions#royal-natal' },
     ],
   },

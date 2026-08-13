@@ -1,6 +1,7 @@
 import { supabase } from './auth'
 
 import type { GpxAnalysis, TrailCrux, TrailGrade, TrailWaypoint } from './gpx'
+import type { GraphFields } from './graph-fields'
 
 export type TrailDay = {
   label: string
@@ -45,7 +46,6 @@ export type Trail = {
   category?: TrailCategory
   // Only meaningful when category is 'speciality_walk'.
   speciality_type?: string
-  slug?: string
   park?: string
   visibility?: 'public' | 'private'
   trail_type?: string
@@ -60,7 +60,7 @@ export type Trail = {
   cruxes?: TrailCrux[]
   waypoints?: TrailWaypoint[]
   generated_at?: string
-}
+} & GraphFields
 
 export const DEFAULT_TRAILS: Trail[] = [
   {
@@ -101,7 +101,7 @@ export const DEFAULT_TRAILS: Trail[] = [
     featured: true,
     image: 'https://images.unsplash.com/photo-1590098563548-8f14eed3a47f?w=800&q=80',
     gallery: [],
-    description: 'The classic Drakensberg hike. The chain ladder ascent to the Amphitheatre plateau is a rite of passage for visitors to the Northern Berg. From the top, the views across the escarpment are unmatched anywhere in southern Africa.',
+    description: 'The classic Drakensberg hike. The chain ladder ascent to the Amphitheatre plateau is a rite of passage for visitors to the Northern Drakensberg. From the top, the views across the escarpment are unmatched anywhere in southern Africa.',
     trailhead: 'Tendele Camp',
     permit_required: false,
     permit_cost: 0,
@@ -114,7 +114,7 @@ export const DEFAULT_TRAILS: Trail[] = [
   {
     id: 'cathedral-peak',
     name: 'Cathedral Peak Summit',
-    region: 'Northern Berg',
+    region: 'Northern Drakensberg',
     difficulty: 'Strenuous',
     distance: '16 km',
     duration: '8 hours',
@@ -134,7 +134,7 @@ export const DEFAULT_TRAILS: Trail[] = [
   {
     id: 'giants-castle',
     name: "Giant's Castle via Meander",
-    region: 'Central Berg',
+    region: 'Central Drakensberg',
     difficulty: 'Moderate',
     distance: '18 km',
     duration: '7–9 hours',
@@ -154,7 +154,7 @@ export const DEFAULT_TRAILS: Trail[] = [
   {
     id: 'grand-traverse',
     name: 'Drakensberg Grand Traverse',
-    region: 'Central Berg',
+    region: 'Central Drakensberg',
     difficulty: 'Strenuous',
     distance: '210 km',
     duration: '14–18 days',
@@ -181,7 +181,7 @@ export const DEFAULT_TRAILS: Trail[] = [
   {
     id: 'fairy-glen',
     name: 'Fairy Glen Waterfall Walk',
-    region: 'Central Berg',
+    region: 'Central Drakensberg',
     difficulty: 'Easy',
     distance: '5 km',
     duration: '2 hours',

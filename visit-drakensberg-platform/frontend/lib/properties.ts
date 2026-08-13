@@ -1,12 +1,17 @@
 import { DEFAULT_REGIONS } from './regions'
 import { listEntities, getEntity, insertEntity, updateEntity, deleteEntity, newEntityId } from './entities'
+import type { GraphFields } from './graph-fields'
 
 export const PROPERTY_REGIONS = DEFAULT_REGIONS.map(region => region.name)
 
 // Shared vocabulary for every surface that describes a property: the supplier
-// wizard, the property edit form and the public listing application.
+// wizard, the property edit form and the public listing application. Resort,
+// Glamping and Farm Stay were added for the "Stay" destination-graph
+// taxonomy — genuine, distinct South African tourism accommodation
+// categories, not just labels to complete a menu.
 export const PROPERTY_TYPES = [
   'Lodge', 'Guesthouse', 'Hotel', 'Self-catering Cottage', 'Campsite', 'Backpackers', 'Boutique Hotel',
+  'Resort', 'Glamping', 'Farm Stay',
 ]
 
 export const PROPERTY_AMENITIES = [
@@ -34,7 +39,7 @@ export type Property = {
   photos: string[]
   status: 'active' | 'draft'
   createdAt: string
-}
+} & GraphFields
 
 const KIND = 'property'
 

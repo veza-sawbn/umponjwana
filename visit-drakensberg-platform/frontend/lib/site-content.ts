@@ -66,17 +66,17 @@ export const SITE_CONTENT_DEFAULTS = {
     ] as HomeCard[],
     regions: [
       {
-        id: 'reg-north', name: 'North Berg', subtitle: 'Royal Natal · Bergville · Amphitheatre',
+        id: 'reg-north', name: 'Northern Drakensberg', subtitle: 'Royal Natal · Bergville · Amphitheatre',
         desc: 'Home to the iconic Amphitheatre and Tugela Falls — the second highest waterfall in the world. Gateway town: Bergville.',
         img: 'https://images.unsplash.com/photo-1590098563548-8f14eed3a47f?w=900&q=80', href: '/regions#northern', visible: true,
       },
       {
-        id: 'reg-central', name: 'Central Berg', subtitle: 'Cathedral Peak · Winterton · Champagne Valley',
+        id: 'reg-central', name: 'Central Drakensberg', subtitle: 'Cathedral Peak · Winterton · Champagne Valley',
         desc: 'Alpine meadows, the richest San rock art in the world and dramatic escarpment views stretching to Lesotho. Gateway town: Winterton.',
         img: 'https://images.unsplash.com/photo-1542587222-e14b891ee40b?w=900&q=80', href: '/regions#central', visible: true,
       },
       {
-        id: 'reg-south', name: 'South Berg', subtitle: 'Sani Pass · Underberg · Himeville',
+        id: 'reg-south', name: 'Southern Drakensberg', subtitle: 'Sani Pass · Underberg · Himeville',
         desc: 'The legendary Sani Pass climbs to Lesotho through a raw mountain landscape. Boutique villages Himeville and Underberg sit at its foot.',
         img: 'https://images.unsplash.com/photo-1503614472-8c93d56e92ce?w=900&q=80', href: '/regions#southern', visible: true,
       },
@@ -165,7 +165,7 @@ export const SITE_CONTENT_DEFAULTS = {
     itineraries_eyebrow: 'Itineraries', itineraries_heading: 'How long to stay',
     essentials_eyebrow: 'Need to know', essentials_heading: 'Essentials',
     essential_1_title: 'Getting there',
-    essential_1_body: 'Fly to Durban (King Shaka) or Johannesburg (OR Tambo). From Durban it\'s a 3.5-hour drive to the Northern Berg, 2.5 hours to the Central Berg. Car hire is recommended.',
+    essential_1_body: 'Fly to Durban (King Shaka) or Johannesburg (OR Tambo). From Durban it\'s a 3.5-hour drive to the Northern Drakensberg, 2.5 hours to the Central Drakensberg. Car hire is recommended.',
     essential_2_title: 'Entry & permits',
     essential_2_body: 'A daily conservation fee applies in all KZN Wildlife reserves. Hiking permits for overnight trails must be pre-booked. No entry visa required for most nationalities for stays under 90 days.',
     essential_3_title: 'What to bring',
