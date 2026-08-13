@@ -7,6 +7,7 @@ import { getProperties } from '@/lib/properties'
 import { getActivities } from '@/lib/activities'
 import { getPackages } from '@/lib/packages'
 import { getTours } from '@/lib/tours'
+import { getRoutes, routeSlug } from '@/lib/transport-routes'
 import { publicSupabase } from '@/lib/supabase-public'
 
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://visitdrakensberg.com'
@@ -25,6 +26,7 @@ const STATIC_ROUTES = [
   { path: '/hikes', priority: 0.9 },
   { path: '/activities', priority: 0.9 },
   { path: '/tours', priority: 0.8 },
+  { path: '/transport', priority: 0.6 },
   { path: '/search', priority: 0.8 },
   { path: '/regions', priority: 0.8 },
   { path: '/nature-reserves', priority: 0.7 },
@@ -58,7 +60,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   // DEFAULT_* content the live pages themselves fall back to on a read
   // failure, so the sitemap never silently drops URLs that the site is
   // still actually serving.
-  const [regions, reserves, towns, trails, properties, activities, packages, tours] = await Promise.all([
+  const [regions, reserves, towns, trails, properties, activities, packages, tours, routes] = await Promise.all([
     getRegions(publicSupabase).catch(() => DEFAULT_REGIONS),
     getReserves(publicSupabase).catch(() => DEFAULT_RESERVES),
     getTowns(publicSupabase).catch(() => DEFAULT_TOWNS),
@@ -67,6 +69,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     getActivities(publicSupabase).catch(() => []),
     getPackages(publicSupabase).catch(() => []),
     getTours(publicSupabase).catch(() => []),
+    getRoutes(publicSupabase).catch(() => []),
   ])
 
   return [
@@ -144,6 +147,14 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
         lastModified: new Date(t.createdAt),
         changeFrequency: 'weekly' as const,
         priority: 0.6,
+      })),
+    ...routes
+      .filter(r => r.status === 'active' && r.robotsIndex !== false)
+      .map(r => ({
+        url: `${SITE_URL}/transport/${routeSlug(r)}`,
+        lastModified: r.updatedAt ? new Date(r.updatedAt) : new Date(r.createdAt),
+        changeFrequency: 'monthly' as const,
+        priority: 0.5,
       })),
   ]
 }

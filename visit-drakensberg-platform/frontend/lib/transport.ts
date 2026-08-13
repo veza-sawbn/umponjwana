@@ -1,3 +1,4 @@
+import type { SupabaseClient } from '@supabase/supabase-js'
 import { supabase } from './auth'
 import { listEntities, getEntity, insertEntity, updateEntity, newEntityId } from './entities'
 import { getSupplierEntities, updateSupplierEntity, type SupplierEntity } from './supplier-entities'
@@ -202,13 +203,16 @@ export type TransportCompany = {
 
 const COMPANY_KIND = 'transport_company'
 
-export async function getTransportCompanies(): Promise<TransportCompany[]> {
-  const all = await listEntities<TransportCompany>(COMPANY_KIND)
+// Optional client param — lets the public /transport/[slug] route (a
+// session-less server render) resolve the operator's display name for a
+// route without a signed-in supplier session. See lib/supabase-public.ts.
+export async function getTransportCompanies(client?: SupabaseClient): Promise<TransportCompany[]> {
+  const all = await listEntities<TransportCompany>(COMPANY_KIND, client)
   return all.map(c => ({ ...c, stats: { ...EMPTY_STATS, ...c.stats }, openJobs: c.openJobs ?? [] }))
 }
 
-export async function getMyTransportCompany(supplierId: string): Promise<TransportCompany | null> {
-  const all = await getTransportCompanies()
+export async function getMyTransportCompany(supplierId: string, client?: SupabaseClient): Promise<TransportCompany | null> {
+  const all = await getTransportCompanies(client)
   return all.find(c => c.supplierId === supplierId) ?? null
 }
 

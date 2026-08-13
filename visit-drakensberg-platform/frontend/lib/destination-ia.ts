@@ -139,10 +139,7 @@ export const DESTINATION_GRAPH_NAV: NavNode[] = [
     label: 'Transport', href: '/shuttles', type: 'landing_page', status: 'live',
     children: [
       { label: 'Shuttles', href: '/shuttles', type: 'landing_page', status: 'live' },
-      {
-        label: 'Shuttle Routes', href: '/transport', type: 'entity', status: 'planned',
-        requires: '/transport/[slug] detail route — Phase B. Transport marketplace data (routes/vehicles/drivers) already exists; only the public route is missing.',
-      },
+      { label: 'Shuttle Routes', href: '/transport', type: 'entity', status: 'live' },
     ],
   },
 ]

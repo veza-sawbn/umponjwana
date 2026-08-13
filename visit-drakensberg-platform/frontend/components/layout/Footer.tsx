@@ -35,6 +35,7 @@ const COLUMNS = [
       { label: 'Plan Your Trip', href: '/plan' },
       { label: 'Trail Map', href: '/hikes' },
       { label: 'Rock Art', href: '/activities' },
+      { label: 'Shuttle Routes', href: '/transport' },
     ],
   },
   {

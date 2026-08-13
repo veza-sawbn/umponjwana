@@ -139,6 +139,11 @@ export const SITE_CONTENT_DEFAULTS = {
     heading: 'Guided Tours',
     subheading: 'Multi-day treks and tours led by verified local operators, with scheduled departures you can join or book privately',
   },
+  transport_page: {
+    eyebrow: 'Getting around',
+    heading: 'Shuttle Routes',
+    subheading: 'Fixed-price transfers between towns, trailheads and valleys, run by verified transport partners',
+  },
   reserves_page: {
     eyebrow: 'Protected wilderness',
     heading: 'Nature Reserves',
