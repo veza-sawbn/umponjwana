@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import toast from 'react-hot-toast'
 import { Building2, Eye, EyeOff, AlertCircle } from 'lucide-react'
 import { supabase } from '@/lib/auth'
+import { effectiveSupplierId } from '@/lib/effective-supplier'
 import { getMyOperatorProfile, saveOperatorProfile, type OperatorProfile } from '@/lib/operators'
 import { PROPERTY_REGIONS } from '@/lib/properties'
 import { supplierMediaSource } from '@/lib/supplier-media'
@@ -58,13 +59,20 @@ export default function CompanyProfilePage() {
   useEffect(() => {
     supabase.auth.getUser().then(async ({ data: { user } }) => {
       if (!user) { setLoading(false); return }
-      setUserId(user.id)
-      const profile = await getMyOperatorProfile(user.id)
+      // Company profile belongs to the SUPPLIER, not whoever is signed in.
+      // When an operations employee is acting-as a managed supplier, this
+      // resolves to the supplier's own id — using the raw signed-in user id
+      // here would read and write the employee's own (non-supplier) profile
+      // instead, and would misreport the employee's role/approval status as
+      // if it were the supplier's.
+      const ownerId = effectiveSupplierId(user.id)
+      setUserId(ownerId)
+      const profile = await getMyOperatorProfile(ownerId)
 
       const { data: myProfile } = await supabase
         .from('profiles')
-        .select('role, is_approved, approval_status')
-        .eq('id', user.id)
+        .select('full_name, role, is_approved, approval_status')
+        .eq('id', ownerId)
         .maybeSingle()
       if (myProfile && myProfile.role !== 'admin' && !myProfile.is_approved) {
         setApprovalBlock(
@@ -91,7 +99,9 @@ export default function CompanyProfilePage() {
           status: profile.status,
         })
       } else {
-        setForm(f => ({ ...f, companyName: user.user_metadata?.full_name ?? '' }))
+        // Prefer the supplier's own profile name over the signed-in user's
+        // metadata — the two differ whenever an ops employee is acting-as.
+        setForm(f => ({ ...f, companyName: myProfile?.full_name || user.user_metadata?.full_name || '' }))
       }
       setLoading(false)
     })

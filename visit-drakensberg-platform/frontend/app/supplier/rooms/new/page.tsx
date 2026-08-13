@@ -128,7 +128,7 @@ export default function NewRoomPage() {
       await addRoom({
         propertyId: form.propertyId,
         propertyName: prop?.name ?? '',
-        supplierId: user.id,
+        supplierId: effectiveSupplierId(user.id),
         name: form.name,
         bedConfig: form.bedConfig,
         maxOccupancy: +form.maxOccupancy || 1,

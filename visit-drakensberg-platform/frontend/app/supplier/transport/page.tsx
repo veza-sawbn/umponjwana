@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { Building2, Check, MapPin, Star, Truck } from 'lucide-react'
 import { supabase } from '@/lib/auth'
+import { effectiveSupplierId } from '@/lib/effective-supplier'
 import { GoogleAddressField, type GooglePlaceSelection } from '@/components/maps/GoogleAddressField'
 import {
   SUPPLIER_CATEGORIES, TRANSPORT_AREAS, companyAvgResponseMinutes, companyRating, companyReliability,
@@ -33,8 +34,9 @@ export default function TransportCompanyPage() {
     async function load() {
       const { data } = await supabase.auth.getUser()
       if (!data.user) { setLoading(false); return }
-      setUserId(data.user.id)
-      const existing = await getMyTransportCompany(data.user.id)
+      const ownerId = effectiveSupplierId(data.user.id)
+      setUserId(ownerId)
+      const existing = await getMyTransportCompany(ownerId)
       if (existing) {
         setCompany(existing)
         setCompanyName(existing.companyName)
