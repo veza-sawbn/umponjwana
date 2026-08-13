@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { signIn } from '@/lib/auth'
+import { signIn, supabase } from '@/lib/auth'
 
 const schema = z.object({
   email: z.string().email('Enter a valid email'),
@@ -24,8 +24,29 @@ export default function LoginPage() {
     setAuthError(null)
     try {
       const result = await signIn(data.email, data.password)
-      const role = result?.user?.app_metadata?.role ?? result?.user?.user_metadata?.role
-      const staffRole = result?.user?.app_metadata?.staff_role ?? result?.user?.user_metadata?.staff_role
+      let role = result?.user?.app_metadata?.role ?? result?.user?.user_metadata?.role
+      let staffRole = result?.user?.app_metadata?.staff_role ?? result?.user?.user_metadata?.staff_role
+
+      // Auth metadata is set at invite/creation time and can be incomplete —
+      // e.g. accounts created outside the standard invite flow, or ones where
+      // only user_metadata (not app_metadata) was ever set. profiles is the
+      // authoritative record for both fields, so confirm against it rather
+      // than trust metadata alone: this is the same fallback middleware.ts
+      // already uses, kept in sync here so the very first navigation lands
+      // in the right place instead of bouncing through a wrong default and
+      // back.
+      if (result?.user?.id) {
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('role, staff_role')
+          .eq('id', result.user.id)
+          .maybeSingle()
+        if (profile) {
+          role = profile.role ?? role
+          staffRole = profile.staff_role ?? staffRole
+        }
+      }
+
       const redirect = new URLSearchParams(window.location.search).get('redirect')
       // Operations employees have role='visitor' but belong in their own
       // /operations environment — not the admin console.

@@ -11,7 +11,7 @@
 
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
-import { LogOut, Mountain, LayoutGrid, Building2, AlertCircle } from 'lucide-react'
+import { LogOut, LayoutGrid, Building2, AlertCircle } from 'lucide-react'
 import { signOut } from '@/lib/auth'
 import { OperationsProvider, useOperations } from '@/lib/operations-context'
 import { OPS_ROLE_LABEL } from '@/lib/ops-assignments'
@@ -139,12 +139,6 @@ function Sidebar() {
             )}
           </div>
         )}
-        <Link
-          href="/"
-          className="flex items-center gap-3 px-3 py-2.5 font-sans text-sm text-white/40 hover:text-white transition-colors rounded"
-        >
-          <Mountain size={16} /> View Site
-        </Link>
         <button
           onClick={handleSignOut}
           className="w-full flex items-center gap-3 px-3 py-2.5 font-sans text-sm text-white/40 hover:text-red-400 transition-colors rounded"

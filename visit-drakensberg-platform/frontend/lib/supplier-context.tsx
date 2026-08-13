@@ -1,6 +1,7 @@
 'use client'
 import { createContext, useContext, useEffect, useState } from 'react'
 import { supabase } from './auth'
+import { effectiveSupplierId } from './effective-supplier'
 import type { SupplierType, SupplierTypeConfig } from './supplier-config'
 import { getSupplierConfig, SUPPLIER_CONFIG, mergeNavForTypes } from './supplier-config'
 
@@ -40,6 +41,13 @@ export function SupplierProvider({ children }: { children: React.ReactNode }) {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) { setValue(v => ({ ...v, loading: false })); return }
 
+      // Whose portal this is. When an operations employee is acting-as a
+      // managed supplier, this resolves to the SUPPLIER's id — using the raw
+      // signed-in user id here would read the employee's own (non-supplier)
+      // profile instead, reporting their role/approval/nav as if it were the
+      // supplier's. This context feeds every /supplier/* page, so getting it
+      // wrong here is the single highest-impact version of that bug.
+      const ownerId = effectiveSupplierId(user.id)
       const meta = user.user_metadata ?? {}
 
       // profiles is the authoritative record — auth metadata is a copy that can
@@ -48,7 +56,7 @@ export function SupplierProvider({ children }: { children: React.ReactNode }) {
       const { data: profile } = await supabase
         .from('profiles')
         .select('full_name, supplier_type, is_approved, approval_status')
-        .eq('id', user.id)
+        .eq('id', ownerId)
         .maybeSingle()
 
       const rawType = (profile?.supplier_type ?? meta.supplier_type) as string | undefined
