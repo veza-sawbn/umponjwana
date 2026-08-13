@@ -1,4 +1,5 @@
 import { supabase } from './auth'
+import type { SupabaseClient } from '@supabase/supabase-js'
 
 export type ReservePeak = { id: string; name: string; elevation: number; difficulty: 'accessible' | 'moderate' | 'expert' }
 
@@ -156,8 +157,11 @@ async function saveReserves(reserves: Reserve[]) {
   if (error) throw error
 }
 
-export async function getReserves(): Promise<Reserve[]> {
-  const { data, error } = await supabase.from('site_content').select('value').eq('key', 'admin_reserves').maybeSingle()
+// Accepts an optional Supabase client so Server Components can pass a
+// session-less client (lib/supabase-public.ts) — see lib/regions.ts's
+// getRegions() for the same pattern. Existing callers are unaffected.
+export async function getReserves(client: SupabaseClient = supabase): Promise<Reserve[]> {
+  const { data, error } = await client.from('site_content').select('value').eq('key', 'admin_reserves').maybeSingle()
   if (error) throw error
   if (Array.isArray(data?.value?.items) && data.value.items.length > 0) {
     return data.value.items.map((item: Reserve) => normalizeReserve(item))

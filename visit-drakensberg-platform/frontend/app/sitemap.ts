@@ -1,9 +1,16 @@
 import type { MetadataRoute } from 'next'
+import { getRegions, DEFAULT_REGIONS } from '@/lib/regions'
+import { getReserves, DEFAULT_RESERVES } from '@/lib/reserves'
+import { getTowns, DEFAULT_TOWNS } from '@/lib/towns'
+import { publicSupabase } from '@/lib/supabase-public'
 
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://visitdrakensberg.com'
 
 // Public, indexable routes. Detail pages backed by live Supabase data are
-// intentionally omitted here — add them once listing slugs are stable.
+// added incrementally as each entity type gets a real generateMetadata pass
+// (see docs/destination-graph/PHASE_B.md) — regions, reserves and towns are
+// done. Adding the rest (trails, properties, activities, ...) is Phase B
+// follow-up work, not done here yet.
 const STATIC_ROUTES = [
   { path: '', priority: 1.0 },
   { path: '/stays', priority: 0.9 },
@@ -34,8 +41,20 @@ const STORY_SLUGS = [
   'conservation-umdoni-wetlands',
 ]
 
-export default function sitemap(): MetadataRoute.Sitemap {
+export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const now = new Date()
+
+  // Session-less client (see lib/supabase-public.ts) — this runs at build/
+  // request time outside any user's request context. Falls back to the same
+  // DEFAULT_* content the live pages themselves fall back to on a read
+  // failure, so the sitemap never silently drops URLs that the site is
+  // still actually serving.
+  const [regions, reserves, towns] = await Promise.all([
+    getRegions(publicSupabase).catch(() => DEFAULT_REGIONS),
+    getReserves(publicSupabase).catch(() => DEFAULT_RESERVES),
+    getTowns(publicSupabase).catch(() => DEFAULT_TOWNS),
+  ])
+
   return [
     ...STATIC_ROUTES.map(r => ({
       url: `${SITE_URL}${r.path}`,
@@ -46,6 +65,24 @@ export default function sitemap(): MetadataRoute.Sitemap {
     ...STORY_SLUGS.map(slug => ({
       url: `${SITE_URL}/mydrakensberg/${slug}`,
       lastModified: now,
+      changeFrequency: 'monthly' as const,
+      priority: 0.5,
+    })),
+    ...regions.map(r => ({
+      url: `${SITE_URL}/regions/${r.slug}`,
+      lastModified: r.updatedAt ? new Date(r.updatedAt) : now,
+      changeFrequency: 'monthly' as const,
+      priority: 0.7,
+    })),
+    ...reserves.map(r => ({
+      url: `${SITE_URL}/nature-reserves/${r.slug}`,
+      lastModified: r.updatedAt ? new Date(r.updatedAt) : now,
+      changeFrequency: 'monthly' as const,
+      priority: 0.6,
+    })),
+    ...towns.map(t => ({
+      url: `${SITE_URL}/towns/${t.slug}`,
+      lastModified: t.updatedAt ? new Date(t.updatedAt) : now,
       changeFrequency: 'monthly' as const,
       priority: 0.5,
     })),

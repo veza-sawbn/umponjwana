@@ -1,4 +1,5 @@
 import { supabase } from './auth'
+import type { SupabaseClient } from '@supabase/supabase-js'
 
 export type Subregion = { id: string; name: string; description: string }
 
@@ -172,9 +173,13 @@ async function saveRegions(regions: Region[]) {
   if (error) throw error
 }
 
-export async function getRegions(): Promise<Region[]> {
+// Accepts an optional Supabase client so Server Components can pass a
+// session-less client (lib/supabase-public.ts) instead of the browser
+// client-component client this module defaults to — every existing caller
+// is unaffected since the parameter defaults to the current behaviour.
+export async function getRegions(client: SupabaseClient = supabase): Promise<Region[]> {
   try {
-    const { data } = await supabase.from('site_content').select('value').eq('key', 'admin_regions').maybeSingle()
+    const { data } = await client.from('site_content').select('value').eq('key', 'admin_regions').maybeSingle()
     if (Array.isArray(data?.value?.items) && data.value.items.length > 0) {
       return data.value.items.map((item: Region) => normalizeRegion(item))
     }

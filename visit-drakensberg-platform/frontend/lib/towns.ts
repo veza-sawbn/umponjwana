@@ -1,4 +1,5 @@
 import { supabase } from './auth'
+import type { SupabaseClient } from '@supabase/supabase-js'
 
 export type Town = {
   id: string
@@ -100,8 +101,11 @@ async function saveTowns(towns: Town[]) {
   if (error) throw error
 }
 
-export async function getTowns(): Promise<Town[]> {
-  const { data, error } = await supabase.from('site_content').select('value').eq('key', 'admin_towns').maybeSingle()
+// Accepts an optional Supabase client so Server Components can pass a
+// session-less client (lib/supabase-public.ts) — see lib/regions.ts's
+// getRegions() for the same pattern. Existing callers are unaffected.
+export async function getTowns(client: SupabaseClient = supabase): Promise<Town[]> {
+  const { data, error } = await client.from('site_content').select('value').eq('key', 'admin_towns').maybeSingle()
   if (error) throw error
   if (Array.isArray(data?.value?.items) && data.value.items.length > 0) {
     return data.value.items.map((item: Town) => normalizeTown(item))
