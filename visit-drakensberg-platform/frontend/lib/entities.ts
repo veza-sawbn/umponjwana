@@ -115,19 +115,59 @@ export async function insertEntity<T extends { id: string; status?: string; supp
     value: item,
   })
   if (error) {
-    // 42501 is the RLS refusal from "Suppliers insert own", whose check calls
-    // is_active_supplier() — so in practice this means the account is not an
-    // approved supplier. Say that, rather than leaving callers to report a
-    // generic failure the user can do nothing with.
+    // 42501 is the RLS refusal from "Suppliers insert own", whose check is
+    // owner_id = auth.uid() AND is_active_supplier() — the latter requires
+    // role = 'supplier' AND is_approved = true. Rather than assume which half
+    // failed, read the account's own live profile (readable under "Users can
+    // read own profile") and report what the database actually says right
+    // now, so a stale is_approved and a genuinely-blocked account produce
+    // different, actionable messages instead of one guess.
     if (error.code === '42501') {
-      throw new Error(
-        'Your supplier account is not approved yet, so it cannot create listings. ' +
-        'Once an administrator approves it this will save normally.',
-      )
+      throw new Error(await diagnoseSupplierApprovalBlock())
     }
     throw error
   }
   return item
+}
+
+async function diagnoseSupplierApprovalBlock(): Promise<string> {
+  const fallback =
+    'Your supplier account is not approved yet, so it cannot create listings. ' +
+    'Once an administrator approves it this will save normally.'
+  try {
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return fallback
+
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('role, is_approved, approval_status')
+      .eq('id', user.id)
+      .maybeSingle()
+    if (!profile) return fallback
+
+    if (profile.role !== 'supplier' && profile.role !== 'admin') {
+      return `Your account isn't set up as a supplier (current role: "${profile.role}"). ` +
+        'Ask a platform administrator to check your account type.'
+    }
+
+    if (!profile.is_approved) {
+      return 'Your supplier account is not approved yet' +
+        (profile.approval_status ? ` (status: ${profile.approval_status})` : '') +
+        '. Ask a platform administrator to approve it in the admin console.'
+    }
+
+    // role is correct and is_approved is already true, yet the database still
+    // refused the write — the two representations can't both be true here
+    // and still hit this policy. The most likely explanation is that
+    // 20260815_approval_consistency.sql hasn't been applied to this database
+    // yet, so the underlying schema RLS is still operating on stale logic.
+    return 'Your account shows as approved, but the database still rejected this save. ' +
+      'This usually means a pending database update hasn\'t been applied yet — ask ' +
+      'whoever manages the Supabase project to confirm migration ' +
+      '20260815_approval_consistency.sql has been run.'
+  } catch {
+    return fallback
+  }
 }
 
 export async function updateEntity(
