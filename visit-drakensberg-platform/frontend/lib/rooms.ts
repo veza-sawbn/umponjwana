@@ -1,5 +1,6 @@
 import { supabase } from './auth'
 import { listEntities, getEntity, insertEntity, updateEntity, deleteEntity, newEntityId, listEntitiesByOwner } from './entities'
+import type { SupabaseClient } from '@supabase/supabase-js'
 
 export type Season = { name: string; from: string; to: string; price: string }
 
@@ -36,8 +37,8 @@ export async function getRoomsBySupplier(supplierId: string): Promise<Room[]> {
   return listEntitiesByOwner<Room>(KIND, supplierId)
 }
 
-export async function getRoomsByProperty(propertyId: string): Promise<Room[]> {
-  const all = await listEntities<Room>(KIND)
+export async function getRoomsByProperty(propertyId: string, client?: SupabaseClient): Promise<Room[]> {
+  const all = client ? await listEntities<Room>(KIND, client) : await listEntities<Room>(KIND)
   return all.filter(r => r.propertyId === propertyId)
 }
 

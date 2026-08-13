@@ -6,6 +6,7 @@ import { MapPin, Star, Mountain, Zap, Compass, Bus, Plus, Navigation } from 'luc
 import { useBooking } from '@/lib/booking-context'
 import { useShuttleRecommendations } from '@/lib/shuttle-service'
 import { useAutoDrivingDistances, type DistancePlace } from '@/components/maps/GoogleAddressField'
+import { haversineKm } from '@/lib/stay-distance'
 import { getTrails, trailStartPoint, type Trail } from '@/lib/trails'
 import { getActivities, type Activity } from '@/lib/activities'
 import { getUpcomingExperiences, type TrekkingExperience } from '@/lib/experiences'
@@ -125,14 +126,26 @@ export default function SmartRecommendations({ region, excludeListingId, originL
           lng: e.gpsLng || undefined,
         }))
 
-      // Dated experiences first (most relevant once a stay is booked), then
-      // trails, then general activities — capped to a tidy sidebar panel.
-      setRecommendations([...experienceItems, ...trailItems, ...activityItems].slice(0, 4))
+      // Combine all types, then sort nearest-first when origin coordinates are
+      // available so activities, trails and experiences compete on proximity
+      // rather than type order. Items without GPS coords sink to the end.
+      const all = [...experienceItems, ...trailItems, ...activityItems]
+      const oLat = originLat ? parseFloat(originLat) : NaN
+      const oLng = originLng ? parseFloat(originLng) : NaN
+      if (Number.isFinite(oLat) && Number.isFinite(oLng)) {
+        all.sort((a, b) => {
+          const dA = a.lat && a.lng ? haversineKm(oLat, oLng, parseFloat(a.lat), parseFloat(a.lng)) : Infinity
+          const dB = b.lat && b.lng ? haversineKm(oLat, oLng, parseFloat(b.lat), parseFloat(b.lng)) : Infinity
+          return dA - dB
+        })
+      }
+      // Show up to 6 so multiple listing types can be represented
+      setRecommendations(all.slice(0, 6))
       setLoading(false)
     })
 
     return () => { cancelled = true }
-  }, [region, excludeListingId, checkIn, checkOut])
+  }, [region, excludeListingId, checkIn, checkOut, originLat, originLng])
 
   const origin: DistancePlace | null = originLocation ? { address: `${originLocation}, South Africa`, lat: originLat, lng: originLng } : null
   const destinations: DistancePlace[] = [
@@ -240,12 +253,22 @@ export default function SmartRecommendations({ region, excludeListingId, originL
       )}
 
       {recommendations.length > 0 && (
-        <Link
-          href={`/hikes?region=${encodeURIComponent(region)}`}
-          className="mt-4 block text-center font-sans text-xs text-[#2d6a4f] hover:underline"
-        >
-          Explore all {region} listings →
-        </Link>
+        <div className="mt-4 flex items-center justify-center gap-4">
+          <Link href={`/hikes?region=${encodeURIComponent(region)}`}
+            className="font-sans text-xs text-[#2d6a4f] hover:underline">
+            Hikes →
+          </Link>
+          <span className="text-gray-200 select-none">·</span>
+          <Link href={`/activities?region=${encodeURIComponent(region)}`}
+            className="font-sans text-xs text-[#2d6a4f] hover:underline">
+            Activities →
+          </Link>
+          <span className="text-gray-200 select-none">·</span>
+          <Link href={`/stays?region=${encodeURIComponent(region)}`}
+            className="font-sans text-xs text-[#2d6a4f] hover:underline">
+            Stays →
+          </Link>
+        </div>
       )}
     </div>
   )

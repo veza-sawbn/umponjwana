@@ -2,6 +2,147 @@ import type { BookingState } from './booking-context'
 
 export type DestinationCategory = 'destination' | 'attraction' | 'nature' | 'experience' | 'summer' | 'winter'
 
+// ── Destination-graph navigation (Phase A, wired in Phase E) ────────────────
+// This is the reframed primary IA from the destination-graph review: 7
+// primaries (Explore · Hikes · Stay · Things to Do · Tours · Plan Your Trip
+// · Transport). As of Phase E this is what Navbar.tsx actually renders,
+// filtered to 'live' nodes only — PRIMARY_NAVIGATION below is no longer
+// consumed by the Navbar but is left in place in case other code still
+// reads it. See docs/destination-graph/PHASE_A.md and PHASE_E.md.
+//
+// Critically, per the graph-first reassessment: most of the original 81-item
+// IA are taxonomy values or filter facets, not pages, and are NOT
+// represented as nodes here — a facet belongs in a listing page's filter
+// module (lib/page-composition.ts, Phase B), not in the navigation tree.
+// Only genuine entities, deliberate landing pages and content pages get a
+// NavNode. See docs/destination-graph/PHASE_A.md for the full
+// entity/taxonomy/facet/page classification this list is drawn from.
+
+export type NavNodeType = 'entity' | 'landing_page' | 'content_page'
+export type NavNodeStatus = 'live' | 'planned'
+
+export type NavNode = {
+  label: string
+  href: string
+  type: NavNodeType
+  status: NavNodeStatus
+  /** What unblocks this node moving from 'planned' to 'live'. Doubles as a
+   *  lightweight in-code roadmap — kept deliberately short, full detail
+   *  lives in docs/destination-graph/PHASE_A.md. */
+  requires?: string
+  children?: NavNode[]
+}
+
+/** The renderer (Navbar.tsx, Phase E) must only expose 'live' nodes. 'planned' nodes stay
+ *  in this array so the full IA is visible to admins/devs without being
+ *  linked publicly — resolvability is checked at render time, not by
+ *  filtering this array, so a node flips to 'live' by editing one field
+ *  here, not by moving it between arrays. */
+export const DESTINATION_GRAPH_NAV: NavNode[] = [
+  {
+    label: 'Explore', href: '/regions', type: 'landing_page', status: 'live',
+    children: [
+      { label: 'Northern Drakensberg', href: '/regions/north-berg', type: 'entity', status: 'live' },
+      { label: 'Central Drakensberg', href: '/regions/central-berg', type: 'entity', status: 'live' },
+      { label: 'Southern Drakensberg', href: '/regions/south-berg', type: 'entity', status: 'live' },
+      { label: 'Towns & Villages', href: '/towns', type: 'entity', status: 'live' },
+      {
+        label: 'Mountains & Peaks', href: '/nature-reserves', type: 'landing_page', status: 'planned',
+        requires: 'Reserve detail pages (/nature-reserves/[slug]) — peaks render as anchors on their parent reserve, not as separate pages (Peaks decision: nested attribute of Reserve)',
+      },
+      {
+        label: 'Waterfalls', href: '/nature-reserves', type: 'landing_page', status: 'planned',
+        requires: 'feature/tag vocabulary on Reserve + filtered view — not a new entity',
+      },
+      { label: 'Nature & Wildlife', href: '/nature-reserves', type: 'landing_page', status: 'live' },
+      {
+        label: 'Heritage & Culture', href: '/nature-reserves', type: 'landing_page', status: 'planned',
+        requires: 'feature/tag vocabulary on Reserve/Town + filtered view',
+      },
+      {
+        label: 'Viewpoints', href: '/nature-reserves', type: 'landing_page', status: 'planned',
+        requires: 'feature/tag vocabulary on Reserve — not a new entity',
+      },
+      {
+        label: 'Maps', href: '/maps', type: 'content_page', status: 'planned',
+        requires: 'static regional map utility page',
+      },
+    ],
+  },
+  {
+    label: 'Hikes', href: '/hikes', type: 'landing_page', status: 'live',
+    children: [
+      { label: 'All Hikes', href: '/hikes', type: 'landing_page', status: 'live' },
+      { label: 'Grand Traverse', href: '/hikes/grand-traverse', type: 'entity', status: 'live' },
+      {
+        label: 'Northern Traverse', href: '/hikes/northern-traverse', type: 'entity', status: 'planned',
+        requires: 'admin creates the trail record — no such trail exists in the data yet (only Grand Traverse does)',
+      },
+      {
+        label: 'Hiking Resources', href: '/mydrakensberg', type: 'content_page', status: 'planned',
+        requires: 'Article entity (see docs/seo-audit/SEO_GAPS.md G13) — currently no editorial content type for this',
+      },
+      {
+        label: 'Trail Safety', href: '/mydrakensberg', type: 'content_page', status: 'planned',
+        requires: 'Article entity',
+      },
+      {
+        label: 'Hiking Gear', href: '/mydrakensberg', type: 'content_page', status: 'planned',
+        requires: 'Article entity',
+      },
+    ],
+  },
+  {
+    label: 'Stay', href: '/stays', type: 'landing_page', status: 'live',
+    children: [
+      { label: 'All Accommodation', href: '/stays', type: 'landing_page', status: 'live' },
+    ],
+  },
+  {
+    label: 'Things to Do', href: '/activities', type: 'landing_page', status: 'live',
+    children: [
+      { label: 'Activities', href: '/activities', type: 'landing_page', status: 'live' },
+      {
+        // Public and empty until a supplier publishes a listing — that's the
+        // correct state of a real, unpopulated catalogue (Events decision:
+        // genuine entity, supplier-populated, see lib/events.ts).
+        label: 'Events', href: '/events', type: 'landing_page', status: 'live',
+      },
+    ],
+  },
+  {
+    label: 'Tours', href: '/tours', type: 'landing_page', status: 'live',
+    children: [
+      { label: 'All Tours', href: '/tours', type: 'landing_page', status: 'live' },
+    ],
+  },
+  {
+    label: 'Plan Your Trip', href: '/plan', type: 'landing_page', status: 'live',
+    children: [
+      { label: 'Trip Planner', href: '/plan', type: 'landing_page', status: 'live' },
+      {
+        label: 'When to Visit', href: '/plan', type: 'content_page', status: 'planned',
+        requires: 'dedicated content section or Article entity',
+      },
+      {
+        label: 'What to Pack', href: '/plan', type: 'content_page', status: 'planned',
+        requires: 'dedicated content section or Article entity',
+      },
+      {
+        label: 'Getting Here', href: '/plan', type: 'content_page', status: 'planned',
+        requires: 'dedicated content section or Article entity',
+      },
+    ],
+  },
+  {
+    label: 'Transport', href: '/shuttles', type: 'landing_page', status: 'live',
+    children: [
+      { label: 'Shuttles', href: '/shuttles', type: 'landing_page', status: 'live' },
+      { label: 'Shuttle Routes', href: '/transport', type: 'entity', status: 'live' },
+    ],
+  },
+]
+
 export type Coordinates = {
   lat: number
   lng: number
@@ -89,7 +230,7 @@ export const DESTINATIONS: DestinationNode[] = [
     id: 'champagne-valley',
     slug: 'champagne-valley',
     name: 'Champagne Valley',
-    region: 'Central Berg',
+    region: 'Central Drakensberg',
     subRegion: 'Cathedral Peak & Champagne Valley',
     town: 'Winterton',
     category: 'destination',
@@ -98,19 +239,19 @@ export const DESTINATIONS: DestinationNode[] = [
     history: 'Long used as a gateway into Cathedral Peak and the upper valleys, Champagne Valley grew around mountain hotels, farms and conservation access routes.',
     culture: 'The valley connects farm hospitality, Drakensberg Boys Choir performances, craft producers and San rock-art interpretation.',
     wildlife: 'Grassland birding, eland sightings and raptor viewing are common, with bearded vulture habitat in the high Berg.',
-    landscape: 'Open foothills, basalt cliffs, river valleys and wide sunrise views define the Central Berg landscape.',
+    landscape: 'Open foothills, basalt cliffs, river valleys and wide sunrise views define the Central Drakensberg landscape.',
     attractions: ['Drakensberg Boys Choir', 'Monks Cowl', 'Cathkin Peak', 'Falcon Ridge', 'Champagne Castle'],
     towns: ['Winterton', 'Bergville', 'Estcourt'],
     villages: ['Champagne Valley', 'Cathkin Park'],
     nearbyRegionSlugs: ['north-berg', 'south-berg'],
     travelInfo: ['Best for first-time visitors', 'Good base for families', 'Strong access to activities and guided hikes'],
-    mapLabel: 'Central Berg hub',
+    mapLabel: 'Central Drakensberg hub',
   },
   {
     id: 'cathedral-peak',
     slug: 'cathedral-peak',
     name: 'Cathedral Peak',
-    region: 'Central Berg',
+    region: 'Central Drakensberg',
     subRegion: 'Cathedral Peak Wilderness',
     town: 'Winterton',
     category: 'nature',
@@ -131,7 +272,7 @@ export const DESTINATIONS: DestinationNode[] = [
     id: 'royal-natal',
     slug: 'royal-natal',
     name: 'Royal Natal',
-    region: 'Northern Berg',
+    region: 'Northern Drakensberg',
     subRegion: 'Amphitheatre & Sentinel',
     town: 'Bergville',
     category: 'nature',
@@ -146,13 +287,13 @@ export const DESTINATIONS: DestinationNode[] = [
     villages: ['Tendele', 'Mahai'],
     nearbyRegionSlugs: ['central-berg', 'champagne-valley'],
     travelInfo: ['Early start essential for summit hikes', 'Chain ladder is exposed — avoid in thunderstorms', 'Permit required for the Sentinel car park'],
-    mapLabel: 'Northern Berg icon',
+    mapLabel: 'Northern Drakensberg icon',
   },
   {
     id: 'underberg-himeville',
     slug: 'underberg-himeville',
     name: 'Underberg & Himeville',
-    region: 'South Berg',
+    region: 'Southern Drakensberg',
     subRegion: 'Sani Pass Gateway',
     town: 'Underberg',
     category: 'destination',
@@ -167,21 +308,21 @@ export const DESTINATIONS: DestinationNode[] = [
     villages: ['Pevensey', 'Sani Valley'],
     nearbyRegionSlugs: ['central-berg'],
     travelInfo: ['Best for Sani Pass tours', 'Cool winter mornings', '4x4 routes require planning'],
-    mapLabel: 'Southern Berg gateway',
+    mapLabel: 'Southern Drakensberg gateway',
   },
 ]
 
 // ── Contextual recommendation seeds ───────────────────────────────────────────
 
 export const DESTINATION_RECOMMENDATIONS: Omit<ContextualRecommendation, 'distanceKm' | 'travelTimeMinutes'>[] = [
-  { id: 'stay-champagne', title: 'Champagne Valley Mountain Lodge', category: 'Accommodation', region: 'Central Berg', town: 'Champagne Valley', coordinates: { lat: -29.001, lng: 29.429 }, href: '/stays/champagne-lodge', price: 1450, supplierRating: 4.8, availability: 'Available for your dates' },
-  { id: 'quad-biking', title: 'Quad Biking Adventure', category: 'Activity', region: 'Central Berg', town: 'Champagne Valley', coordinates: { lat: -28.974, lng: 29.463 }, href: '/activities/a1', price: 650, supplierRating: 4.7, availability: 'Available for your dates' },
-  { id: 'horse-riding', title: 'Horse Riding Centre', category: 'Activity', region: 'Central Berg', town: 'Champagne Valley', coordinates: { lat: -28.989, lng: 29.450 }, href: '/activities/horse-riding', price: 350, supplierRating: 4.6, availability: 'Available for your dates' },
-  { id: 'cathedral-hike', title: 'Cathedral Peak Guided Hike', category: 'Guided Tour', region: 'Central Berg', town: 'Cathedral Peak', coordinates: { lat: -28.943, lng: 29.204 }, href: '/guides/cathedral-peak', price: 850, supplierRating: 4.9, availability: 'Check schedule' },
-  { id: 'choir-event', title: 'Drakensberg Boys Choir', category: 'Event', region: 'Central Berg', town: 'Winterton', coordinates: { lat: -29.009, lng: 29.457 }, href: '/events/boys-choir', price: 220, supplierRating: 4.9, availability: 'Seasonal' },
-  { id: 'valley-restaurant', title: 'Valley Farm Restaurant', category: 'Restaurant', region: 'Central Berg', town: 'Champagne Valley', coordinates: { lat: -28.993, lng: 29.444 }, href: '/activities/food-drink', price: 180, supplierRating: 4.5, availability: 'Available for your dates' },
-  { id: 'monks-cowl-trail', title: 'Monks Cowl Nature Walk', category: 'Trail', region: 'Central Berg', town: 'Champagne Valley', coordinates: { lat: -29.024, lng: 29.399 }, href: '/hikes/monks-cowl', supplierRating: 4.8, availability: 'Available for your dates' },
-  { id: 'private-transfer', title: 'Airport Private Transfer', category: 'Transport', region: 'Central Berg', town: 'Champagne Valley', coordinates: { lat: -28.996, lng: 29.438 }, href: '/shuttles', price: 3640, supplierRating: 4.8, availability: 'Available for your dates' },
+  { id: 'stay-champagne', title: 'Champagne Valley Mountain Lodge', category: 'Accommodation', region: 'Central Drakensberg', town: 'Champagne Valley', coordinates: { lat: -29.001, lng: 29.429 }, href: '/stays/champagne-lodge', price: 1450, supplierRating: 4.8, availability: 'Available for your dates' },
+  { id: 'quad-biking', title: 'Quad Biking Adventure', category: 'Activity', region: 'Central Drakensberg', town: 'Champagne Valley', coordinates: { lat: -28.974, lng: 29.463 }, href: '/activities/a1', price: 650, supplierRating: 4.7, availability: 'Available for your dates' },
+  { id: 'horse-riding', title: 'Horse Riding Centre', category: 'Activity', region: 'Central Drakensberg', town: 'Champagne Valley', coordinates: { lat: -28.989, lng: 29.450 }, href: '/activities/horse-riding', price: 350, supplierRating: 4.6, availability: 'Available for your dates' },
+  { id: 'cathedral-hike', title: 'Cathedral Peak Guided Hike', category: 'Guided Tour', region: 'Central Drakensberg', town: 'Cathedral Peak', coordinates: { lat: -28.943, lng: 29.204 }, href: '/guides/cathedral-peak', price: 850, supplierRating: 4.9, availability: 'Check schedule' },
+  { id: 'choir-event', title: 'Drakensberg Boys Choir', category: 'Event', region: 'Central Drakensberg', town: 'Winterton', coordinates: { lat: -29.009, lng: 29.457 }, href: '/events/boys-choir', price: 220, supplierRating: 4.9, availability: 'Seasonal' },
+  { id: 'valley-restaurant', title: 'Valley Farm Restaurant', category: 'Restaurant', region: 'Central Drakensberg', town: 'Champagne Valley', coordinates: { lat: -28.993, lng: 29.444 }, href: '/activities/food-drink', price: 180, supplierRating: 4.5, availability: 'Available for your dates' },
+  { id: 'monks-cowl-trail', title: 'Monks Cowl Nature Walk', category: 'Trail', region: 'Central Drakensberg', town: 'Champagne Valley', coordinates: { lat: -29.024, lng: 29.399 }, href: '/hikes/monks-cowl', supplierRating: 4.8, availability: 'Available for your dates' },
+  { id: 'private-transfer', title: 'Airport Private Transfer', category: 'Transport', region: 'Central Drakensberg', town: 'Champagne Valley', coordinates: { lat: -28.996, lng: 29.438 }, href: '/shuttles', price: 3640, supplierRating: 4.8, availability: 'Available for your dates' },
 ]
 
 // ── Utility functions ─────────────────────────────────────────────────────────

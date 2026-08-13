@@ -3,6 +3,9 @@ import {
 } from './entities'
 import { deleteDeparturesByTour } from './departures'
 import { getEffectiveSupplierId } from './effective-supplier'
+import type { GraphFields } from './graph-fields'
+import { slugify, uniqueSlug } from './slugify'
+import type { SupabaseClient } from '@supabase/supabase-js'
 
 export type Tour = {
   id: string
@@ -38,7 +41,7 @@ export type Tour = {
   rating?: number
   reviewCount?: number
   featured?: boolean
-}
+} & GraphFields
 
 const KIND = 'tour'
 
@@ -47,8 +50,8 @@ const KIND = 'tour'
  * Use only on public-facing pages and in the admin console.
  * Supplier-portal screens must use getMyTours() / getToursBySupplier().
  */
-export async function getTours(): Promise<Tour[]> {
-  return listEntities<Tour>(KIND)
+export async function getTours(client?: SupabaseClient): Promise<Tour[]> {
+  return client ? listEntities<Tour>(KIND, client) : listEntities<Tour>(KIND)
 }
 
 /** Only the tours owned by `supplierId`. */
@@ -66,7 +69,11 @@ export async function getMyTours(): Promise<Tour[]> {
 }
 
 export async function addTour(tour: Omit<Tour, 'id' | 'createdAt'>): Promise<Tour> {
-  const newTour: Tour = { ...tour, id: newEntityId('tour'), createdAt: new Date().toISOString() }
+  // Slug population (see lib/slugify.ts) — auto-generated from the tour
+  // name unless already supplied, unique against every other tour's
+  // canonical URL segment (slug || id).
+  const slug = tour.slug || uniqueSlug(slugify(tour.name), (await getTours()).map(e => e.slug || e.id))
+  const newTour: Tour = { ...tour, slug, id: newEntityId('tour'), createdAt: new Date().toISOString() }
   return insertEntity(KIND, newTour)
 }
 

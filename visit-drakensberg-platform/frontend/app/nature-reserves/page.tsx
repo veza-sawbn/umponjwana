@@ -88,7 +88,9 @@ export default function NatureReservesPage() {
                       {regionName(reserve.regionSlug) || 'Drakensberg'}
                     </Link>
                   )}
-                  <h2 className="font-display text-4xl lg:text-5xl text-forest mb-2">{reserve.name}</h2>
+                  <Link href={`/nature-reserves/${reserve.slug}`} className="group/title">
+                    <h2 className="font-display text-4xl lg:text-5xl text-forest mb-2 group-hover/title:text-sage transition-colors">{reserve.name}</h2>
+                  </Link>
                   {reserve.tagline && <p className="font-sans text-sm text-forest/50 mb-6">{reserve.tagline}</p>}
                   {reserve.description && <p className="font-sans text-base text-forest/60 leading-relaxed mb-8">{reserve.description}</p>}
 
@@ -149,6 +151,9 @@ export default function NatureReservesPage() {
 
                   {/* CTAs — stay bound to live data by region */}
                   <div className="flex flex-wrap gap-4">
+                    <Link href={`/nature-reserves/${reserve.slug}`} className="font-sans text-sm px-5 py-2.5 bg-gold text-forest hover:bg-[#b8935e] transition-colors inline-flex items-center gap-2">
+                      Full Reserve Guide <ArrowRight className="w-3.5 h-3.5" />
+                    </Link>
                     {reserve.regionSlug && (
                       <Link href={`/hikes?region=${encodeURIComponent(regionName(reserve.regionSlug))}`} className="font-sans text-sm px-5 py-2.5 bg-forest text-white hover:bg-sage transition-colors inline-flex items-center gap-2">
                         View Hikes <ArrowRight className="w-3.5 h-3.5" />

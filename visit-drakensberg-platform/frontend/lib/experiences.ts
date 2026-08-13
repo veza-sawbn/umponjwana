@@ -1,6 +1,7 @@
 import { getTours, type Tour } from './tours'
 import { getDepartures, type Departure, type DeparturePackage } from './departures'
 import { getTrails, type Trail } from './trails'
+import type { SupabaseClient } from '@supabase/supabase-js'
 
 export type { DeparturePackage }
 
@@ -114,8 +115,11 @@ function compose(dep: Departure, tour: Tour, trail?: Trail): TrekkingExperience 
   }
 }
 
-async function loadAll(): Promise<TrekkingExperience[]> {
-  const [departures, tours, trails] = await Promise.all([getDepartures(), getTours(), getTrails()])
+// Every entry point accepts an optional Supabase client so Server
+// Components can pass a session-less client (lib/supabase-public.ts) — same
+// pattern as lib/regions.ts's getRegions(). Existing callers are unaffected.
+async function loadAll(client?: SupabaseClient): Promise<TrekkingExperience[]> {
+  const [departures, tours, trails] = await Promise.all([getDepartures(client), getTours(client), getTrails(client)])
   const tourById = new Map(tours.filter(t => t.status === 'active').map(t => [t.id, t]))
   const trailById = new Map(trails.map(t => [t.id, t]))
   const list: TrekkingExperience[] = []
@@ -128,19 +132,19 @@ async function loadAll(): Promise<TrekkingExperience[]> {
 }
 
 /** All published upcoming experiences, soonest first. */
-export async function getUpcomingExperiences(): Promise<TrekkingExperience[]> {
+export async function getUpcomingExperiences(client?: SupabaseClient): Promise<TrekkingExperience[]> {
   const today = new Date().toISOString().slice(0, 10)
-  return (await loadAll())
+  return (await loadAll(client))
     .filter(e => e.departureDate >= today)
     .sort((a, b) => a.departureDate.localeCompare(b.departureDate))
 }
 
 /** Published upcoming experiences that use a specific hiking trail. */
-export async function getExperiencesByTrail(trailId: string): Promise<TrekkingExperience[]> {
-  return (await getUpcomingExperiences()).filter(e => e.trailId === trailId)
+export async function getExperiencesByTrail(trailId: string, client?: SupabaseClient): Promise<TrekkingExperience[]> {
+  return (await getUpcomingExperiences(client)).filter(e => e.trailId === trailId)
 }
 
 /** One experience by its id (departure id) — includes past departures. */
-export async function getExperienceById(id: string): Promise<TrekkingExperience | null> {
-  return (await loadAll()).find(e => e.id === id) ?? null
+export async function getExperienceById(id: string, client?: SupabaseClient): Promise<TrekkingExperience | null> {
+  return (await loadAll(client)).find(e => e.id === id) ?? null
 }

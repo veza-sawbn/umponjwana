@@ -1,12 +1,19 @@
 import { DEFAULT_REGIONS } from './regions'
 import { listEntities, getEntity, insertEntity, updateEntity, deleteEntity, newEntityId, listEntitiesByOwner } from './entities'
+import type { GraphFields } from './graph-fields'
+import { slugify, uniqueSlug } from './slugify'
+import type { SupabaseClient } from '@supabase/supabase-js'
 
 export const PROPERTY_REGIONS = DEFAULT_REGIONS.map(region => region.name)
 
 // Shared vocabulary for every surface that describes a property: the supplier
-// wizard, the property edit form and the public listing application.
+// wizard, the property edit form and the public listing application. Resort,
+// Glamping and Farm Stay were added for the "Stay" destination-graph
+// taxonomy — genuine, distinct South African tourism accommodation
+// categories, not just labels to complete a menu.
 export const PROPERTY_TYPES = [
   'Lodge', 'Guesthouse', 'Hotel', 'Self-catering Cottage', 'Campsite', 'Backpackers', 'Boutique Hotel',
+  'Resort', 'Glamping', 'Farm Stay',
 ]
 
 export const PROPERTY_AMENITIES = [
@@ -34,16 +41,16 @@ export type Property = {
   photos: string[]
   status: 'active' | 'draft'
   createdAt: string
-}
+} & GraphFields
 
 const KIND = 'property'
 
-export async function getProperties(): Promise<Property[]> {
-  return listEntities<Property>(KIND)
+export async function getProperties(client?: SupabaseClient): Promise<Property[]> {
+  return client ? listEntities<Property>(KIND, client) : listEntities<Property>(KIND)
 }
 
-export async function getPropertyById(id: string): Promise<Property | null> {
-  return getEntity<Property>(KIND, id)
+export async function getPropertyById(id: string, client?: SupabaseClient): Promise<Property | null> {
+  return client ? getEntity<Property>(KIND, id, client) : getEntity<Property>(KIND, id)
 }
 
 export async function getPropertiesBySupplier(supplierId: string): Promise<Property[]> {
@@ -53,7 +60,11 @@ export async function getPropertiesBySupplier(supplierId: string): Promise<Prope
 }
 
 export async function addProperty(p: Omit<Property, 'id' | 'createdAt'>): Promise<Property> {
-  const prop: Property = { ...p, id: newEntityId('prop'), createdAt: new Date().toISOString() }
+  // Slug population (see lib/slugify.ts) — auto-generated from the listing
+  // name unless the caller already supplied one, unique against every
+  // other property's canonical URL segment (slug || id).
+  const slug = p.slug || uniqueSlug(slugify(p.name), (await getProperties()).map(e => e.slug || e.id))
+  const prop: Property = { ...p, slug, id: newEntityId('prop'), createdAt: new Date().toISOString() }
   return insertEntity(KIND, prop)
 }
 

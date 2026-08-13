@@ -3,6 +3,7 @@ import {
   listEntities, listEntitiesByOwner, insertEntity, updateEntity, deleteEntity, newEntityId,
 } from './entities'
 import { getEffectiveSupplierId } from './effective-supplier'
+import type { SupabaseClient } from '@supabase/supabase-js'
 
 // A rate package is one way to buy a seat on a departure — e.g. "Self-Sufficient"
 // vs "Portered" on the same scheduled hike, each with its own price and its own
@@ -51,8 +52,8 @@ export function newDeparturePackageId(): string {
  * Use only on public-facing pages and in the admin console.
  * Supplier-portal screens must use getMyDepartures() / getDeparturesBySupplier().
  */
-export async function getDepartures(): Promise<Departure[]> {
-  return listEntities<Departure>(KIND)
+export async function getDepartures(client?: SupabaseClient): Promise<Departure[]> {
+  return client ? listEntities<Departure>(KIND, client) : listEntities<Departure>(KIND)
 }
 
 /** Only the departures owned by `supplierId`. */

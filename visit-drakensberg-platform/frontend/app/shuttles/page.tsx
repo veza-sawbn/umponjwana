@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { ArrowRight, Bus, Calendar, Check, MapPin, Users } from 'lucide-react'
 import Footer from '@/components/layout/Footer'
@@ -77,6 +78,9 @@ export default function ShuttlesPage() {
             Pick up anywhere, drop off anywhere. Your transfer is quoted from live driving distance and
             operated by the best-matched company in our transport partner marketplace.
           </p>
+          <Link href="/transport" className="inline-flex items-center gap-1.5 mt-4 font-sans text-sm text-gold hover:text-white transition-colors">
+            Browse fixed-price routes <ArrowRight size={14} />
+          </Link>
         </div>
       </section>
 

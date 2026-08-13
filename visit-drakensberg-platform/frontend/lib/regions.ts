@@ -1,4 +1,5 @@
 import { supabase } from './auth'
+import type { SupabaseClient } from '@supabase/supabase-js'
 
 export type Subregion = { id: string; name: string; description: string }
 
@@ -23,51 +24,55 @@ export type Region = {
 
 export const DEFAULT_REGIONS: Region[] = [
   {
+    // id/slug intentionally unchanged — these back live URLs (/regions/north-berg)
+    // and are not part of the public terminology rename. See
+    // docs/destination-graph/PHASE_A.md "Region naming" for the rationale:
+    // display name changes, canonical URL does not.
     id: 'north-berg',
     slug: 'north-berg',
-    name: 'North Berg',
+    name: 'Northern Drakensberg',
     tagline: 'Royal Natal National Park · Amphitheatre',
     heroImage: 'https://images.unsplash.com/photo-1590098563548-8f14eed3a47f?w=1200&q=85',
     heroVideo: '',
-    overview: 'The Amphitheatre — a 5 km sheer basalt cliff — anchors the North Berg. The Tugela River drops 948 metres over five falls here, making it the second highest waterfall on Earth. Royal Natal National Park offers some of the most dramatic scenery in Africa.',
+    overview: 'The Amphitheatre — a 5 km sheer basalt cliff — anchors the Northern Drakensberg. The Tugela River drops 948 metres over five falls here, making it the second highest waterfall on Earth. Royal Natal National Park offers some of the most dramatic scenery in Africa.',
     highlights: ['Tugela Falls Circuit', 'Amphitheatre via Chain Ladder', 'Policemans Helmet', 'Mont-aux-Sources'],
     gettingThere: '',
     bestTime: '',
     keyAttractions: [],
     subregions: [],
-    seoTitle: 'North Berg | Visit Drakensberg',
+    seoTitle: 'Northern Drakensberg | Visit Drakensberg',
     seoDescription: 'Explore Royal Natal National Park, the Amphitheatre and Tugela Falls.',
   },
   {
     id: 'central-berg',
     slug: 'central-berg',
-    name: 'Central Berg',
+    name: 'Central Drakensberg',
     tagline: 'Cathedral Peak · Giants Castle · Champagne Valley',
     heroImage: 'https://images.unsplash.com/photo-1503614472-8c93d56e92ce?w=1200&q=85',
     heroVideo: '',
-    overview: 'Cathedral Peak rises to 3,004 m at the heart of the Central Berg, surrounded by the richest concentration of San rock art in the world. Giants Castle Game Reserve protects bearded vultures and herds of eland against a backdrop of jagged peaks.',
+    overview: 'Cathedral Peak rises to 3,004 m at the heart of the Central Drakensberg, surrounded by the richest concentration of San rock art in the world. Giants Castle Game Reserve protects bearded vultures and herds of eland against a backdrop of jagged peaks.',
     highlights: ['Cathedral Peak Summit', 'Giants Castle Hike', 'Injasuti Cave', 'Champagne Castle'],
     gettingThere: '',
     bestTime: '',
     keyAttractions: [],
     subregions: [],
-    seoTitle: 'Central Berg | Visit Drakensberg',
+    seoTitle: 'Central Drakensberg | Visit Drakensberg',
     seoDescription: 'Explore Cathedral Peak, Giants Castle and Champagne Valley.',
   },
   {
     id: 'south-berg',
     slug: 'south-berg',
-    name: 'South Berg',
+    name: 'Southern Drakensberg',
     tagline: 'Sani Pass · Mkhomazi · Underberg',
     heroImage: 'https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?w=1200&q=85',
     heroVideo: '',
-    overview: 'The Sani Pass climbs 1,332 m in 9 km through a series of hairpin bends carved into the escarpment, crossing into the mountain Kingdom of Lesotho at 2,873 m. The Mkhomazi Wilderness Area below is one of the least visited and most pristine parts of the berg.',
+    overview: 'The Sani Pass climbs 1,332 m in 9 km through a series of hairpin bends carved into the escarpment, crossing into the mountain Kingdom of Lesotho at 2,873 m. The Mkhomazi Wilderness Area below is one of the least visited and most pristine parts of the Southern Drakensberg.',
     highlights: ['Sani Pass 4x4', 'Mkhomazi Wilderness', 'Garden Castle', 'Mzimkhulu Gorge'],
     gettingThere: '',
     bestTime: '',
     keyAttractions: [],
     subregions: [],
-    seoTitle: 'South Berg | Visit Drakensberg',
+    seoTitle: 'Southern Drakensberg | Visit Drakensberg',
     seoDescription: 'Explore Sani Pass, Mkhomazi and Underberg.',
   },
 ]
@@ -86,24 +91,37 @@ export function slugifyRegion(name: string) {
 // SUBREGION_ALIASES maps normalised park / subregion names → normalised parent
 // region name. This covers cases where substring matching cannot work because
 // the park name shares no words with the parent region name (e.g. "royal natal
-// national park" ↔ "north berg").
+// national park" ↔ "north drakensberg").
+//
+// Target values use the current canonical region names ("Northern/Central/
+// Southern Drakensberg", normalised). The first three entries are a
+// backward-compatibility bridge: any entity whose free-text `region` field
+// still says "North Berg" / "Central Berg" / "South Berg" — the previous
+// public terminology, and still perfectly valid supplier/admin-entered data —
+// continues to resolve correctly against the renamed canonical regions with
+// no data migration required. Do not remove these without confirming no
+// live entity still carries the old wording.
 const SUBREGION_ALIASES: Record<string, string> = {
-  'royal natal national park': 'north berg',
-  'royal natal':               'north berg',
-  'amphitheatre':              'north berg',
-  "giant's castle":            'central berg',
-  'giants castle':             'central berg',
-  'monks cowl':                'central berg',
-  'cathedral peak':            'central berg',
-  'champagne valley':          'central berg',
-  'champagne castle':          'central berg',
-  'mkhomazi':                  'south berg',
-  'mkhomazi wilderness':       'south berg',
-  'garden castle':             'south berg',
-  "bushman's nek":             'south berg',
-  'bushmans nek':              'south berg',
-  'sani pass':                 'south berg',
-  'drakensberg gardens':       'south berg',
+  'north berg':                'north drakensberg',
+  'central berg':              'central drakensberg',
+  'south berg':                'south drakensberg',
+
+  'royal natal national park': 'north drakensberg',
+  'royal natal':               'north drakensberg',
+  'amphitheatre':              'north drakensberg',
+  "giant's castle":            'central drakensberg',
+  'giants castle':             'central drakensberg',
+  'monks cowl':                'central drakensberg',
+  'cathedral peak':            'central drakensberg',
+  'champagne valley':          'central drakensberg',
+  'champagne castle':          'central drakensberg',
+  'mkhomazi':                  'south drakensberg',
+  'mkhomazi wilderness':       'south drakensberg',
+  'garden castle':             'south drakensberg',
+  "bushman's nek":             'south drakensberg',
+  'bushmans nek':              'south drakensberg',
+  'sani pass':                 'south drakensberg',
+  'drakensberg gardens':       'south drakensberg',
 }
 
 export function normalizeRegionName(region: string | undefined | null): string {
@@ -155,9 +173,13 @@ async function saveRegions(regions: Region[]) {
   if (error) throw error
 }
 
-export async function getRegions(): Promise<Region[]> {
+// Accepts an optional Supabase client so Server Components can pass a
+// session-less client (lib/supabase-public.ts) instead of the browser
+// client-component client this module defaults to — every existing caller
+// is unaffected since the parameter defaults to the current behaviour.
+export async function getRegions(client: SupabaseClient = supabase): Promise<Region[]> {
   try {
-    const { data } = await supabase.from('site_content').select('value').eq('key', 'admin_regions').maybeSingle()
+    const { data } = await client.from('site_content').select('value').eq('key', 'admin_regions').maybeSingle()
     if (Array.isArray(data?.value?.items) && data.value.items.length > 0) {
       return data.value.items.map((item: Region) => normalizeRegion(item))
     }
