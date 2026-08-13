@@ -1,5 +1,6 @@
 import { listEntities, getEntity, insertEntity, updateEntity, deleteEntity, newEntityId } from './entities'
 import type { GraphFields } from './graph-fields'
+import { slugify, uniqueSlug } from './slugify'
 import type { SupabaseClient } from '@supabase/supabase-js'
 
 // Marketplace packages are administrator-managed products, curated by Visit
@@ -141,8 +142,13 @@ export async function addPackage(
   pkg: Omit<MarketplacePackage, 'id' | 'status' | 'createdAt'>,
   adminId: string,
 ): Promise<MarketplacePackage> {
+  // Slug population (see lib/slugify.ts) — auto-generated from the package
+  // title unless already supplied, unique against every other package's
+  // canonical URL segment (slug || id).
+  const slug = pkg.slug || uniqueSlug(slugify(pkg.title), (await getPackages()).map(e => e.slug || e.id))
   const item: MarketplacePackage = {
     ...pkg,
+    slug,
     id: newEntityId('pkg'),
     status: publicStatus(pkg.packageStatus),
     supplierId: adminId,
@@ -165,7 +171,10 @@ export async function setPackageStatus(id: string, packageStatus: PackageStatus)
 export async function duplicatePackage(id: string, adminId: string): Promise<MarketplacePackage | null> {
   const original = await getPackageById(id)
   if (!original) return null
-  const { id: _id, createdAt: _c, updatedAt: _u, ...rest } = original
+  // Drop `slug` along with the identity fields — a copy must get its own
+  // freshly generated slug (addPackage's auto-slug branch only fires when
+  // slug is absent), not silently share the original's canonical URL.
+  const { id: _id, createdAt: _c, updatedAt: _u, slug: _s, ...rest } = original
   return addPackage(
     { ...rest, title: `${original.title} (copy)`, packageStatus: 'draft', featured: false },
     adminId,

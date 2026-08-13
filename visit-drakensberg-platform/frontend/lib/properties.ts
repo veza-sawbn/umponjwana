@@ -1,6 +1,7 @@
 import { DEFAULT_REGIONS } from './regions'
 import { listEntities, getEntity, insertEntity, updateEntity, deleteEntity, newEntityId } from './entities'
 import type { GraphFields } from './graph-fields'
+import { slugify, uniqueSlug } from './slugify'
 import type { SupabaseClient } from '@supabase/supabase-js'
 
 export const PROPERTY_REGIONS = DEFAULT_REGIONS.map(region => region.name)
@@ -58,7 +59,11 @@ export async function getPropertiesBySupplier(supplierId: string): Promise<Prope
 }
 
 export async function addProperty(p: Omit<Property, 'id' | 'createdAt'>): Promise<Property> {
-  const prop: Property = { ...p, id: newEntityId('prop'), createdAt: new Date().toISOString() }
+  // Slug population (see lib/slugify.ts) — auto-generated from the listing
+  // name unless the caller already supplied one, unique against every
+  // other property's canonical URL segment (slug || id).
+  const slug = p.slug || uniqueSlug(slugify(p.name), (await getProperties()).map(e => e.slug || e.id))
+  const prop: Property = { ...p, slug, id: newEntityId('prop'), createdAt: new Date().toISOString() }
   return insertEntity(KIND, prop)
 }
 

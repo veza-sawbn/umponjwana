@@ -1,6 +1,7 @@
 import { listEntities, insertEntity, updateEntity, deleteEntity, newEntityId } from './entities'
 import { deleteDeparturesByTour } from './departures'
 import type { GraphFields } from './graph-fields'
+import { slugify, uniqueSlug } from './slugify'
 import type { SupabaseClient } from '@supabase/supabase-js'
 
 export type Tour = {
@@ -45,7 +46,11 @@ export async function getTours(client?: SupabaseClient): Promise<Tour[]> {
 }
 
 export async function addTour(tour: Omit<Tour, 'id' | 'createdAt'>): Promise<Tour> {
-  const newTour: Tour = { ...tour, id: newEntityId('tour'), createdAt: new Date().toISOString() }
+  // Slug population (see lib/slugify.ts) — auto-generated from the tour
+  // name unless already supplied, unique against every other tour's
+  // canonical URL segment (slug || id).
+  const slug = tour.slug || uniqueSlug(slugify(tour.name), (await getTours()).map(e => e.slug || e.id))
+  const newTour: Tour = { ...tour, slug, id: newEntityId('tour'), createdAt: new Date().toISOString() }
   return insertEntity(KIND, newTour)
 }
 

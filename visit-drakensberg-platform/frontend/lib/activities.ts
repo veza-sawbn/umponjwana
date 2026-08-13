@@ -1,5 +1,6 @@
 import { listEntities, getEntity, insertEntity, updateEntity, deleteEntity, newEntityId } from './entities'
 import type { GraphFields } from './graph-fields'
+import { slugify, uniqueSlug } from './slugify'
 import type { SupabaseClient } from '@supabase/supabase-js'
 
 // Single canonical activity-category vocabulary — imported by both the
@@ -62,7 +63,11 @@ export async function getActivityById(id: string, client?: SupabaseClient): Prom
 }
 
 export async function addActivity(a: Omit<Activity, 'id' | 'createdAt'>): Promise<Activity> {
-  const activity: Activity = { ...a, id: newEntityId('act'), createdAt: new Date().toISOString() }
+  // Slug population (see lib/slugify.ts) — auto-generated from the
+  // activity name unless already supplied, unique against every other
+  // activity's canonical URL segment (slug || id).
+  const slug = a.slug || uniqueSlug(slugify(a.name), (await getActivities()).map(e => e.slug || e.id))
+  const activity: Activity = { ...a, slug, id: newEntityId('act'), createdAt: new Date().toISOString() }
   return insertEntity(KIND, activity)
 }
 

@@ -4,6 +4,7 @@ import {
   type SupplierEntity,
 } from './supplier-entities'
 import type { GraphFields } from './graph-fields'
+import { slugify, uniqueSlug } from './slugify'
 
 // Named shuttle routes are a genuine destination-graph entity that already
 // existed as data with nowhere public to render (SEO audit G17 — see
@@ -49,7 +50,13 @@ export async function getRouteById(id: string, client?: SupabaseClient): Promise
 }
 
 export async function addRoute(r: Omit<Route, 'id' | 'createdAt'>): Promise<Route> {
-  return addSupplierEntity<Route>(ENTITY, r)
+  // Slug population (see lib/slugify.ts) — auto-generated from "From to To"
+  // unless already supplied, unique against every other route's canonical
+  // URL segment (slug || id). No admin/supplier UI collects a slug for
+  // routes yet (app/supplier/routes/new/page.tsx doesn't), so this is
+  // currently the only source of a route slug.
+  const slug = r.slug || uniqueSlug(slugify(`${r.from}-to-${r.to}`), (await getRoutes()).map(e => e.slug || e.id))
+  return addSupplierEntity<Route>(ENTITY, { ...r, slug })
 }
 
 export async function updateRoute(id: string, patch: Partial<Route>): Promise<void> {
