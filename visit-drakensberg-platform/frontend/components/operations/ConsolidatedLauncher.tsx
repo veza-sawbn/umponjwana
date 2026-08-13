@@ -55,11 +55,11 @@ export default function ConsolidatedLauncher({
   }
 
   if (loading) {
-    return <div className="p-8"><p className="font-sans text-sm text-gray-400">Loading…</p></div>
+    return <div className="p-4 sm:p-6 lg:p-8"><p className="font-sans text-sm text-gray-400">Loading…</p></div>
   }
 
   return (
-    <div className="p-8">
+    <div className="p-4 sm:p-6 lg:p-8">
       <div className="mb-6">
         <p className="font-sans text-[10px] tracking-[0.14em] uppercase text-gray-400 mb-1">
           Across All Suppliers

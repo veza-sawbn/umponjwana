@@ -36,7 +36,7 @@ export default function OperationsDashboard() {
   const { opsRole, fullName, suppliers, consolidated } = useOperations()
 
   return (
-    <div className="p-8">
+    <div className="p-4 sm:p-6 lg:p-8">
       <div className="mb-8">
         <p className="font-sans text-[10px] tracking-[0.14em] uppercase text-gray-400 mb-1">
           Visit Drakensberg Operations

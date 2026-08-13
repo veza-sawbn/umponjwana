@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react'
 import toast from 'react-hot-toast'
 import { Users, Plus, Mountain, Star, CheckCircle, Clock, XCircle, User } from 'lucide-react'
 import { supabase } from '@/lib/auth'
+import { effectiveSupplierId } from '@/lib/effective-supplier'
 import {
   getSupplierEntities, addSupplierEntity, deleteSupplierEntity, type SupplierEntity,
 } from '@/lib/supplier-entities'
@@ -33,7 +34,7 @@ export default function GuidesPage() {
 
   useEffect(() => {
     supabase.auth.getUser().then(async ({ data: { user } }) => {
-      if (user) setGuides(await getSupplierEntities<Guide>(ENTITY, user.id))
+      if (user) setGuides(await getSupplierEntities<Guide>(ENTITY, effectiveSupplierId(user.id)))
       setLoading(false)
     })
   }, [])
@@ -44,7 +45,7 @@ export default function GuidesPage() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) throw new Error('no session')
       const saved = await addSupplierEntity<Guide>(ENTITY, {
-        supplierId: user.id,
+        supplierId: effectiveSupplierId(user.id),
         name: form.name, certs: form.certs, guideNo: form.guideNo,
         speciality: form.speciality, languages: form.languages,
         qualifications: form.qualifications,

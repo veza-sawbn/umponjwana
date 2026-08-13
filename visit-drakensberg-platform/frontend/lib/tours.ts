@@ -1,5 +1,8 @@
-import { listEntities, insertEntity, updateEntity, deleteEntity, newEntityId } from './entities'
+import {
+  listEntities, listEntitiesByOwner, insertEntity, updateEntity, deleteEntity, newEntityId,
+} from './entities'
 import { deleteDeparturesByTour } from './departures'
+import { getEffectiveSupplierId } from './effective-supplier'
 
 export type Tour = {
   id: string
@@ -38,8 +41,27 @@ export type Tour = {
 
 const KIND = 'tour'
 
+/**
+ * Public catalog read — every live tour on the platform.
+ * Use only on public-facing pages and in the admin console.
+ * Supplier-portal screens must use getMyTours() / getToursBySupplier().
+ */
 export async function getTours(): Promise<Tour[]> {
   return listEntities<Tour>(KIND)
+}
+
+/** Only the tours owned by `supplierId`. */
+export async function getToursBySupplier(supplierId: string): Promise<Tour[]> {
+  return listEntitiesByOwner<Tour>(KIND, supplierId)
+}
+
+/**
+ * The signed-in supplier's own tours — or, for operations staff who have
+ * entered a managed supplier, that supplier's tours.
+ */
+export async function getMyTours(): Promise<Tour[]> {
+  const ownerId = await getEffectiveSupplierId()
+  return ownerId ? getToursBySupplier(ownerId) : []
 }
 
 export async function addTour(tour: Omit<Tour, 'id' | 'createdAt'>): Promise<Tour> {

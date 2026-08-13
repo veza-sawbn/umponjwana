@@ -111,6 +111,10 @@ export async function POST(req: Request) {
     user_metadata: {
       full_name: body.businessName.trim(),
       role: 'supplier',
+      // The supplier portal reads supplier_type to build its tool nav. Set it
+      // here as well as on the profile row so the account has its tools from
+      // first sign-in rather than an empty sidebar.
+      supplier_type: body.supplierType,
       ...(ownerContactEmail ? { owner_contact_email: ownerContactEmail } : {}),
     },
   })
@@ -128,14 +132,27 @@ export async function POST(req: Request) {
   // Update the profile with supplier-specific fields.
   // handle_new_user() runs in the same DB transaction as the auth INSERT so
   // the profile row already exists by the time we get here.
-  const { error: profileError } = await admin
+  // approval_status is written alongside is_approved so the supplier portal
+  // (which honours either) never shows a VD-created account as pending.
+  const profileRow = {
+    full_name: body.businessName.trim(),
+    supplier_type: body.supplierType,
+    is_approved: true,
+    approval_status: 'approved',
+  }
+  let { error: profileError } = await admin
     .from('profiles')
-    .update({
-      full_name: body.businessName.trim(),
-      supplier_type: body.supplierType,
-      is_approved: true,
-    })
+    .update(profileRow)
     .eq('id', supplierId)
+
+  // 42703 = approval_status missing (moderation migration not applied here).
+  if (profileError?.code === '42703') {
+    const { approval_status: _omit, ...withoutStatus } = profileRow
+    ;({ error: profileError } = await admin
+      .from('profiles')
+      .update(withoutStatus)
+      .eq('id', supplierId))
+  }
 
   if (profileError) {
     console.error('[ops/create-supplier] profile update error:', profileError)

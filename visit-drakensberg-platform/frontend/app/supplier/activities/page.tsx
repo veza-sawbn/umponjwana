@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { Zap, Plus, Clock, Users, Trash2 } from 'lucide-react'
 import { supabase } from '@/lib/auth'
+import { effectiveSupplierId } from '@/lib/effective-supplier'
 import { getActivitiesBySupplier, deleteActivity, type Activity } from '@/lib/activities'
 
 export default function ActivitiesPage() {
@@ -12,7 +13,7 @@ export default function ActivitiesPage() {
   useEffect(() => {
     supabase.auth.getUser().then(({ data: { user } }) => {
       if (!user) { setLoading(false); return }
-      getActivitiesBySupplier(user.id).then(a => {
+      getActivitiesBySupplier(effectiveSupplierId(user.id)).then(a => {
         setActivities(a)
         setLoading(false)
       })

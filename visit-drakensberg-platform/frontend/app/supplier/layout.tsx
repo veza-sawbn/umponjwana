@@ -8,6 +8,7 @@ import { ManagedSupplierProvider, useManagedSupplier } from '@/lib/managed-suppl
 import Logo from '@/components/Logo'
 import NotificationsBell from '@/components/ui/NotificationsBell'
 import ManagedSupplierBanner from '@/components/operations/ManagedSupplierBanner'
+import PortalShell from '@/components/layout/PortalShell'
 
 function SidebarNav() {
   const pathname = usePathname()
@@ -40,7 +41,9 @@ function SidebarNav() {
   }
 
   return (
-    <aside className="w-60 shrink-0 bg-[#111111] border-r border-white/8 flex flex-col fixed inset-y-0 left-0 z-40">
+    // Positioning is owned by PortalShell (fixed rail on desktop, drawer on
+    // mobile); this element just fills whatever box it is given.
+    <aside className="h-full w-full bg-[#111111] border-r border-white/8 flex flex-col overflow-hidden">
       {/* Brand */}
       <div className="px-6 py-5 border-b border-white/8">
         <Link href="/" className="flex flex-col gap-2">
@@ -119,17 +122,17 @@ export default function SupplierLayout({ children }: { children: React.ReactNode
   return (
     <SupplierProvider>
       <ManagedSupplierProvider>
-        <div className="min-h-screen bg-[#0a0a0a] flex">
-          <SidebarNav />
-          <div className="ml-60 flex-1 min-h-screen bg-[#F7F5F2]">
-            {/* Contextual banner shown when a VD Operations employee is managing a supplier */}
-            <ManagedSupplierBanner />
-            <div className="flex items-center justify-end px-8 pt-4 -mb-4">
-              <NotificationsBell />
-            </div>
-            {children}
-          </div>
-        </div>
+        <PortalShell
+          sidebar={<SidebarNav />}
+          label="Supplier"
+          homeHref="/supplier"
+          mobileActions={<NotificationsBell />}
+          desktopActions={<NotificationsBell />}
+        >
+          {/* Contextual banner shown when a VD Operations employee is managing a supplier */}
+          <ManagedSupplierBanner />
+          {children}
+        </PortalShell>
       </ManagedSupplierProvider>
     </SupplierProvider>
   )

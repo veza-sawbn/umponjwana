@@ -7,6 +7,7 @@ import {
   AlertTriangle,
 } from 'lucide-react'
 import { supabase } from '@/lib/auth'
+import { effectiveSupplierId } from '@/lib/effective-supplier'
 import { getSupplierEntities } from '@/lib/supplier-entities'
 import type { GuideProfile } from '@/lib/operators'
 import {
@@ -65,7 +66,7 @@ export default function SupplierRequestsPage() {
       if (!user) { setLoading(false); return }
       const [reqs, myGuides] = await Promise.all([
         getTripRequests(),
-        getSupplierEntities<GuideProfile>('guides', user.id),
+        getSupplierEntities<GuideProfile>('guides', effectiveSupplierId(user.id)),
       ])
       setRequests(reqs.filter(r => r.operatorId === user.id))
       setGuides(myGuides)

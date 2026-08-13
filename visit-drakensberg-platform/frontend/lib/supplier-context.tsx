@@ -41,8 +41,18 @@ export function SupplierProvider({ children }: { children: React.ReactNode }) {
       if (!user) { setValue(v => ({ ...v, loading: false })); return }
 
       const meta = user.user_metadata ?? {}
-      const rawType = meta.supplier_type as string | undefined
-      const fullName = meta.full_name ?? ''
+
+      // profiles is the authoritative record — auth metadata is a copy that can
+      // drift (accounts created by admins/operations set supplier_type on the
+      // profile row only). Read the profile first and fall back to metadata.
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('full_name, supplier_type, is_approved, approval_status')
+        .eq('id', user.id)
+        .maybeSingle()
+
+      const rawType = (profile?.supplier_type ?? meta.supplier_type) as string | undefined
+      const fullName = profile?.full_name || meta.full_name || ''
 
       // Support comma-separated multi-type e.g. "Accommodation,Activity"
       const types = rawType
@@ -52,9 +62,12 @@ export function SupplierProvider({ children }: { children: React.ReactNode }) {
       const primaryType = types[0] ?? null
       const config = primaryType ? getSupplierConfig(primaryType) : null
 
-      // is_approved comes from profiles table
-      const { data: profile } = await supabase.from('profiles').select('is_approved').eq('id', user.id).maybeSingle()
-      const isApproved = profile?.is_approved ?? false
+      // Treat either representation as approved. They are meant to stay in
+      // sync, and honouring both means a drift in one column can't strand an
+      // approved supplier behind the "pending approval" notice.
+      const isApproved = Boolean(
+        profile?.is_approved || profile?.approval_status === 'approved',
+      )
 
       setValue({
         supplierType: primaryType,

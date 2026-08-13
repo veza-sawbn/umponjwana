@@ -86,16 +86,52 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
     profilePatch.full_name = body.businessName
     metaPatch.full_name = body.businessName
   }
-  if (body.supplierType !== undefined) profilePatch.supplier_type = body.supplierType
+  if (body.supplierType !== undefined) {
+    profilePatch.supplier_type = body.supplierType
+    // The supplier portal derives its tool nav from supplier_type; keep the
+    // auth metadata copy in step so the portal and the profile never disagree.
+    metaPatch.supplier_type = body.supplierType
+  }
   if (body.bio !== undefined) profilePatch.bio = body.bio
   if (body.website !== undefined) profilePatch.website = body.website
-  if (body.isApproved !== undefined) profilePatch.is_approved = body.isApproved
   if (body.ownerContactEmail !== undefined) metaPatch.owner_contact_email = body.ownerContactEmail
 
   try {
     if (Object.keys(profilePatch).length > 0) {
       const { error } = await admin.from('profiles').update(profilePatch).eq('id', params.id)
       if (error) throw error
+    }
+
+    // Approval has two representations on profiles that must move together:
+    //   is_approved     — boolean, read by is_active_supplier() and RLS
+    //   approval_status — tri-state, read by the admin verification console
+    // Writing only is_approved (as this route used to) left approval_status on
+    // 'pending', which is what made an approved supplier still see the
+    // "pending approval" notice in their portal.
+    //
+    // admin_set_supplier_status() normally keeps them in sync, but it guards on
+    // is_admin() and auth.uid() is null under the service role — so we write
+    // both columns here instead. The caller was already proven to be an admin
+    // by requireAdmin() above.
+    if (body.isApproved !== undefined) {
+      const approved = body.isApproved
+      const { error } = await admin
+        .from('profiles')
+        .update({ is_approved: approved, approval_status: approved ? 'approved' : 'pending' })
+        .eq('id', params.id)
+
+      // 42703 = column does not exist: the supplier-moderation migration
+      // hasn't been applied on this environment yet. Fall back to the boolean
+      // so approving still works rather than failing outright.
+      if (error?.code === '42703') {
+        const { error: fallbackError } = await admin
+          .from('profiles')
+          .update({ is_approved: approved })
+          .eq('id', params.id)
+        if (fallbackError) throw fallbackError
+      } else if (error) {
+        throw error
+      }
     }
     if (Object.keys(metaPatch).length > 0) {
       const { error } = await admin.auth.admin.updateUserById(params.id, { user_metadata: metaPatch })

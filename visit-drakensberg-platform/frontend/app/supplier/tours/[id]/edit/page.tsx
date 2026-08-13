@@ -2,7 +2,7 @@
 import { useState, useEffect } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { ChevronLeft } from 'lucide-react'
-import { getTours, updateTour } from '@/lib/tours'
+import { getMyTours, updateTour } from '@/lib/tours'
 import { GoogleAddressField } from '@/components/maps/GoogleAddressField'
 
 const DIFFICULTIES = ['Easy', 'Moderate', 'Challenging', 'Extreme']
@@ -33,7 +33,9 @@ export default function EditTourPage() {
   const set = (k: string, v: unknown) => setForm(f => ({ ...f, [k]: v }))
 
   useEffect(() => {
-    getTours().then(all => {
+    // Scoped read: a supplier must not be able to load another supplier's
+    // tour into this form, even though the write would be refused by RLS.
+    getMyTours().then(all => {
       const tour = all.find(t => t.id === id)
       if (tour) {
         setForm({

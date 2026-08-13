@@ -3,9 +3,10 @@ import { useState, useEffect } from 'react'
 import toast from 'react-hot-toast'
 import { Clock, Plus, Trash2 } from 'lucide-react'
 import { supabase } from '@/lib/auth'
+import { effectiveSupplierId } from '@/lib/effective-supplier'
 import { getPropertiesBySupplier } from '@/lib/properties'
 import { getActivitiesBySupplier } from '@/lib/activities'
-import { getTours } from '@/lib/tours'
+import { getToursBySupplier } from '@/lib/tours'
 import {
   getSupplierEntities, addSupplierEntity, deleteSupplierEntity, type SupplierEntity,
 } from '@/lib/supplier-entities'
@@ -26,16 +27,16 @@ export default function AvailabilityPage() {
     supabase.auth.getUser().then(async ({ data: { user } }) => {
       if (!user) { setLoading(false); return }
       const [myBlocks, props, acts, tours] = await Promise.all([
-        getSupplierEntities<Block>(ENTITY, user.id),
-        getPropertiesBySupplier(user.id),
-        getActivitiesBySupplier(user.id),
-        getTours(),
+        getSupplierEntities<Block>(ENTITY, effectiveSupplierId(user.id)),
+        getPropertiesBySupplier(effectiveSupplierId(user.id)),
+        getActivitiesBySupplier(effectiveSupplierId(user.id)),
+        getToursBySupplier(effectiveSupplierId(user.id)),
       ])
       setBlocks(myBlocks.sort((a, b) => a.from.localeCompare(b.from)))
       setListings([
         ...props.map(p => ({ id: p.id, name: p.name })),
         ...acts.map(a => ({ id: a.id, name: a.name })),
-        ...tours.filter(t => t.supplierId === user.id).map(t => ({ id: t.id, name: t.name })),
+        ...tours.map(t => ({ id: t.id, name: t.name })),
       ])
       setLoading(false)
     })
@@ -53,7 +54,7 @@ export default function AvailabilityPage() {
       if (!user) throw new Error('no session')
       const listing = listings.find(l => l.id === form.listingId)
       const saved = await addSupplierEntity<Block>(ENTITY, {
-        supplierId: user.id,
+        supplierId: effectiveSupplierId(user.id),
         listingId: form.listingId,
         listing: listing?.name ?? form.listingId,
         from: form.from,
