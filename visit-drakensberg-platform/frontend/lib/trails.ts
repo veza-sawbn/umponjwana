@@ -1,4 +1,5 @@
 import { supabase } from './auth'
+import type { SupabaseClient } from '@supabase/supabase-js'
 
 import type { GpxAnalysis, TrailCrux, TrailGrade, TrailWaypoint } from './gpx'
 import type { GraphFields } from './graph-fields'
@@ -213,9 +214,12 @@ export function trailStartPoint(trail: Trail): { lat: number; lng: number } | nu
   return p && Number.isFinite(p.lat) && Number.isFinite(p.lon) ? { lat: p.lat, lng: p.lon } : null
 }
 
-export async function getTrails(): Promise<Trail[]> {
+// Accepts an optional Supabase client so Server Components can pass a
+// session-less client (lib/supabase-public.ts) — see lib/regions.ts's
+// getRegions() for the same pattern. Existing callers are unaffected.
+export async function getTrails(client: SupabaseClient = supabase): Promise<Trail[]> {
   try {
-    const { data } = await supabase
+    const { data } = await client
       .from('site_content')
       .select('value')
       .eq('key', 'trails')

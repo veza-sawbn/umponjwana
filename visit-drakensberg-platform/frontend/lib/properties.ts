@@ -1,6 +1,7 @@
 import { DEFAULT_REGIONS } from './regions'
 import { listEntities, getEntity, insertEntity, updateEntity, deleteEntity, newEntityId } from './entities'
 import type { GraphFields } from './graph-fields'
+import type { SupabaseClient } from '@supabase/supabase-js'
 
 export const PROPERTY_REGIONS = DEFAULT_REGIONS.map(region => region.name)
 
@@ -47,8 +48,8 @@ export async function getProperties(): Promise<Property[]> {
   return listEntities<Property>(KIND)
 }
 
-export async function getPropertyById(id: string): Promise<Property | null> {
-  return getEntity<Property>(KIND, id)
+export async function getPropertyById(id: string, client?: SupabaseClient): Promise<Property | null> {
+  return client ? getEntity<Property>(KIND, id, client) : getEntity<Property>(KIND, id)
 }
 
 export async function getPropertiesBySupplier(supplierId: string): Promise<Property[]> {

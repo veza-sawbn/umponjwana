@@ -55,11 +55,30 @@ GET /towns                         → every town card links to its /towns/[slug
 
 Both were caught before commit, not after.
 
-## 5. What Phase B does not include yet (queued)
+## 5. Second slice: `/hikes/[id]`, `/activities/[id]`, `/stays/[id]` converted
 
-- The same server-shell pattern for the remaining five existing detail routes (`/stays/[id]`, `/hikes/[id]`, `/activities/[id]`, `/packages/[id]`, `/guides/[id]`, `/experiences/[id]`) — same recipe as regions, not yet repeated.
-- Structured data beyond `TouristDestination`/`TouristAttraction`/`BreadcrumbList` (`LodgingBusiness`, `Product`/`Offer`, `Event`, `Person`/`Organization` per the audit's schema mapping).
-- Slug resolution for the UUID-based entities (`prop-<uuid>` etc.) — `URL_ARCHITECTURE.md` §4.
-- Reading `GraphFields`/`ModuleConfig` (Phase A's foundation types) anywhere — nothing populates or renders against them yet.
+Same server-shell pattern repeated across the three remaining highest-traffic existing detail routes. `lib/entities.ts`'s `listEntities`/`getEntity` — the shared read layer under `properties`, `activities`, `tours`, `packages`, `departures`, `media` — gained the same optional-client parameter as `getRegions()`, so this unblocks stays/packages/tours together, not just this batch. `getTrails()`, `getPropertyById()`, `getRoomsByProperty()`, `getActivityById()` all extended the same way.
+
+- **`/hikes/[id]`** — `HikeDetail.tsx` (new) is the previous body verbatim, now taking `trail` as a prop. **Fixed a latent bug in the process**: previously, an unresolvable id silently fell back to `trails[0]` (the first trail in the array) instead of showing an error — a mistyped or stale `/hikes/xyz` URL would render an unrelated trail with no indication anything was wrong. Now 404s correctly, matching every other entity route. `TouristAttraction` + `BreadcrumbList` JSON-LD.
+- **`/activities/[id]`** — `ActivityDetail.tsx` (new) keeps 100% of the booking-cart interactivity (date/group-size selection, add-to-booking toggle) client-side; only the entity lookup moved server-side. `Product` + `Offer` + `BreadcrumbList` JSON-LD, with price/currency in the offer. Draft activities (`status !== 'active'`) deliberately keep resolving exactly as before — a supplier previewing an unpublished listing via direct link still needs that — but now carry `robots: {index:false}` so a draft can never be indexed even if a link to it leaks.
+- **`/stays/[id]`** — the largest of the three. `StayDetail.tsx` (new) keeps live per-date room-inventory checking, the booking-cart flow and the room detail modal entirely client-side (genuinely dynamic/interactive). The *static* room catalog (name, price, images, amenities — not date-dependent) now loads server-side alongside the property, removing the initial loading-spinner for the page's main content. `LodgingBusiness` JSON-LD with `geo`, `amenityFeature` and `priceRange`. Same `robots: {index:false}` treatment for non-active listings.
+
+**Verified live:**
+```
+GET /hikes/tugela-falls  → 200, <title>Tugela Falls Circuit — Royal Natal National Park | Visit Drakensberg</title>,
+                            canonical, TouristAttraction + BreadcrumbList JSON-LD
+GET /hikes/does-not-exist → 404 (previously would have rendered trails[0])
+GET /activities/[any id] → 404 gracefully (no seed-data fallback exists for this entity type — expected)
+GET /stays/[any id]      → 404 gracefully, same reason
+```
+`Activity`/`Property` have no `DEFAULT_*` seed array (unlike `Trail`/`Region`/`Reserve`/`Town`), so a full 200-path verification of these two specifically needs a reachable Supabase instance — the 404 path (the code path shared by "not found" and "network unreachable") was verified instead, confirming no crash and no hang under a genuine backend failure.
+
+## 6. What Phase B does not include yet (queued)
+
+- The same server-shell pattern for `/packages/[id]`, `/guides/[id]`, `/guides/operators/[id]`, `/experiences/[id]` — same recipe, not yet repeated.
+- Structured data for those remaining kinds (`Product`/`Offer` for packages, `Person`/`Organization` for guides, `Event`/`Offer` for experiences, per the audit's schema mapping).
+- Slug resolution for the UUID-based entities (`prop-<uuid>` etc.) — `URL_ARCHITECTURE.md` §4. Every converted route already reads `entity.slug || entity.id` for its canonical URL, so slugs will take effect the moment they're populated, with no further route change needed.
+- Sitemap entries for trails/properties/activities — intentionally held until slug resolution lands, so the sitemap doesn't have to carry ID-based URLs that later get superseded.
+- Reading `GraphFields`/`ModuleConfig` (Phase A's foundation types) anywhere beyond `seoTitle`/`seoDescription`/`slug` fallback checks — nothing populates or renders the relationship fields yet.
 - `/tours`, `/transport/[slug]` — new listing + detail routes, not started.
-- ISR/`revalidate` on the new dynamic routes.
+- ISR/`revalidate` on any of the new dynamic routes.

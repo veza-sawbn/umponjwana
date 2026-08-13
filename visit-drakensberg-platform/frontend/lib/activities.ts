@@ -1,5 +1,6 @@
 import { listEntities, getEntity, insertEntity, updateEntity, deleteEntity, newEntityId } from './entities'
 import type { GraphFields } from './graph-fields'
+import type { SupabaseClient } from '@supabase/supabase-js'
 
 // Single canonical activity-category vocabulary — imported by both the
 // supplier creation/edit forms and the public /activities filter tabs.
@@ -56,8 +57,8 @@ export async function getActivitiesBySupplier(supplierId: string): Promise<Activ
   return all.filter(a => a.supplierId === supplierId)
 }
 
-export async function getActivityById(id: string): Promise<Activity | null> {
-  return getEntity<Activity>(KIND, id)
+export async function getActivityById(id: string, client?: SupabaseClient): Promise<Activity | null> {
+  return client ? getEntity<Activity>(KIND, id, client) : getEntity<Activity>(KIND, id)
 }
 
 export async function addActivity(a: Omit<Activity, 'id' | 'createdAt'>): Promise<Activity> {

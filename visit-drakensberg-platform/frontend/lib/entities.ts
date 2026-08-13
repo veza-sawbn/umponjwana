@@ -1,4 +1,5 @@
 import { supabase } from './auth'
+import type { SupabaseClient } from '@supabase/supabase-js'
 
 // Core data access for catalog entities stored one-row-per-item in the
 // `vd_entities` table (see supabase/migrations/20260704_secure_data_layer.sql).
@@ -32,9 +33,14 @@ export function newEntityId(prefix: string): string {
   return `${prefix}-${uuid}`
 }
 
-export async function listEntities<T>(kind: string): Promise<T[]> {
+// Both read functions accept an optional Supabase client so Server
+// Components can pass a session-less client (lib/supabase-public.ts) —
+// same pattern as lib/regions.ts's getRegions(). Existing callers (every
+// domain lib wrapping this module) are unaffected; only the new server
+// detail-page shells pass a client explicitly.
+export async function listEntities<T>(kind: string, client: SupabaseClient = supabase): Promise<T[]> {
   try {
-    const { data } = await supabase
+    const { data } = await client
       .from('vd_entities')
       .select('*')
       .eq('kind', kind)
@@ -44,9 +50,9 @@ export async function listEntities<T>(kind: string): Promise<T[]> {
   return []
 }
 
-export async function getEntity<T>(kind: string, id: string): Promise<T | null> {
+export async function getEntity<T>(kind: string, id: string, client: SupabaseClient = supabase): Promise<T | null> {
   try {
-    const { data } = await supabase
+    const { data } = await client
       .from('vd_entities')
       .select('*')
       .eq('kind', kind)
