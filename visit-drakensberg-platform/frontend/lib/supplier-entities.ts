@@ -1,4 +1,4 @@
-import { listEntities, getEntity, insertEntity, updateEntity, deleteEntity, newEntityId } from './entities'
+import { listEntities, getEntity, insertEntity, updateEntity, deleteEntity, newEntityId, listEntitiesByOwner } from './entities'
 
 export type SupplierStatus = 'active' | 'draft' | 'pending' | 'verified' | 'rejected' | 'inactive' | 'maintenance' | string
 
@@ -13,8 +13,10 @@ export type SupplierEntity = {
 const kindFor = (entity: string) => `supplier_${entity}`
 
 export async function getSupplierEntities<T extends SupplierEntity>(entity: string, supplierId?: string): Promise<T[]> {
-  const all = await listEntities<T>(kindFor(entity))
-  return supplierId ? all.filter(item => item.supplierId === supplierId) : all
+  // When a supplier is named, scope the query at the database rather than
+  // fetching every supplier's rows and discarding them client-side.
+  if (supplierId) return listEntitiesByOwner<T>(kindFor(entity), supplierId)
+  return listEntities<T>(kindFor(entity))
 }
 
 export async function getSupplierEntity<T extends SupplierEntity>(entity: string, id: string): Promise<T | null> {

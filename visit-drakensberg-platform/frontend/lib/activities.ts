@@ -1,4 +1,4 @@
-import { listEntities, getEntity, insertEntity, updateEntity, deleteEntity, newEntityId } from './entities'
+import { listEntities, getEntity, insertEntity, updateEntity, deleteEntity, newEntityId, listEntitiesByOwner } from './entities'
 
 export type Activity = {
   id: string
@@ -35,8 +35,9 @@ export async function getActivities(): Promise<Activity[]> {
 }
 
 export async function getActivitiesBySupplier(supplierId: string): Promise<Activity[]> {
-  const all = await listEntities<Activity>(KIND)
-  return all.filter(a => a.supplierId === supplierId)
+  // Owner-scoped at the database — see the note in lib/entities.ts on why
+  // listEntities() must not be used for supplier-facing reads.
+  return listEntitiesByOwner<Activity>(KIND, supplierId)
 }
 
 export async function getActivityById(id: string): Promise<Activity | null> {

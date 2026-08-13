@@ -1,5 +1,6 @@
 import { supabase } from './auth'
-import { listEntities, insertEntity, deleteEntity, newEntityId } from './entities'
+import { getEffectiveSupplierId } from './effective-supplier'
+import { listEntities, insertEntity, deleteEntity, newEntityId, listEntitiesByOwner } from './entities'
 
 // A supplier's own uploaded media — real Supabase Storage files (bucket
 // `media`, path supplier/{uid}/...), indexed as vd_entities rows so RLS
@@ -24,10 +25,13 @@ export type MediaItem = {
 const KIND = 'media'
 
 export async function getMyMedia(): Promise<MediaItem[]> {
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return []
-  const all = await listEntities<MediaItem>(KIND)
-  return all.filter(m => m.supplierId === user.id).sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+  // Owner-scoped at the database: filtering listEntities() in JS would ship
+  // every supplier's media library to the browser. Resolves to the managed
+  // supplier when an operations employee is acting on one's behalf.
+  const ownerId = await getEffectiveSupplierId()
+  if (!ownerId) return []
+  const mine = await listEntitiesByOwner<MediaItem>(KIND, ownerId)
+  return mine.sort((a, b) => b.createdAt.localeCompare(a.createdAt))
 }
 
 function imageDimensions(file: File): Promise<string> {
