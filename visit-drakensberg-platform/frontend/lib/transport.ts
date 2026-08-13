@@ -1,5 +1,5 @@
 import { supabase } from './auth'
-import { listEntities, getEntity, insertEntity, updateEntity, newEntityId } from './entities'
+import { listEntities, getEntity, insertEntity, updateEntity, newEntityId, listEntitiesByOwner } from './entities'
 import { getSupplierEntities, updateSupplierEntity, type SupplierEntity } from './supplier-entities'
 import { notify } from './notifications'
 
@@ -208,8 +208,10 @@ export async function getTransportCompanies(): Promise<TransportCompany[]> {
 }
 
 export async function getMyTransportCompany(supplierId: string): Promise<TransportCompany | null> {
-  const all = await getTransportCompanies()
-  return all.find(c => c.supplierId === supplierId) ?? null
+  // Owner-scoped read rather than pulling every transport company to find one.
+  const mine = await listEntitiesByOwner<TransportCompany>(COMPANY_KIND, supplierId)
+  const c = mine[0]
+  return c ? { ...c, stats: { ...EMPTY_STATS, ...c.stats }, openJobs: c.openJobs ?? [] } : null
 }
 
 export async function saveTransportCompany(

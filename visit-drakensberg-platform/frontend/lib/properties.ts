@@ -1,5 +1,5 @@
 import { DEFAULT_REGIONS } from './regions'
-import { listEntities, getEntity, insertEntity, updateEntity, deleteEntity, newEntityId } from './entities'
+import { listEntities, getEntity, insertEntity, updateEntity, deleteEntity, newEntityId, listEntitiesByOwner } from './entities'
 
 export const PROPERTY_REGIONS = DEFAULT_REGIONS.map(region => region.name)
 
@@ -47,8 +47,9 @@ export async function getPropertyById(id: string): Promise<Property | null> {
 }
 
 export async function getPropertiesBySupplier(supplierId: string): Promise<Property[]> {
-  const all = await listEntities<Property>(KIND)
-  return all.filter(p => p.supplierId === supplierId)
+  // Owner-scoped at the database — see the note in lib/entities.ts on why
+  // listEntities() must not be used for supplier-facing reads.
+  return listEntitiesByOwner<Property>(KIND, supplierId)
 }
 
 export async function addProperty(p: Omit<Property, 'id' | 'createdAt'>): Promise<Property> {

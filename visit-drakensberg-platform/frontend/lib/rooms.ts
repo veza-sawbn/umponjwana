@@ -1,5 +1,5 @@
 import { supabase } from './auth'
-import { listEntities, getEntity, insertEntity, updateEntity, deleteEntity, newEntityId } from './entities'
+import { listEntities, getEntity, insertEntity, updateEntity, deleteEntity, newEntityId, listEntitiesByOwner } from './entities'
 
 export type Season = { name: string; from: string; to: string; price: string }
 
@@ -30,8 +30,10 @@ export type Room = {
 const KIND = 'room'
 
 export async function getRoomsBySupplier(supplierId: string): Promise<Room[]> {
-  const all = await listEntities<Room>(KIND)
-  return all.filter(r => r.supplierId === supplierId)
+  // Owner-scoped at the database. Filtering listEntities() in JS would still
+  // ship every other supplier's rooms to the browser, and would key on the
+  // value.supplierId copy rather than the authoritative owner_id column.
+  return listEntitiesByOwner<Room>(KIND, supplierId)
 }
 
 export async function getRoomsByProperty(propertyId: string): Promise<Room[]> {
