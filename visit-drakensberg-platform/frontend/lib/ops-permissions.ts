@@ -22,7 +22,7 @@
  */
 
 import {
-  CalendarDays, Clock, Wallet, Users, Building2, Tag,
+  CalendarDays, Clock, Wallet, Users, Building2, Tag, FileSignature,
   type LucideIcon,
 } from 'lucide-react'
 import type { NavItem, SupplierType } from './supplier-config'
@@ -63,6 +63,9 @@ const ROUTE_PERMISSION: Record<string, string> = {
 
   // Customers & comms
   '/supplier/messages':      'view_customers',
+  // Waivers carry participant medical and emergency-contact detail, so they
+  // sit behind the customer-data permission rather than content.
+  '/supplier/waivers':       'view_customers',
 
   // Content
   '/supplier/media':         'manage_content',
@@ -152,6 +155,13 @@ export const CONSOLIDATED_TOOLS: ConsolidatedTool[] = [
     label: 'Guest Messages',
     description: 'Consolidated guest enquiries and conversations.',
     icon: Users,
+    permission: 'view_customers',
+  },
+  {
+    href: '/operations/waivers',
+    label: 'Waivers',
+    description: 'Signed and outstanding participant waivers across your suppliers.',
+    icon: FileSignature,
     permission: 'view_customers',
   },
   {
