@@ -14,6 +14,7 @@ import { AnimatePresence, motion } from 'framer-motion'
 import Logo from '@/components/Logo'
 import { getUnreadCount } from '@/lib/notifications'
 import { getThreadsByCustomer } from '@/lib/messages'
+import { PRIMARY_NAVIGATION, DESTINATIONS } from '@/lib/destination-ia'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -28,25 +29,34 @@ type NavItem  = {
 }
 
 // ── Navigation data ───────────────────────────────────────────────────────────
+// Top-level categories are sourced from PRIMARY_NAVIGATION in destination-ia.ts.
+// Each entry is enriched with editorial images and sub-links for the super menu.
 
-const NAV_ITEMS: NavItem[] = [
-  {
-    label:    'Stays',
-    href:     '/stays',
-    image:    'https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=1200&q=80',
-    imageAlt: 'Mountain lodge in the Drakensberg',
-    sublabel: 'Mountain lodges, guesthouses & glamping',
+// Map PRIMARY_NAVIGATION's category labels to the richer NavItem shape the
+// super-menu requires (image, sub-links with hrefs, etc.).
+const _primaryMap: Record<string, Pick<NavItem, 'image' | 'imageAlt' | 'sublabel' | 'children'>> = {
+  Destinations: {
+    image:    'https://images.unsplash.com/photo-1516026672322-bc52d61a55d5?w=1200&q=80',
+    imageAlt: 'Drakensberg mountain panorama',
+    sublabel: "Explore the Berg's distinct landscapes and destination hubs",
+    // Children are derived from DESTINATIONS so they stay in sync with destination-ia.ts
     children: [
-      { label: 'Mountain Lodges',        href: '/stays?type=lodge' },
-      { label: 'Boutique Guesthouses',   href: '/stays?type=guesthouse' },
-      { label: 'Self-Catering Cottages', href: '/stays?type=cottage' },
-      { label: 'Camping & Glamping',     href: '/stays?type=camping' },
-      { label: 'Backpacker Hostels',     href: '/stays?type=hostel' },
+      ...DESTINATIONS.map(d => ({ label: d.name, href: `/regions/${d.slug}` })),
+      { label: 'All Regions', href: '/regions' },
     ],
   },
-  {
-    label:    'Hikes',
-    href:     '/hikes',
+  Attractions: {
+    image:    'https://images.unsplash.com/photo-1501854140801-50d01698950b?w=1200&q=80',
+    imageAlt: 'Drakensberg nature reserve',
+    sublabel: 'UNESCO heritage, nature reserves & scenic routes',
+    children: [
+      { label: 'Nature Reserves',  href: '/nature-reserves' },
+      { label: 'UNESCO Heritage',  href: '/nature-reserves?type=heritage' },
+      { label: 'Scenic Routes',    href: '/nature-reserves?type=scenic' },
+      { label: 'Cultural Sites',   href: '/nature-reserves?type=culture' },
+    ],
+  },
+  Nature: {
     image:    'https://images.unsplash.com/photo-1551632811-561732d1e306?w=1200&q=80',
     imageAlt: 'Hiker on a Drakensberg trail',
     sublabel: 'From easy walks to world-class summit trails',
@@ -58,18 +68,69 @@ const NAV_ITEMS: NavItem[] = [
       { label: 'Guided Hikes',     href: '/hikes?feature=guided' },
     ],
   },
-  {
-    label:    'Activities',
-    href:     '/activities',
+  Experiences: {
     image:    'https://images.unsplash.com/photo-1533130061792-64b345e4a833?w=1200&q=80',
     imageAlt: 'Activities in the Drakensberg',
     sublabel: 'Horse riding, rock climbing, fly fishing & more',
     children: [
-      { label: 'Horse Riding',      href: '/activities?cat=horse-riding' },
-      { label: 'Rock Climbing',     href: '/activities?cat=rock-climbing' },
-      { label: 'Fly Fishing',       href: '/activities?cat=fly-fishing' },
-      { label: 'Bird Watching',     href: '/activities?cat=birding' },
-      { label: 'Spa & Wellness',    href: '/activities?cat=wellness' },
+      { label: 'Horse Riding',   href: '/activities?cat=horse-riding' },
+      { label: 'Rock Climbing',  href: '/activities?cat=rock-climbing' },
+      { label: 'Fly Fishing',    href: '/activities?cat=fly-fishing' },
+      { label: 'Bird Watching',  href: '/activities?cat=birding' },
+      { label: 'Spa & Wellness', href: '/activities?cat=wellness' },
+    ],
+  },
+  Summer: {
+    image:    'https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?w=1200&q=80',
+    imageAlt: 'Summer hiking in the Drakensberg',
+    sublabel: 'Hiking, mountain biking, water activities & more',
+    children: [
+      { label: 'Day Hikes',          href: '/hikes?difficulty=easy' },
+      { label: 'Mountain Biking',    href: '/activities?cat=mountain-biking' },
+      { label: 'Adventure Activities', href: '/activities?cat=adventure' },
+      { label: 'Water Activities',   href: '/activities?cat=water' },
+    ],
+  },
+  Winter: {
+    image:    'https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=1200&q=80',
+    imageAlt: 'Winter in the Drakensberg',
+    sublabel: 'Snow walks, winter hikes & seasonal mountain experiences',
+    children: [
+      { label: 'Winter Hikes',       href: '/hikes?season=winter' },
+      { label: 'Snow Adventures',    href: '/activities?cat=snow' },
+      { label: 'Seasonal Events',    href: '/activities?cat=events' },
+      { label: 'Mountain Stays',     href: '/stays?type=lodge' },
+    ],
+  },
+}
+
+// Build the super-menu items from PRIMARY_NAVIGATION, enriched with local editorial data.
+// Product pages (Stays, Shuttles, Plan) are appended after the IA-driven categories.
+const NAV_ITEMS: NavItem[] = [
+  // Destination IA categories (in order defined by PRIMARY_NAVIGATION)
+  ...PRIMARY_NAVIGATION.map(nav => ({
+    label:    nav.label,
+    href:     nav.href,
+    ...(_primaryMap[nav.label] ?? {
+      image:    'https://images.unsplash.com/photo-1441974231531-c6227db76b6e?w=1200&q=80',
+      imageAlt: nav.label,
+      sublabel: '',
+      children: [],
+    }),
+  })),
+  // Product pages appended
+  {
+    label:    'Stays',
+    href:     '/stays',
+    image:    'https://images.unsplash.com/photo-1590098563548-8f14eed3a47f?w=1200&q=80',
+    imageAlt: 'Mountain lodge in the Drakensberg',
+    sublabel: 'Mountain lodges, guesthouses & glamping',
+    children: [
+      { label: 'Mountain Lodges',        href: '/stays?type=lodge' },
+      { label: 'Boutique Guesthouses',   href: '/stays?type=guesthouse' },
+      { label: 'Self-Catering Cottages', href: '/stays?type=cottage' },
+      { label: 'Camping & Glamping',     href: '/stays?type=camping' },
+      { label: 'Backpacker Hostels',     href: '/stays?type=hostel' },
     ],
   },
   {
@@ -81,32 +142,11 @@ const NAV_ITEMS: NavItem[] = [
     children: [],
   },
   {
-    label:    'Regions',
-    href:     '/regions',
-    image:    'https://images.unsplash.com/photo-1516026672322-bc52d61a55d5?w=1200&q=80',
-    imageAlt: 'Drakensberg mountain panorama',
-    sublabel: "Explore the Berg's distinct landscapes",
-    children: [
-      { label: 'North Berg',       href: '/regions/north-berg' },
-      { label: 'Central Berg',     href: '/regions/central-berg' },
-      { label: 'South Berg',       href: '/regions/south-berg' },
-      { label: 'All Regions',      href: '/regions' },
-    ],
-  },
-  {
     label:    'Stories',
     href:     '/mydrakensberg',
     image:    'https://images.unsplash.com/photo-1501854140801-50d01698950b?w=1200&q=80',
     imageAlt: 'Drakensberg sunset landscape',
     sublabel: 'Travel inspiration, tips & local knowledge',
-    children: [],
-  },
-  {
-    label:    'Plan',
-    href:     '/plan',
-    image:    'https://images.unsplash.com/photo-1441974231531-c6227db76b6e?w=1200&q=80',
-    imageAlt: 'Forest trail in the Drakensberg',
-    sublabel: 'Build your perfect Drakensberg itinerary',
     children: [],
   },
 ]
