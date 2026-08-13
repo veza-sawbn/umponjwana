@@ -1,32 +1,32 @@
 'use client'
 import { useState, useEffect } from 'react'
 import { useParams, useRouter } from 'next/navigation'
-import { ChevronLeft } from 'lucide-react'
+import { ChevronLeft, Plus, X } from 'lucide-react'
 import { getMyTours, updateTour } from '@/lib/tours'
 import { GoogleAddressField } from '@/components/maps/GoogleAddressField'
 
 const DIFFICULTIES = ['Easy', 'Moderate', 'Challenging', 'Extreme']
-const INCLUDED_OPTIONS = ['Meals', 'Accommodation', 'Guides', 'Permits', 'Equipment', 'Transport']
 const CANCELLATIONS = ['48h', '72h', '7 days', '14 days']
 
 type FormState = {
   name: string; difficulty: string; days: number; minAge: number; maxGroup: number;
   meetingPoint: string; gpsLat: string; gpsLng: string; description: string;
   included: string[]; fitnessNotes: string; cancellation: string;
-  pricePerPerson: number; groupDiscount: number; status: 'active' | 'draft'
+  pricePerPerson: number; status: 'active' | 'draft'
 }
 
 const EMPTY: FormState = {
   name: '', difficulty: 'Moderate', days: 1, minAge: 0, maxGroup: 10,
   meetingPoint: '', gpsLat: '', gpsLng: '', description: '',
   included: [], fitnessNotes: '', cancellation: '48h',
-  pricePerPerson: 0, groupDiscount: 0, status: 'active',
+  pricePerPerson: 0, status: 'active',
 }
 
 export default function EditTourPage() {
   const { id } = useParams<{ id: string }>()
   const router = useRouter()
   const [form, setForm] = useState<FormState>(EMPTY)
+  const [includedDraft, setIncludedDraft] = useState('')
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
@@ -44,7 +44,7 @@ export default function EditTourPage() {
           meetingPoint: tour.meetingPoint, gpsLat: tour.gpsLat, gpsLng: tour.gpsLng,
           description: tour.description, included: tour.included,
           fitnessNotes: tour.fitnessNotes, cancellation: tour.cancellation,
-          pricePerPerson: tour.pricePerPerson, groupDiscount: tour.groupDiscount,
+          pricePerPerson: tour.pricePerPerson,
           status: tour.status,
         })
       }
@@ -52,8 +52,15 @@ export default function EditTourPage() {
     })
   }, [id])
 
-  function toggleIncluded(item: string) {
-    setForm(f => ({ ...f, included: f.included.includes(item) ? f.included.filter(x => x !== item) : [...f.included, item] }))
+  function addIncluded() {
+    const v = includedDraft.trim()
+    if (!v) return
+    setForm(f => (f.included.includes(v) ? f : { ...f, included: [...f.included, v] }))
+    setIncludedDraft('')
+  }
+
+  function removeIncluded(item: string) {
+    setForm(f => ({ ...f, included: f.included.filter(x => x !== item) }))
   }
 
   async function handleSave() {
@@ -109,11 +116,44 @@ export default function EditTourPage() {
         <F label="Description" required><textarea value={form.description} onChange={e => set('description', e.target.value)} rows={4} className={`${inp} resize-none`} /></F>
 
         <F label="What's Included">
-          <div className="flex flex-wrap gap-2">
-            {INCLUDED_OPTIONS.map(item => (
-              <button key={item} onClick={() => toggleIncluded(item)} className={chip(form.included.includes(item))}>{item}</button>
-            ))}
+          <div className="flex gap-2">
+            <input
+              value={includedDraft}
+              onChange={e => setIncludedDraft(e.target.value)}
+              onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addIncluded() } }}
+              placeholder="e.g. Two nights in mountain huts"
+              className={inp}
+            />
+            <button
+              type="button"
+              onClick={addIncluded}
+              disabled={!includedDraft.trim()}
+              className="shrink-0 px-3 rounded-lg border border-black/15 text-black/60 hover:border-[#C9A96E]/50 hover:text-[#C9A96E] disabled:opacity-30 transition-colors"
+              aria-label="Add inclusion"
+            >
+              <Plus size={16} />
+            </button>
           </div>
+          {form.included.length > 0 && (
+            <ul className="mt-2 space-y-1.5">
+              {form.included.map(item => (
+                <li key={item} className="flex items-center justify-between gap-3 border border-black/8 rounded-lg px-3 py-2">
+                  <span className="font-sans text-sm text-black/70 min-w-0 break-words">{item}</span>
+                  <button
+                    type="button"
+                    onClick={() => removeIncluded(item)}
+                    className="text-black/25 hover:text-red-500 shrink-0 transition-colors"
+                    aria-label={`Remove ${item}`}
+                  >
+                    <X size={14} />
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+          <p className="font-sans text-xs text-black/35 mt-1">
+            List exactly what this tour covers, in your own words. Press Enter to add each one.
+          </p>
         </F>
 
         <F label="Fitness Requirements"><textarea value={form.fitnessNotes} onChange={e => set('fitnessNotes', e.target.value)} rows={3} className={`${inp} resize-none`} /></F>
@@ -124,10 +164,8 @@ export default function EditTourPage() {
               {CANCELLATIONS.map(c => <option key={c}>{c}</option>)}
             </select>
           </F>
-          <F label="Group Discount (%)"><input type="number" value={form.groupDiscount} onChange={e => set('groupDiscount', +e.target.value)} min="0" max="100" className={inp} /></F>
+          <F label="Price per Person (ZAR)" required><input type="number" value={form.pricePerPerson || ''} onChange={e => set('pricePerPerson', +e.target.value)} className={inp} /></F>
         </div>
-
-        <F label="Price per Person (ZAR)" required><input type="number" value={form.pricePerPerson || ''} onChange={e => set('pricePerPerson', +e.target.value)} className={inp} /></F>
 
         <F label="Status">
           <div className="flex gap-2">

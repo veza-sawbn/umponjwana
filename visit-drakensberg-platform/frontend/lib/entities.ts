@@ -114,7 +114,19 @@ export async function insertEntity<T extends { id: string; status?: string; supp
     status: item.status || 'active',
     value: item,
   })
-  if (error) throw error
+  if (error) {
+    // 42501 is the RLS refusal from "Suppliers insert own", whose check calls
+    // is_active_supplier() — so in practice this means the account is not an
+    // approved supplier. Say that, rather than leaving callers to report a
+    // generic failure the user can do nothing with.
+    if (error.code === '42501') {
+      throw new Error(
+        'Your supplier account is not approved yet, so it cannot create listings. ' +
+        'Once an administrator approves it this will save normally.',
+      )
+    }
+    throw error
+  }
   return item
 }
 

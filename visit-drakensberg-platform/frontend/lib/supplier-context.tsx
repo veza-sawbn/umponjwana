@@ -62,12 +62,15 @@ export function SupplierProvider({ children }: { children: React.ReactNode }) {
       const primaryType = types[0] ?? null
       const config = primaryType ? getSupplierConfig(primaryType) : null
 
-      // Treat either representation as approved. They are meant to stay in
-      // sync, and honouring both means a drift in one column can't strand an
-      // approved supplier behind the "pending approval" notice.
-      const isApproved = Boolean(
-        profile?.is_approved || profile?.approval_status === 'approved',
-      )
+      // is_approved is the operative flag: is_active_supplier() reads only
+      // this, and that function gates every catalog write through RLS. Showing
+      // approval based on anything else would tell a supplier they are live
+      // while every save is silently refused.
+      //
+      // 20260815_approval_consistency.sql reconciles is_approved with
+      // approval_status and keeps them in sync, so reading the operative flag
+      // no longer risks stranding a supplier the admin has approved.
+      const isApproved = Boolean(profile?.is_approved)
 
       setValue({
         supplierType: primaryType,
