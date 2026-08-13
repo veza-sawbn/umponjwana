@@ -4,6 +4,7 @@ import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { BedDouble, Plus, Users, Pencil } from 'lucide-react'
 import { supabase } from '@/lib/auth'
+import { effectiveSupplierId } from '@/lib/effective-supplier'
 import { getRoomsBySupplier, type Room } from '@/lib/rooms'
 
 function RoomsInner() {
@@ -16,7 +17,7 @@ function RoomsInner() {
   useEffect(() => {
     supabase.auth.getUser().then(({ data: { user } }) => {
       if (!user) { setLoading(false); return }
-      getRoomsBySupplier(user.id).then(r => {
+      getRoomsBySupplier(effectiveSupplierId(user.id)).then(r => {
         setRooms(r)
         setLoading(false)
       })

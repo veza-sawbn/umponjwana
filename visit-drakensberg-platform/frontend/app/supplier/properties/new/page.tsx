@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { ChevronRight, ChevronLeft } from 'lucide-react'
 import { supabase } from '@/lib/auth'
+import { effectiveSupplierId } from '@/lib/effective-supplier'
 import { addProperty, PROPERTY_REGIONS, PROPERTY_TYPES, PROPERTY_AMENITIES } from '@/lib/properties'
 import { getRegionNames } from '@/lib/regions'
 import { GoogleAddressField } from '@/components/maps/GoogleAddressField'
@@ -43,7 +44,7 @@ export default function NewPropertyPage() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) { alert('Not signed in'); return }
       await addProperty({
-        supplierId: user.id,
+        supplierId: effectiveSupplierId(user.id),
         name: form.name,
         type: form.type,
         starRating: form.starRating,

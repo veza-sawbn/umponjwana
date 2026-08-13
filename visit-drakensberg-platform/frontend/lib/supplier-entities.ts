@@ -1,5 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
-import { listEntities, getEntity, insertEntity, updateEntity, deleteEntity, newEntityId } from './entities'
+import { listEntities, getEntity, insertEntity, updateEntity, deleteEntity, newEntityId, listEntitiesByOwner } from './entities'
 
 export type SupplierStatus = 'active' | 'draft' | 'pending' | 'verified' | 'rejected' | 'inactive' | 'maintenance' | string
 
@@ -18,8 +18,10 @@ const kindFor = (entity: string) => `supplier_${entity}`
 // pattern as lib/entities.ts's listEntities()/getEntity(). Existing callers
 // (supplier dashboards, using the session-bound default) are unaffected.
 export async function getSupplierEntities<T extends SupplierEntity>(entity: string, supplierId?: string, client?: SupabaseClient): Promise<T[]> {
-  const all = await listEntities<T>(kindFor(entity), client)
-  return supplierId ? all.filter(item => item.supplierId === supplierId) : all
+  // When a supplier is named, scope the query at the database rather than
+  // fetching every supplier's rows and discarding them client-side.
+  if (supplierId) return listEntitiesByOwner<T>(kindFor(entity), supplierId, client)
+  return listEntities<T>(kindFor(entity), client)
 }
 
 export async function getSupplierEntity<T extends SupplierEntity>(entity: string, id: string, client?: SupabaseClient): Promise<T | null> {

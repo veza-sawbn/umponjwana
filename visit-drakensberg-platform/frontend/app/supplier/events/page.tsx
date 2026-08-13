@@ -32,6 +32,7 @@ interface SupplierEvent extends Pick<VdEvent, 'region' | 'gpsLat' | 'gpsLng'> {
 }
 
 import { supabase } from '@/lib/auth'
+import { effectiveSupplierId } from '@/lib/effective-supplier'
 import {
   getSupplierEntities, addSupplierEntity, updateSupplierEntity, deleteSupplierEntity,
 } from '@/lib/supplier-entities'
@@ -45,7 +46,7 @@ export default function EventsManagePage() {
 
   useEffect(() => {
     supabase.auth.getUser().then(async ({ data: { user } }) => {
-      if (user) setEvents(await getSupplierEntities<any>(ENTITY, user.id) as unknown as SupplierEvent[])
+      if (user) setEvents(await getSupplierEntities<any>(ENTITY, effectiveSupplierId(user.id)) as unknown as SupplierEvent[])
       setLoading(false)
     })
     getRegionNames().then(setRegions)
@@ -71,7 +72,7 @@ export default function EventsManagePage() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) throw new Error('no session')
       const saved = await addSupplierEntity<any>(ENTITY, {
-        supplierId: user.id,
+        supplierId: effectiveSupplierId(user.id),
         title: form.title,
         description: form.description,
         event_type: form.event_type,

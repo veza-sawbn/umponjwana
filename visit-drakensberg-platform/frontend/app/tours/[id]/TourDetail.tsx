@@ -167,7 +167,7 @@ export default function TourDetail({ tour, nearbyStays }: { tour: Tour; nearbySt
               <div className="mb-5">
                 <p className="font-sans text-[10px] tracking-[0.12em] uppercase text-gray-400">From</p>
                 <p className="font-display italic text-3xl text-[#2d6a4f]">R {tour.pricePerPerson.toLocaleString()}<span className="font-sans text-sm text-gray-400"> pp</span></p>
-                {tour.groupDiscount > 0 && (
+                {!!tour.groupDiscount && tour.groupDiscount > 0 && (
                   <p className="font-sans text-xs text-gray-400 mt-1">{tour.groupDiscount}% off for groups</p>
                 )}
               </div>

@@ -2,8 +2,9 @@
 
 import { useEffect, useState } from 'react'
 import toast from 'react-hot-toast'
-import { Building2, Eye, EyeOff } from 'lucide-react'
+import { Building2, Eye, EyeOff, AlertCircle } from 'lucide-react'
 import { supabase } from '@/lib/auth'
+import { effectiveSupplierId } from '@/lib/effective-supplier'
 import { getMyOperatorProfile, saveOperatorProfile, type OperatorProfile } from '@/lib/operators'
 import { PROPERTY_REGIONS } from '@/lib/properties'
 import { supplierMediaSource } from '@/lib/supplier-media'
@@ -47,13 +48,38 @@ export default function CompanyProfilePage() {
   const [userId, setUserId] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  // Only matters for a first save: creating the profile row requires
+  // is_active_supplier() to pass (role='supplier' AND is_approved=true).
+  // Updating an existing profile has no approval gate. Checked here so an
+  // unapproved account sees the reason before filling out the whole form,
+  // not after clicking Save.
+  const [approvalBlock, setApprovalBlock] = useState<string | null>(null)
   const set = (k: keyof FormState, v: unknown) => setForm(f => ({ ...f, [k]: v }))
 
   useEffect(() => {
     supabase.auth.getUser().then(async ({ data: { user } }) => {
       if (!user) { setLoading(false); return }
-      setUserId(user.id)
-      const profile = await getMyOperatorProfile(user.id)
+      // Company profile belongs to the SUPPLIER, not whoever is signed in.
+      // When an operations employee is acting-as a managed supplier, this
+      // resolves to the supplier's own id — using the raw signed-in user id
+      // here would read and write the employee's own (non-supplier) profile
+      // instead, and would misreport the employee's role/approval status as
+      // if it were the supplier's.
+      const ownerId = effectiveSupplierId(user.id)
+      setUserId(ownerId)
+      const profile = await getMyOperatorProfile(ownerId)
+
+      const { data: myProfile } = await supabase
+        .from('profiles')
+        .select('full_name, role, is_approved, approval_status')
+        .eq('id', ownerId)
+        .maybeSingle()
+      if (myProfile && myProfile.role !== 'admin' && !myProfile.is_approved) {
+        setApprovalBlock(
+          `Your supplier account is not approved yet${myProfile.approval_status ? ` (status: ${myProfile.approval_status})` : ''}. ` +
+          'You can fill in the form below, but saving it for the first time will be blocked until an administrator approves your account.',
+        )
+      }
       if (profile) {
         setExisting(profile)
         setForm({
@@ -73,7 +99,9 @@ export default function CompanyProfilePage() {
           status: profile.status,
         })
       } else {
-        setForm(f => ({ ...f, companyName: user.user_metadata?.full_name ?? '' }))
+        // Prefer the supplier's own profile name over the signed-in user's
+        // metadata — the two differ whenever an ops employee is acting-as.
+        setForm(f => ({ ...f, companyName: myProfile?.full_name || user.user_metadata?.full_name || '' }))
       }
       setLoading(false)
     })
@@ -114,8 +142,10 @@ export default function CompanyProfilePage() {
       setExisting(saved)
       set('status', status)
       toast.success(status === 'active' ? 'Profile published to the supplier directory.' : 'Profile saved as draft.')
-    } catch {
-      toast.error('Could not save the profile. Please try again.')
+    } catch (e) {
+      // Surface the real reason — an unapproved account is refused by RLS, and
+      // "please try again" would have the supplier retrying forever.
+      toast.error(e instanceof Error ? e.message : 'Could not save the profile. Please try again.')
     } finally {
       setSaving(false)
     }
@@ -138,6 +168,13 @@ export default function CompanyProfilePage() {
       <p className="font-sans text-sm text-black/40 -mt-3">
         This is your public listing in the Visit Drakensberg supplier directory. Verified guides from your Guides page appear on it automatically.
       </p>
+
+      {!existing && approvalBlock && (
+        <div className="flex items-start gap-3 border border-amber-200 bg-amber-50 rounded-lg px-4 py-3.5">
+          <AlertCircle size={16} className="text-amber-600 shrink-0 mt-0.5" />
+          <p className="font-sans text-sm text-amber-800 leading-relaxed">{approvalBlock}</p>
+        </div>
+      )}
 
       <div className="bg-white rounded-xl border border-black/8 p-6 space-y-4">
         <F label="Company Name" required><input value={form.companyName} onChange={e => set('companyName', e.target.value)} className={inp} /></F>

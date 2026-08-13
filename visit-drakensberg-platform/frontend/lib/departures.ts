@@ -1,5 +1,8 @@
 import { supabase } from './auth'
-import { listEntities, insertEntity, updateEntity, deleteEntity, newEntityId } from './entities'
+import {
+  listEntities, listEntitiesByOwner, insertEntity, updateEntity, deleteEntity, newEntityId,
+} from './entities'
+import { getEffectiveSupplierId } from './effective-supplier'
 import type { SupabaseClient } from '@supabase/supabase-js'
 
 // A rate package is one way to buy a seat on a departure — e.g. "Self-Sufficient"
@@ -44,8 +47,27 @@ export function newDeparturePackageId(): string {
   return newEntityId('pkg')
 }
 
+/**
+ * Public catalog read — every bookable departure on the platform.
+ * Use only on public-facing pages and in the admin console.
+ * Supplier-portal screens must use getMyDepartures() / getDeparturesBySupplier().
+ */
 export async function getDepartures(client?: SupabaseClient): Promise<Departure[]> {
   return client ? listEntities<Departure>(KIND, client) : listEntities<Departure>(KIND)
+}
+
+/** Only the departures owned by `supplierId`. */
+export async function getDeparturesBySupplier(supplierId: string): Promise<Departure[]> {
+  return listEntitiesByOwner<Departure>(KIND, supplierId)
+}
+
+/**
+ * The signed-in supplier's own departures — or, for operations staff who have
+ * entered a managed supplier, that supplier's departures.
+ */
+export async function getMyDepartures(): Promise<Departure[]> {
+  const ownerId = await getEffectiveSupplierId()
+  return ownerId ? getDeparturesBySupplier(ownerId) : []
 }
 
 export async function addDeparture(dep: Omit<Departure, 'id' | 'createdAt'>): Promise<Departure> {

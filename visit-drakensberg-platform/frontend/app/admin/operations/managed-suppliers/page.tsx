@@ -617,85 +617,18 @@ export default function ManagedSuppliersPage() {
     )
   }
 
-  // ── VD Operations employee view ──────────────────────────────────────────────
+  // Operations employees never reach this page — middleware routes them to their
+  // own /operations environment. This page is the admin's management view of the
+  // operations layer: who is on the team, and which suppliers they cover.
   if (isOpsEmployee) {
-    const canCreateSupplier = opsRole === 'ops_administrator'
     return (
       <div className="p-8">
-        <div className="mb-8 flex items-start justify-between flex-wrap gap-4">
-          <div>
-            <p className="font-sans text-[10px] tracking-[0.14em] uppercase text-gray-400 mb-1">
-              Visit Drakensberg Operations
-            </p>
-            <h1 className="font-display italic text-3xl text-[#000000]">Managed Suppliers</h1>
-            <p className="font-sans text-sm text-gray-500 mt-1">
-              Select a supplier to enter their management tools.
-              {mySuppliers.length > 1 && (
-                <span className="ml-1 font-medium text-gray-700">({mySuppliers.length} suppliers assigned)</span>
-              )}
-            </p>
-          </div>
-          {canCreateSupplier && (
-            <button
-              onClick={() => setShowCreateSupplier(true)}
-              className="inline-flex items-center gap-2 bg-[#2d6a4f] text-white px-4 py-2 font-sans text-sm hover:bg-[#245741] transition-colors"
-            >
-              <PlusCircle size={14} /> Create Supplier
-            </button>
-          )}
-        </div>
-        {showCreateSupplier && (
-          <CreateSupplierModal
-            onClose={() => setShowCreateSupplier(false)}
-            onCreated={() => { setShowCreateSupplier(false); load() }}
-          />
-        )}
-
-        {mySuppliers.length === 0 ? (
-          <div className="flex items-start gap-3 border border-amber-200 bg-amber-50 px-4 py-4 max-w-xl">
-            <AlertCircle size={16} className="text-amber-600 shrink-0 mt-0.5" />
-            <div>
-              <p className="font-sans text-sm font-medium text-amber-800">No suppliers assigned yet</p>
-              <p className="font-sans text-xs text-amber-700 mt-1 leading-relaxed">
-                Your account is active. A platform administrator needs to assign suppliers to your account before you can manage them.
-                Once assigned, your suppliers will appear here. Sign in at{' '}
-                <span className="font-mono bg-amber-100 px-1">/auth/login</span> and return here after you&apos;ve been notified.
-              </p>
-            </div>
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
-            {mySuppliers.map(s => (
-              <div key={s.supplier_id} className="bg-white border border-gray-200 p-5 flex flex-col gap-4">
-                <div className="flex items-start justify-between gap-2">
-                  <div className="min-w-0">
-                    <p className="font-display italic text-lg text-gray-900 leading-tight">{s.supplier_name ?? 'Unnamed Supplier'}</p>
-                    <p className="font-sans text-xs text-gray-400 mt-1">{s.supplier_email}</p>
-                  </div>
-                  <div className="shrink-0 flex flex-col items-end gap-1.5">
-                    {typeBadge(s.supplier_type)}
-                    {modelBadge(s.management_model)}
-                  </div>
-                </div>
-
-                <div className="border-t border-gray-100 pt-3 flex items-center justify-between gap-2">
-                  <div>
-                    <p className="font-sans text-[10px] text-gray-400">
-                      {s.permissions.length} permission{s.permissions.length !== 1 ? 's' : ''} ·{' '}
-                      {MANAGEMENT_STATUS_LABEL[s.management_status as keyof typeof MANAGEMENT_STATUS_LABEL] ?? s.management_status}
-                    </p>
-                  </div>
-                  <Link
-                    href={`/admin/operations/managed-suppliers/${s.supplier_id}`}
-                    className="inline-flex items-center gap-1.5 bg-[#2d6a4f] text-white px-3 py-1.5 font-sans text-xs hover:bg-[#245741] transition-colors"
-                  >
-                    Manage <ChevronRight size={12} />
-                  </Link>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
+        <p className="font-sans text-sm text-gray-400">
+          Redirecting you to your operations dashboard…
+        </p>
+        <Link href="/operations" className="font-sans text-sm text-[#2d6a4f] hover:underline">
+          Go to /operations
+        </Link>
       </div>
     )
   }

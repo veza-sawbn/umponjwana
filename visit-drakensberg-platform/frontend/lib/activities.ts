@@ -1,4 +1,4 @@
-import { listEntities, getEntity, insertEntity, updateEntity, deleteEntity, newEntityId } from './entities'
+import { listEntities, getEntity, insertEntity, updateEntity, deleteEntity, newEntityId, listEntitiesByOwner } from './entities'
 import type { GraphFields } from './graph-fields'
 import { slugify, uniqueSlug } from './slugify'
 import type { SupabaseClient } from '@supabase/supabase-js'
@@ -54,8 +54,9 @@ export async function getActivities(client?: SupabaseClient): Promise<Activity[]
 }
 
 export async function getActivitiesBySupplier(supplierId: string): Promise<Activity[]> {
-  const all = await listEntities<Activity>(KIND)
-  return all.filter(a => a.supplierId === supplierId)
+  // Owner-scoped at the database — see the note in lib/entities.ts on why
+  // listEntities() must not be used for supplier-facing reads.
+  return listEntitiesByOwner<Activity>(KIND, supplierId)
 }
 
 export async function getActivityById(id: string, client?: SupabaseClient): Promise<Activity | null> {

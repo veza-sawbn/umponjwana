@@ -33,17 +33,52 @@ export function newEntityId(prefix: string): string {
   return `${prefix}-${uuid}`
 }
 
-// Both read functions accept an optional Supabase client so Server
-// Components can pass a session-less client (lib/supabase-public.ts) —
-// same pattern as lib/regions.ts's getRegions(). Existing callers (every
-// domain lib wrapping this module) are unaffected; only the new server
-// detail-page shells pass a client explicitly.
+/**
+ * Reads every visible row of `kind`.
+ *
+ * IMPORTANT — this is the *public catalog* read. RLS on vd_entities grants
+ * "Public entities are readable" for any row whose status is active/open/
+ * confirmed/full, and Postgres OR-combines permissive policies, so this
+ * returns other suppliers' live listings by design. That is correct for
+ * anonymous browsing (/stays, /tours) and wrong for anything inside the
+ * supplier portal.
+ *
+ * Supplier-facing screens must use listEntitiesByOwner() instead — RLS will
+ * not scope the rows for you.
+ *
+ * Accepts an optional Supabase client so Server Components can pass a
+ * session-less client (lib/supabase-public.ts) instead of the browser
+ * client-component client this module defaults to — every existing caller
+ * (every domain lib wrapping this module) is unaffected.
+ */
 export async function listEntities<T>(kind: string, client: SupabaseClient = supabase): Promise<T[]> {
   try {
     const { data } = await client
       .from('vd_entities')
       .select('*')
       .eq('kind', kind)
+      .order('created_at', { ascending: false })
+    if (Array.isArray(data)) return (data as EntityRow[]).map(r => rowToItem<T>(r))
+  } catch {}
+  return []
+}
+
+/**
+ * Reads only the rows owned by `ownerId` — the correct read for the supplier
+ * portal and for operations staff acting on a managed supplier's behalf.
+ *
+ * Filtering on owner_id here is the actual tenant boundary for reads: the
+ * "Owners read own entities" policy is permissive and sits alongside the
+ * public-catalog policy, so it narrows nothing on its own.
+ */
+export async function listEntitiesByOwner<T>(kind: string, ownerId: string, client: SupabaseClient = supabase): Promise<T[]> {
+  if (!ownerId) return []
+  try {
+    const { data } = await client
+      .from('vd_entities')
+      .select('*')
+      .eq('kind', kind)
+      .eq('owner_id', ownerId)
       .order('created_at', { ascending: false })
     if (Array.isArray(data)) return (data as EntityRow[]).map(r => rowToItem<T>(r))
   } catch {}
@@ -67,15 +102,78 @@ export async function insertEntity<T extends { id: string; status?: string; supp
   kind: string,
   item: T,
 ): Promise<T> {
+  // owner_id is what every ownership check keys on, so it must never be null.
+  // A row inserted without an owner is invisible to owner-scoped reads yet
+  // still public once active — exactly the shape of a cross-tenant leak.
+  // Fall back to the signed-in user when the item carries no supplierId.
+  let ownerId = item.supplierId || null
+  if (!ownerId) {
+    const { data: { user } } = await supabase.auth.getUser()
+    ownerId = user?.id ?? null
+  }
+  if (!ownerId) throw new Error('Cannot create this record without a signed-in owner.')
+
   const { error } = await supabase.from('vd_entities').insert({
     id: item.id,
     kind,
-    owner_id: item.supplierId || null,
+    owner_id: ownerId,
     status: item.status || 'active',
     value: item,
   })
-  if (error) throw error
+  if (error) {
+    // 42501 is the RLS refusal from "Suppliers insert own", whose check is
+    // owner_id = auth.uid() AND is_active_supplier() — the latter requires
+    // role = 'supplier' AND is_approved = true. Rather than assume which half
+    // failed, read the account's own live profile (readable under "Users can
+    // read own profile") and report what the database actually says right
+    // now, so a stale is_approved and a genuinely-blocked account produce
+    // different, actionable messages instead of one guess.
+    if (error.code === '42501') {
+      throw new Error(await diagnoseSupplierApprovalBlock())
+    }
+    throw error
+  }
   return item
+}
+
+async function diagnoseSupplierApprovalBlock(): Promise<string> {
+  const fallback =
+    'Your supplier account is not approved yet, so it cannot create listings. ' +
+    'Once an administrator approves it this will save normally.'
+  try {
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return fallback
+
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('role, is_approved, approval_status')
+      .eq('id', user.id)
+      .maybeSingle()
+    if (!profile) return fallback
+
+    if (profile.role !== 'supplier' && profile.role !== 'admin') {
+      return `Your account isn't set up as a supplier (current role: "${profile.role}"). ` +
+        'Ask a platform administrator to check your account type.'
+    }
+
+    if (!profile.is_approved) {
+      return 'Your supplier account is not approved yet' +
+        (profile.approval_status ? ` (status: ${profile.approval_status})` : '') +
+        '. Ask a platform administrator to approve it in the admin console.'
+    }
+
+    // role is correct and is_approved is already true, yet the database still
+    // refused the write — the two representations can't both be true here
+    // and still hit this policy. The most likely explanation is that
+    // 20260815_approval_consistency.sql hasn't been applied to this database
+    // yet, so the underlying schema RLS is still operating on stale logic.
+    return 'Your account shows as approved, but the database still rejected this save. ' +
+      'This usually means a pending database update hasn\'t been applied yet — ask ' +
+      'whoever manages the Supabase project to confirm migration ' +
+      '20260815_approval_consistency.sql has been run.'
+  } catch {
+    return fallback
+  }
 }
 
 export async function updateEntity(

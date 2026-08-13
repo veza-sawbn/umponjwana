@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { Building2, Plus, Star, BedDouble } from 'lucide-react'
 import { supabase } from '@/lib/auth'
+import { effectiveSupplierId } from '@/lib/effective-supplier'
 import { getPropertiesBySupplier, type Property } from '@/lib/properties'
 
 export default function PropertiesPage() {
@@ -12,7 +13,7 @@ export default function PropertiesPage() {
   useEffect(() => {
     supabase.auth.getUser().then(({ data: { user } }) => {
       if (!user) { setLoading(false); return }
-      getPropertiesBySupplier(user.id).then(p => {
+      getPropertiesBySupplier(effectiveSupplierId(user.id)).then(p => {
         setProperties(p)
         setLoading(false)
       })

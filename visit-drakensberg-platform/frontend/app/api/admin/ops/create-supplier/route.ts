@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { cookies } from 'next/headers'
 import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs'
 import { supabaseAdmin } from '@/lib/supabase-admin'
+import { DEFAULT_PERMISSIONS_BY_ROLE } from '@/lib/ops-assignments'
 
 export const dynamic = 'force-dynamic'
 
@@ -111,6 +112,10 @@ export async function POST(req: Request) {
     user_metadata: {
       full_name: body.businessName.trim(),
       role: 'supplier',
+      // The supplier portal reads supplier_type to build its tool nav. Set it
+      // here as well as on the profile row so the account has its tools from
+      // first sign-in rather than an empty sidebar.
+      supplier_type: body.supplierType,
       ...(ownerContactEmail ? { owner_contact_email: ownerContactEmail } : {}),
     },
   })
@@ -128,14 +133,27 @@ export async function POST(req: Request) {
   // Update the profile with supplier-specific fields.
   // handle_new_user() runs in the same DB transaction as the auth INSERT so
   // the profile row already exists by the time we get here.
-  const { error: profileError } = await admin
+  // approval_status is written alongside is_approved so the supplier portal
+  // (which honours either) never shows a VD-created account as pending.
+  const profileRow = {
+    full_name: body.businessName.trim(),
+    supplier_type: body.supplierType,
+    is_approved: true,
+    approval_status: 'approved',
+  }
+  let { error: profileError } = await admin
     .from('profiles')
-    .update({
-      full_name: body.businessName.trim(),
-      supplier_type: body.supplierType,
-      is_approved: true,
-    })
+    .update(profileRow)
     .eq('id', supplierId)
+
+  // 42703 = approval_status missing (moderation migration not applied here).
+  if (profileError?.code === '42703') {
+    const { approval_status: _omit, ...withoutStatus } = profileRow
+    ;({ error: profileError } = await admin
+      .from('profiles')
+      .update(withoutStatus)
+      .eq('id', supplierId))
+  }
 
   if (profileError) {
     console.error('[ops/create-supplier] profile update error:', profileError)
@@ -143,19 +161,22 @@ export async function POST(req: Request) {
   }
 
   // Ops administrators are automatically assigned to the supplier they create.
+  // Uses the role's own canonical permission set (the same one
+  // AssignSupplierModal pre-fills when an admin assigns staff manually) —
+  // not an ad hoc list. A hand-picked subset here previously included
+  // 'manage_listings', which matches no key in ALL_PERMISSIONS and so
+  // unlocked nothing: not a single supplier-portal tool checks for it, and
+  // no RLS policy on vd_entities does either. It also omitted
+  // 'view_supplier', which every unmapped route (including the portal's own
+  // Overview page) falls back to — so a supplier created this way looked
+  // almost entirely empty to the ops administrator who had just created it.
   if (isOpsAdministrator && !isPlatformAdmin) {
     const { error: assignError } = await admin
       .from('vd_ops_assignments')
       .insert({
         employee_id: user.id,
         supplier_id: supplierId,
-        permissions: [
-          'view_bookings',
-          'manage_listings',
-          'view_financials',
-          'manage_availability',
-          'manage_rates',
-        ],
+        permissions: DEFAULT_PERMISSIONS_BY_ROLE.ops_administrator,
         is_active: true,
       })
     if (assignError) {

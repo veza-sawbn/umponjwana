@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from 'react'
 import { MessageSquare, Send } from 'lucide-react'
 import { useSupplier } from '@/lib/supplier-context'
 import { supabase } from '@/lib/auth'
+import { effectiveSupplierId } from '@/lib/effective-supplier'
 import { getThreadsBySupplier, sendMessage, type MessageThread } from '@/lib/messages'
 
 export default function MessagesPage() {
@@ -20,11 +21,12 @@ export default function MessagesPage() {
   useEffect(() => {
     supabase.auth.getUser().then(({ data: { user } }) => {
       if (!user) { setLoading(false); return }
-      setSupplierId(user.id)
+      const ownerId = effectiveSupplierId(user.id)
+      setSupplierId(ownerId)
       const displayName = fullName || user.user_metadata?.full_name || ''
       const email = user.email || ''
       setSupplierName(displayName || email)
-      getThreadsBySupplier(user.id, [displayName, email].filter(Boolean)).then(t => {
+      getThreadsBySupplier(ownerId, [displayName, email].filter(Boolean)).then(t => {
         setThreads(t.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)))
         setLoading(false)
       })
