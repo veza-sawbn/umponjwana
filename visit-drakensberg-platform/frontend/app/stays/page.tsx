@@ -6,6 +6,7 @@ import Footer from '@/components/layout/Footer'
 import EditablePageHeader from '@/components/editor/EditablePageHeader'
 import { getProperties, type Property } from '@/lib/properties'
 import { getRoomsByProperty } from '@/lib/rooms'
+import { regionsMatch } from '@/lib/regions'
 
 type StayCard = {
   id: string
@@ -47,8 +48,12 @@ export default function StaysPage() {
   const [amenities, setAmenities] = useState<string[]>([])
   const [showFilters, setShowFilters] = useState(false)
   const [liveProperties, setLiveProperties] = useState<StayCard[]>([])
+  const [regionFilter, setRegionFilter] = useState('')
 
   useEffect(() => {
+    const regionParam = new URLSearchParams(window.location.search).get('region')
+    if (regionParam) setRegionFilter(regionParam)
+
     getProperties().then(async props => {
       const active = props.filter(p => p.status === 'active')
       const cards = await Promise.all(active.map(async p => {
@@ -64,7 +69,11 @@ export default function StaysPage() {
     setAmenities((prev) => prev.includes(a) ? prev.filter((x) => x !== a) : [...prev, a])
 
   const filtered = liveProperties
-    .filter((s) => (!s.price || s.price <= maxPrice) && (!amenities.length || amenities.every((a) => s.amenities.includes(a))))
+    .filter((s) =>
+      (!s.price || s.price <= maxPrice) &&
+      (!amenities.length || amenities.every((a) => s.amenities.includes(a))) &&
+      (!regionFilter || regionsMatch(s.location, regionFilter))
+    )
     .sort((a, b) => {
       if (sortBy === 'Price: Low to High') return a.price - b.price
       if (sortBy === 'Price: High to Low') return b.price - a.price

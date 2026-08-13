@@ -82,8 +82,9 @@ export default function RegionsPage() {
                   </div>
                 )}
                 <div className="flex flex-wrap gap-4">
-                  <Link href={`/stays?region=${encodeURIComponent(r.name)}`} className="font-sans text-sm px-5 py-2.5 bg-forest text-white hover:bg-sage transition-colors">Browse Stays</Link>
-                  <Link href={`/hikes?region=${encodeURIComponent(r.name)}`} className="font-sans text-sm px-5 py-2.5 border border-forest text-forest hover:bg-forest hover:text-white transition-colors inline-flex items-center gap-2">View Hikes <ArrowRight className="w-3.5 h-3.5" /></Link>
+                  <Link href={`/regions/${r.slug}`} className="font-sans text-sm px-5 py-2.5 bg-forest text-white hover:bg-sage transition-colors inline-flex items-center gap-2">Explore Region <ArrowRight className="w-3.5 h-3.5" /></Link>
+                  <Link href={`/stays?region=${encodeURIComponent(r.name)}`} className="font-sans text-sm px-5 py-2.5 border border-forest text-forest hover:bg-forest hover:text-white transition-colors">Browse Stays</Link>
+                  <Link href={`/hikes?region=${encodeURIComponent(r.name)}`} className="font-sans text-sm px-5 py-2.5 border border-forest/40 text-forest/60 hover:border-forest hover:text-forest transition-colors inline-flex items-center gap-2">View Hikes <ArrowRight className="w-3.5 h-3.5" /></Link>
                 </div>
               </div>
             </div>
