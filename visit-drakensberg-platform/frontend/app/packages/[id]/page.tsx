@@ -12,6 +12,10 @@ import PackageDetail from './PackageDetail'
 
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://visitdrakensberg.com'
 
+// ISR — short interval: supplier-editable pricing/status changes more
+// often than editorial content. See docs/destination-graph/PHASE_D.md.
+export const revalidate = 300
+
 async function resolvePackage(id: string): Promise<MarketplacePackage | null> {
   return getPackageById(id, publicSupabase)
 }

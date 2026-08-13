@@ -13,6 +13,11 @@ import RegionDetail from './RegionDetail'
 
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://visitdrakensberg.com'
 
+// ISR — regions are admin-configured and change rarely; a stale hour costs
+// nothing and every request no longer needs a live Supabase round-trip.
+// See docs/destination-graph/PHASE_D.md.
+export const revalidate = 3600
+
 async function resolveRegion(slug: string): Promise<Region | null> {
   const regions = await getRegions(publicSupabase)
   return regions.find(r => r.slug === slug || r.id === slug) ?? null

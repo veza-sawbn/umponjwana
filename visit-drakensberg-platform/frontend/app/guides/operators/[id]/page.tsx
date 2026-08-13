@@ -9,6 +9,10 @@ import OperatorDetail from './OperatorDetail'
 
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://visitdrakensberg.com'
 
+// ISR — operator profiles change infrequently. See
+// docs/destination-graph/PHASE_D.md.
+export const revalidate = 1800
+
 async function resolveOperator(id: string): Promise<OperatorProfile | null> {
   return getOperatorById(id, publicSupabase)
 }

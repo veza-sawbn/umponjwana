@@ -21,6 +21,10 @@ import NearbyStaysModule from '@/components/modules/NearbyStaysModule'
 
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://visitdrakensberg.com'
 
+// ISR — reserve content (description, peaks, permits) is admin-edited and
+// changes rarely. See docs/destination-graph/PHASE_D.md.
+export const revalidate = 3600
+
 const DIFF_COLOR: Record<string, string> = {
   accessible: '#4A7251',
   moderate: '#C9A96E',

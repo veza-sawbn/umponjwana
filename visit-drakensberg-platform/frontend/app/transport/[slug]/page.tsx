@@ -15,6 +15,11 @@ import { publicSupabase } from '@/lib/supabase-public'
 
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://visitdrakensberg.com'
 
+// ISR — route pricing/duration is supplier-editable but changes far less
+// often than activity/stay/tour/package pricing. See
+// docs/destination-graph/PHASE_D.md.
+export const revalidate = 1800
+
 async function resolveRoute(slug: string): Promise<{ route: Route; companyName?: string } | null> {
   const routes = await getRoutes(publicSupabase)
   const route = routes.find(r => r.slug === slug || r.id === slug)

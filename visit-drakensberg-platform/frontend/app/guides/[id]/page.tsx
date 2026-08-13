@@ -11,6 +11,10 @@ import GuideDetail from './GuideDetail'
 
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://visitdrakensberg.com'
 
+// ISR — guide profiles change infrequently. See
+// docs/destination-graph/PHASE_D.md.
+export const revalidate = 1800
+
 async function resolveGuide(id: string): Promise<GuideProfile | null> {
   return getGuideById(id, publicSupabase)
 }

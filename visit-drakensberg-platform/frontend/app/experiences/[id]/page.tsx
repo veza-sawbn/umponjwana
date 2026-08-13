@@ -16,6 +16,12 @@ import ExperienceDetail from './ExperienceDetail'
 
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://visitdrakensberg.com'
 
+// No `revalidate` here, deliberately — unlike every other converted route
+// (see docs/destination-graph/PHASE_D.md), an experience is one dated
+// departure: seats booked, sold-out state and the noindex-when-past logic
+// below are all time-sensitive in a way a cached page would misreport.
+// Stays fully dynamic (the Next.js default), rendered fresh per request.
+
 async function resolveExperience(id: string): Promise<TrekkingExperience | null> {
   return getExperienceById(id, publicSupabase)
 }

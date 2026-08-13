@@ -17,6 +17,10 @@ import NearbyStaysModule from '@/components/modules/NearbyStaysModule'
 
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://visitdrakensberg.com'
 
+// ISR — town content is admin-edited and changes rarely. See
+// docs/destination-graph/PHASE_D.md.
+export const revalidate = 3600
+
 async function resolveTown(slug: string): Promise<{ town: Town; regionName: string; regionSlug: string } | null> {
   // getTowns() throws on a Supabase query error (unlike getRegions(), which
   // catches internally) — fall back to the same DEFAULT_TOWNS the rest of

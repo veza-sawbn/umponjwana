@@ -19,6 +19,11 @@ import HikeDetail from './HikeDetail'
 
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://visitdrakensberg.com'
 
+// ISR — trail content (route, elevation, permits) changes infrequently,
+// but more often than region/reserve/town copy. See
+// docs/destination-graph/PHASE_D.md.
+export const revalidate = 1800
+
 async function resolveTrail(id: string): Promise<Trail | null> {
   const trails = await getTrails(publicSupabase).catch(() => DEFAULT_TRAILS)
   return trails.find(t => t.id === id || t.slug === id) ?? null

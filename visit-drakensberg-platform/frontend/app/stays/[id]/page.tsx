@@ -15,6 +15,13 @@ import StayDetail from './StayDetail'
 
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://visitdrakensberg.com'
 
+// ISR — short interval: supplier-editable pricing/status changes more
+// often than editorial content. Live per-date room availability stays a
+// client-side check regardless (see StayDetail.tsx) — this only governs
+// how fresh the static shell (property + room catalog) is. See
+// docs/destination-graph/PHASE_D.md.
+export const revalidate = 300
+
 async function resolveStay(id: string): Promise<{ property: Property; rooms: Room[] } | null> {
   const property = await getPropertyById(id, publicSupabase)
   if (!property) return null

@@ -15,6 +15,12 @@ import TourDetail from './TourDetail'
 
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://visitdrakensberg.com'
 
+// ISR — short interval: supplier-editable pricing/status changes more
+// often than editorial content. Upcoming departures stay a client-side
+// fetch regardless (see TourDetail.tsx) — this only governs freshness of
+// the tour shell itself. See docs/destination-graph/PHASE_D.md.
+export const revalidate = 300
+
 async function resolveTour(id: string): Promise<Tour | null> {
   const tours = await getTours(publicSupabase)
   return tours.find(t => t.id === id || t.slug === id) ?? null
