@@ -82,6 +82,30 @@ export function slugifyRegion(name: string) {
 // to be treated as compatible. Normalize the Northern/Southern adjective
 // forms and fall back to substring matching (either name containing the
 // other) so "Royal Natal" matches "Royal Natal National Park", etc.
+//
+// SUBREGION_ALIASES maps normalised park / subregion names → normalised parent
+// region name. This covers cases where substring matching cannot work because
+// the park name shares no words with the parent region name (e.g. "royal natal
+// national park" ↔ "north berg").
+const SUBREGION_ALIASES: Record<string, string> = {
+  'royal natal national park': 'north berg',
+  'royal natal':               'north berg',
+  'amphitheatre':              'north berg',
+  "giant's castle":            'central berg',
+  'giants castle':             'central berg',
+  'monks cowl':                'central berg',
+  'cathedral peak':            'central berg',
+  'champagne valley':          'central berg',
+  'champagne castle':          'central berg',
+  'mkhomazi':                  'south berg',
+  'mkhomazi wilderness':       'south berg',
+  'garden castle':             'south berg',
+  "bushman's nek":             'south berg',
+  'bushmans nek':              'south berg',
+  'sani pass':                 'south berg',
+  'drakensberg gardens':       'south berg',
+}
+
 export function normalizeRegionName(region: string | undefined | null): string {
   return (region || '').toLowerCase().trim().replace(/\bnorthern\b/, 'north').replace(/\bsouthern\b/, 'south')
 }
@@ -91,7 +115,14 @@ export function regionsMatch(a: string | undefined | null, b: string | undefined
   const na = normalizeRegionName(a)
   const nb = normalizeRegionName(b)
   if (!na || !nb) return false
-  return na.includes(nb) || nb.includes(na)
+  // Exact / substring match (handles "North Berg" ↔ "Northern Berg" etc.)
+  if (na === nb || na.includes(nb) || nb.includes(na)) return true
+  // Subregion alias — check whether either side is an alias for the other's parent region
+  const aliasA = SUBREGION_ALIASES[na]
+  const aliasB = SUBREGION_ALIASES[nb]
+  if (aliasA && (aliasA === nb || nb.includes(aliasA) || aliasA.includes(nb))) return true
+  if (aliasB && (aliasB === na || na.includes(aliasB) || aliasB.includes(na))) return true
+  return false
 }
 
 function normalizeRegion(region: Partial<Region> & { name: string; id?: string }): Region {

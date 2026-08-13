@@ -84,8 +84,10 @@ function ConversationPanel({
     setSending(true)
     try {
       const updated = await sendMessage(thread.id, 'visitor', visitorName, body.trim())
-      if (updated) onNewMessage(updated)
-      setBody('')
+      if (updated) {
+        onNewMessage(updated)
+        setBody('')
+      }
     } finally {
       setSending(false)
     }
@@ -172,6 +174,10 @@ export default function AccountMessagesPage() {
       if (!user) { setLoading(false); return }
       const name = user.user_metadata?.full_name || user.email?.split('@')[0] || 'Guest'
       setVisitorName(name)
+      // Mark all supplier messages as seen — Navbar badge re-counts against this timestamp
+      try {
+        localStorage.setItem(`vd_msgs_last_seen_${user.id}`, new Date().toISOString())
+      } catch {}
       getThreadsByCustomer(user.id).then(ts => {
         setThreads(ts)
         if (ts.length > 0) setActiveId(ts[0].id)

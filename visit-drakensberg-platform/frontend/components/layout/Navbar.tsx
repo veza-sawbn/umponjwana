@@ -211,9 +211,13 @@ export default function Navbar() {
       if (data.user) {
         // Load badge counts after auth — fire and forget
         getUnreadCount().then(setUnreadNotifs).catch(() => {})
-        getThreadsByCustomer(data.user.id).then(threads => {
-          // Count threads with at least one supplier message (any activity = "unread")
-          setUnreadMessages(threads.filter(t => t.messages.some(m => m.from === 'supplier')).length)
+        const userId = data.user.id
+        const lastSeen = localStorage.getItem(`vd_msgs_last_seen_${userId}`) ?? ''
+        getThreadsByCustomer(userId).then(threads => {
+          // Count threads that have a supplier message newer than the visitor's last seen timestamp
+          setUnreadMessages(threads.filter(t =>
+            t.messages.some(m => m.from === 'supplier' && (!lastSeen || m.createdAt > lastSeen))
+          ).length)
         }).catch(() => {})
       }
     })
@@ -226,7 +230,20 @@ export default function Navbar() {
     return () => { sub.subscription.unsubscribe(); window.removeEventListener('scroll', onScroll) }
   }, [])
 
-  useEffect(() => { setMenuOpen(false) }, [pathname])
+  useEffect(() => {
+    setMenuOpen(false)
+    // Re-evaluate the messages badge whenever the user navigates — the messages
+    // page writes vd_msgs_last_seen_{userId} on mount, so navigating away from it
+    // and back to another page should immediately reflect the cleared count.
+    if (user) {
+      const lastSeen = localStorage.getItem(`vd_msgs_last_seen_${user.id}`) ?? ''
+      getThreadsByCustomer(user.id).then(threads => {
+        setUnreadMessages(threads.filter(t =>
+          t.messages.some(m => m.from === 'supplier' && (!lastSeen || m.createdAt > lastSeen))
+        ).length)
+      }).catch(() => {})
+    }
+  }, [pathname])
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {

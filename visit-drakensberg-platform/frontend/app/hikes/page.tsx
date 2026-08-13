@@ -4,6 +4,7 @@ import Link from 'next/link'
 import Footer from '@/components/layout/Footer'
 import EditablePageHeader from '@/components/editor/EditablePageHeader'
 import { getTrails, trailStartPoint, trailCategory, type Trail, type TrailCategory } from '@/lib/trails'
+import { regionsMatch } from '@/lib/regions'
 import TrailExperiences from '@/components/experiences/TrailExperiences'
 import { getUpcomingExperiences, type TrekkingExperience } from '@/lib/experiences'
 import RouteArtwork from '@/components/trails/RouteArtwork'
@@ -53,7 +54,7 @@ export default function HikesPage() {
     (category === 'All' || trailCategory(t) === category) &&
     (category !== 'speciality_walk' || specialityType === 'All' || t.speciality_type === specialityType) &&
     (diff === 'All' || t.difficulty === diff) &&
-    (region === 'All' || t.region === region) &&
+    (region === 'All' || regionsMatch(t.region, region)) &&
     (routeType === 'All' || (t.trail_type || '') === routeType) &&
     parseKm(t.distance) <= maxDist
   )
