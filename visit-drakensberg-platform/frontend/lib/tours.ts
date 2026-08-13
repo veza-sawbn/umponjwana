@@ -21,7 +21,8 @@ export type Tour = {
   fitnessNotes: string
   cancellation: string
   pricePerPerson: number
-  groupDiscount: number
+  /** @deprecated Removed from the supplier forms; retained so stored tours still parse. */
+  groupDiscount?: number
   status: 'active' | 'draft'
   supplierName: string
   supplierId: string

@@ -114,8 +114,10 @@ export default function CompanyProfilePage() {
       setExisting(saved)
       set('status', status)
       toast.success(status === 'active' ? 'Profile published to the supplier directory.' : 'Profile saved as draft.')
-    } catch {
-      toast.error('Could not save the profile. Please try again.')
+    } catch (e) {
+      // Surface the real reason — an unapproved account is refused by RLS, and
+      // "please try again" would have the supplier retrying forever.
+      toast.error(e instanceof Error ? e.message : 'Could not save the profile. Please try again.')
     } finally {
       setSaving(false)
     }
