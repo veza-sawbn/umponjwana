@@ -2,14 +2,13 @@ import type { BookingState } from './booking-context'
 
 export type DestinationCategory = 'destination' | 'attraction' | 'nature' | 'experience' | 'summer' | 'winter'
 
-// ── Destination-graph navigation (Phase A) ─────────────────────────────────
+// ── Destination-graph navigation (Phase A, wired in Phase E) ────────────────
 // This is the reframed primary IA from the destination-graph review: 7
 // primaries (Explore · Hikes · Stay · Things to Do · Tours · Plan Your Trip
-// · Transport). It is deliberately NOT PRIMARY_NAVIGATION's replacement yet
-// — PRIMARY_NAVIGATION above remains what Navbar.tsx renders. This export
-// exists so the new IA is committed as data and reviewable now, wired into
-// the Navbar only once Phase B's resolvability work is done (see
-// docs/destination-graph/PHASE_A.md).
+// · Transport). As of Phase E this is what Navbar.tsx actually renders,
+// filtered to 'live' nodes only — PRIMARY_NAVIGATION below is no longer
+// consumed by the Navbar but is left in place in case other code still
+// reads it. See docs/destination-graph/PHASE_A.md and PHASE_E.md.
 //
 // Critically, per the graph-first reassessment: most of the original 81-item
 // IA are taxonomy values or filter facets, not pages, and are NOT
@@ -34,7 +33,7 @@ export type NavNode = {
   children?: NavNode[]
 }
 
-/** The renderer (Phase B) must only expose 'live' nodes. 'planned' nodes stay
+/** The renderer (Navbar.tsx, Phase E) must only expose 'live' nodes. 'planned' nodes stay
  *  in this array so the full IA is visible to admins/devs without being
  *  linked publicly — resolvability is checked at render time, not by
  *  filtering this array, so a node flips to 'live' by editing one field

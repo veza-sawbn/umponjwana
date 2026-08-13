@@ -236,6 +236,7 @@ export const SITE_CONTENT_DEFAULTS = {
     regions_image:    'https://images.unsplash.com/photo-1516026672322-bc52d61a55d5?w=1200&q=80',
     stories_image:    'https://images.unsplash.com/photo-1501854140801-50d01698950b?w=1200&q=80',
     plan_image:       'https://images.unsplash.com/photo-1441974231531-c6227db76b6e?w=1200&q=80',
+    tours_image:      'https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?w=1200&q=80',
   },
 }
 
