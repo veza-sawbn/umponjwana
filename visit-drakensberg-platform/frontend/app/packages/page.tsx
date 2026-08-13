@@ -3,7 +3,14 @@ import Link from 'next/link'
 import { useEffect, useState } from 'react'
 import { ArrowRight } from 'lucide-react'
 import Footer from '@/components/layout/Footer'
-import { getPublishedPackages } from '@/lib/packages'
+import { getPublishedPackages, PACKAGE_CATEGORIES, PACKAGE_CATEGORY_LABELS, type PackageCategory } from '@/lib/packages'
+
+// Filter tabs mirror the vocabulary curated in the Package Builder
+// (/admin/packages) — see lib/packages.ts PACKAGE_CATEGORIES.
+const TABS: { label: string; slug: PackageCategory | '' }[] = [
+  { label: 'All', slug: '' },
+  ...PACKAGE_CATEGORIES.map(c => ({ label: PACKAGE_CATEGORY_LABELS[c], slug: c })),
+]
 
 type PackageCard = {
   id: string
@@ -17,11 +24,13 @@ type PackageCard = {
   tag?: string
   rating?: number
   reviews?: number
+  categories: PackageCategory[]
 }
 
 export default function PackagesPage() {
   const [cards, setCards] = useState<PackageCard[]>([])
   const [loading, setLoading] = useState(true)
+  const [category, setCategory] = useState<PackageCategory | ''>('')
 
   useEffect(() => {
     getPublishedPackages().then(live => {
@@ -35,10 +44,13 @@ export default function PackagesPage() {
         img: p.image || 'https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?w=900&q=80',
         includes: p.components.map(c => c.title).filter(Boolean).slice(0, 5),
         tag: p.featured ? (p.tag || 'Featured') : p.tag || undefined,
+        categories: p.categories ?? [],
       })))
       setLoading(false)
     }).catch(() => setLoading(false))
   }, [])
+
+  const filtered = cards.filter(c => !category || c.categories.includes(category))
 
   return (
     <main className="bg-mist min-h-screen pt-16">
@@ -51,12 +63,33 @@ export default function PackagesPage() {
         </div>
       </section>
 
+      <section className="bg-white border-b border-black/8 px-6 lg:px-12">
+        <div className="max-w-[1440px] mx-auto flex gap-8 overflow-x-auto">
+          {TABS.map((t) => (
+            <button
+              key={t.slug || 'all'}
+              onClick={() => setCategory(t.slug)}
+              className={`font-sans text-sm py-4 border-b-2 transition-all whitespace-nowrap ${
+                category === t.slug
+                  ? 'text-forest border-forest'
+                  : 'text-forest/50 border-transparent hover:text-forest hover:border-forest'
+              }`}
+            >
+              {t.label}
+            </button>
+          ))}
+        </div>
+      </section>
+
       <div className="max-w-[1440px] mx-auto px-6 lg:px-12 py-12">
         {!loading && cards.length === 0 && (
           <p className="font-sans text-sm text-forest/40 py-16 text-center">No packages published yet — check back soon.</p>
         )}
+        {!loading && cards.length > 0 && filtered.length === 0 && (
+          <p className="font-sans text-sm text-forest/40 py-16 text-center">No packages in {TABS.find(t => t.slug === category)?.label} yet — try another category.</p>
+        )}
         <div className="grid lg:grid-cols-2 gap-8">
-          {cards.map((p) => (
+          {filtered.map((p) => (
             <Link key={p.id} href={`/packages/${p.id}`} className="group bg-white border border-black/8 block hover:border-forest/30 transition-colors">
               <div className="relative overflow-hidden aspect-[16/9]">
                 <img src={p.img} alt={p.title}

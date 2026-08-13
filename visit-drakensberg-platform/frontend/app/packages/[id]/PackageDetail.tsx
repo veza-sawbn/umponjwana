@@ -9,7 +9,7 @@ import {
   Calendar, Minus, Plus, Info, Mountain,
 } from 'lucide-react'
 import { supabase } from '@/lib/auth'
-import { COMPONENT_TYPE_LABELS, type MarketplacePackage } from '@/lib/packages'
+import { COMPONENT_TYPE_LABELS, PACKAGE_CATEGORY_LABELS, type MarketplacePackage } from '@/lib/packages'
 import { bookPackage } from '@/lib/package-bookings'
 import { getTrails, type Trail } from '@/lib/trails'
 
@@ -122,6 +122,9 @@ export default function PackageDetail({ pkg, id }: { pkg: MarketplacePackage; id
             <div className="flex items-center gap-3 flex-wrap mb-2">
               {pkg.tag && <span className="font-sans text-[10px] tracking-[0.15em] uppercase bg-[#C9A96E] text-[#2d2d2d] px-3 py-1">{pkg.tag}</span>}
               {pkg.featured && <span className="font-sans text-[10px] tracking-[0.15em] uppercase bg-white/15 text-white px-3 py-1 flex items-center gap-1"><Star size={10} /> Featured</span>}
+              {(pkg.categories ?? []).map(c => (
+                <span key={c} className="font-sans text-[10px] tracking-[0.15em] uppercase bg-white/15 text-white px-3 py-1">{PACKAGE_CATEGORY_LABELS[c]}</span>
+              ))}
             </div>
             <h1 className="font-display italic text-4xl lg:text-6xl text-white">{pkg.title}</h1>
             <p className="font-sans text-sm text-white/70 mt-2 flex items-center gap-2">
@@ -149,7 +152,7 @@ export default function PackageDetail({ pkg, id }: { pkg: MarketplacePackage; id
                 {pkg.components.map(c => (
                   <div key={c.id} className="bg-white border border-gray-200 p-4 flex items-start gap-3">
                     <CheckCircle size={15} className="text-[#2d6a4f] mt-0.5 shrink-0" />
-                    <div>
+                    <div className="flex-1 min-w-0">
                       <p className="font-sans text-sm text-gray-800">
                         <span className="text-[10px] tracking-[0.1em] uppercase text-[#C9A96E] mr-2">{COMPONENT_TYPE_LABELS[c.type]}</span>
                         {c.title}
@@ -159,6 +162,14 @@ export default function PackageDetail({ pkg, id }: { pkg: MarketplacePackage; id
                         {c.availability && <> · {c.availability}</>}
                         {c.cancellationRules && <> · {c.cancellationRules}</>}
                       </p>
+                      {(c.gallery ?? []).length > 0 && (
+                        <div className="flex gap-2 mt-3 overflow-x-auto">
+                          {(c.gallery ?? []).map((url, i) => (
+                            <img key={i} src={url} alt={`${c.title} photo ${i + 1}`}
+                              className="w-24 h-20 object-cover shrink-0 border border-gray-100" />
+                          ))}
+                        </div>
+                      )}
                     </div>
                   </div>
                 ))}

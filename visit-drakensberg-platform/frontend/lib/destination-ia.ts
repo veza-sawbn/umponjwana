@@ -113,7 +113,8 @@ export const DESTINATION_GRAPH_NAV: NavNode[] = [
   {
     label: 'Tours', href: '/tours', type: 'landing_page', status: 'live',
     children: [
-      { label: 'All Tours', href: '/tours', type: 'landing_page', status: 'live' },
+      { label: 'Guided Tours', href: '/tours', type: 'landing_page', status: 'live' },
+      { label: 'Curated Journeys', href: '/packages', type: 'landing_page', status: 'live' },
     ],
   },
   {
