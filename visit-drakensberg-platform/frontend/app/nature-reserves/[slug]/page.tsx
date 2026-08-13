@@ -6,6 +6,9 @@ import Footer from '@/components/layout/Footer'
 import { getReserves, DEFAULT_RESERVES, type Reserve } from '@/lib/reserves'
 import { getRegions, DEFAULT_REGIONS } from '@/lib/regions'
 import { publicSupabase } from '@/lib/supabase-public'
+import { getNearbyTrails, getNearbyStays } from '@/lib/modules'
+import RelatedTrailsModule from '@/components/modules/RelatedTrailsModule'
+import NearbyStaysModule from '@/components/modules/NearbyStaysModule'
 
 // New route — Reserve already had slug + seoTitle + seoDescription + rich
 // content (peaks, permits, best time, facilities) with admin CRUD, but no
@@ -69,6 +72,16 @@ export default async function ReservePage({ params }: { params: { slug: string }
   const resolved = await resolveReserve(params.slug)
   if (!resolved) notFound()
   const { reserve, regionName, regionSlug } = resolved
+
+  // Automatic-mode module content (see lib/modules.ts) — region-matched,
+  // server-rendered so the links are crawlable, unlike the client-only
+  // SmartRecommendations sidebar on the stay booking page.
+  const [nearbyTrails, nearbyStays] = regionName
+    ? await Promise.all([
+        getNearbyTrails(regionName, { limit: 4 }, publicSupabase),
+        getNearbyStays(regionName, { limit: 4 }, publicSupabase),
+      ])
+    : [[], []]
 
   const canonicalUrl = `${SITE_URL}/nature-reserves/${reserve.slug}`
 
@@ -226,6 +239,15 @@ export default async function ReservePage({ params }: { params: { slug: string }
           </div>
         </div>
       </section>
+
+      {(nearbyTrails.length > 0 || nearbyStays.length > 0) && (
+        <section className="bg-mist py-14">
+          <div className="max-w-[1440px] mx-auto px-6 lg:px-12 space-y-12">
+            <RelatedTrailsModule trails={nearbyTrails} viewAllHref={`/hikes?region=${encodeURIComponent(regionName)}`} />
+            <NearbyStaysModule stays={nearbyStays} viewAllHref={`/stays?region=${encodeURIComponent(regionName)}`} />
+          </div>
+        </section>
+      )}
 
       <div className="bg-white border-t border-gray-100 py-6">
         <div className="max-w-[1440px] mx-auto px-6 lg:px-12">

@@ -8,6 +8,8 @@ import {
 } from 'lucide-react'
 import { getDepartures, type Departure } from '@/lib/departures'
 import type { Tour } from '@/lib/tours'
+import type { NearbyStayResult } from '@/lib/modules'
+import NearbyStaysModule from '@/components/modules/NearbyStaysModule'
 
 const DIFF_COLOR: Record<string, string> = { Easy: '#4A7251', Moderate: '#C9A96E', Strenuous: '#c0392b', Extreme: '#7f1d1d' }
 
@@ -17,13 +19,17 @@ function formatDate(iso: string) {
 
 /**
  * Client island rendered inside the server shell (page.tsx), which already
- * resolved `tour` for generateMetadata/JSON-LD and 404s server-side if the
- * id doesn't exist. Upcoming departures are fetched here — dated,
+ * resolved `tour` (and `nearbyStays`, the automatic-mode module content —
+ * see lib/modules.ts) for generateMetadata/JSON-LD and 404s server-side if
+ * the id doesn't exist. Upcoming departures are fetched here — dated,
  * time-sensitive booking data, unlike the tour itself, which is evergreen.
  * A departure expiring never affects this page (the point of separating
  * Tours from Departures — see docs/destination-graph/PHASE_A.md "Tours").
+ * `nearbyStays` is server-fetched data passed as a prop, not a client
+ * fetch, so it renders in the initial server HTML exactly like `tour`
+ * itself does — see docs/destination-graph/PHASE_C.md.
  */
-export default function TourDetail({ tour }: { tour: Tour }) {
+export default function TourDetail({ tour, nearbyStays }: { tour: Tour; nearbyStays: NearbyStayResult[] }) {
   const [departures, setDepartures] = useState<Departure[]>([])
 
   useEffect(() => {
@@ -151,6 +157,8 @@ export default function TourDetail({ tour }: { tour: Tour }) {
                 </p>
               )}
             </div>
+
+            <NearbyStaysModule stays={nearbyStays} title="Places to Stay Nearby" />
           </div>
 
           {/* Sidebar */}

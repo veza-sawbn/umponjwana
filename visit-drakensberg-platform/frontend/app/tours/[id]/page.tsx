@@ -1,7 +1,9 @@
 import type { Metadata } from 'next'
 import { notFound } from 'next/navigation'
 import { getTours, type Tour } from '@/lib/tours'
+import { getTrails } from '@/lib/trails'
 import { publicSupabase } from '@/lib/supabase-public'
+import { getNearbyStays, type NearbyStayResult } from '@/lib/modules'
 import TourDetail from './TourDetail'
 
 // Server shell — same pattern as the other converted detail routes. Tours
@@ -16,6 +18,14 @@ const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://visitdrakensberg.c
 async function resolveTour(id: string): Promise<Tour | null> {
   const tours = await getTours(publicSupabase)
   return tours.find(t => t.id === id || t.slug === id) ?? null
+}
+
+// Tour has no region field of its own — it's derived from the trail it
+// runs on, same relationship Departure/TrekkingExperience use elsewhere.
+async function resolveTourRegion(tour: Tour): Promise<string> {
+  if (!tour.trailId) return ''
+  const trails = await getTrails(publicSupabase)
+  return trails.find(t => t.id === tour.trailId)?.region ?? ''
 }
 
 function buildDescription(tour: Tour): string | undefined {
@@ -48,6 +58,11 @@ export async function generateMetadata({ params }: { params: { id: string } }): 
 export default async function TourPage({ params }: { params: { id: string } }) {
   const tour = await resolveTour(params.id)
   if (!tour) notFound()
+
+  const regionName = await resolveTourRegion(tour)
+  const nearbyStays: NearbyStayResult[] = regionName
+    ? await getNearbyStays(regionName, { limit: 4 }, publicSupabase)
+    : []
 
   const canonicalUrl = `${SITE_URL}/tours/${tour.slug || tour.id}`
 
@@ -87,7 +102,7 @@ export default async function TourPage({ params }: { params: { id: string } }) {
     <>
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(productJsonLd) }} />
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbJsonLd) }} />
-      <TourDetail tour={tour} />
+      <TourDetail tour={tour} nearbyStays={nearbyStays} />
     </>
   )
 }

@@ -6,6 +6,9 @@ import Footer from '@/components/layout/Footer'
 import { getTowns, DEFAULT_TOWNS, type Town } from '@/lib/towns'
 import { getRegions, DEFAULT_REGIONS } from '@/lib/regions'
 import { publicSupabase } from '@/lib/supabase-public'
+import { getNearbyTrails, getNearbyStays } from '@/lib/modules'
+import RelatedTrailsModule from '@/components/modules/RelatedTrailsModule'
+import NearbyStaysModule from '@/components/modules/NearbyStaysModule'
 
 // New route — same rationale as app/nature-reserves/[slug]/page.tsx: Town
 // already had slug + seoTitle + seoDescription with admin CRUD, but no
@@ -60,6 +63,13 @@ export default async function TownPage({ params }: { params: { slug: string } })
   const resolved = await resolveTown(params.slug)
   if (!resolved) notFound()
   const { town, regionName, regionSlug } = resolved
+
+  const [nearbyTrails, nearbyStays] = regionName
+    ? await Promise.all([
+        getNearbyTrails(regionName, { limit: 4 }, publicSupabase),
+        getNearbyStays(regionName, { limit: 4 }, publicSupabase),
+      ])
+    : [[], []]
 
   const canonicalUrl = `${SITE_URL}/towns/${town.slug}`
 
@@ -159,6 +169,15 @@ export default async function TownPage({ params }: { params: { slug: string } })
           </div>
         </div>
       </section>
+
+      {(nearbyTrails.length > 0 || nearbyStays.length > 0) && (
+        <section className="bg-white py-14 border-t border-gray-100">
+          <div className="max-w-[1440px] mx-auto px-6 lg:px-12 space-y-12">
+            <RelatedTrailsModule trails={nearbyTrails} title="Hikes Nearby" viewAllHref={`/hikes?region=${encodeURIComponent(regionName)}`} />
+            <NearbyStaysModule stays={nearbyStays} title={`Places to Stay near ${town.name}`} viewAllHref={`/stays?region=${encodeURIComponent(regionName)}`} />
+          </div>
+        </section>
+      )}
 
       <div className="bg-white border-t border-gray-100 py-6">
         <div className="max-w-[1440px] mx-auto px-6 lg:px-12">
