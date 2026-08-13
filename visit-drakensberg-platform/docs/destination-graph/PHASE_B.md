@@ -73,12 +73,51 @@ GET /stays/[any id]      → 404 gracefully, same reason
 ```
 `Activity`/`Property` have no `DEFAULT_*` seed array (unlike `Trail`/`Region`/`Reserve`/`Town`), so a full 200-path verification of these two specifically needs a reachable Supabase instance — the 404 path (the code path shared by "not found" and "network unreachable") was verified instead, confirming no crash and no hang under a genuine backend failure.
 
-## 6. What Phase B does not include yet (queued)
+## 6. Third slice: `/packages/[id]`, `/guides/[id]`, `/guides/operators/[id]`, `/experiences/[id]` converted
 
-- The same server-shell pattern for `/packages/[id]`, `/guides/[id]`, `/guides/operators/[id]`, `/experiences/[id]` — same recipe, not yet repeated.
-- Structured data for those remaining kinds (`Product`/`Offer` for packages, `Person`/`Organization` for guides, `Event`/`Offer` for experiences, per the audit's schema mapping).
-- Slug resolution for the UUID-based entities (`prop-<uuid>` etc.) — `URL_ARCHITECTURE.md` §4. Every converted route already reads `entity.slug || entity.id` for its canonical URL, so slugs will take effect the moment they're populated, with no further route change needed.
-- Sitemap entries for trails/properties/activities — intentionally held until slug resolution lands, so the sitemap doesn't have to carry ID-based URLs that later get superseded.
-- Reading `GraphFields`/`ModuleConfig` (Phase A's foundation types) anywhere beyond `seoTitle`/`seoDescription`/`slug` fallback checks — nothing populates or renders the relationship fields yet.
-- `/tours`, `/transport/[slug]` — new listing + detail routes, not started.
-- ISR/`revalidate` on any of the new dynamic routes.
+Same pattern, fourth through seventh routes. `lib/operators.ts`, `lib/departures.ts`, `lib/experiences.ts` all gained the same optional-client parameter as the rest.
+
+- **`/packages/[id]`** — `MarketplacePackage` gained `& GraphFields` (it hadn't been mixed in yet). Only a genuinely missing package 404s server-side; an existing-but-unpublished package still resolves and is handled by `PackageDetail.tsx`'s own "not available" branch (unchanged prior behaviour), with `robots: {index:false}` set at the metadata level instead. `Product` + `Offer` JSON-LD.
+- **`/guides/[id]`** — `Person` JSON-LD with `aggregateRating` when the guide has a rating. The operator lookup (`getOperatorForGuide`) needs the resolved guide as input, so it stays a client-side fetch in `GuideDetail.tsx`.
+- **`/guides/operators/[id]`** — **found and fixed a duplicate-function bug while extending `lib/operators.ts`**: a second `getOperatorById` was added alongside the pre-existing one instead of extending it in place, which would have been a TypeScript duplicate-implementation error. Caught by inspection before it ever reached the build. `getOperatorForGuide` now delegates to the single `getOperatorById`, removing a few lines of duplicated lookup logic in the process. `Organization` JSON-LD.
+- **`/experiences/[id]`** — the one route with genuinely different framing: `TrekkingExperience` is a *derived* composite (Departure + Tour + Trail + Operator, composed in `lib/experiences.ts`'s `loadAll()`), not a single stored entity, so it has no `seoTitle`/`seoDescription` of its own. `Event` + `Offer` JSON-LD with `startDate`/`endDate`/`availability`. A dated departure that has passed or sold out gets `robots: {index:false, follow:true}` rather than being deleted — direct links (booking confirmations, etc.) keep working, it just stops being a search result once it's no longer bookable.
+
+All ten of the platform's pre-existing entity detail routes now have real, per-entity `generateMetadata` and JSON-LD: regions, reserves, towns, hikes, activities, stays, packages, guides, operators, experiences.
+
+**Verified live:** `/packages/[any id]`, `/guides/[any id]`, `/guides/operators/[any id]`, `/experiences/[any id]` all 404 gracefully (no crash, no hang) — consistent with activities/stays, these entity kinds have no `DEFAULT_*` seed data in this test environment. Regression-checked `/regions/north-berg` and `/hikes/tugela-falls` still render correctly after the shared `lib/experiences.ts`/`lib/tours.ts`/`lib/departures.ts` changes.
+
+## 7. Sitemap: trails, properties, activities, packages, tours added
+
+Extended the async sitemap (§1) to include every converted entity type. `getProperties()`, `getActivities()`, `getPackages()`, `getTours()` each gained the same optional-client parameter. Filtered to `published`/`active` status and `robotsIndex !== false`; falls back to `[]` (properties/activities/packages/tours have no `DEFAULT_*` seed data) or the appropriate `DEFAULT_*` array (trails) on a read failure — consistent with §1's "never advertise a URL the site can't serve" principle. Guides/operators (directory-style, lower search volume) and experiences (dated — see the noindex-when-past logic above) are deliberately left out; a crawler reaches them via the trail/tour pages that already link to them.
+
+Every entry uses `entity.slug || entity.id` — the same resolution each route reads for its own canonical tag — so nothing here can advertise a non-canonical URL, and slugs take effect automatically the moment they're populated with no further code change.
+
+**Verified live:** sitemap includes all 6 seed trails (`/hikes/tugela-falls`, `/hikes/amphitheatre`, etc.) — properties/activities/packages/tours correctly empty in this test environment (no seed data), same as their own detail-route verification.
+
+## 8. `/tours` — new listing + detail route
+
+The one genuinely new (not converted) route pair this phase, per the earlier destination-graph review: Tours are the evergreen bookable product; Departures are dated/temporal and attach to a Tour without ever affecting its canonical page.
+
+- **`app/tours/page.tsx`** (new) — listing page, `'use client'` matching the site's established listing-page convention (hikes/stays/activities all follow this pattern), with difficulty and trail filters. **`app/tours/layout.tsx`** (new) — static metadata, matching every other listing route.
+- **`app/tours/[id]/page.tsx`** + **`TourDetail.tsx`** (new) — same server-shell pattern as everything else in this phase. `Product` + `Offer` JSON-LD, with `aggregateRating` when rated. Upcoming departures (dated, time-sensitive) are fetched client-side and link to `/experiences/[id]` for the actual booking — the tour page stays the evergreen landing page, the experience page stays the one-dated-booking checkout, exactly the separation the strategic review called for.
+- No dedicated `getTourById()` existed, so resolution filters from the full `getTours()` list — the same approach `getExperiencesByTrail()` etc. already use elsewhere in the codebase, not a new pattern.
+- **Found a real type error while wiring this up**: `EditablePageHeader`'s `section` prop is a closed union derived from `SITE_CONTENT_DEFAULTS`'s keys — using `"tours_page"` without first adding it to that object was a compile-time error, not a runtime surprise. Fixed by adding a `tours_page` entry to `lib/site-content.ts`, matching the shape of every other listing page's entry, giving `/tours` an admin-editable header like the rest of the site gets for free.
+- **`/tours` added to `Footer.tsx`'s "Explore" column** — present on every page, so the route is never an orphan (reachable by a real link, not just present in the sitemap) — and to the sitemap's static routes and entity list.
+- **`DESTINATION_GRAPH_NAV`'s Tours node flipped from `'planned'` to `'live'`** in `lib/destination-ia.ts`, now that its `requires` condition is met. Still not wired into the rendered `Navbar` — that remains the separate, larger decision from the destination-graph strategic review, not something this phase does unilaterally.
+
+**Verified live:**
+```
+GET /tours                → 200, <title>Guided Tours | Visit Drakensberg</title>
+GET /tours/does-not-exist → 404
+GET /                     → footer contains href="/tours"
+GET /sitemap.xml          → includes https://visitdrakensberg.com/tours
+```
+
+## 9. What's still queued (deliberately out of scope for Phase B)
+
+- Slug population for the UUID-based entities — the resolution logic (`slug || id`) is everywhere already; only the admin UI to *set* a slug (Tool 1, SEO panel) and a backfill pass remain.
+- Reading `GraphFields`/`ModuleConfig` beyond the `seoTitle`/`seoDescription`/`slug` fallback checks used in this phase — nothing populates or renders the relationship fields (`relatedTrailIds` etc.) yet; that's the module-composition work from the destination-graph review.
+- `/transport/[slug]` — a shuttle-route detail page, the same evergreen-vs-dated distinction as Tours/Departures would apply.
+- ISR/`revalidate` on any of the new dynamic routes — everything renders per-request; a cache layer is a performance optimisation on top of working correctness, not a blocker to it.
+- Wiring `DESTINATION_GRAPH_NAV`/the 7-primary IA into the live `Navbar` and mobile drill-down — explicitly the separate decision flagged in the destination-graph strategic review, requiring its own sign-off.
+- Admin SEO panel (Tool 1) and the rest of `docs/seo-audit/INTERNAL_SEO_TOOLS.md` — the fields these tools would edit already exist and are already read by every converted route; only the editing surface itself is unbuilt.

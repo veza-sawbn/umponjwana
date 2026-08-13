@@ -134,6 +134,11 @@ export const SITE_CONTENT_DEFAULTS = {
     heading: 'Activities',
     subheading: 'Guided experiences, tours and adventures across the Drakensberg',
   },
+  tours_page: {
+    eyebrow: 'Guided departures',
+    heading: 'Guided Tours',
+    subheading: 'Multi-day treks and tours led by verified local operators, with scheduled departures you can join or book privately',
+  },
   reserves_page: {
     eyebrow: 'Protected wilderness',
     heading: 'Nature Reserves',

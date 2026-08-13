@@ -1,6 +1,7 @@
 import { listEntities, insertEntity, updateEntity, deleteEntity, newEntityId } from './entities'
 import { deleteDeparturesByTour } from './departures'
 import type { GraphFields } from './graph-fields'
+import type { SupabaseClient } from '@supabase/supabase-js'
 
 export type Tour = {
   id: string
@@ -39,8 +40,8 @@ export type Tour = {
 
 const KIND = 'tour'
 
-export async function getTours(): Promise<Tour[]> {
-  return listEntities<Tour>(KIND)
+export async function getTours(client?: SupabaseClient): Promise<Tour[]> {
+  return client ? listEntities<Tour>(KIND, client) : listEntities<Tour>(KIND)
 }
 
 export async function addTour(tour: Omit<Tour, 'id' | 'createdAt'>): Promise<Tour> {

@@ -48,8 +48,8 @@ export type Activity = {
 
 const KIND = 'activity'
 
-export async function getActivities(): Promise<Activity[]> {
-  return listEntities<Activity>(KIND)
+export async function getActivities(client?: SupabaseClient): Promise<Activity[]> {
+  return client ? listEntities<Activity>(KIND, client) : listEntities<Activity>(KIND)
 }
 
 export async function getActivitiesBySupplier(supplierId: string): Promise<Activity[]> {

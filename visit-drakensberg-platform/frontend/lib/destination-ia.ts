@@ -112,13 +112,9 @@ export const DESTINATION_GRAPH_NAV: NavNode[] = [
     ],
   },
   {
-    label: 'Tours', href: '/tours', type: 'landing_page', status: 'planned',
-    requires: '/tours listing + /tours/[slug] detail template — Phase B. Data layer (tour kind, supplier CRUD) already exists (lib/tours.ts); only the public route is missing.',
+    label: 'Tours', href: '/tours', type: 'landing_page', status: 'live',
     children: [
-      {
-        label: 'All Tours', href: '/tours', type: 'landing_page', status: 'planned',
-        requires: 'same as parent',
-      },
+      { label: 'All Tours', href: '/tours', type: 'landing_page', status: 'live' },
     ],
   },
   {

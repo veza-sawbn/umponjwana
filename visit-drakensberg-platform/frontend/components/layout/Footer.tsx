@@ -14,6 +14,7 @@ const COLUMNS = [
       { label: 'Stays', href: '/stays' },
       { label: 'Hikes', href: '/hikes' },
       { label: 'Activities', href: '/activities' },
+      { label: 'Guided Tours', href: '/tours' },
       { label: 'Packages', href: '/packages' },
       { label: 'Nature Reserves', href: '/nature-reserves' },
     ],

@@ -1,5 +1,6 @@
 import { supabase } from './auth'
 import { listEntities, insertEntity, updateEntity, deleteEntity, newEntityId } from './entities'
+import type { SupabaseClient } from '@supabase/supabase-js'
 
 // A rate package is one way to buy a seat on a departure — e.g. "Self-Sufficient"
 // vs "Portered" on the same scheduled hike, each with its own price and its own
@@ -43,8 +44,8 @@ export function newDeparturePackageId(): string {
   return newEntityId('pkg')
 }
 
-export async function getDepartures(): Promise<Departure[]> {
-  return listEntities<Departure>(KIND)
+export async function getDepartures(client?: SupabaseClient): Promise<Departure[]> {
+  return client ? listEntities<Departure>(KIND, client) : listEntities<Departure>(KIND)
 }
 
 export async function addDeparture(dep: Omit<Departure, 'id' | 'createdAt'>): Promise<Departure> {

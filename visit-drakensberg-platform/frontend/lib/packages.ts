@@ -1,4 +1,6 @@
 import { listEntities, getEntity, insertEntity, updateEntity, deleteEntity, newEntityId } from './entities'
+import type { GraphFields } from './graph-fields'
+import type { SupabaseClient } from '@supabase/supabase-js'
 
 // Marketplace packages are administrator-managed products, curated by Visit
 // Drakensberg from services supplied by multiple businesses. Suppliers cannot
@@ -105,7 +107,7 @@ export type MarketplacePackage = {
   supplierId?: string         // owner (admin account) for the entity row
   createdAt: string
   updatedAt?: string
-}
+} & GraphFields
 
 const KIND = 'package'
 
@@ -117,8 +119,8 @@ export function packageTotals(pkg: MarketplacePackage) {
   return { cost, sell, margin: sell - cost }
 }
 
-export async function getPackages(): Promise<MarketplacePackage[]> {
-  return listEntities<MarketplacePackage>(KIND)
+export async function getPackages(client?: SupabaseClient): Promise<MarketplacePackage[]> {
+  return client ? listEntities<MarketplacePackage>(KIND, client) : listEntities<MarketplacePackage>(KIND)
 }
 
 /** Packages visible on the public site (published, inside their window). */
@@ -131,8 +133,8 @@ export async function getPublishedPackages(): Promise<MarketplacePackage[]> {
   )
 }
 
-export async function getPackageById(id: string): Promise<MarketplacePackage | null> {
-  return getEntity<MarketplacePackage>(KIND, id)
+export async function getPackageById(id: string, client?: SupabaseClient): Promise<MarketplacePackage | null> {
+  return client ? getEntity<MarketplacePackage>(KIND, id, client) : getEntity<MarketplacePackage>(KIND, id)
 }
 
 export async function addPackage(

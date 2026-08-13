@@ -44,8 +44,8 @@ export type Property = {
 
 const KIND = 'property'
 
-export async function getProperties(): Promise<Property[]> {
-  return listEntities<Property>(KIND)
+export async function getProperties(client?: SupabaseClient): Promise<Property[]> {
+  return client ? listEntities<Property>(KIND, client) : listEntities<Property>(KIND)
 }
 
 export async function getPropertyById(id: string, client?: SupabaseClient): Promise<Property | null> {
