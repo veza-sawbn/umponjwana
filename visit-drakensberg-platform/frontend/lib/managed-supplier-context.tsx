@@ -38,6 +38,19 @@ import { getMyManagedSuppliers, isManagedSupplier } from './ops-assignments'
 
 const SESSION_KEY = 'vd_managed_supplier_id'
 
+/**
+ * Arms the acting-as context before navigating into the supplier tools.
+ *
+ * Used by /operations to hand off into /supplier/* for a chosen supplier.
+ * This is a navigation hint only — ManagedSupplierProvider re-validates the
+ * ID against the employee's live assignments on mount, and every query is
+ * still gated by is_managed_supplier() in RLS, so a forged value grants
+ * nothing.
+ */
+export function armManagedSupplier(supplierId: string) {
+  try { sessionStorage.setItem(SESSION_KEY, supplierId) } catch {}
+}
+
 export interface ManagedSupplierContextValue {
   /** Whether this session is running in "acting-as" mode for a managed supplier */
   isActingAs: boolean

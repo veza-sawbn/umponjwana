@@ -50,7 +50,7 @@ export default function ManagedSupplierBanner() {
         <p className="font-sans text-xs text-white/50">
           Visit Drakensberg Operations ·{' '}
           <Link
-            href="/admin/operations/managed-suppliers"
+            href="/operations"
             className="text-[#C9A96E] hover:text-[#C9A96E]/80"
           >
             Select a supplier to manage
@@ -125,7 +125,7 @@ export default function ManagedSupplierBanner() {
 
         {/* Back to operations dashboard */}
         <Link
-          href="/admin/operations/managed-suppliers"
+          href="/operations"
           className="flex items-center gap-1.5 px-2.5 py-1.5 font-sans text-xs text-white/60 hover:text-white border border-white/10 hover:border-white/20 transition-colors"
         >
           <ArrowLeft size={12} /> Overview

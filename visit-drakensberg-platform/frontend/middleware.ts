@@ -2,16 +2,20 @@ import { createMiddlewareClient } from '@supabase/auth-helpers-nextjs'
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 
-const PROTECTED_ROUTES = ['/dashboard', '/checkout', '/supplier', '/admin', '/account']
+const PROTECTED_ROUTES = ['/dashboard', '/checkout', '/supplier', '/admin', '/account', '/operations']
 const ADMIN_ROUTES = ['/admin']
 const SUPPLIER_ROUTES = ['/supplier']
+// The VD Operations working environment. Distinct from /admin: an operations
+// employee holds delegated authority over specific suppliers, not platform
+// administration, so this area is gated on ops_role rather than the admin role.
+const OPERATIONS_ROUTES = ['/operations']
 // Routes that must stay reachable even while maintenance mode is on — the
 // admin/supplier consoles (per the settings toggle's own description), the
 // auth flow (needed to sign in and reach those consoles), the maintenance
 // page itself (avoid rewriting it into a loop), and customer-facing
 // invoices/quotes (RLS-gated per document, not part of the public site the
 // toggle is meant to hide).
-const MAINTENANCE_EXEMPT_ROUTES = ['/admin', '/supplier', '/auth', '/maintenance', '/invoices', '/quotes']
+const MAINTENANCE_EXEMPT_ROUTES = ['/admin', '/supplier', '/operations', '/auth', '/maintenance', '/invoices', '/quotes']
 
 export async function middleware(req: NextRequest) {
   // `res` must be passed through so auth-helpers can refresh the session cookie.
@@ -93,12 +97,22 @@ export async function middleware(req: NextRequest) {
       return redirectTo('/account')
     }
 
-    // Redirect operations employees from the generic /admin root to their
-    // dedicated Managed Suppliers dashboard. This covers both the post-invite
-    // landing (redirectTo was set to /admin) and direct /admin visits.
+    // Operations employees don't belong in the admin console at all — send any
+    // /admin visit to their own environment. This covers the post-invite
+    // landing (redirectTo was set to /admin) as well as direct visits.
     // Full platform admins are not redirected — they use the whole console.
-    if (pathname === '/admin' && staffRole === 'operations' && role !== 'admin') {
-      return redirectTo('/admin/operations/managed-suppliers')
+    if (ADMIN_ROUTES.some(r => pathname.startsWith(r)) && staffRole === 'operations' && role !== 'admin') {
+      return redirectTo('/operations')
+    }
+
+    // /operations is for configured VD Operations employees. Platform admins
+    // may look in (they manage the layer), but nobody else gets past here.
+    // The environment itself re-checks ops_role client-side, and every query
+    // is gated by RLS — this is the coarse routing guard only.
+    if (OPERATIONS_ROUTES.some(r => pathname.startsWith(r))) {
+      if (role !== 'admin' && staffRole !== 'operations') {
+        return redirectTo('/account')
+      }
     }
 
     // Supplier routes: normal suppliers and admins get unconditional access.
@@ -144,7 +158,7 @@ export async function middleware(req: NextRequest) {
 
         if (!assignments || assignments.length === 0) {
           // No active assignments → no supplier tool access
-          return redirectTo('/admin/operations/managed-suppliers')
+          return redirectTo('/operations')
         }
 
         // Pass the ops context as a response header so the supplier layout can
