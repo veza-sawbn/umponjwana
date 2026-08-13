@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { cookies } from 'next/headers'
 import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs'
 import { supabaseAdmin } from '@/lib/supabase-admin'
+import { getSiteOrigin } from '@/lib/origin'
 
 export const dynamic = 'force-dynamic'
 
@@ -31,7 +32,7 @@ export async function POST(req: Request) {
 
   const role = body.level === 'admin' ? 'admin' : 'visitor'
   const staffRole = body.level === 'finance' || body.level === 'operations' ? body.level : null
-  const origin = process.env.NEXT_PUBLIC_SITE_URL || new URL(req.url).origin
+  const origin = getSiteOrigin(req)
 
   const { data, error } = await supabaseAdmin().auth.admin.inviteUserByEmail(email, {
     data: { full_name: body.fullName || '', role, staff_role: staffRole },

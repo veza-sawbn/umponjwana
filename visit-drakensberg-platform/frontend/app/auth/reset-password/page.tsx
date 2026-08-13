@@ -28,10 +28,18 @@ export default function ResetPasswordPage() {
     resolver: zodResolver(schema),
   })
 
-  // Supabase delivers the auth token in one of three formats depending on the
-  // project's auth flow setting. We handle all three:
+  // Supabase delivers the auth token in one of four ways depending on the
+  // project's auth flow setting and which route the email linked to:
   //
-  //   1. PKCE auth-code  → ?code=AUTH_CODE
+  //   0. Server-side callback (preferred new path)
+  //      POST /api/auth/request-password-reset sets redirectTo to
+  //      /api/auth/callback, which exchanges the PKCE code server-side and
+  //      redirects here with the session cookie already set.
+  //      → getSession() returns a session immediately; or onAuthStateChange
+  //        fires PASSWORD_RECOVERY / SIGNED_IN.
+  //      → ?error=link_expired is appended when the code exchange fails.
+  //
+  //   1. PKCE auth-code  → ?code=AUTH_CODE (direct link to this page)
   //      Call exchangeCodeForSession(code) — onAuthStateChange fires on success.
   //
   //   2. PKCE token-hash → ?token_hash=HASH&type=invite|recovery
@@ -41,14 +49,23 @@ export default function ResetPasswordPage() {
   //      The client picks it up automatically; onAuthStateChange fires on its own.
   //
   // In all cases the form is gated behind onAuthStateChange firing with
-  // PASSWORD_RECOVERY or SIGNED_IN. A 3600 s safety-net timeout is only
-  // started when no URL token is found (implicit flow fallback).
+  // PASSWORD_RECOVERY or SIGNED_IN, or an existing session being found.
+  // A 3600 s safety-net timeout is only started when no URL token is found
+  // (implicit flow fallback — the timeout is intentionally long to give
+  // the hash exchange time to complete before showing "link expired").
   //
   // Edge case: user refreshes the page after a successful exchange — the URL
   // still has the (now-consumed) token. We check for an existing session first
   // and set ready immediately, avoiding a spurious "link expired" screen.
   useEffect(() => {
     let timeout: ReturnType<typeof setTimeout>
+
+    // ── Case 0b: server-side callback signalled a failed exchange ─────────────
+    const params = new URLSearchParams(window.location.search)
+    if (params.get('error') === 'link_expired') {
+      setInvalidLink(true)
+      return
+    }
 
     const { data: sub } = supabase.auth.onAuthStateChange((event) => {
       if (event === 'PASSWORD_RECOVERY' || event === 'SIGNED_IN') {
@@ -59,19 +76,20 @@ export default function ResetPasswordPage() {
     })
 
     async function bootstrap() {
-      // ── Already have a session? (page refresh / returning tab) ───────────────
+      // ── Case 0a / page-refresh: already have a session ────────────────────
+      // This covers both the server-side callback flow (session set in cookies
+      // before redirect here) and refreshing the page after a successful exchange.
       const { data: { session } } = await supabase.auth.getSession()
       if (session) {
         setReady(true)
         return
       }
 
-      const params = new URLSearchParams(window.location.search)
       const code      = params.get('code')
       const tokenHash = params.get('token_hash')
       const type      = params.get('type') as 'invite' | 'recovery' | 'email' | null
 
-      // ── Format 1: PKCE auth-code (?code=…) ──────────────────────────────────
+      // ── Case 1: PKCE auth-code (?code=…) ────────────────────────────────────
       if (code) {
         const { error } = await supabase.auth.exchangeCodeForSession(code)
         if (error) {
@@ -84,7 +102,7 @@ export default function ResetPasswordPage() {
         return
       }
 
-      // ── Format 2: PKCE token-hash (?token_hash=…&type=…) ────────────────────
+      // ── Case 2: PKCE token-hash (?token_hash=…&type=…) ──────────────────────
       if (tokenHash && type) {
         const { error } = await supabase.auth.verifyOtp({ token_hash: tokenHash, type })
         if (error) {
@@ -97,7 +115,7 @@ export default function ResetPasswordPage() {
         return
       }
 
-      // ── Format 3: Implicit flow (#access_token=… hash) ──────────────────────
+      // ── Case 3: Implicit flow (#access_token=… hash) ─────────────────────────
       // The client exchanges the hash automatically; we just wait for the event.
       // Start the 3600 s safety-net in case no token is present at all.
       timeout = setTimeout(() => {

@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { cookies } from 'next/headers'
 import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs'
 import { supabaseAdmin } from '@/lib/supabase-admin'
+import { getSiteOrigin } from '@/lib/origin'
 
 export const dynamic = 'force-dynamic'
 
@@ -73,11 +74,9 @@ export async function POST(req: Request, { params }: { params: { id: string } })
   // Update the profile email column so it stays in sync
   await admin.from('profiles').update({ email: ownerEmail }).eq('id', params.id)
 
-  // Build the redirectTo for the setup link
-  const host = req.headers.get('x-forwarded-host') ?? new URL(req.url).host
-  const proto = req.headers.get('x-forwarded-proto') ?? 'https'
-  const origin = process.env.NEXT_PUBLIC_SITE_URL || `${proto}://${host}`
-  const redirectTo = `${origin}/auth/reset-password`
+  // Build the redirectTo for the setup link — always prefer request headers.
+  // See lib/origin.ts for the rationale.
+  const redirectTo = `${getSiteOrigin(req)}/auth/reset-password`
 
   // Send a password-reset link to the owner's new email so they can take over
   const { error: resetError } = await admin.auth.resetPasswordForEmail(ownerEmail, { redirectTo })
