@@ -181,7 +181,15 @@ export async function getRegions(client: SupabaseClient = supabase): Promise<Reg
   try {
     const { data } = await client.from('site_content').select('value').eq('key', 'admin_regions').maybeSingle()
     if (Array.isArray(data?.value?.items) && data.value.items.length > 0) {
-      return data.value.items.map((item: Region) => normalizeRegion(item))
+      // Normalize each row independently — one malformed row (e.g. missing
+      // `name`) must not take down every other region with it. Before this,
+      // a single bad item threw inside .map(), the surrounding try/catch
+      // swallowed it, and getRegions() silently fell all the way back to
+      // DEFAULT_REGIONS — every admin-authored region "disappearing" behind
+      // a 404 at once, with nothing in the UI to explain why.
+      return data.value.items
+        .map((item: Region): Region | null => { try { return normalizeRegion(item) } catch { return null } })
+        .filter((r: Region | null): r is Region => r !== null)
     }
   } catch {}
   return DEFAULT_REGIONS
@@ -190,6 +198,20 @@ export async function getRegions(client: SupabaseClient = supabase): Promise<Reg
 export async function getRegionNames(): Promise<string[]> {
   const regions = await getRegions()
   return regions.map(region => region.name)
+}
+
+/**
+ * Persist the full region list exactly as shown in the admin console —
+ * mirrors lib/reserves.ts's saveAllReserves(). Normalizing here (not just
+ * on read) is what makes a region's slug *stable*: the first save bakes in
+ * a real `slug` field, so every later normalizeRegion() call finds a
+ * truthy `region.slug` and stops re-deriving one from `name` — a later
+ * rename no longer changes the canonical URL out from under any existing
+ * link, bookmark, or cached page.
+ */
+export async function saveAllRegions(regions: Region[]): Promise<void> {
+  const now = new Date().toISOString()
+  await saveRegions(regions.map(r => normalizeRegion({ ...r, updatedAt: r.updatedAt ?? now })))
 }
 
 export async function createRegion(data: Omit<Region, 'id' | 'slug' | 'createdAt' | 'updatedAt'>): Promise<Region> {
@@ -203,7 +225,10 @@ export async function createRegion(data: Omit<Region, 'id' | 'slug' | 'createdAt
 export async function updateRegion(id: string, data: Omit<Region, 'id' | 'slug' | 'createdAt' | 'updatedAt'>): Promise<Region> {
   const all = await getRegions()
   const previous = all.find(region => region.id === id)
-  const updated = normalizeRegion({ ...data, id, createdAt: previous?.createdAt, updatedAt: new Date().toISOString() })
+  // Slug pinned to whatever it already was — same rationale as
+  // lib/reserves.ts's updateReserve(): a rename must not change the
+  // canonical URL a previous normalizeRegion() call already committed to.
+  const updated = normalizeRegion({ ...data, id, slug: previous?.slug, createdAt: previous?.createdAt, updatedAt: new Date().toISOString() })
   await saveRegions(all.map(region => region.id === id ? updated : region))
   return updated
 }

@@ -2,24 +2,6 @@ import { supabase } from './auth'
 import { getBookings, updateBookingStatus, type SavedBooking } from './bookings'
 import { notify } from './notifications'
 
-export type AdminRegion = {
-  id: string
-  name: string
-  tagline: string
-  heroImage: string
-  heroVideo: string
-  overview: string
-  highlights: string[]
-  gettingThere: string
-  bestTime: string
-  keyAttractions: { id: string; name: string; description: string }[]
-  subregions: { id: string; name: string; description: string }[]
-  seoTitle: string
-  seoDescription: string
-  createdAt?: string
-  updatedAt?: string
-}
-
 export type AdminMedia = {
   id: string
   type: 'image' | 'video'
@@ -60,46 +42,14 @@ async function saveCollection<T>(key: string, items: T[]): Promise<void> {
   if (error) throw error
 }
 
-export async function getAdminRegions(): Promise<AdminRegion[]> {
-  return getCollection<AdminRegion>('admin_regions')
-}
-
-export async function createAdminRegion(data: Omit<AdminRegion, 'id' | 'createdAt' | 'updatedAt'>): Promise<AdminRegion> {
-  const all = await getAdminRegions()
-  const now = new Date().toISOString()
-  const item: AdminRegion = {
-    ...data,
-    id: `region-${Date.now()}`,
-    subregions: data.subregions || [],
-    seoTitle: data.seoTitle || `${data.name} | Visit Drakensberg`,
-    createdAt: now,
-    updatedAt: now,
-  }
-  await saveCollection('admin_regions', [...all, item])
-  return item
-}
-
-export async function updateAdminRegion(id: string, data: Omit<AdminRegion, 'id' | 'createdAt' | 'updatedAt'>): Promise<AdminRegion> {
-  const all = await getAdminRegions()
-  const previous = all.find(item => item.id === id)
-  const updated: AdminRegion = { ...data, id, createdAt: previous?.createdAt, updatedAt: new Date().toISOString() }
-  // Upsert semantics: a region edited in the console but missing from the
-  // stored list (e.g. seeded defaults) must be appended, not silently dropped.
-  const next = previous ? all.map(item => item.id === id ? updated : item) : [...all, updated]
-  await saveCollection('admin_regions', next)
-  return updated
-}
-
-/** Persist the full region list exactly as shown in the admin console. */
-export async function saveAdminRegions(items: AdminRegion[]): Promise<void> {
-  const now = new Date().toISOString()
-  await saveCollection('admin_regions', items.map(item => ({ ...item, updatedAt: item.updatedAt ?? now })))
-}
-
-export async function deleteAdminRegion(id: string): Promise<void> {
-  const all = await getAdminRegions()
-  await saveCollection('admin_regions', all.filter(item => item.id !== id))
-}
+// Region CRUD lives in lib/regions.ts (getRegions/saveAllRegions/
+// createRegion/updateRegion/deleteRegion) — the same module the public
+// site reads from, exactly like lib/reserves.ts and lib/towns.ts already
+// do for their own admin consoles. A parallel AdminRegion type/getCollection
+// path used to live here, writing regions with no `slug` field at all;
+// normalizeRegion() on the read side then re-derived a slug from `name` on
+// every single read, so a rename silently changed the canonical URL and any
+// existing link to it. See docs/destination-graph/PHASE_G.md.
 
 export async function getAdminMedia(): Promise<AdminMedia[]> {
   return getCollection<AdminMedia>('admin_media')
