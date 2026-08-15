@@ -2,6 +2,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import { getTrails, trailStartPoint, type Trail } from './trails'
 import { getProperties, type Property } from './properties'
 import { getActivities, type Activity } from './activities'
+import { getPublishedRoutes, type Route } from './transport-routes'
 import { regionsMatch } from './regions'
 
 // Automatic-mode resolvers for the reusable page modules described in
@@ -81,5 +82,24 @@ export async function getNearbyActivities(
   const all = client ? await getActivities(client) : await getActivities()
   return all
     .filter(a => a.status === 'active' && a.id !== opts.excludeId && regionsMatch(a.region, regionName))
+    .slice(0, opts.limit ?? 4)
+}
+
+/**
+ * Active named shuttle routes (lib/transport-routes.ts) touching this
+ * region — matched on either endpoint (`from` or `to`) against the region
+ * name, via the same regionsMatch() fuzzy join every other module here
+ * uses. Routes have no regionSlug field of their own; reusing regionsMatch
+ * on free-text endpoints avoids adding one just for this. See
+ * docs/destination-graph/PHASE_H.md.
+ */
+export async function getNearbyRoutes(
+  regionName: string,
+  opts: { limit?: number } = {},
+  client?: SupabaseClient,
+): Promise<Route[]> {
+  const all = client ? await getPublishedRoutes(client) : await getPublishedRoutes()
+  return all
+    .filter(r => regionsMatch(r.from, regionName) || regionsMatch(r.to, regionName))
     .slice(0, opts.limit ?? 4)
 }

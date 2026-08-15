@@ -3,6 +3,13 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 
 export type Subregion = { id: string; name: string; description: string }
 
+// Getting There structure — see docs/destination-graph/PHASE_H.md. The
+// original `gettingThere` free-text field is kept as-is (an optional intro
+// paragraph) so existing admin-authored content keeps rendering unchanged;
+// these two are additive, opt-in richer content an admin can layer on top.
+export type GettingThereSection = { id: string; title: string; body: string }
+export type GettingThereRoute = { id: string; from: string; distance: string; duration: string }
+
 export type Region = {
   id: string
   slug: string
@@ -13,6 +20,8 @@ export type Region = {
   overview: string
   highlights: string[]
   gettingThere: string
+  gettingThereSections: GettingThereSection[]
+  gettingThereRoutes: GettingThereRoute[]
   bestTime: string
   keyAttractions: { id: string; name: string; description: string }[]
   subregions: Subregion[]
@@ -41,6 +50,8 @@ export const DEFAULT_REGIONS: Region[] = [
     overview: 'The Amphitheatre — a 5 km sheer basalt cliff — anchors the Northern Drakensberg. The Tugela River drops 948 metres over five falls here, making it the second highest waterfall on Earth. Royal Natal National Park offers some of the most dramatic scenery in Africa.',
     highlights: ['Tugela Falls Circuit', 'Amphitheatre via Chain Ladder', 'Policemans Helmet', 'Mont-aux-Sources'],
     gettingThere: '',
+    gettingThereSections: [],
+    gettingThereRoutes: [],
     bestTime: '',
     keyAttractions: [],
     subregions: [],
@@ -57,6 +68,8 @@ export const DEFAULT_REGIONS: Region[] = [
     overview: 'Cathedral Peak rises to 3,004 m at the heart of the Central Drakensberg, surrounded by the richest concentration of San rock art in the world. Giants Castle Game Reserve protects bearded vultures and herds of eland against a backdrop of jagged peaks.',
     highlights: ['Cathedral Peak Summit', 'Giants Castle Hike', 'Injasuti Cave', 'Champagne Castle'],
     gettingThere: '',
+    gettingThereSections: [],
+    gettingThereRoutes: [],
     bestTime: '',
     keyAttractions: [],
     subregions: [],
@@ -73,6 +86,8 @@ export const DEFAULT_REGIONS: Region[] = [
     overview: 'The Sani Pass climbs 1,332 m in 9 km through a series of hairpin bends carved into the escarpment, crossing into the mountain Kingdom of Lesotho at 2,873 m. The Mkhomazi Wilderness Area below is one of the least visited and most pristine parts of the Southern Drakensberg.',
     highlights: ['Sani Pass 4x4', 'Mkhomazi Wilderness', 'Garden Castle', 'Mzimkhulu Gorge'],
     gettingThere: '',
+    gettingThereSections: [],
+    gettingThereRoutes: [],
     bestTime: '',
     keyAttractions: [],
     subregions: [],
@@ -159,6 +174,8 @@ function normalizeRegion(region: Partial<Region> & { name: string; id?: string }
     overview: region.overview || '',
     highlights: region.highlights || [],
     gettingThere: region.gettingThere || '',
+    gettingThereSections: region.gettingThereSections || [],
+    gettingThereRoutes: region.gettingThereRoutes || [],
     bestTime: region.bestTime || '',
     keyAttractions: region.keyAttractions || [],
     subregions: region.subregions || [],
