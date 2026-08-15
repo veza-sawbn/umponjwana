@@ -27,7 +27,11 @@ export const DEFAULT_REGIONS: Region[] = [
     // id/slug intentionally unchanged — these back live URLs (/regions/north-berg)
     // and are not part of the public terminology rename. See
     // docs/destination-graph/PHASE_A.md "Region naming" for the rationale:
-    // display name changes, canonical URL does not.
+    // display name changes, canonical URL does not. This fallback array
+    // still honors that; the *live* Supabase-backed regions no longer do,
+    // per docs/destination-graph/PHASE_G.md — an admin saved them at least
+    // once before the Phase G fix, which derived+stored a new slug from
+    // the renamed display name instead of preserving this one.
     id: 'north-berg',
     slug: 'north-berg',
     name: 'Northern Drakensberg',

@@ -42,9 +42,17 @@ export const DESTINATION_GRAPH_NAV: NavNode[] = [
   {
     label: 'Explore', href: '/regions', type: 'landing_page', status: 'live',
     children: [
-      { label: 'Northern Drakensberg', href: '/regions/north-berg', type: 'entity', status: 'live' },
-      { label: 'Central Drakensberg', href: '/regions/central-berg', type: 'entity', status: 'live' },
-      { label: 'Southern Drakensberg', href: '/regions/south-berg', type: 'entity', status: 'live' },
+      // Hrefs match the *live* canonical slugs, not the original
+      // north-berg/central-berg/south-berg ids Phase A intended to keep
+      // stable. An admin saved these regions at least once through the
+      // pre-Phase-G admin console (see docs/destination-graph/PHASE_G.md),
+      // which never persisted a `slug` — so normalizeRegion() derived one
+      // from the renamed display name ("Northern Drakensberg" →
+      // "northern-drakensberg") and, as of Phase G, that derived slug is
+      // now stabilized in storage. Confirmed against production data.
+      { label: 'Northern Drakensberg', href: '/regions/northern-drakensberg', type: 'entity', status: 'live' },
+      { label: 'Central Drakensberg', href: '/regions/central-drakensberg', type: 'entity', status: 'live' },
+      { label: 'Southern Drakensberg', href: '/regions/southern-drakensberg', type: 'entity', status: 'live' },
       { label: 'Towns & Villages', href: '/towns', type: 'entity', status: 'live' },
       {
         label: 'Mountains & Peaks', href: '/nature-reserves', type: 'landing_page', status: 'planned',

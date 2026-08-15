@@ -47,6 +47,20 @@ GET /admin/regions           → 307 (auth redirect — expected, unauthenticate
 ```
 A live check against real admin-authored region content needs a reachable Supabase project with actual `admin_regions` rows, which this environment doesn't have — the fix itself is a straight port of the exact pattern already proven working for reserves in production.
 
+## Addendum: the fix above didn't fully resolve it — one more root cause
+
+Reported again: region pages still 404'd after this shipped. The above fix was necessary but not sufficient — it stops the slug-drift bug from *recurring*, but doesn't retroactively repair data already corrupted by it. Confirmed against production: the original three regions had already been saved at least once through the pre-fix admin console (no `slug` persisted), so `normalizeRegion()` had already derived and — once Phase G's `saveAllRegions()` ran — stabilized a slug from each region's *renamed* display name:
+
+| Region | Old hardcoded href | Actual live slug |
+|---|---|---|
+| Northern Drakensberg | `/regions/north-berg` | `/regions/northern-drakensberg` |
+| Central Drakensberg | `/regions/central-berg` | `/regions/central-drakensberg` |
+| Southern Drakensberg | `/regions/south-berg` | `/regions/southern-drakensberg` |
+
+Only one place in the codebase hardcoded the old slugs: `DESTINATION_GRAPH_NAV`'s Explore children in `lib/destination-ia.ts` (consumed by `Navbar.tsx` since Phase E). The `/regions` listing page was never affected — it always builds its links from `getRegions()`'s own returned `slug`, so it already pointed at the correct live URL. Updated the three hrefs to match; verified with Playwright against a running build that the Navbar's Explore sub-menu now links to `/regions/northern-drakensberg`, `/regions/central-drakensberg`, `/regions/southern-drakensberg`.
+
+This does mean the original Phase A design intent — "display name changes, canonical URL does not" (`lib/regions.ts`'s `DEFAULT_REGIONS` comment) — no longer holds for the *live* Supabase-backed regions, only for the `DEFAULT_REGIONS` fallback array itself. Restoring that guarantee for the live data would need a one-time backfill (explicitly re-setting `slug` back to `north-berg`/`central-berg`/`south-berg` on those three rows) rather than a code change — not done here, since the current live slugs work fine and a backfill risks a different kind of disruption (any link already shared/indexed at the `northern-drakensberg`-style URL since the earlier fix shipped would break again).
+
 ## What's still queued
 
 - The same `getAdminRegions`-style disconnected-write-path bug is worth auditing for on any other admin console that doesn't already share its data module with the public read path (towns' admin console already matches the reserves/regions-fixed pattern — confirmed while investigating this).
