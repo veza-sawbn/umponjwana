@@ -1,15 +1,19 @@
 import type { Metadata } from 'next'
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
-import { MapPin, Mountain, Zap, Home, ArrowRight, ChevronRight, Clock, Navigation } from 'lucide-react'
+import { MapPin, Mountain, Zap, Home, ArrowRight, ChevronRight, Clock, Navigation, Bus } from 'lucide-react'
 import Footer from '@/components/layout/Footer'
 import { getRegions, regionsMatch, type Region } from '@/lib/regions'
 import { getProperties, type Property } from '@/lib/properties'
 import { getRoomsByProperty } from '@/lib/rooms'
 import { getTrails, trailStartPoint, type Trail } from '@/lib/trails'
 import { getActivities, type Activity } from '@/lib/activities'
+import { getTowns } from '@/lib/towns'
+import { getNearbyRoutes } from '@/lib/modules'
+import { type Route } from '@/lib/transport-routes'
 import { publicSupabase } from '@/lib/supabase-public'
 import { StayDistance } from '@/lib/stay-distance'
+import ShuttleRoutesModule from '@/components/modules/ShuttleRoutesModule'
 
 // Pure server component — same shape as app/nature-reserves/[slug]/page.tsx.
 // Previously this was a server shell (this file) handing off to
@@ -45,11 +49,15 @@ async function resolveRegion(slug: string): Promise<Region | null> {
 
 type StayWithPrice = { prop: Property; minPrice: number | null }
 
-async function loadRegionContent(region: Region): Promise<{ stays: StayWithPrice[]; trails: Trail[]; activities: Activity[] }> {
-  const [properties, allTrails, allActivities] = await Promise.all([
+async function loadRegionContent(region: Region): Promise<{
+  stays: StayWithPrice[]; trails: Trail[]; activities: Activity[]; shuttleRoutes: Route[]; gatewayTown: string | undefined
+}> {
+  const [properties, allTrails, allActivities, towns, shuttleRoutes] = await Promise.all([
     getProperties(publicSupabase),
     getTrails(publicSupabase),
     getActivities(publicSupabase),
+    getTowns(publicSupabase).catch(() => []),
+    getNearbyRoutes(region.name, { limit: 4 }, publicSupabase),
   ])
 
   const regionProps = properties.filter(p => p.status === 'active' && regionsMatch(p.region, region.name))
@@ -63,8 +71,13 @@ async function loadRegionContent(region: Region): Promise<{ stays: StayWithPrice
 
   const trails = allTrails.filter(t => t.status === 'published' && regionsMatch(t.region, region.name))
   const activities = allActivities.filter(a => a.status === 'active' && regionsMatch(a.region, region.name))
+  // First town filed under this region — used to give the "Get a Shuttle
+  // Here" CTA a real, geocodable destination (a region name like "Northern
+  // Drakensberg" isn't a specific-enough address for Google's Distance
+  // Matrix; a town is). See docs/destination-graph/PHASE_H.md.
+  const gatewayTown = towns.find(t => t.regionSlug === region.slug)?.name
 
-  return { stays, trails, activities }
+  return { stays, trails, activities, shuttleRoutes, gatewayTown }
 }
 
 export async function generateMetadata({ params }: { params: { slug: string } }): Promise<Metadata> {
@@ -225,7 +238,14 @@ export default async function RegionPage({ params }: { params: { slug: string } 
   const region = await resolveRegion(params.slug)
   if (!region) notFound()
 
-  const { stays, trails, activities } = await loadRegionContent(region)
+  const { stays, trails, activities, shuttleRoutes, gatewayTown } = await loadRegionContent(region)
+  // Preserve the paragraph breaks an admin already typed into the plain
+  // gettingThere textarea — collapsing them into one <p> was the original
+  // complaint (see docs/destination-graph/PHASE_H.md).
+  const gettingThereParagraphs = region.gettingThere.split(/\n\s*\n/).map(p => p.trim()).filter(Boolean)
+  const shuttleHref = gatewayTown ? `/shuttles?to=${encodeURIComponent(gatewayTown)}` : '/shuttles'
+  const hasGettingThereContent =
+    gettingThereParagraphs.length > 0 || region.gettingThereSections.length > 0 || region.gettingThereRoutes.length > 0 || shuttleRoutes.length > 0
 
   const canonicalUrl = `${SITE_URL}/regions/${region.slug}`
   const heroImg = region.heroImage || FALLBACK
@@ -303,22 +323,6 @@ export default async function RegionPage({ params }: { params: { slug: string } 
                   </ul>
                 </div>
               )}
-              {(region.gettingThere || region.bestTime) && (
-                <div className="grid sm:grid-cols-2 gap-6 mb-8">
-                  {region.gettingThere && (
-                    <div>
-                      <p className="font-sans text-[10px] tracking-[0.15em] uppercase text-forest/30 mb-1.5">Getting There</p>
-                      <p className="font-sans text-sm text-forest/70 leading-relaxed">{region.gettingThere}</p>
-                    </div>
-                  )}
-                  {region.bestTime && (
-                    <div>
-                      <p className="font-sans text-[10px] tracking-[0.15em] uppercase text-forest/30 mb-1.5">Best Time to Visit</p>
-                      <p className="font-sans text-sm text-forest/70 leading-relaxed">{region.bestTime}</p>
-                    </div>
-                  )}
-                </div>
-              )}
               {region.keyAttractions.length > 0 && (
                 <div>
                   <p className="font-sans text-[10px] tracking-[0.2em] uppercase text-[#C9A96E] mb-3">Key Attractions</p>
@@ -348,10 +352,99 @@ export default async function RegionPage({ params }: { params: { slug: string } 
                 <p className="font-sans text-[10px] tracking-[0.15em] uppercase text-gray-400 mb-1">Activities</p>
                 <p className="font-display italic text-3xl text-[#2d6a4f]">{activities.length}</p>
               </div>
+              {region.bestTime && (
+                <div className="border border-gray-100 p-5 mt-4">
+                  <p className="font-sans text-[10px] tracking-[0.15em] uppercase text-gray-400 mb-1.5">Best Time to Visit</p>
+                  <p className="font-sans text-sm text-forest/70 leading-relaxed">{region.bestTime}</p>
+                </div>
+              )}
             </div>
           </div>
         </div>
       </section>
+
+      {/* ── Getting There ────────────────────────────────────────────────── */}
+      {hasGettingThereContent && (
+        <section className="py-16 bg-[#F7F5F2] border-y border-gray-200">
+          <div className="max-w-[1440px] mx-auto px-6 lg:px-12">
+            <div className="flex items-center gap-3 mb-8">
+              <Bus size={20} className="text-[#2d6a4f]" />
+              <h2 className="font-display italic text-3xl text-[#000000]">Getting There</h2>
+            </div>
+
+            <div className="grid lg:grid-cols-[2fr_1fr] gap-10 items-start">
+              <div className="space-y-8">
+                {gettingThereParagraphs.length > 0 && (
+                  <div className="space-y-4">
+                    {gettingThereParagraphs.map((p, i) => (
+                      <p key={i} className="font-sans text-sm text-forest/70 leading-relaxed">{p}</p>
+                    ))}
+                  </div>
+                )}
+
+                {region.gettingThereSections.length > 0 && (
+                  <div className="space-y-6">
+                    {region.gettingThereSections.map(s => (
+                      <div key={s.id}>
+                        <h3 className="font-display italic text-xl text-[#000000] mb-2">{s.title}</h3>
+                        <div className="space-y-3">
+                          {s.body.split(/\n\s*\n/).map(p => p.trim()).filter(Boolean).map((p, i) => (
+                            <p key={i} className="font-sans text-sm text-forest/70 leading-relaxed">{p}</p>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {region.gettingThereRoutes.length > 0 && (
+                  <div>
+                    <p className="font-sans text-[10px] tracking-[0.2em] uppercase text-[#C9A96E] mb-3">Distance & Duration</p>
+                    <div className="overflow-x-auto bg-white border border-gray-200">
+                      <table className="w-full text-left">
+                        <thead>
+                          <tr className="border-b border-gray-200">
+                            <th className="font-sans text-[10px] tracking-[0.12em] uppercase text-gray-400 px-4 py-3">From</th>
+                            <th className="font-sans text-[10px] tracking-[0.12em] uppercase text-gray-400 px-4 py-3">Distance</th>
+                            <th className="font-sans text-[10px] tracking-[0.12em] uppercase text-gray-400 px-4 py-3">Duration</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {region.gettingThereRoutes.map((r, i) => (
+                            <tr key={r.id} className={i > 0 ? 'border-t border-gray-100' : ''}>
+                              <td className="font-sans text-sm text-forest px-4 py-3">{r.from}</td>
+                              <td className="font-sans text-sm text-forest/70 px-4 py-3">{r.distance}</td>
+                              <td className="font-sans text-sm text-forest/70 px-4 py-3">{r.duration}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Shuttle module */}
+              <div className="space-y-5">
+                <div className="bg-white border border-gray-200 p-6">
+                  <p className="font-sans text-[10px] tracking-[0.15em] uppercase text-gray-400 mb-1.5">Need a Ride?</p>
+                  <h3 className="font-display italic text-2xl text-[#000000] mb-3">Plan Your Shuttle</h3>
+                  <p className="font-sans text-sm text-gray-500 mb-5">
+                    Get an instant quote for a private or shared shuttle into {region.name}.
+                  </p>
+                  <Link
+                    href={shuttleHref}
+                    className="block text-center bg-[#2d6a4f] text-white py-3 font-sans text-sm hover:bg-[#235a3f] transition-colors"
+                  >
+                    Get a Shuttle Here →
+                  </Link>
+                </div>
+                {shuttleRoutes.length > 0 && <ShuttleRoutesModule routes={shuttleRoutes} />}
+              </div>
+            </div>
+          </div>
+        </section>
+      )}
 
       {/* ── Stays ─────────────────────────────────────────────────────────── */}
       {stays.length > 0 && (

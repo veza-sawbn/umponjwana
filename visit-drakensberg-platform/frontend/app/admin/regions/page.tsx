@@ -18,8 +18,8 @@ import { MediaPicker } from '@/components/media/MediaPicker'
 function blankRegion(): Region {
   return {
     id: `region-${Date.now()}`, slug: '', name: 'New Region', tagline: '', heroImage: '', heroVideo: '',
-    overview: '', highlights: [], gettingThere: '', bestTime: '', keyAttractions: [], subregions: [],
-    seoTitle: '', seoDescription: '',
+    overview: '', highlights: [], gettingThere: '', gettingThereSections: [], gettingThereRoutes: [],
+    bestTime: '', keyAttractions: [], subregions: [], seoTitle: '', seoDescription: '',
   }
 }
 
@@ -129,7 +129,47 @@ export default function AdminRegionsPage() {
               ))}
             </div>
 
-            <div><label className={labelCls}>Getting There</label><textarea value={data.gettingThere} onChange={e => update('gettingThere', e.target.value)} rows={3} className={`${inputCls} resize-none`}/></div>
+            <div className="pt-4 border-t border-gray-100">
+              <p className="font-sans text-[10px] tracking-[0.14em] uppercase text-gray-400 mb-3">Getting There</p>
+              <div className="space-y-4">
+                <div>
+                  <label className={labelCls}>Intro</label>
+                  <textarea value={data.gettingThere} onChange={e => update('gettingThere', e.target.value)} rows={3} className={`${inputCls} resize-none`} placeholder="A short overview — blank lines between paragraphs are preserved on the public page."/>
+                </div>
+
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <label className={labelCls}>Sections (e.g. By Road, By Air, By Shuttle)</label>
+                    <button onClick={() => update('gettingThereSections', [...data.gettingThereSections, { id: `gts${Date.now()}`, title: '', body: '' }])} className="flex items-center gap-1 font-sans text-xs text-[#2d6a4f]"><Plus size={12}/> Add</button>
+                  </div>
+                  {data.gettingThereSections.map(s => (
+                    <div key={s.id} className="border border-gray-100 p-3 bg-[#F7F5F2] mb-3">
+                      <div className="flex gap-2 mb-2">
+                        <input placeholder="Section title, e.g. By Road" value={s.title} onChange={e => update('gettingThereSections', data.gettingThereSections.map(item => item.id === s.id ? { ...item, title: e.target.value } : item))} className="flex-1 border border-gray-200 px-3 py-2 font-sans text-sm bg-white"/>
+                        <button onClick={() => update('gettingThereSections', data.gettingThereSections.filter(item => item.id !== s.id))} className="p-2 text-gray-400 hover:text-red-400"><Trash2 size={13}/></button>
+                      </div>
+                      <textarea placeholder="Section content" value={s.body} onChange={e => update('gettingThereSections', data.gettingThereSections.map(item => item.id === s.id ? { ...item, body: e.target.value } : item))} rows={3} className="w-full border border-gray-200 px-3 py-2 font-sans text-sm bg-white resize-none"/>
+                    </div>
+                  ))}
+                </div>
+
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <label className={labelCls}>Distance & Duration Table</label>
+                    <button onClick={() => update('gettingThereRoutes', [...data.gettingThereRoutes, { id: `gtr${Date.now()}`, from: '', distance: '', duration: '' }])} className="flex items-center gap-1 font-sans text-xs text-[#2d6a4f]"><Plus size={12}/> Add Row</button>
+                  </div>
+                  {data.gettingThereRoutes.map(r => (
+                    <div key={r.id} className="flex gap-2 mb-2 items-center">
+                      <input placeholder="From, e.g. Johannesburg" value={r.from} onChange={e => update('gettingThereRoutes', data.gettingThereRoutes.map(item => item.id === r.id ? { ...item, from: e.target.value } : item))} className="flex-1 border border-gray-200 px-3 py-2 font-sans text-sm bg-[#F7F5F2]"/>
+                      <input placeholder="Distance, e.g. 380 km" value={r.distance} onChange={e => update('gettingThereRoutes', data.gettingThereRoutes.map(item => item.id === r.id ? { ...item, distance: e.target.value } : item))} className="w-32 border border-gray-200 px-3 py-2 font-sans text-sm bg-[#F7F5F2]"/>
+                      <input placeholder="Duration, e.g. 4h 30m" value={r.duration} onChange={e => update('gettingThereRoutes', data.gettingThereRoutes.map(item => item.id === r.id ? { ...item, duration: e.target.value } : item))} className="w-32 border border-gray-200 px-3 py-2 font-sans text-sm bg-[#F7F5F2]"/>
+                      <button onClick={() => update('gettingThereRoutes', data.gettingThereRoutes.filter(item => item.id !== r.id))} className="p-2 text-gray-400 hover:text-red-400"><Trash2 size={13}/></button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+
             <div><label className={labelCls}>Best Time to Visit</label><textarea value={data.bestTime} onChange={e => update('bestTime', e.target.value)} rows={3} className={`${inputCls} resize-none`}/></div>
 
             <div>

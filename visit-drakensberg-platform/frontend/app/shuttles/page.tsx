@@ -1,8 +1,8 @@
 'use client'
 
-import { useState } from 'react'
+import { Suspense, useState } from 'react'
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { ArrowRight, Bus, Calendar, Check, MapPin, Users } from 'lucide-react'
 import Footer from '@/components/layout/Footer'
 import { useBooking } from '@/lib/booking-context'
@@ -23,14 +23,35 @@ function fmtMinutes(minutes: number) {
   return m ? `${h}h ${m}m` : `${h}h`
 }
 
+// useSearchParams() requires a Suspense boundary around any client
+// component that calls it (Next.js App Router) — the actual page body
+// lives in ShuttlesPageContent below.
 export default function ShuttlesPage() {
+  return (
+    <Suspense fallback={null}>
+      <ShuttlesPageContent />
+    </Suspense>
+  )
+}
+
+function ShuttlesPageContent() {
   const router = useRouter()
   const booking = useBooking()
+  const searchParams = useSearchParams()
+  // Pre-fill support (?to=<address>) — used by /regions/[slug]'s "Get a
+  // Shuttle Here" CTA to seed the destination with that region's gateway
+  // town, so a visitor lands here ready to quote instead of starting from
+  // a blank form. See docs/destination-graph/PHASE_H.md. Takes priority
+  // over the booking-context stay prefill since it's an explicit link the
+  // visitor just followed.
+  const prefillTo = searchParams.get('to')
   const [pickup, setPickup] = useState<GooglePlaceSelection>(EMPTY_PLACE)
   const [destination, setDestination] = useState<GooglePlaceSelection>(
-    booking.stay?.address || booking.stay?.lat
-      ? { address: booking.stay.address || booking.stay.title, lat: booking.stay.lat, lng: booking.stay.lng }
-      : EMPTY_PLACE
+    prefillTo
+      ? { address: prefillTo }
+      : booking.stay?.address || booking.stay?.lat
+        ? { address: booking.stay.address || booking.stay.title, lat: booking.stay.lat, lng: booking.stay.lng }
+        : EMPTY_PLACE
   )
   const [date, setDate] = useState(booking.checkIn || '')
   const [passengers, setPassengers] = useState(booking.guests || 2)
