@@ -4,6 +4,7 @@ import { useParams, useRouter } from 'next/navigation'
 import { ChevronLeft, Plus, Trash2 } from 'lucide-react'
 import { getActivityById, updateActivity, ACTIVITY_CATEGORIES } from '@/lib/activities'
 import { getRegionNames } from '@/lib/regions'
+import { SEASONS, SEASON_META, SEASON_TOPICS, SEASON_TOPIC_META, type Season, type SeasonTopic } from '@/lib/seasons'
 import { GoogleAddressField } from '@/components/maps/GoogleAddressField'
 import { supplierMediaSource } from '@/lib/supplier-media'
 import { MediaGalleryPicker } from '@/components/media/MediaPicker'
@@ -20,6 +21,7 @@ type FormState = {
   description: string; whatToWear: string; photos: string[]; included: string[]; safetyNotes: string;
   pricePerPerson: number; priceGroup: number; depositRequired: boolean; depositPercent: string;
   status: 'active' | 'draft'
+  seasons: Season[]; topics: SeasonTopic[]
 }
 
 const EMPTY: FormState = {
@@ -28,6 +30,7 @@ const EMPTY: FormState = {
   description: '', whatToWear: '', photos: [], included: [], safetyNotes: '',
   pricePerPerson: 0, priceGroup: 0, depositRequired: false, depositPercent: '30',
   status: 'active',
+  seasons: [], topics: [],
 }
 
 function ImageList({ images, onChange }: { images: string[]; onChange: (v: string[]) => void }) {
@@ -66,6 +69,7 @@ export default function EditActivityPage() {
           pricePerPerson: a.pricePerPerson, priceGroup: a.priceGroup,
           depositRequired: a.depositRequired, depositPercent: a.depositPercent,
           status: a.status,
+          seasons: a.seasons ?? [], topics: a.topics ?? [],
         })
       }
       setLoading(false)
@@ -74,6 +78,12 @@ export default function EditActivityPage() {
 
   function toggle(item: string) {
     setForm(f => ({ ...f, included: f.included.includes(item) ? f.included.filter(x => x !== item) : [...f.included, item] }))
+  }
+  function toggleSeason(s: Season) {
+    setForm(f => ({ ...f, seasons: f.seasons.includes(s) ? f.seasons.filter(x => x !== s) : [...f.seasons, s] }))
+  }
+  function toggleTopic(t: SeasonTopic) {
+    setForm(f => ({ ...f, topics: f.topics.includes(t) ? f.topics.filter(x => x !== t) : [...f.topics, t] }))
   }
 
   async function handleSave() {
@@ -149,6 +159,18 @@ export default function EditActivityPage() {
         </div>
 
         <F label="Description" required><textarea value={form.description} onChange={e => set('description', e.target.value)} rows={3} className={`${inp} resize-none`} /></F>
+
+        <F label="Best Seasons">
+          <div className="flex flex-wrap gap-2">
+            {SEASONS.map(s => <button key={s} onClick={() => toggleSeason(s)} className={chip(form.seasons.includes(s))}>{SEASON_META[s].label}</button>)}
+          </div>
+        </F>
+
+        <F label="Topics">
+          <div className="flex flex-wrap gap-2">
+            {SEASON_TOPICS.map(t => <button key={t} onClick={() => toggleTopic(t)} className={chip(form.topics.includes(t))}>{SEASON_TOPIC_META[t].label}</button>)}
+          </div>
+        </F>
 
         <F label="What to Wear / Bring"><textarea value={form.whatToWear} onChange={e => set('whatToWear', e.target.value)} rows={3} className={`${inp} resize-none`} /></F>
 

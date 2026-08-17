@@ -3,6 +3,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 
 import type { GpxAnalysis, TrailCrux, TrailGrade, TrailWaypoint } from './gpx'
 import type { GraphFields } from './graph-fields'
+import type { Season, SeasonTopic } from './seasons'
 
 export type TrailDay = {
   label: string
@@ -61,6 +62,12 @@ export type Trail = {
   cruxes?: TrailCrux[]
   waypoints?: TrailWaypoint[]
   generated_at?: string
+  /** Which seasons this trail suits — powers the region "When to Go"
+   *  module and /regions/[slug]/[season] pages. See lib/seasons.ts. */
+  seasons?: Season[]
+  /** Which season-page topic groups ("By Water", "In the Mountains", …)
+   *  this trail should appear under. See lib/seasons.ts. */
+  topics?: SeasonTopic[]
 } & GraphFields
 
 export const DEFAULT_TRAILS: Trail[] = [

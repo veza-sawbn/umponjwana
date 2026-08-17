@@ -4,6 +4,7 @@ import { getProperties, type Property } from './properties'
 import { getActivities, type Activity } from './activities'
 import { getPublishedRoutes, type Route } from './transport-routes'
 import { regionsMatch } from './regions'
+import { SEASON_TOPICS, type Season, type SeasonTopic } from './seasons'
 
 // Automatic-mode resolvers for the reusable page modules described in
 // lib/page-composition.ts. These are the "automatic" query behind
@@ -102,4 +103,46 @@ export async function getNearbyRoutes(
   return all
     .filter(r => regionsMatch(r.from, regionName) || regionsMatch(r.to, regionName))
     .slice(0, opts.limit ?? 4)
+}
+
+// ── Season / topic module (Phase I) ─────────────────────────────────────
+// Powers /regions/[slug]/[season] — see docs/destination-graph/PHASE_I.md.
+
+export type SeasonalItem =
+  | { kind: 'trail'; item: Trail }
+  | { kind: 'activity'; item: Activity }
+
+export type SeasonalTopicGroup = { topic: SeasonTopic; items: SeasonalItem[] }
+
+/**
+ * Published trails + active activities in this region tagged for this
+ * season, grouped by topic (SEASON_TOPICS order), with topics that have no
+ * matches omitted entirely — a season page only ever shows groups with
+ * real content, same "no empty-state clutter" rule as every other
+ * automatic module here.
+ */
+export async function getSeasonalContent(
+  regionName: string,
+  season: Season,
+  client?: SupabaseClient,
+): Promise<SeasonalTopicGroup[]> {
+  const [trails, activities] = await Promise.all([
+    client ? getTrails(client) : getTrails(),
+    client ? getActivities(client) : getActivities(),
+  ])
+
+  const matchingTrails = trails.filter(
+    t => t.status === 'published' && regionsMatch(t.region, regionName) && (t.seasons ?? []).includes(season)
+  )
+  const matchingActivities = activities.filter(
+    a => a.status === 'active' && regionsMatch(a.region, regionName) && (a.seasons ?? []).includes(season)
+  )
+
+  return SEASON_TOPICS.map(topic => {
+    const items: SeasonalItem[] = [
+      ...matchingTrails.filter(t => (t.topics ?? []).includes(topic)).map(item => ({ kind: 'trail' as const, item })),
+      ...matchingActivities.filter(a => (a.topics ?? []).includes(topic)).map(item => ({ kind: 'activity' as const, item })),
+    ]
+    return { topic, items }
+  }).filter(group => group.items.length > 0)
 }
