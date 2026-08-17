@@ -1,6 +1,7 @@
 import { listEntities, getEntity, insertEntity, updateEntity, deleteEntity, newEntityId, listEntitiesByOwner } from './entities'
 import type { GraphFields } from './graph-fields'
 import { slugify, uniqueSlug } from './slugify'
+import type { Season, SeasonTopic } from './seasons'
 import type { SupabaseClient } from '@supabase/supabase-js'
 
 // Single canonical activity-category vocabulary — imported by both the
@@ -45,6 +46,12 @@ export type Activity = {
   depositPercent: string
   status: 'active' | 'draft'
   createdAt: string
+  /** Which seasons this activity suits — powers the region "When to Go"
+   *  module and /regions/[slug]/[season] pages. See lib/seasons.ts. */
+  seasons?: Season[]
+  /** Which season-page topic groups ("By Water", "In the Mountains", …)
+   *  this activity should appear under. See lib/seasons.ts. */
+  topics?: SeasonTopic[]
 } & GraphFields
 
 const KIND = 'activity'

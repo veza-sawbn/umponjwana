@@ -14,6 +14,7 @@ import { type Route } from '@/lib/transport-routes'
 import { publicSupabase } from '@/lib/supabase-public'
 import { StayDistance } from '@/lib/stay-distance'
 import ShuttleRoutesModule from '@/components/modules/ShuttleRoutesModule'
+import SeasonMosaic from '@/components/modules/SeasonMosaic'
 
 // Pure server component — same shape as app/nature-reserves/[slug]/page.tsx.
 // Previously this was a server shell (this file) handing off to
@@ -352,14 +353,20 @@ export default async function RegionPage({ params }: { params: { slug: string } 
                 <p className="font-sans text-[10px] tracking-[0.15em] uppercase text-gray-400 mb-1">Activities</p>
                 <p className="font-display italic text-3xl text-[#2d6a4f]">{activities.length}</p>
               </div>
-              {region.bestTime && (
-                <div className="border border-gray-100 p-5 mt-4">
-                  <p className="font-sans text-[10px] tracking-[0.15em] uppercase text-gray-400 mb-1.5">Best Time to Visit</p>
-                  <p className="font-sans text-sm text-forest/70 leading-relaxed">{region.bestTime}</p>
-                </div>
-              )}
             </div>
           </div>
+        </div>
+      </section>
+
+      {/* ── When to Go ───────────────────────────────────────────────────── */}
+      <section className="py-16 bg-white">
+        <div className="max-w-[1440px] mx-auto px-6 lg:px-12">
+          <p className="font-sans text-[10px] tracking-[0.2em] uppercase text-[#C9A96E] mb-2">Plan by Season</p>
+          <h2 className="font-display italic text-3xl text-[#000000] mb-3">When to Go</h2>
+          <p className="font-sans text-sm text-gray-500 max-w-2xl mb-8 leading-relaxed">
+            {region.bestTime || `${region.name} changes character through the year — pick a season to see what's worth doing in it.`}
+          </p>
+          <SeasonMosaic regionSlug={region.slug} heroImage={heroImg} />
         </div>
       </section>
 
