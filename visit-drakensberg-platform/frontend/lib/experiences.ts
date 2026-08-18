@@ -62,8 +62,23 @@ function addDays(iso: string, days: number): string {
   return d.toISOString().slice(0, 10)
 }
 
+// A package linked to a tour pricing tier (DeparturePackage.tierId) always
+// shows that tier's *current* name/inclusions/price — editing a tour tier
+// updates every departure using it automatically — except price, which the
+// supplier can freeze per departure via priceOverride (e.g. a peak-season
+// surcharge). A package whose tier was since deleted falls back to its own
+// stored snapshot, and a freeform custom package is returned unchanged.
+function resolveTierPackages(packages: DeparturePackage[], tour: Tour): DeparturePackage[] {
+  return packages.map(p => {
+    if (!p.tierId) return p
+    const tier = tour.pricingTiers?.find(t => t.id === p.tierId)
+    if (!tier) return p
+    return { ...p, name: tier.name, inclusions: tier.inclusions, pricePerPerson: p.priceOverride ?? tier.pricePerPerson }
+  })
+}
+
 function composePackages(dep: Departure, tour: Tour): DeparturePackage[] {
-  if (dep.packages && dep.packages.length > 0) return dep.packages
+  if (dep.packages && dep.packages.length > 0) return resolveTierPackages(dep.packages, tour)
   return [{
     id: 'standard',
     name: 'Standard',

@@ -7,6 +7,18 @@ import type { GraphFields } from './graph-fields'
 import { slugify, uniqueSlug } from './slugify'
 import type { SupabaseClient } from '@supabase/supabase-js'
 
+// One way to buy a seat on any departure of this tour — e.g. "Shuttled" vs
+// "Self-Drive" — with its own price and its own add-ons. Departures choose
+// which subset of a tour's tiers apply to their date (see DeparturePackage
+// and composePackages() in lib/experiences.ts); a tour with none defined
+// falls back to the flat `pricePerPerson` below.
+export type PricingTier = {
+  id: string
+  name: string
+  pricePerPerson: number
+  inclusions: string[]
+}
+
 export type Tour = {
   id: string
   trailId: string
@@ -23,7 +35,12 @@ export type Tour = {
   included: string[]
   fitnessNotes: string
   cancellation: string
+  // Kept in sync with the cheapest entry in `pricingTiers` (mirrors how
+  // Departure.pricePerPerson follows its cheapest package) so the public
+  // listing/SEO/admin surfaces that read this directly keep working
+  // unchanged. Only a true stored value when pricingTiers is empty.
   pricePerPerson: number
+  pricingTiers?: PricingTier[]
   /** @deprecated Removed from the supplier forms; retained so stored tours still parse. */
   groupDiscount?: number
   status: 'active' | 'draft'
@@ -44,6 +61,10 @@ export type Tour = {
 } & GraphFields
 
 const KIND = 'tour'
+
+export function newPricingTierId(): string {
+  return newEntityId('tier')
+}
 
 /**
  * Public catalog read — every live tour on the platform.

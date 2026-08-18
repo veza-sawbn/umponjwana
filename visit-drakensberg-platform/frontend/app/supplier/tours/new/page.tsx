@@ -8,6 +8,7 @@ import { supabase } from '@/lib/auth'
 import { effectiveSupplierId } from '@/lib/effective-supplier'
 import { getMyOperatorProfile } from '@/lib/operators'
 import { GoogleAddressField } from '@/components/maps/GoogleAddressField'
+import { PackagesEditor, emptyTier, formToTiers, cheapest, type PackageForm } from '@/components/tours/PackageEditor'
 
 const DIFFICULTIES = ['Easy', 'Moderate', 'Challenging', 'Extreme']
 const CANCELLATIONS = ['48h', '72h', '7 days', '14 days']
@@ -17,12 +18,15 @@ const EMPTY = {
   name: '', difficulty: 'Moderate', days: 1, minAge: 0, maxGroup: 10,
   meetingPoint: '', gpsLat: '', gpsLng: '', description: '',
   included: [] as string[], fitnessNotes: '', cancellation: '48h',
-  pricePerPerson: 0, status: 'draft' as 'active' | 'draft',
+  status: 'draft' as 'active' | 'draft',
 }
 
 export default function NewTourPage() {
   const router = useRouter()
-  const [form, setForm] = useState(EMPTY)
+  // Lazy initializer so each mount gets a fresh tier id — EMPTY is a module
+  // singleton and would otherwise hand every "New Tour" visit in the same
+  // session the same id.
+  const [form, setForm] = useState(() => ({ ...EMPTY, pricingTiers: [emptyTier('Standard')] as PackageForm[] }))
   const [trails, setTrails] = useState<Trail[]>([])
   const [trailOpen, setTrailOpen] = useState(false)
   const [saving, setSaving] = useState(false)
@@ -84,7 +88,8 @@ export default function NewTourPage() {
   async function handleCreate() {
     if (!form.name.trim()) { setError('Tour name is required.'); return }
     if (!form.meetingPoint.trim()) { setError('Meeting point is required.'); return }
-    if (!form.pricePerPerson) { setError('Price per person is required.'); return }
+    const pricingTiers = formToTiers(form.pricingTiers)
+    if (pricingTiers.length === 0) { setError('At least one pricing tier with a name and price is required.'); return }
     setError('')
     // Snapshot form values before any async gap so stale closure can't affect them
     const snapshot = { ...form }
@@ -102,6 +107,8 @@ export default function NewTourPage() {
       await addTour({
         ...snapshot,
         included,
+        pricingTiers,
+        pricePerPerson: cheapest(pricingTiers),
         supplierId: ownerId,
         supplierName: companyName,
       })
@@ -258,16 +265,26 @@ export default function NewTourPage() {
           <textarea value={form.fitnessNotes} onChange={e => set('fitnessNotes', e.target.value)} rows={3} placeholder="Describe fitness level needed…" className={`${inp} resize-none`} />
         </F>
 
-        <div className="grid grid-cols-2 gap-4">
-          <F label="Cancellation Policy">
-            <select value={form.cancellation} onChange={e => set('cancellation', e.target.value)} className={inp}>
-              {CANCELLATIONS.map(c => <option key={c}>{c}</option>)}
-            </select>
-          </F>
-          <F label="Price per Person (ZAR)" required>
-            <input type="number" value={form.pricePerPerson || ''} onChange={e => set('pricePerPerson', +e.target.value)} placeholder="0" className={inp} />
-          </F>
-        </div>
+        <F label="Cancellation Policy">
+          <select value={form.cancellation} onChange={e => set('cancellation', e.target.value)} className={inp}>
+            {CANCELLATIONS.map(c => <option key={c}>{c}</option>)}
+          </select>
+        </F>
+
+        <F label="Pricing Tiers" required>
+          <PackagesEditor
+            packages={form.pricingTiers}
+            onChange={next => set('pricingTiers', next)}
+            namePlaceholder={i => (i === 0 ? 'Tier name (e.g. Shuttled)' : 'Tier name (e.g. Self-Drive)')}
+            priceLabel="Price per person (ZAR)"
+            inclusionsLabel="Add-ons for this tier"
+            addLabel="Add another pricing tier"
+            makeRow={emptyTier}
+          />
+          <p className="font-sans text-xs text-black/35 mt-1">
+            Each departure can offer a subset of these tiers — e.g. Shuttled on one date, Self-Drive on another.
+          </p>
+        </F>
 
         <F label="Status">
           <div className="flex gap-2">
