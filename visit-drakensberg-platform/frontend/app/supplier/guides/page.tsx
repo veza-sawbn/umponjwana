@@ -1,20 +1,23 @@
 'use client'
 import { useState, useEffect } from 'react'
+import Link from 'next/link'
 import toast from 'react-hot-toast'
-import { Users, Plus, Mountain, Star, CheckCircle, Clock, XCircle, User } from 'lucide-react'
+import { Users, Plus, Mountain, Star, CheckCircle, Clock, XCircle, User, Pencil, GraduationCap } from 'lucide-react'
 import { supabase } from '@/lib/auth'
 import { effectiveSupplierId } from '@/lib/effective-supplier'
+import { GUIDE_TYPE_LABEL, type GuideProfile } from '@/lib/operators'
 import {
   getSupplierEntities, addSupplierEntity, deleteSupplierEntity, type SupplierEntity,
 } from '@/lib/supplier-entities'
 import { supplierMediaSource } from '@/lib/supplier-media'
 import { MediaPicker } from '@/components/media/MediaPicker'
 
-type Guide = SupplierEntity & {
-  name: string; certs: string; guideNo: string; speciality: string; languages: string; rating: number; tours: number; status: 'verified' | 'pending' | 'rejected'
+type Guide = SupplierEntity & GuideProfile & {
+  status: 'verified' | 'pending' | 'rejected'
 }
 
 const ENTITY = 'guides'
+const GUIDE_TYPES = ['certified', 'trainee'] as const
 
 const STATUS: Record<Guide['status'], { label: string; Icon: typeof CheckCircle; cls: string }> = {
   verified: { label: 'Verified',        Icon: CheckCircle, cls: 'bg-emerald-100 text-emerald-700' },
@@ -29,6 +32,7 @@ export default function GuidesPage() {
   const [form, setForm] = useState({
     name: '', certs: '', guideNo: '', speciality: '', languages: '',
     qualifications: '', yearsExperience: '', highestSummit: '', completedExpeditions: '', portrait: '', bio: '',
+    guideType: 'certified' as 'certified' | 'trainee',
   })
   const set = (k: string, v: string) => setForm(f => ({ ...f, [k]: v }))
 
@@ -53,10 +57,11 @@ export default function GuidesPage() {
         highestSummit: form.highestSummit,
         completedExpeditions: Number(form.completedExpeditions) || 0,
         portrait: form.portrait, bio: form.bio,
+        guideType: form.guideType,
         rating: 0, tours: 0, status: 'pending', blocked: [],
       } as unknown as Omit<Guide, 'id' | 'createdAt'>)
       setGuides(g => [...g, saved])
-      setForm({ name: '', certs: '', guideNo: '', speciality: '', languages: '', qualifications: '', yearsExperience: '', highestSummit: '', completedExpeditions: '', portrait: '', bio: '' })
+      setForm({ name: '', certs: '', guideNo: '', speciality: '', languages: '', qualifications: '', yearsExperience: '', highestSummit: '', completedExpeditions: '', portrait: '', bio: '', guideType: 'certified' })
       setAdding(false)
       toast.success('Guide registered.')
     } catch {
@@ -90,10 +95,37 @@ export default function GuidesPage() {
       {adding && (
         <div className="bg-white rounded-xl border border-black/8 p-6 space-y-4">
           <p className="font-sans font-semibold text-black/80">Register New Guide</p>
+
+          <F label="Guide Type">
+            <div className="flex gap-2">
+              {GUIDE_TYPES.map(t => (
+                <button
+                  key={t}
+                  type="button"
+                  onClick={() => set('guideType', t)}
+                  className={`font-sans text-xs px-3 py-1.5 rounded-full border transition-colors ${
+                    form.guideType === t ? 'bg-[#C9A96E] text-white border-[#C9A96E]' : 'border-black/15 text-black/60 hover:border-[#C9A96E]/40'
+                  }`}
+                >
+                  {GUIDE_TYPE_LABEL[t]}
+                </button>
+              ))}
+            </div>
+            {form.guideType === 'trainee' && (
+              <p className="font-sans text-xs text-black/40 mt-1.5">
+                Internally trained staff without a formal FGASA/TBCSA certification yet — cert fields below are optional.
+              </p>
+            )}
+          </F>
+
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <F label="Full Name" required><input value={form.name} onChange={e => set('name', e.target.value)} className={inp} /></F>
-            <F label="FGASA / Cert Number"><input value={form.certs} onChange={e => set('certs', e.target.value)} className={inp} /></F>
-            <F label="TBCSA Guide Number"><input value={form.guideNo} onChange={e => set('guideNo', e.target.value)} className={inp} /></F>
+            <F label={form.guideType === 'trainee' ? 'FGASA / Cert Number (optional)' : 'FGASA / Cert Number'}>
+              <input value={form.certs} onChange={e => set('certs', e.target.value)} className={inp} />
+            </F>
+            <F label={form.guideType === 'trainee' ? 'TBCSA Guide Number (optional)' : 'TBCSA Guide Number'}>
+              <input value={form.guideNo} onChange={e => set('guideNo', e.target.value)} className={inp} />
+            </F>
             <F label="Speciality"><input value={form.speciality} onChange={e => set('speciality', e.target.value)} className={inp} /></F>
             <F label="Languages"><input value={form.languages} onChange={e => set('languages', e.target.value)} placeholder="English, Zulu" className={inp} /></F>
             <F label="Qualifications"><input value={form.qualifications} onChange={e => set('qualifications', e.target.value)} placeholder="FGASA Level 3, Wilderness First Responder" className={inp} /></F>
@@ -121,8 +153,15 @@ export default function GuidesPage() {
                 <span className="font-sans text-sm font-semibold text-[#C9A96E]">{g.name.split(' ').map(n => n[0]).join('')}</span>
               </div>
               <div className="flex-1 min-w-0">
-                <p className="font-sans font-semibold text-black/90">{g.name}</p>
-                <p className="font-sans text-xs text-black/40 mt-0.5">{g.certs}</p>
+                <p className="font-sans font-semibold text-black/90 flex items-center gap-2">
+                  {g.name}
+                  {g.guideType === 'trainee' && (
+                    <span className="font-sans text-[10px] px-1.5 py-0.5 rounded-full bg-blue-50 text-blue-600 flex items-center gap-1 shrink-0">
+                      <GraduationCap size={10} /> Trainee
+                    </span>
+                  )}
+                </p>
+                <p className="font-sans text-xs text-black/40 mt-0.5">{g.certs || (g.guideType === 'trainee' ? 'In training — no formal certification yet' : '—')}</p>
                 <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-1">
                   {g.speciality && <span className="font-sans text-xs text-black/40 flex items-center gap-1"><Mountain size={11} /> {g.speciality}</span>}
                   {g.tours > 0 && <span className="font-sans text-xs text-black/40 flex items-center gap-1"><Star size={11} /> {g.rating} · {g.tours} tours</span>}
@@ -131,6 +170,9 @@ export default function GuidesPage() {
               </div>
               <div className="flex items-center gap-3 shrink-0">
                 <span className={`font-sans text-xs px-2 py-0.5 rounded-full flex items-center gap-1 ${s.cls}`}><Icon size={10} /> {s.label}</span>
+                <Link href={`/supplier/guides/${g.id}/edit`} className="font-sans text-xs text-black/40 hover:text-[#C9A96E] flex items-center gap-1">
+                  <Pencil size={11} /> Edit
+                </Link>
                 <button onClick={() => remove(g.id)} className="font-sans text-xs text-red-400 hover:text-red-600">Remove</button>
               </div>
             </div>

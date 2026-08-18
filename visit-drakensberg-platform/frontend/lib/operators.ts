@@ -47,6 +47,16 @@ export type GuideProfile = SupplierEntity & {
   specialisations?: string
   highestSummit?: string
   completedExpeditions?: number
+  // 'certified' (FGASA/TBCSA or equivalent — the default, including for rows
+  // saved before this field existed) or 'trainee' — internally trained staff
+  // a supplier wants listed while they work toward formal certification.
+  // Neither certs nor guideNo is required for a trainee.
+  guideType?: 'certified' | 'trainee'
+}
+
+export const GUIDE_TYPE_LABEL: Record<'certified' | 'trainee', string> = {
+  certified: 'Certified',
+  trainee: 'Trainee',
 }
 
 const KIND = 'operator_profile'
