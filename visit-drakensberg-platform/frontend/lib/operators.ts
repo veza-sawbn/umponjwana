@@ -1,5 +1,7 @@
 import { listEntities, getEntity, insertEntity, updateEntity } from './entities'
 import { getSupplierEntities, type SupplierEntity } from './supplier-entities'
+import type { GraphFields } from './graph-fields'
+import type { SupabaseClient } from '@supabase/supabase-js'
 
 // Supplier directory: Tour Operator → Guide Team → Guide Profile.
 // Operator public profiles are `operator_profile` entities owned by the
@@ -27,7 +29,7 @@ export type OperatorProfile = {
   reviewCount: number
   status: 'active' | 'draft'
   createdAt: string
-}
+} & GraphFields
 
 export type GuideProfile = SupplierEntity & {
   name: string
@@ -52,7 +54,7 @@ export type GuideProfile = SupplierEntity & {
   // a supplier wants listed while they work toward formal certification.
   // Neither certs nor guideNo is required for a trainee.
   guideType?: 'certified' | 'trainee'
-}
+} & GraphFields
 
 export const GUIDE_TYPE_LABEL: Record<'certified' | 'trainee', string> = {
   certified: 'Certified',
@@ -70,8 +72,8 @@ export async function getOperators(): Promise<OperatorProfile[]> {
   return (await listEntities<OperatorProfile>(KIND)).filter(o => o.status === 'active')
 }
 
-export async function getOperatorById(id: string): Promise<OperatorProfile | null> {
-  return getEntity<OperatorProfile>(KIND, id)
+export async function getOperatorById(id: string, client?: SupabaseClient): Promise<OperatorProfile | null> {
+  return client ? getEntity<OperatorProfile>(KIND, id, client) : getEntity<OperatorProfile>(KIND, id)
 }
 
 /** The signed-in supplier's own profile (draft or active). */
@@ -105,12 +107,12 @@ export async function getDirectoryGuides(): Promise<GuideProfile[]> {
   return (await getSupplierEntities<GuideProfile>('guides')).filter(g => g.status === 'verified')
 }
 
-export async function getGuideById(id: string): Promise<GuideProfile | null> {
-  return getEntity<GuideProfile>('supplier_guides', id)
+export async function getGuideById(id: string, client?: SupabaseClient): Promise<GuideProfile | null> {
+  return client ? getEntity<GuideProfile>('supplier_guides', id, client) : getEntity<GuideProfile>('supplier_guides', id)
 }
 
 /** The operator a guide belongs to. */
-export async function getOperatorForGuide(guide: GuideProfile): Promise<OperatorProfile | null> {
+export async function getOperatorForGuide(guide: GuideProfile, client?: SupabaseClient): Promise<OperatorProfile | null> {
   if (!guide.supplierId) return null
-  return getEntity<OperatorProfile>(KIND, operatorProfileId(guide.supplierId))
+  return getOperatorById(operatorProfileId(guide.supplierId), client)
 }

@@ -1,18 +1,38 @@
-'use client'
-
-import { useEffect, useState } from 'react'
+import type { Metadata } from 'next'
+import { notFound } from 'next/navigation'
 import Link from 'next/link'
-import { useParams } from 'next/navigation'
-import { MapPin, Mountain, Zap, Home, ArrowRight, ChevronRight, Clock, Navigation } from 'lucide-react'
+import { MapPin, Mountain, Zap, Home, ArrowRight, ChevronRight, Clock, Navigation, Bus } from 'lucide-react'
 import Footer from '@/components/layout/Footer'
 import { getRegions, regionsMatch, type Region } from '@/lib/regions'
 import { getProperties, type Property } from '@/lib/properties'
 import { getRoomsByProperty } from '@/lib/rooms'
 import { getTrails, trailStartPoint, type Trail } from '@/lib/trails'
 import { getActivities, type Activity } from '@/lib/activities'
+import { getTowns } from '@/lib/towns'
+import { getNearbyRoutes } from '@/lib/modules'
+import { type Route } from '@/lib/transport-routes'
+import { publicSupabase } from '@/lib/supabase-public'
 import { StayDistance } from '@/lib/stay-distance'
+import ShuttleRoutesModule from '@/components/modules/ShuttleRoutesModule'
+import SeasonMosaic from '@/components/modules/SeasonMosaic'
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
+// Pure server component — same shape as app/nature-reserves/[slug]/page.tsx.
+// Previously this was a server shell (this file) handing off to
+// RegionDetail.tsx, a separate 'use client' component that ran its own
+// independent fetch of getRegions()/getProperties()/getTrails()/
+// getActivities() via useParams() and the plain browser client. Folding
+// that into one server-rendered pass removes a second, disconnected read
+// path for the same data. StayDistance is the one genuinely client-only
+// leaf (reads the visitor's chosen stay from booking-context) and is used
+// as-is inside this server tree, same as everywhere else it's used.
+// See docs/destination-graph/PHASE_G.md.
+
+const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://visitdrakensberg.com'
+
+// ISR — regions are admin-configured and change rarely; a stale hour costs
+// nothing and every request no longer needs a live Supabase round-trip.
+// See docs/destination-graph/PHASE_D.md.
+export const revalidate = 3600
 
 const DIFF_COLOR: Record<string, string> = {
   Easy: 'text-green-600 bg-green-50',
@@ -23,7 +43,72 @@ const DIFF_COLOR: Record<string, string> = {
 
 const FALLBACK = 'https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=800&q=80'
 
-// ── Section heading ───────────────────────────────────────────────────────────
+async function resolveRegion(slug: string): Promise<Region | null> {
+  const regions = await getRegions(publicSupabase)
+  return regions.find(r => r.slug === slug || r.id === slug) ?? null
+}
+
+type StayWithPrice = { prop: Property; minPrice: number | null }
+
+async function loadRegionContent(region: Region): Promise<{
+  stays: StayWithPrice[]; trails: Trail[]; activities: Activity[]; shuttleRoutes: Route[]; gatewayTown: string | undefined
+}> {
+  const [properties, allTrails, allActivities, towns, shuttleRoutes] = await Promise.all([
+    getProperties(publicSupabase),
+    getTrails(publicSupabase),
+    getActivities(publicSupabase),
+    getTowns(publicSupabase).catch(() => []),
+    getNearbyRoutes(region.name, { limit: 4 }, publicSupabase),
+  ])
+
+  const regionProps = properties.filter(p => p.status === 'active' && regionsMatch(p.region, region.name))
+  const stays: StayWithPrice[] = await Promise.all(
+    regionProps.map(async prop => {
+      const rooms = await getRoomsByProperty(prop.id, publicSupabase).catch(() => [])
+      const minPrice = rooms.length > 0 ? Math.min(...rooms.map(rm => rm.basePrice)) : null
+      return { prop, minPrice }
+    })
+  )
+
+  const trails = allTrails.filter(t => t.status === 'published' && regionsMatch(t.region, region.name))
+  const activities = allActivities.filter(a => a.status === 'active' && regionsMatch(a.region, region.name))
+  // First town filed under this region — used to give the "Get a Shuttle
+  // Here" CTA a real, geocodable destination (a region name like "Northern
+  // Drakensberg" isn't a specific-enough address for Google's Distance
+  // Matrix; a town is). See docs/destination-graph/PHASE_H.md.
+  const gatewayTown = towns.find(t => t.regionSlug === region.slug)?.name
+
+  return { stays, trails, activities, shuttleRoutes, gatewayTown }
+}
+
+export async function generateMetadata({ params }: { params: { slug: string } }): Promise<Metadata> {
+  const region = await resolveRegion(params.slug)
+  if (!region) return { title: 'Region Not Found' }
+
+  const title = region.seoTitle || `${region.name} | Visit Drakensberg`
+  const description = region.seoDescription || region.overview || region.tagline || undefined
+  const canonical = `/regions/${region.slug}`
+
+  return {
+    // `title` already includes " | Visit Drakensberg" — use `absolute` so
+    // the root layout's title template (`%s | Visit Drakensberg`) doesn't
+    // apply on top of it and double the suffix.
+    title: { absolute: title },
+    description,
+    alternates: { canonical },
+    openGraph: {
+      title,
+      description,
+      url: `${SITE_URL}${canonical}`,
+      images: region.heroImage ? [{ url: region.heroImage }] : undefined,
+    },
+    twitter: {
+      card: 'summary_large_image',
+      title,
+      description,
+    },
+  }
+}
 
 function SectionHeading({ icon, label, count }: { icon: React.ReactNode; label: string; count: number }) {
   return (
@@ -37,12 +122,10 @@ function SectionHeading({ icon, label, count }: { icon: React.ReactNode; label: 
   )
 }
 
-// ── Stay card ─────────────────────────────────────────────────────────────────
-
 function StayCard({ prop, minPrice }: { prop: Property; minPrice: number | null }) {
   return (
     <Link
-      href={`/stays/${prop.id}`}
+      href={`/stays/${prop.slug || prop.id}`}
       className="group bg-white border border-gray-200 overflow-hidden hover:border-[#2d6a4f] transition-colors flex flex-col"
     >
       <div className="relative h-44 overflow-hidden">
@@ -78,13 +161,11 @@ function StayCard({ prop, minPrice }: { prop: Property; minPrice: number | null 
   )
 }
 
-// ── Trail card ────────────────────────────────────────────────────────────────
-
 function TrailCard({ trail }: { trail: Trail }) {
   const start = trailStartPoint(trail)
   return (
     <Link
-      href={`/hikes/${trail.id}`}
+      href={`/hikes/${trail.slug || trail.id}`}
       className="group bg-white border border-gray-200 overflow-hidden hover:border-[#2d6a4f] transition-colors flex gap-0"
     >
       <div className="relative w-28 shrink-0 overflow-hidden">
@@ -119,12 +200,10 @@ function TrailCard({ trail }: { trail: Trail }) {
   )
 }
 
-// ── Activity card ─────────────────────────────────────────────────────────────
-
 function ActivityCard({ activity }: { activity: Activity }) {
   return (
     <Link
-      href={`/activities/${activity.id}`}
+      href={`/activities/${activity.slug || activity.id}`}
       className="group bg-white border border-gray-200 overflow-hidden hover:border-[#C9A96E] transition-colors flex gap-0"
     >
       <div className="relative w-28 shrink-0 overflow-hidden">
@@ -156,79 +235,55 @@ function ActivityCard({ activity }: { activity: Activity }) {
   )
 }
 
-// ── Page ──────────────────────────────────────────────────────────────────────
+export default async function RegionPage({ params }: { params: { slug: string } }) {
+  const region = await resolveRegion(params.slug)
+  if (!region) notFound()
 
-type StayWithPrice = { prop: Property; minPrice: number | null }
+  const { stays, trails, activities, shuttleRoutes, gatewayTown } = await loadRegionContent(region)
+  // Preserve the paragraph breaks an admin already typed into the plain
+  // gettingThere textarea — collapsing them into one <p> was the original
+  // complaint (see docs/destination-graph/PHASE_H.md).
+  const gettingThereParagraphs = region.gettingThere.split(/\n\s*\n/).map(p => p.trim()).filter(Boolean)
+  const shuttleHref = gatewayTown ? `/shuttles?to=${encodeURIComponent(gatewayTown)}` : '/shuttles'
+  const hasGettingThereContent =
+    gettingThereParagraphs.length > 0 || region.gettingThereSections.length > 0 || region.gettingThereRoutes.length > 0 || shuttleRoutes.length > 0
 
-export default function RegionPage() {
-  const { slug } = useParams() as { slug: string }
-  const [region, setRegion] = useState<Region | null>(null)
-  const [stays, setStays] = useState<StayWithPrice[]>([])
-  const [trails, setTrails] = useState<Trail[]>([])
-  const [activities, setActivities] = useState<Activity[]>([])
-  const [loading, setLoading] = useState(true)
-
-  useEffect(() => {
-    Promise.all([
-      getRegions(),
-      getProperties(),
-      getTrails(),
-      getActivities(),
-    ]).then(async ([regions, properties, allTrails, allActivities]) => {
-      const r = regions.find(r => r.slug === slug || r.id === slug)
-      setRegion(r ?? null)
-
-      if (r) {
-        // Stays in this region with min room price
-        const regionProps = properties.filter(
-          p => p.status === 'active' && regionsMatch(p.region, r.name)
-        )
-        const staysWithPrice: StayWithPrice[] = await Promise.all(
-          regionProps.map(async prop => {
-            const rooms = await getRoomsByProperty(prop.id).catch(() => [])
-            const minPrice = rooms.length > 0 ? Math.min(...rooms.map(rm => rm.basePrice)) : null
-            return { prop, minPrice }
-          })
-        )
-        setStays(staysWithPrice)
-
-        // Trails & activities for this region
-        setTrails(allTrails.filter(t => t.status === 'published' && regionsMatch(t.region, r.name)))
-        setActivities(allActivities.filter(a => a.status === 'active' && regionsMatch(a.region, r.name)))
-      }
-
-      setLoading(false)
-    })
-  }, [slug])
-
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-mist pt-16 flex items-center justify-center">
-        <div className="w-8 h-8 border-2 border-[#2d6a4f] border-t-transparent rounded-full animate-spin" />
-      </div>
-    )
-  }
-
-  if (!region) {
-    return (
-      <div className="min-h-screen bg-mist pt-16 flex flex-col items-center justify-center gap-4">
-        <p className="font-display italic text-3xl text-gray-300">Region not found</p>
-        <Link href="/regions" className="font-sans text-sm text-[#2d6a4f] hover:underline">← All regions</Link>
-      </div>
-    )
-  }
-
+  const canonicalUrl = `${SITE_URL}/regions/${region.slug}`
   const heroImg = region.heroImage || FALLBACK
+
+  const destinationJsonLd = {
+    '@context': 'https://schema.org',
+    '@type': 'TouristDestination',
+    name: region.name,
+    description: region.seoDescription || region.overview || undefined,
+    url: canonicalUrl,
+    image: region.heroImage || undefined,
+    containedInPlace: {
+      '@type': 'Place',
+      name: 'Drakensberg, KwaZulu-Natal, South Africa',
+    },
+  }
+
+  const breadcrumbJsonLd = {
+    '@context': 'https://schema.org',
+    '@type': 'BreadcrumbList',
+    itemListElement: [
+      { '@type': 'ListItem', position: 1, name: 'Home', item: SITE_URL },
+      { '@type': 'ListItem', position: 2, name: 'Regions', item: `${SITE_URL}/regions` },
+      { '@type': 'ListItem', position: 3, name: region.name, item: canonicalUrl },
+    ],
+  }
 
   return (
     <main className="bg-[#F7F5F2]">
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(destinationJsonLd) }} />
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbJsonLd) }} />
 
       {/* ── Hero ─────────────────────────────────────────────────────────── */}
       <section className="relative h-[70vh] min-h-[480px] overflow-hidden">
         <img src={heroImg} alt={region.name} className="absolute inset-0 w-full h-full object-cover" />
         <div className="absolute inset-0 bg-gradient-to-b from-black/30 via-black/20 to-black/70" />
 
-        {/* Breadcrumb */}
         <div className="absolute top-20 left-0 right-0 px-6 lg:px-12">
           <nav className="flex items-center gap-2 font-sans text-[11px] text-white/50 max-w-[1440px] mx-auto">
             <Link href="/" className="hover:text-white/80 transition-colors">Home</Link>
@@ -239,7 +294,6 @@ export default function RegionPage() {
           </nav>
         </div>
 
-        {/* Caption */}
         <div className="absolute bottom-0 left-0 right-0 px-6 lg:px-12 pb-12 max-w-[1440px] mx-auto">
           <p className="font-sans text-[11px] tracking-[0.22em] uppercase text-[#C9A96E] mb-3">Drakensberg Region</p>
           <h1 className="font-display italic text-5xl lg:text-7xl text-white leading-none mb-3">{region.name}</h1>
@@ -258,7 +312,7 @@ export default function RegionPage() {
                 {region.overview || region.seoDescription}
               </p>
               {region.highlights.length > 0 && (
-                <div>
+                <div className="mb-8">
                   <p className="font-sans text-[10px] tracking-[0.2em] uppercase text-[#C9A96E] mb-3">Highlights</p>
                   <ul className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                     {region.highlights.map(h => (
@@ -268,6 +322,19 @@ export default function RegionPage() {
                       </li>
                     ))}
                   </ul>
+                </div>
+              )}
+              {region.keyAttractions.length > 0 && (
+                <div>
+                  <p className="font-sans text-[10px] tracking-[0.2em] uppercase text-[#C9A96E] mb-3">Key Attractions</p>
+                  <div className="grid sm:grid-cols-2 gap-3">
+                    {region.keyAttractions.map(a => (
+                      <div key={a.id} className="border border-gray-100 px-4 py-3 bg-[#F7F5F2]">
+                        <p className="font-sans text-sm font-medium text-forest">{a.name}</p>
+                        {a.description && <p className="font-sans text-xs text-forest/50 mt-0.5 leading-relaxed">{a.description}</p>}
+                      </div>
+                    ))}
+                  </div>
                 </div>
               )}
             </div>
@@ -291,15 +358,106 @@ export default function RegionPage() {
         </div>
       </section>
 
+      {/* ── When to Go ───────────────────────────────────────────────────── */}
+      <section className="py-16 bg-white">
+        <div className="max-w-[1440px] mx-auto px-6 lg:px-12">
+          <p className="font-sans text-[10px] tracking-[0.2em] uppercase text-[#C9A96E] mb-2">Plan by Season</p>
+          <h2 className="font-display italic text-3xl text-[#000000] mb-3">When to Go</h2>
+          <p className="font-sans text-sm text-gray-500 max-w-2xl mb-8 leading-relaxed">
+            {region.bestTime || `${region.name} changes character through the year — pick a season to see what's worth doing in it.`}
+          </p>
+          <SeasonMosaic regionSlug={region.slug} heroImage={heroImg} />
+        </div>
+      </section>
+
+      {/* ── Getting There ────────────────────────────────────────────────── */}
+      {hasGettingThereContent && (
+        <section className="py-16 bg-[#F7F5F2] border-y border-gray-200">
+          <div className="max-w-[1440px] mx-auto px-6 lg:px-12">
+            <div className="flex items-center gap-3 mb-8">
+              <Bus size={20} className="text-[#2d6a4f]" />
+              <h2 className="font-display italic text-3xl text-[#000000]">Getting There</h2>
+            </div>
+
+            <div className="grid lg:grid-cols-[2fr_1fr] gap-10 items-start">
+              <div className="space-y-8">
+                {gettingThereParagraphs.length > 0 && (
+                  <div className="space-y-4">
+                    {gettingThereParagraphs.map((p, i) => (
+                      <p key={i} className="font-sans text-sm text-forest/70 leading-relaxed">{p}</p>
+                    ))}
+                  </div>
+                )}
+
+                {region.gettingThereSections.length > 0 && (
+                  <div className="space-y-6">
+                    {region.gettingThereSections.map(s => (
+                      <div key={s.id}>
+                        <h3 className="font-display italic text-xl text-[#000000] mb-2">{s.title}</h3>
+                        <div className="space-y-3">
+                          {s.body.split(/\n\s*\n/).map(p => p.trim()).filter(Boolean).map((p, i) => (
+                            <p key={i} className="font-sans text-sm text-forest/70 leading-relaxed">{p}</p>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {region.gettingThereRoutes.length > 0 && (
+                  <div>
+                    <p className="font-sans text-[10px] tracking-[0.2em] uppercase text-[#C9A96E] mb-3">Distance & Duration</p>
+                    <div className="overflow-x-auto bg-white border border-gray-200">
+                      <table className="w-full text-left">
+                        <thead>
+                          <tr className="border-b border-gray-200">
+                            <th className="font-sans text-[10px] tracking-[0.12em] uppercase text-gray-400 px-4 py-3">From</th>
+                            <th className="font-sans text-[10px] tracking-[0.12em] uppercase text-gray-400 px-4 py-3">Distance</th>
+                            <th className="font-sans text-[10px] tracking-[0.12em] uppercase text-gray-400 px-4 py-3">Duration</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {region.gettingThereRoutes.map((r, i) => (
+                            <tr key={r.id} className={i > 0 ? 'border-t border-gray-100' : ''}>
+                              <td className="font-sans text-sm text-forest px-4 py-3">{r.from}</td>
+                              <td className="font-sans text-sm text-forest/70 px-4 py-3">{r.distance}</td>
+                              <td className="font-sans text-sm text-forest/70 px-4 py-3">{r.duration}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Shuttle module */}
+              <div className="space-y-5">
+                <div className="bg-white border border-gray-200 p-6">
+                  <p className="font-sans text-[10px] tracking-[0.15em] uppercase text-gray-400 mb-1.5">Need a Ride?</p>
+                  <h3 className="font-display italic text-2xl text-[#000000] mb-3">Plan Your Shuttle</h3>
+                  <p className="font-sans text-sm text-gray-500 mb-5">
+                    Get an instant quote for a private or shared shuttle into {region.name}.
+                  </p>
+                  <Link
+                    href={shuttleHref}
+                    className="block text-center bg-[#2d6a4f] text-white py-3 font-sans text-sm hover:bg-[#235a3f] transition-colors"
+                  >
+                    Get a Shuttle Here →
+                  </Link>
+                </div>
+                {shuttleRoutes.length > 0 && <ShuttleRoutesModule routes={shuttleRoutes} />}
+              </div>
+            </div>
+          </div>
+        </section>
+      )}
+
       {/* ── Stays ─────────────────────────────────────────────────────────── */}
       {stays.length > 0 && (
         <section className="py-16 bg-[#F7F5F2]">
           <div className="max-w-[1440px] mx-auto px-6 lg:px-12">
-            <SectionHeading
-              icon={<Home size={20} />}
-              label={`Stay in ${region.name}`}
-              count={stays.length}
-            />
+            <SectionHeading icon={<Home size={20} />} label={`Stay in ${region.name}`} count={stays.length} />
             <p className="font-sans text-sm text-gray-400 mb-8 -mt-2">
               Pick a stay first — distance chips on trails and activities below will update to show how far each is from your chosen lodge.
             </p>
@@ -309,10 +467,7 @@ export default function RegionPage() {
               ))}
             </div>
             <div className="mt-6">
-              <Link
-                href={`/stays?region=${encodeURIComponent(region.name)}`}
-                className="inline-flex items-center gap-2 font-sans text-sm text-[#2d6a4f] hover:underline"
-              >
+              <Link href={`/stays?region=${encodeURIComponent(region.name)}`} className="inline-flex items-center gap-2 font-sans text-sm text-[#2d6a4f] hover:underline">
                 Browse all stays in {region.name} <ArrowRight size={14} />
               </Link>
             </div>
@@ -324,21 +479,14 @@ export default function RegionPage() {
       {trails.length > 0 && (
         <section className="py-16 bg-white">
           <div className="max-w-[1440px] mx-auto px-6 lg:px-12">
-            <SectionHeading
-              icon={<Mountain size={20} />}
-              label="Trails & Hikes"
-              count={trails.length}
-            />
+            <SectionHeading icon={<Mountain size={20} />} label="Trails & Hikes" count={trails.length} />
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {trails.map(trail => (
                 <TrailCard key={trail.id} trail={trail} />
               ))}
             </div>
             <div className="mt-6">
-              <Link
-                href={`/hikes?region=${encodeURIComponent(region.name)}`}
-                className="inline-flex items-center gap-2 font-sans text-sm text-[#2d6a4f] hover:underline"
-              >
+              <Link href={`/hikes?region=${encodeURIComponent(region.name)}`} className="inline-flex items-center gap-2 font-sans text-sm text-[#2d6a4f] hover:underline">
                 All hikes in {region.name} <ArrowRight size={14} />
               </Link>
             </div>
@@ -350,21 +498,14 @@ export default function RegionPage() {
       {activities.length > 0 && (
         <section className="py-16 bg-[#F7F5F2]">
           <div className="max-w-[1440px] mx-auto px-6 lg:px-12">
-            <SectionHeading
-              icon={<Zap size={20} />}
-              label="Activities & Experiences"
-              count={activities.length}
-            />
+            <SectionHeading icon={<Zap size={20} />} label="Activities & Experiences" count={activities.length} />
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {activities.map(activity => (
                 <ActivityCard key={activity.id} activity={activity} />
               ))}
             </div>
             <div className="mt-6">
-              <Link
-                href={`/activities?region=${encodeURIComponent(region.name)}`}
-                className="inline-flex items-center gap-2 font-sans text-sm text-[#C9A96E] hover:underline"
-              >
+              <Link href={`/activities?region=${encodeURIComponent(region.name)}`} className="inline-flex items-center gap-2 font-sans text-sm text-[#C9A96E] hover:underline">
                 All activities in {region.name} <ArrowRight size={14} />
               </Link>
             </div>

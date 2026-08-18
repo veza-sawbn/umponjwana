@@ -1,4 +1,5 @@
 import { supabase } from './auth'
+import type { SupabaseClient } from '@supabase/supabase-js'
 
 export type Town = {
   id: string
@@ -6,7 +7,7 @@ export type Town = {
   /** Region this town is filed under (Region.slug). Empty = unassigned. */
   regionSlug: string
   name: string
-  /** Short role/label, e.g. "North Berg gateway". */
+  /** Short role/label, e.g. "Northern Drakensberg gateway". */
   gateway: string
   description: string
   image: string
@@ -21,35 +22,35 @@ export type Town = {
 export const DEFAULT_TOWNS: Town[] = [
   {
     id: 'bergville', slug: 'bergville', regionSlug: 'north-berg', name: 'Bergville',
-    gateway: 'North Berg gateway',
-    description: 'Main service town for the Northern Berg. Close to Royal Natal National Park and the Amphitheatre.',
+    gateway: 'Northern Drakensberg gateway',
+    description: 'Main service town for the Northern Drakensberg. Close to Royal Natal National Park and the Amphitheatre.',
     image: 'https://images.unsplash.com/photo-1590098563548-8f14eed3a47f?w=900&q=80',
     highlights: [], seoTitle: 'Bergville | Visit Drakensberg', seoDescription: '',
   },
   {
     id: 'winterton', slug: 'winterton', regionSlug: 'central-berg', name: 'Winterton',
-    gateway: 'Central Berg gateway',
+    gateway: 'Central Drakensberg gateway',
     description: 'Gateway to Cathedral Peak and the Drakensberg resort strip. Home to the Drakensberg Boys Choir.',
     image: 'https://images.unsplash.com/photo-1503614472-8c93d56e92ce?w=900&q=80',
     highlights: [], seoTitle: 'Winterton | Visit Drakensberg', seoDescription: '',
   },
   {
     id: 'estcourt', slug: 'estcourt', regionSlug: 'central-berg', name: 'Estcourt',
-    gateway: 'Central Berg',
+    gateway: 'Central Drakensberg',
     description: 'Larger regional centre with good access to Giants Castle Game Reserve.',
     image: 'https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?w=900&q=80',
     highlights: [], seoTitle: 'Estcourt | Visit Drakensberg', seoDescription: '',
   },
   {
     id: 'underberg', slug: 'underberg', regionSlug: 'south-berg', name: 'Underberg',
-    gateway: 'South Berg gateway',
+    gateway: 'Southern Drakensberg gateway',
     description: 'The main town for southern Drakensberg, sitting at the foot of Sani Pass. Practical and unpretentious.',
     image: 'https://images.unsplash.com/photo-1542587222-e14b891ee40b?w=900&q=80',
     highlights: [], seoTitle: 'Underberg | Visit Drakensberg', seoDescription: '',
   },
   {
     id: 'himeville', slug: 'himeville', regionSlug: 'south-berg', name: 'Himeville',
-    gateway: 'South Berg — boutique',
+    gateway: 'Southern Drakensberg — boutique',
     description: 'A charming village with a restored fort, trout streams and boutique accommodation. A hidden gem.',
     image: 'https://images.unsplash.com/photo-1520250497591-112f2f40a3f4?w=900&q=80',
     highlights: [], seoTitle: 'Himeville | Visit Drakensberg', seoDescription: '',
@@ -63,7 +64,7 @@ export const DEFAULT_TOWNS: Town[] = [
   },
   {
     id: 'champagne-valley', slug: 'champagne-valley', regionSlug: 'central-berg', name: 'Champagne Valley',
-    gateway: 'Central Berg',
+    gateway: 'Central Drakensberg',
     description: 'A scenic valley resort corridor with a dense cluster of lodges, spas and adventure operators.',
     image: 'https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=900&q=80',
     highlights: [], seoTitle: 'Champagne Valley | Visit Drakensberg', seoDescription: '',
@@ -100,8 +101,11 @@ async function saveTowns(towns: Town[]) {
   if (error) throw error
 }
 
-export async function getTowns(): Promise<Town[]> {
-  const { data, error } = await supabase.from('site_content').select('value').eq('key', 'admin_towns').maybeSingle()
+// Accepts an optional Supabase client so Server Components can pass a
+// session-less client (lib/supabase-public.ts) — see lib/regions.ts's
+// getRegions() for the same pattern. Existing callers are unaffected.
+export async function getTowns(client: SupabaseClient = supabase): Promise<Town[]> {
+  const { data, error } = await client.from('site_content').select('value').eq('key', 'admin_towns').maybeSingle()
   if (error) throw error
   if (Array.isArray(data?.value?.items) && data.value.items.length > 0) {
     return data.value.items.map((item: Town) => normalizeTown(item))

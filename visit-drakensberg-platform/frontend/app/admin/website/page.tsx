@@ -18,7 +18,7 @@ const SECTIONS: { id: Section; label: string; desc: string }[] = [
   { id: 'about', label: 'About / Platform Copy', desc: 'Platform description and about text' },
 ]
 
-const REGION_OPTIONS = ['All', 'Northern Berg', 'Central Berg', 'Southern Berg']
+const REGION_OPTIONS = ['All', 'Northern Drakensberg', 'Central Drakensberg', 'Southern Drakensberg']
 const TYPE_OPTIONS = ['Accommodation', 'Hiking', 'Activities', 'Experiences', 'Events']
 
 type NavItem = { id: string; label: string; href: string; visible: boolean }

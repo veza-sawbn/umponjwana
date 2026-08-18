@@ -1,4 +1,5 @@
 import { supabase } from './auth'
+import type { SupabaseClient } from '@supabase/supabase-js'
 
 // Core data access for catalog entities stored one-row-per-item in the
 // `vd_entities` table (see supabase/migrations/20260704_secure_data_layer.sql).
@@ -44,10 +45,15 @@ export function newEntityId(prefix: string): string {
  *
  * Supplier-facing screens must use listEntitiesByOwner() instead — RLS will
  * not scope the rows for you.
+ *
+ * Accepts an optional Supabase client so Server Components can pass a
+ * session-less client (lib/supabase-public.ts) instead of the browser
+ * client-component client this module defaults to — every existing caller
+ * (every domain lib wrapping this module) is unaffected.
  */
-export async function listEntities<T>(kind: string): Promise<T[]> {
+export async function listEntities<T>(kind: string, client: SupabaseClient = supabase): Promise<T[]> {
   try {
-    const { data } = await supabase
+    const { data } = await client
       .from('vd_entities')
       .select('*')
       .eq('kind', kind)
@@ -65,10 +71,10 @@ export async function listEntities<T>(kind: string): Promise<T[]> {
  * "Owners read own entities" policy is permissive and sits alongside the
  * public-catalog policy, so it narrows nothing on its own.
  */
-export async function listEntitiesByOwner<T>(kind: string, ownerId: string): Promise<T[]> {
+export async function listEntitiesByOwner<T>(kind: string, ownerId: string, client: SupabaseClient = supabase): Promise<T[]> {
   if (!ownerId) return []
   try {
-    const { data } = await supabase
+    const { data } = await client
       .from('vd_entities')
       .select('*')
       .eq('kind', kind)
@@ -79,9 +85,9 @@ export async function listEntitiesByOwner<T>(kind: string, ownerId: string): Pro
   return []
 }
 
-export async function getEntity<T>(kind: string, id: string): Promise<T | null> {
+export async function getEntity<T>(kind: string, id: string, client: SupabaseClient = supabase): Promise<T | null> {
   try {
-    const { data } = await supabase
+    const { data } = await client
       .from('vd_entities')
       .select('*')
       .eq('kind', kind)

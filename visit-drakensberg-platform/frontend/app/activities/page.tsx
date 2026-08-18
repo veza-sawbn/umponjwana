@@ -3,17 +3,17 @@ import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import Footer from '@/components/layout/Footer'
 import EditablePageHeader from '@/components/editor/EditablePageHeader'
-import { getActivities, type Activity } from '@/lib/activities'
+import { getActivities, ACTIVITY_CATEGORIES, type Activity } from '@/lib/activities'
 import { StayDistance } from '@/lib/stay-distance'
 import { regionsMatch } from '@/lib/regions'
 
+// Derived from the canonical activity-category vocabulary (lib/activities.ts)
+// so every category a supplier can tag is reachable via a public filter tab —
+// previously this list had drifted from the supplier form's, leaving
+// 'Nature'/'Water'-tagged activities permanently unreachable here.
 const CATEGORIES = [
   { label: 'All', slug: '' },
-  { label: 'Adventure', slug: 'Adventure' },
-  { label: 'Wildlife', slug: 'Wildlife' },
-  { label: 'Cultural', slug: 'Cultural' },
-  { label: 'Family', slug: 'Family' },
-  { label: 'Wellness', slug: 'Wellness' },
+  ...ACTIVITY_CATEGORIES.map(c => ({ label: c, slug: c })),
 ]
 
 export default function ActivitiesPage() {

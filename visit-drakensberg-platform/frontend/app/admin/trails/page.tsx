@@ -3,12 +3,13 @@
 import { useState, useEffect, useRef } from 'react'
 import { Plus, Pencil, Trash2, Star, X, Check, GripVertical, CalendarDays } from 'lucide-react'
 import { Trail, TrailDay, TrailCategory, getTrails, saveTrails, DEFAULT_TRAILS, trailCategory, SPECIALITY_WALK_TYPES } from '@/lib/trails'
+import { SEASONS, SEASON_META, SEASON_TOPICS, SEASON_TOPIC_META, type Season, type SeasonTopic } from '@/lib/seasons'
 import { analyseGpxAsync, ROUTE_TYPES } from '@/lib/gpx'
 import RouteArtwork from '@/components/trails/RouteArtwork'
 import { MediaPicker, MediaGalleryPicker } from '@/components/media/MediaPicker'
 import { adminMediaSource } from '@/lib/admin-supabase'
 
-const REGIONS = ['Northern Berg', 'Central Berg', 'Southern Berg', 'Royal Natal National Park', 'Champagne Valley', "Giant's Castle", 'Sani Pass']
+const REGIONS = ['Northern Drakensberg', 'Central Drakensberg', 'Southern Drakensberg', 'Royal Natal National Park', 'Champagne Valley', "Giant's Castle", 'Sani Pass']
 const DIFFICULTIES = ['Easy', 'Moderate', 'Strenuous', 'Extreme'] as const
 
 const TRAIL_CATEGORIES: { value: TrailCategory; label: string }[] = [
@@ -303,6 +304,46 @@ function TrailForm({ trail, onChange, onSave, onCancel, saveLabel, saving }: {
         <textarea value={trail.description} onChange={e => onChange('description', e.target.value)} rows={4} className={`${inputCls} resize-none`} />
       </div>
 
+      {/* Best seasons / topics — powers the "When to Go" seasonal pages, see docs/destination-graph/PHASE_I.md */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div>
+          <label className={labelCls}>Best Seasons</label>
+          <div className="flex flex-wrap gap-2 mt-1">
+            {SEASONS.map(s => {
+              const active = (trail.seasons ?? []).includes(s)
+              return (
+                <button
+                  key={s}
+                  type="button"
+                  onClick={() => onChange('seasons', active ? (trail.seasons ?? []).filter(x => x !== s) : [...(trail.seasons ?? []), s])}
+                  className={`font-sans text-xs px-3 py-1.5 rounded-full border capitalize transition-colors ${active ? 'bg-[#C9A96E] text-white border-[#C9A96E]' : 'border-black/15 text-black/60 hover:border-[#C9A96E]/40'}`}
+                >
+                  {SEASON_META[s].label}
+                </button>
+              )
+            })}
+          </div>
+        </div>
+        <div>
+          <label className={labelCls}>Topics</label>
+          <div className="flex flex-wrap gap-2 mt-1">
+            {SEASON_TOPICS.map(t => {
+              const active = (trail.topics ?? []).includes(t)
+              return (
+                <button
+                  key={t}
+                  type="button"
+                  onClick={() => onChange('topics', active ? (trail.topics ?? []).filter(x => x !== t) : [...(trail.topics ?? []), t])}
+                  className={`font-sans text-xs px-3 py-1.5 rounded-full border capitalize transition-colors ${active ? 'bg-[#C9A96E] text-white border-[#C9A96E]' : 'border-black/15 text-black/60 hover:border-[#C9A96E]/40'}`}
+                >
+                  {SEASON_TOPIC_META[t].label}
+                </button>
+              )
+            })}
+          </div>
+        </div>
+      </div>
+
       {/* Hero image */}
       <div>
         <label className={labelCls}>Hero Image</label>
@@ -371,9 +412,10 @@ function TrailForm({ trail, onChange, onSave, onCancel, saveLabel, saving }: {
 }
 
 const BLANK_TRAIL: Trail = {
-  id: '', name: '', region: 'Northern Berg', difficulty: 'Moderate', distance: '', duration: '', elevation: '',
+  id: '', name: '', region: 'Northern Drakensberg', difficulty: 'Moderate', distance: '', duration: '', elevation: '',
   status: 'draft', featured: false, image: '', gallery: [], description: '', trailhead: '', slug: '', park: '', visibility: 'public', trail_type: 'Out and back',
   permit_required: false, permit_cost: 0, what_to_bring: [], highlights: [], is_multi_day: false, days: [], category: 'day_hike',
+  seasons: [], topics: [],
 }
 
 export default function AdminTrailsPage() {
