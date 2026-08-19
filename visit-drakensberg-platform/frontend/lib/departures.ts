@@ -14,6 +14,17 @@ export type DeparturePackage = {
   pricePerPerson: number
   inclusions: string[]
   description?: string
+  // Links this package back to the tour pricing tier it was selected from
+  // (PricingTier in lib/tours.ts). Absent for freeform custom packages typed
+  // directly on the departure. When present, name/inclusions and price are
+  // resolved live from the current tour tier at read time — see
+  // composePackages() in lib/experiences.ts — so editing a tour tier updates
+  // every departure using it automatically, unless overridden below.
+  tierId?: string
+  // Per-departure override of a tier-linked package's price (e.g. a
+  // peak-season surcharge for one date). Ignored for freeform packages.
+  // Absent means "follow the tour tier's current price."
+  priceOverride?: number
 }
 
 export type Departure = {

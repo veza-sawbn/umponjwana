@@ -4,6 +4,7 @@ import { useParams, useRouter } from 'next/navigation'
 import { ChevronLeft, Plus, X } from 'lucide-react'
 import { getMyTours, updateTour } from '@/lib/tours'
 import { GoogleAddressField } from '@/components/maps/GoogleAddressField'
+import { PackagesEditor, emptyTier, tiersToForm, formToTiers, cheapest, type PackageForm } from '@/components/tours/PackageEditor'
 
 const DIFFICULTIES = ['Easy', 'Moderate', 'Challenging', 'Extreme']
 const CANCELLATIONS = ['48h', '72h', '7 days', '14 days']
@@ -12,20 +13,23 @@ type FormState = {
   name: string; difficulty: string; days: number; minAge: number; maxGroup: number;
   meetingPoint: string; gpsLat: string; gpsLng: string; description: string;
   included: string[]; fitnessNotes: string; cancellation: string;
-  pricePerPerson: number; status: 'active' | 'draft'
+  pricingTiers: PackageForm[]; status: 'active' | 'draft'
 }
 
-const EMPTY: FormState = {
+const EMPTY: Omit<FormState, 'pricingTiers'> = {
   name: '', difficulty: 'Moderate', days: 1, minAge: 0, maxGroup: 10,
   meetingPoint: '', gpsLat: '', gpsLng: '', description: '',
   included: [], fitnessNotes: '', cancellation: '48h',
-  pricePerPerson: 0, status: 'active',
+  status: 'active',
 }
 
 export default function EditTourPage() {
   const { id } = useParams<{ id: string }>()
   const router = useRouter()
-  const [form, setForm] = useState<FormState>(EMPTY)
+  // Lazy initializer so each mount gets a fresh tier id — EMPTY is a module
+  // singleton and would otherwise hand every mount the same placeholder id
+  // (overwritten once the real tour loads below, but never while loading===true).
+  const [form, setForm] = useState<FormState>(() => ({ ...EMPTY, pricingTiers: [emptyTier('Standard')] }))
   const [includedDraft, setIncludedDraft] = useState('')
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -44,7 +48,7 @@ export default function EditTourPage() {
           meetingPoint: tour.meetingPoint, gpsLat: tour.gpsLat, gpsLng: tour.gpsLng,
           description: tour.description, included: tour.included,
           fitnessNotes: tour.fitnessNotes, cancellation: tour.cancellation,
-          pricePerPerson: tour.pricePerPerson,
+          pricingTiers: tiersToForm(tour.pricingTiers, tour.pricePerPerson),
           status: tour.status,
         })
       }
@@ -65,10 +69,12 @@ export default function EditTourPage() {
 
   async function handleSave() {
     if (!form.name.trim()) { setError('Tour name is required.'); return }
+    const pricingTiers = formToTiers(form.pricingTiers)
+    if (pricingTiers.length === 0) { setError('At least one pricing tier with a name and price is required.'); return }
     setError('')
     setSaving(true)
     try {
-      await updateTour(id, form)
+      await updateTour(id, { ...form, pricingTiers, pricePerPerson: cheapest(pricingTiers) })
       router.push('/supplier/tours')
     } catch {
       setError('Failed to save changes. Please try again.')
@@ -158,14 +164,26 @@ export default function EditTourPage() {
 
         <F label="Fitness Requirements"><textarea value={form.fitnessNotes} onChange={e => set('fitnessNotes', e.target.value)} rows={3} className={`${inp} resize-none`} /></F>
 
-        <div className="grid grid-cols-2 gap-4">
-          <F label="Cancellation Policy">
-            <select value={form.cancellation} onChange={e => set('cancellation', e.target.value)} className={inp}>
-              {CANCELLATIONS.map(c => <option key={c}>{c}</option>)}
-            </select>
-          </F>
-          <F label="Price per Person (ZAR)" required><input type="number" value={form.pricePerPerson || ''} onChange={e => set('pricePerPerson', +e.target.value)} className={inp} /></F>
-        </div>
+        <F label="Cancellation Policy">
+          <select value={form.cancellation} onChange={e => set('cancellation', e.target.value)} className={inp}>
+            {CANCELLATIONS.map(c => <option key={c}>{c}</option>)}
+          </select>
+        </F>
+
+        <F label="Pricing Tiers" required>
+          <PackagesEditor
+            packages={form.pricingTiers}
+            onChange={next => set('pricingTiers', next)}
+            namePlaceholder={i => (i === 0 ? 'Tier name (e.g. Shuttled)' : 'Tier name (e.g. Self-Drive)')}
+            priceLabel="Price per person (ZAR)"
+            inclusionsLabel="Add-ons for this tier"
+            addLabel="Add another pricing tier"
+            makeRow={emptyTier}
+          />
+          <p className="font-sans text-xs text-black/35 mt-1">
+            Each departure can offer a subset of these tiers — e.g. Shuttled on one date, Self-Drive on another.
+          </p>
+        </F>
 
         <F label="Status">
           <div className="flex gap-2">

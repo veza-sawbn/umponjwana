@@ -2,15 +2,22 @@
 import { useState, useEffect, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
-import { CalendarDays, Plus, Users, Trash2, ChevronLeft, X, Settings2 } from 'lucide-react'
+import { CalendarDays, Plus, Users, Trash2, ChevronLeft, X, Settings2, UserPlus } from 'lucide-react'
 import { supabase } from '@/lib/auth'
 import { effectiveSupplierId } from '@/lib/effective-supplier'
 import { getSupplierEntities, type SupplierEntity } from '@/lib/supplier-entities'
-import { getMyTours, type Tour } from '@/lib/tours'
+import { getMyTours, type Tour, type PricingTier } from '@/lib/tours'
 import {
   getMyDepartures, addDeparture, updateDeparture, deleteDeparture, newDeparturePackageId,
-  type Departure, type DeparturePackage,
+  type Departure,
 } from '@/lib/departures'
+import {
+  PackagesEditor, InclusionChips, emptyPackage, packagesToForm, formToPackages, cheapest,
+  resolveLivePackages, withTierOverrides, inp, type PackageForm,
+} from '@/components/tours/PackageEditor'
+import {
+  getGuestsForDeparture, addManualGuest, removeManualGuest, type DepartureGuest,
+} from '@/lib/departure-guests'
 
 type Guide = SupplierEntity & { name: string }
 
@@ -20,102 +27,12 @@ const STATUS: Record<string, string> = {
   full:      'bg-slate-100 text-slate-600',
 }
 
-const INCLUSION_OPTIONS = ['Guide', 'Permits', 'Meals', 'Accommodation', 'Transport', 'Equipment', 'Porter', 'Emergency evacuation cover']
-
-type PackageForm = { id: string; name: string; pricePerPerson: string; inclusions: string[] }
-
-function emptyPackage(name = ''): PackageForm {
-  return { id: newDeparturePackageId(), name, pricePerPerson: '', inclusions: [] }
-}
-
-function packagesToForm(packages: DeparturePackage[] | undefined): PackageForm[] {
-  if (!packages || packages.length === 0) return [emptyPackage('Standard')]
-  return packages.map(p => ({ id: p.id, name: p.name, pricePerPerson: String(p.pricePerPerson || ''), inclusions: p.inclusions ?? [] }))
-}
-
-function formToPackages(packages: PackageForm[]): DeparturePackage[] {
-  return packages
-    .filter(p => p.name.trim() && +p.pricePerPerson > 0)
-    .map(p => ({ id: p.id, name: p.name.trim(), pricePerPerson: +p.pricePerPerson, inclusions: p.inclusions }))
-}
-
-function cheapest(packages: DeparturePackage[]): number {
-  return packages.length > 0 ? Math.min(...packages.map(p => p.pricePerPerson)) : 0
-}
-
-/* ─── Shared rate/inclusions editor (used by both Add and Configure) ───────── */
-
-function InclusionChips({ value, onChange }: { value: string[]; onChange: (next: string[]) => void }) {
-  const [custom, setCustom] = useState('')
-  function toggle(item: string) {
-    onChange(value.includes(item) ? value.filter(x => x !== item) : [...value, item])
-  }
-  function addCustom() {
-    const v = custom.trim()
-    if (v && !value.includes(v)) onChange([...value, v])
-    setCustom('')
-  }
-  const extras = value.filter(v => !INCLUSION_OPTIONS.includes(v))
-  return (
-    <div>
-      <div className="flex flex-wrap gap-1.5 mb-2">
-        {INCLUSION_OPTIONS.map(item => <button key={item} type="button" onClick={() => toggle(item)} className={chip(value.includes(item))}>{item}</button>)}
-        {extras.map(item => <button key={item} type="button" onClick={() => toggle(item)} className={chip(true)}>{item} ×</button>)}
-      </div>
-      <div className="flex gap-2">
-        <input
-          value={custom}
-          onChange={e => setCustom(e.target.value)}
-          onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addCustom() } }}
-          placeholder="Add custom inclusion…"
-          className={`${inp} text-xs py-1.5`}
-        />
-        <button type="button" onClick={addCustom} className="font-sans text-xs px-3 py-1.5 border border-black/10 rounded-lg text-black/50 hover:border-[#C9A96E]/40 whitespace-nowrap">Add</button>
-      </div>
-    </div>
-  )
-}
-
-function PackagesEditor({ packages, onChange }: { packages: PackageForm[]; onChange: (next: PackageForm[]) => void }) {
-  function update(id: string, patch: Partial<PackageForm>) {
-    onChange(packages.map(p => (p.id === id ? { ...p, ...patch } : p)))
-  }
-  function remove(id: string) {
-    if (packages.length <= 1) return
-    onChange(packages.filter(p => p.id !== id))
-  }
-  return (
-    <div className="space-y-4">
-      {packages.map((pkg, i) => (
-        <div key={pkg.id} className="border border-black/10 rounded-lg p-4 space-y-3 bg-black/[0.015]">
-          <div className="flex items-center gap-3">
-            <input
-              value={pkg.name}
-              onChange={e => update(pkg.id, { name: e.target.value })}
-              placeholder={i === 0 ? 'Rate name (e.g. Self-Sufficient)' : 'Rate name (e.g. Portered)'}
-              className={`${inp} font-medium`}
-            />
-            {packages.length > 1 && (
-              <button type="button" onClick={() => remove(pkg.id)} className="text-red-400 hover:text-red-600 shrink-0">
-                <Trash2 size={14} />
-              </button>
-            )}
-          </div>
-          <div className="w-44">
-            <label className="font-sans text-xs text-black/40 block mb-1">Price per person (ZAR)</label>
-            <input type="number" value={pkg.pricePerPerson} onChange={e => update(pkg.id, { pricePerPerson: e.target.value })} placeholder="0" min="0" className={inp} />
-          </div>
-          <div>
-            <label className="font-sans text-xs text-black/40 block mb-1">Extra inclusions for this rate</label>
-            <InclusionChips value={pkg.inclusions} onChange={next => update(pkg.id, { inclusions: next })} />
-          </div>
-        </div>
-      ))}
-      <button type="button" onClick={() => onChange([...packages, emptyPackage()])} className="flex items-center gap-1.5 font-sans text-xs text-[#C9A96E] hover:text-[#b8965d]">
-        <Plus size={13} /> Add another rate package
-      </button>
-    </div>
-  )
+// Turns a tour's pricing tiers into one pre-selected package row each,
+// carrying tierId so the price/add-ons stay linked to that tier (see
+// resolveLivePackages/withTierOverrides). The supplier prunes whichever
+// tiers don't apply to this particular date, or overrides a price.
+function packagesFromTiers(tiers: PricingTier[]): PackageForm[] {
+  return tiers.map(t => ({ id: newDeparturePackageId(), name: t.name, pricePerPerson: String(t.pricePerPerson || ''), inclusions: t.inclusions, tierId: t.id }))
 }
 
 function RatesFieldset({
@@ -140,16 +57,25 @@ function RatesFieldset({
 
 /* ─── Configure modal for an existing departure ─────────────────────────────── */
 
-function ConfigureModal({ dep, onClose, onSaved }: { dep: Departure; onClose: () => void; onSaved: (patch: Partial<Departure>) => void }) {
+function ConfigureModal({ dep, tour, onClose, onSaved }: { dep: Departure; tour: Tour | undefined; onClose: () => void; onSaved: (patch: Partial<Departure>) => void }) {
   const [inclusions, setInclusions] = useState<string[]>(dep.inclusions ?? [])
-  const [packages, setPackages] = useState<PackageForm[]>(packagesToForm(dep.packages))
+  // Load with each tier-linked row showing its tour tier's *current*
+  // name/price/add-ons, not the stale snapshot stored on the departure —
+  // editing a tour tier should be visible here immediately.
+  const [packages, setPackages] = useState<PackageForm[]>(() => packagesToForm(resolveLivePackages(dep.packages ?? [], tour)))
   const [saving, setSaving] = useState(false)
+
+  const availableTiers = (tour?.pricingTiers ?? []).filter(t => !packages.some(p => p.tierId === t.id))
+
+  function addTier(t: PricingTier) {
+    setPackages(p => [...p, { id: newDeparturePackageId(), name: t.name, pricePerPerson: String(t.pricePerPerson || ''), inclusions: t.inclusions, tierId: t.id }])
+  }
 
   async function save() {
     const parsed = formToPackages(packages)
     if (parsed.length === 0) return
     setSaving(true)
-    const patch = { inclusions, packages: parsed, pricePerPerson: cheapest(parsed) }
+    const patch = { inclusions, packages: withTierOverrides(parsed, tour), pricePerPerson: cheapest(parsed) }
     try {
       await updateDeparture(dep.id, patch)
       onSaved(patch)
@@ -170,6 +96,19 @@ function ConfigureModal({ dep, onClose, onSaved }: { dep: Departure; onClose: ()
           <button onClick={onClose} className="text-black/30 hover:text-black/60"><X size={18} /></button>
         </div>
 
+        {availableTiers.length > 0 && (
+          <div className="space-y-1.5">
+            <label className="font-sans text-sm font-medium text-black/70">Add from this tour&apos;s pricing tiers</label>
+            <div className="flex flex-wrap gap-1.5">
+              {availableTiers.map(t => (
+                <button key={t.id} type="button" onClick={() => addTier(t)} className="font-sans text-xs px-3 py-1.5 rounded-full border border-[#C9A96E]/40 text-[#C9A96E] hover:bg-[#C9A96E]/10 flex items-center gap-1">
+                  <Plus size={12} /> {t.name}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
         <RatesFieldset inclusions={inclusions} onChangeInclusions={setInclusions} packages={packages} onChangePackages={setPackages} />
 
         <div className="flex gap-3 pt-2">
@@ -177,6 +116,125 @@ function ConfigureModal({ dep, onClose, onSaved }: { dep: Departure; onClose: ()
             {saving ? 'Saving…' : 'Save Rates & Inclusions'}
           </button>
           <button onClick={onClose} className="font-sans text-sm px-5 py-2.5 border border-black/15 rounded-lg text-black/50">Cancel</button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+/* ─── Guests modal — record who's already booked on a departure ─────────────── */
+/* For suppliers migrating off Wix Events (or any other outside booking       */
+/* system): the guest already has a seat, so this just records who they are  */
+/* and reserves that seat here, without running them through checkout.       */
+
+const emptyGuestForm = { name: '', email: '', phone: '', seats: '1', notes: '' }
+
+function GuestsModal({
+  dep, onClose, onSeatsChanged,
+}: { dep: Departure; onClose: () => void; onSeatsChanged: (bookedSeats: number) => void }) {
+  const [guests, setGuests] = useState<DepartureGuest[]>([])
+  const [loading, setLoading] = useState(true)
+  const [form, setForm] = useState(emptyGuestForm)
+  const [saving, setSaving] = useState(false)
+  const [removingId, setRemovingId] = useState<string | null>(null)
+  const [error, setError] = useState('')
+  // Local copy of the running seat count, so "seats left" updates live as
+  // guests are added/removed without waiting on the parent table to re-render.
+  const [bookedSeats, setBookedSeats] = useState(dep.bookedSeats)
+
+  useEffect(() => {
+    getGuestsForDeparture(dep.id).then(g => { setGuests(g); setLoading(false) })
+  }, [dep.id])
+
+  const seatsLeft = Math.max(0, dep.maxSeats - bookedSeats)
+
+  async function handleAdd() {
+    if (!form.name.trim()) { setError('Guest name is required.'); return }
+    setError('')
+    setSaving(true)
+    try {
+      const guest = await addManualGuest({
+        departureId: dep.id,
+        name: form.name,
+        email: form.email,
+        phone: form.phone,
+        seats: +form.seats || 1,
+        notes: form.notes,
+      })
+      setGuests(g => [...g, guest])
+      setForm(emptyGuestForm)
+      const next = bookedSeats + guest.seats
+      setBookedSeats(next)
+      onSeatsChanged(next)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Could not add this guest.')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  async function handleRemove(guest: DepartureGuest) {
+    setRemovingId(guest.id)
+    try {
+      await removeManualGuest(guest)
+      setGuests(g => g.filter(x => x.id !== guest.id))
+      const next = Math.max(0, bookedSeats - guest.seats)
+      setBookedSeats(next)
+      onSeatsChanged(next)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Could not remove this guest.')
+    } finally {
+      setRemovingId(null)
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-6" onClick={onClose}>
+      <div className="bg-white rounded-xl border border-black/8 w-full max-w-xl max-h-[85vh] overflow-y-auto p-6 space-y-5" onClick={e => e.stopPropagation()}>
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="font-display italic text-xl text-black/90">Guests</h2>
+            <p className="font-sans text-xs text-black/40 mt-0.5">{dep.tour} · {dep.date} · {seatsLeft} seat{seatsLeft === 1 ? '' : 's'} left</p>
+          </div>
+          <button onClick={onClose} className="text-black/30 hover:text-black/60"><X size={18} /></button>
+        </div>
+
+        <div className="space-y-2">
+          {loading && <p className="font-sans text-sm text-black/30">Loading…</p>}
+          {!loading && guests.length === 0 && (
+            <p className="font-sans text-sm text-black/30">No guests recorded yet. Add anyone who booked outside the platform below (e.g. migrating from Wix Events).</p>
+          )}
+          {guests.map(g => (
+            <div key={g.id} className="flex items-center justify-between gap-3 border border-black/8 rounded-lg px-3 py-2">
+              <div className="min-w-0">
+                <p className="font-sans text-sm text-black/80 truncate">{g.name} <span className="text-black/35">· {g.seats} seat{g.seats === 1 ? '' : 's'}</span></p>
+                {(g.email || g.phone) && (
+                  <p className="font-sans text-xs text-black/40 truncate">{[g.email, g.phone].filter(Boolean).join(' · ')}</p>
+                )}
+                {g.notes && <p className="font-sans text-xs text-black/35 truncate">{g.notes}</p>}
+              </div>
+              <button onClick={() => handleRemove(g)} disabled={removingId === g.id} className="text-red-400 hover:text-red-600 shrink-0 disabled:opacity-40">
+                <Trash2 size={14} />
+              </button>
+            </div>
+          ))}
+        </div>
+
+        <div className="h-px bg-black/6" />
+
+        <div className="space-y-3">
+          <label className="font-sans text-sm font-medium text-black/70">Add a guest</label>
+          <div className="grid grid-cols-2 gap-3">
+            <input value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} placeholder="Guest name" className={inp} />
+            <input type="number" min="1" value={form.seats} onChange={e => setForm(f => ({ ...f, seats: e.target.value }))} placeholder="Seats" className={inp} />
+            <input value={form.email} onChange={e => setForm(f => ({ ...f, email: e.target.value }))} placeholder="Email (optional)" className={inp} />
+            <input value={form.phone} onChange={e => setForm(f => ({ ...f, phone: e.target.value }))} placeholder="Phone (optional)" className={inp} />
+          </div>
+          <input value={form.notes} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))} placeholder="Notes — e.g. Wix booking reference (optional)" className={inp} />
+          {error && <p className="font-sans text-xs text-red-500">{error}</p>}
+          <button onClick={handleAdd} disabled={saving} className="flex items-center gap-1.5 font-sans text-xs text-[#C9A96E] hover:text-[#b8965d] disabled:opacity-50">
+            <Plus size={13} /> {saving ? 'Adding…' : 'Add guest'}
+          </button>
         </div>
       </div>
     </div>
@@ -195,6 +253,7 @@ function DeparturesInner() {
   const [adding, setAdding] = useState(false)
   const [saving, setSaving] = useState(false)
   const [configuring, setConfiguring] = useState<Departure | null>(null)
+  const [managingGuests, setManagingGuests] = useState<Departure | null>(null)
   const [form, setForm] = useState({
     tourId: '', date: '', guide: '', maxSeats: '10',
     inclusions: [] as string[],
@@ -222,14 +281,23 @@ function DeparturesInner() {
 
   function selectTour(tourId: string) {
     const tour = tours.find(t => t.id === tourId)
-    setForm(f => ({
-      ...f,
-      tourId,
-      inclusions: f.inclusions.length === 0 ? (tour?.included ?? []) : f.inclusions,
-      packages: f.packages.length === 1 && !f.packages[0].pricePerPerson
-        ? [{ ...f.packages[0], name: f.packages[0].name || 'Standard', pricePerPerson: tour ? String(tour.pricePerPerson || '') : f.packages[0].pricePerPerson }]
-        : f.packages,
-    }))
+    setForm(f => {
+      // Only replace packages while the form is still at its untouched
+      // default (a single blank row) — never clobber packages the supplier
+      // already started editing.
+      const untouched = f.packages.length === 1 && !f.packages[0].pricePerPerson
+      const packages = untouched
+        ? (tour?.pricingTiers && tour.pricingTiers.length > 0
+            ? packagesFromTiers(tour.pricingTiers)
+            : [{ ...f.packages[0], name: f.packages[0].name || 'Standard', pricePerPerson: tour ? String(tour.pricePerPerson || '') : f.packages[0].pricePerPerson }])
+        : f.packages
+      return {
+        ...f,
+        tourId,
+        inclusions: f.inclusions.length === 0 ? (tour?.included ?? []) : f.inclusions,
+        packages,
+      }
+    })
   }
 
   async function handleAdd() {
@@ -254,7 +322,7 @@ function DeparturesInner() {
         status: 'open',
         pricePerPerson: cheapest(packages),
         inclusions: form.inclusions,
-        packages,
+        packages: withTierOverrides(packages, tour),
       })
       setRows(r => [...r, dep])
       setAdding(false)
@@ -273,7 +341,7 @@ function DeparturesInner() {
   }
 
   function rateSummary(r: Departure) {
-    const packages = r.packages && r.packages.length > 0 ? r.packages : null
+    const packages = r.packages && r.packages.length > 0 ? resolveLivePackages(r.packages, tours.find(t => t.id === r.tourId)) : null
     if (!packages) return `R ${r.pricePerPerson.toLocaleString()}`
     if (packages.length === 1) return `R ${packages[0].pricePerPerson.toLocaleString()} · ${packages[0].name}`
     const prices = packages.map(p => p.pricePerPerson)
@@ -394,6 +462,9 @@ function DeparturesInner() {
                 </td>
                 <td className="px-4 py-3">
                   <div className="flex items-center gap-3">
+                    <button onClick={() => setManagingGuests(r)} className="text-black/30 hover:text-[#C9A96E]" title="Add or view guests">
+                      <UserPlus size={14} />
+                    </button>
                     <button onClick={() => setConfiguring(r)} className="text-black/30 hover:text-[#C9A96E]" title="Configure rates & inclusions">
                       <Settings2 size={14} />
                     </button>
@@ -411,8 +482,17 @@ function DeparturesInner() {
       {configuring && (
         <ConfigureModal
           dep={configuring}
+          tour={tours.find(t => t.id === configuring.tourId)}
           onClose={() => setConfiguring(null)}
           onSaved={patch => setRows(rs => rs.map(x => (x.id === configuring.id ? { ...x, ...patch } : x)))}
+        />
+      )}
+
+      {managingGuests && (
+        <GuestsModal
+          dep={managingGuests}
+          onClose={() => setManagingGuests(null)}
+          onSeatsChanged={bookedSeats => setRows(rs => rs.map(x => (x.id === managingGuests.id ? { ...x, bookedSeats, status: bookedSeats >= x.maxSeats ? 'full' : (x.status === 'full' ? 'open' : x.status) } : x)))}
         />
       )}
     </div>
@@ -426,6 +506,3 @@ export default function DeparturesPage() {
     </Suspense>
   )
 }
-
-const inp = 'w-full font-sans text-sm border border-black/10 rounded-lg px-3 py-2 outline-none focus:border-[#C9A96E]/50 bg-white'
-const chip = (active: boolean) => `font-sans text-xs px-3 py-1.5 rounded-full border capitalize transition-colors ${active ? 'bg-[#C9A96E] text-white border-[#C9A96E]' : 'border-black/15 text-black/60 hover:border-[#C9A96E]/40'}`
