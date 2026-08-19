@@ -2,7 +2,7 @@
 import { useState, useEffect, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
-import { CalendarDays, Plus, Users, Trash2, ChevronLeft, X, Settings2 } from 'lucide-react'
+import { CalendarDays, Plus, Users, Trash2, ChevronLeft, X, Settings2, UserPlus } from 'lucide-react'
 import { supabase } from '@/lib/auth'
 import { effectiveSupplierId } from '@/lib/effective-supplier'
 import { getSupplierEntities, type SupplierEntity } from '@/lib/supplier-entities'
@@ -15,6 +15,9 @@ import {
   PackagesEditor, InclusionChips, emptyPackage, packagesToForm, formToPackages, cheapest,
   resolveLivePackages, withTierOverrides, inp, type PackageForm,
 } from '@/components/tours/PackageEditor'
+import {
+  getGuestsForDeparture, addManualGuest, removeManualGuest, type DepartureGuest,
+} from '@/lib/departure-guests'
 
 type Guide = SupplierEntity & { name: string }
 
@@ -119,6 +122,125 @@ function ConfigureModal({ dep, tour, onClose, onSaved }: { dep: Departure; tour:
   )
 }
 
+/* ─── Guests modal — record who's already booked on a departure ─────────────── */
+/* For suppliers migrating off Wix Events (or any other outside booking       */
+/* system): the guest already has a seat, so this just records who they are  */
+/* and reserves that seat here, without running them through checkout.       */
+
+const emptyGuestForm = { name: '', email: '', phone: '', seats: '1', notes: '' }
+
+function GuestsModal({
+  dep, onClose, onSeatsChanged,
+}: { dep: Departure; onClose: () => void; onSeatsChanged: (bookedSeats: number) => void }) {
+  const [guests, setGuests] = useState<DepartureGuest[]>([])
+  const [loading, setLoading] = useState(true)
+  const [form, setForm] = useState(emptyGuestForm)
+  const [saving, setSaving] = useState(false)
+  const [removingId, setRemovingId] = useState<string | null>(null)
+  const [error, setError] = useState('')
+  // Local copy of the running seat count, so "seats left" updates live as
+  // guests are added/removed without waiting on the parent table to re-render.
+  const [bookedSeats, setBookedSeats] = useState(dep.bookedSeats)
+
+  useEffect(() => {
+    getGuestsForDeparture(dep.id).then(g => { setGuests(g); setLoading(false) })
+  }, [dep.id])
+
+  const seatsLeft = Math.max(0, dep.maxSeats - bookedSeats)
+
+  async function handleAdd() {
+    if (!form.name.trim()) { setError('Guest name is required.'); return }
+    setError('')
+    setSaving(true)
+    try {
+      const guest = await addManualGuest({
+        departureId: dep.id,
+        name: form.name,
+        email: form.email,
+        phone: form.phone,
+        seats: +form.seats || 1,
+        notes: form.notes,
+      })
+      setGuests(g => [...g, guest])
+      setForm(emptyGuestForm)
+      const next = bookedSeats + guest.seats
+      setBookedSeats(next)
+      onSeatsChanged(next)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Could not add this guest.')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  async function handleRemove(guest: DepartureGuest) {
+    setRemovingId(guest.id)
+    try {
+      await removeManualGuest(guest)
+      setGuests(g => g.filter(x => x.id !== guest.id))
+      const next = Math.max(0, bookedSeats - guest.seats)
+      setBookedSeats(next)
+      onSeatsChanged(next)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Could not remove this guest.')
+    } finally {
+      setRemovingId(null)
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-6" onClick={onClose}>
+      <div className="bg-white rounded-xl border border-black/8 w-full max-w-xl max-h-[85vh] overflow-y-auto p-6 space-y-5" onClick={e => e.stopPropagation()}>
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="font-display italic text-xl text-black/90">Guests</h2>
+            <p className="font-sans text-xs text-black/40 mt-0.5">{dep.tour} · {dep.date} · {seatsLeft} seat{seatsLeft === 1 ? '' : 's'} left</p>
+          </div>
+          <button onClick={onClose} className="text-black/30 hover:text-black/60"><X size={18} /></button>
+        </div>
+
+        <div className="space-y-2">
+          {loading && <p className="font-sans text-sm text-black/30">Loading…</p>}
+          {!loading && guests.length === 0 && (
+            <p className="font-sans text-sm text-black/30">No guests recorded yet. Add anyone who booked outside the platform below (e.g. migrating from Wix Events).</p>
+          )}
+          {guests.map(g => (
+            <div key={g.id} className="flex items-center justify-between gap-3 border border-black/8 rounded-lg px-3 py-2">
+              <div className="min-w-0">
+                <p className="font-sans text-sm text-black/80 truncate">{g.name} <span className="text-black/35">· {g.seats} seat{g.seats === 1 ? '' : 's'}</span></p>
+                {(g.email || g.phone) && (
+                  <p className="font-sans text-xs text-black/40 truncate">{[g.email, g.phone].filter(Boolean).join(' · ')}</p>
+                )}
+                {g.notes && <p className="font-sans text-xs text-black/35 truncate">{g.notes}</p>}
+              </div>
+              <button onClick={() => handleRemove(g)} disabled={removingId === g.id} className="text-red-400 hover:text-red-600 shrink-0 disabled:opacity-40">
+                <Trash2 size={14} />
+              </button>
+            </div>
+          ))}
+        </div>
+
+        <div className="h-px bg-black/6" />
+
+        <div className="space-y-3">
+          <label className="font-sans text-sm font-medium text-black/70">Add a guest</label>
+          <div className="grid grid-cols-2 gap-3">
+            <input value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} placeholder="Guest name" className={inp} />
+            <input type="number" min="1" value={form.seats} onChange={e => setForm(f => ({ ...f, seats: e.target.value }))} placeholder="Seats" className={inp} />
+            <input value={form.email} onChange={e => setForm(f => ({ ...f, email: e.target.value }))} placeholder="Email (optional)" className={inp} />
+            <input value={form.phone} onChange={e => setForm(f => ({ ...f, phone: e.target.value }))} placeholder="Phone (optional)" className={inp} />
+          </div>
+          <input value={form.notes} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))} placeholder="Notes — e.g. Wix booking reference (optional)" className={inp} />
+          {error && <p className="font-sans text-xs text-red-500">{error}</p>}
+          <button onClick={handleAdd} disabled={saving} className="flex items-center gap-1.5 font-sans text-xs text-[#C9A96E] hover:text-[#b8965d] disabled:opacity-50">
+            <Plus size={13} /> {saving ? 'Adding…' : 'Add guest'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 /* ─── Page ───────────────────────────────────────────────────────────────────── */
 
 function DeparturesInner() {
@@ -131,6 +253,7 @@ function DeparturesInner() {
   const [adding, setAdding] = useState(false)
   const [saving, setSaving] = useState(false)
   const [configuring, setConfiguring] = useState<Departure | null>(null)
+  const [managingGuests, setManagingGuests] = useState<Departure | null>(null)
   const [form, setForm] = useState({
     tourId: '', date: '', guide: '', maxSeats: '10',
     inclusions: [] as string[],
@@ -339,6 +462,9 @@ function DeparturesInner() {
                 </td>
                 <td className="px-4 py-3">
                   <div className="flex items-center gap-3">
+                    <button onClick={() => setManagingGuests(r)} className="text-black/30 hover:text-[#C9A96E]" title="Add or view guests">
+                      <UserPlus size={14} />
+                    </button>
                     <button onClick={() => setConfiguring(r)} className="text-black/30 hover:text-[#C9A96E]" title="Configure rates & inclusions">
                       <Settings2 size={14} />
                     </button>
@@ -359,6 +485,14 @@ function DeparturesInner() {
           tour={tours.find(t => t.id === configuring.tourId)}
           onClose={() => setConfiguring(null)}
           onSaved={patch => setRows(rs => rs.map(x => (x.id === configuring.id ? { ...x, ...patch } : x)))}
+        />
+      )}
+
+      {managingGuests && (
+        <GuestsModal
+          dep={managingGuests}
+          onClose={() => setManagingGuests(null)}
+          onSeatsChanged={bookedSeats => setRows(rs => rs.map(x => (x.id === managingGuests.id ? { ...x, bookedSeats, status: bookedSeats >= x.maxSeats ? 'full' : (x.status === 'full' ? 'open' : x.status) } : x)))}
         />
       )}
     </div>
