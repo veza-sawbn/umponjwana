@@ -2,8 +2,9 @@
 
 import { useState, useEffect } from 'react'
 import toast from 'react-hot-toast'
-import { CalendarDays, Search, Phone, Mail, Users, MessageSquare, XCircle } from 'lucide-react'
+import { CalendarDays, Search, Phone, Mail, Users, MessageSquare, XCircle, CheckCircle2 } from 'lucide-react'
 import { getMyOrders, cancelOrderAsSupplier, type SupplierOrder } from '@/lib/booking-orders'
+import { getMyOrderLinesForBooking, setLineFulfilment, type OrderLine } from '@/lib/orders'
 import { getMyDepartures, releaseDepartureSeats } from '@/lib/departures'
 import { supabase } from '@/lib/auth'
 
@@ -25,6 +26,8 @@ export default function BookingsPage() {
   const [orders, setOrders] = useState<SupplierOrder[]>([])
   const [loading, setLoading] = useState(true)
   const [expanded, setExpanded] = useState<string | null>(null)
+  const [linesByBooking, setLinesByBooking] = useState<Record<string, OrderLine[]>>({})
+  const [linesLoading, setLinesLoading] = useState<Record<string, boolean>>({})
 
   useEffect(() => {
     supabase.auth.getUser().then(async ({ data: { user } }) => {
@@ -51,6 +54,33 @@ export default function BookingsPage() {
       toast.success('Your service was cancelled and the guest notified.')
     } catch {
       toast.error('Could not cancel this booking. Please try again.')
+    }
+  }
+
+  // Line items carry the real fulfilment status (vd_order_lines); this
+  // booking's vd_booking_orders row only ever tracks confirmed/cancelled.
+  // Fetched lazily on expand rather than for every row up front.
+  async function toggleExpand(o: SupplierOrder) {
+    const willOpen = expanded !== o.id
+    setExpanded(willOpen ? o.id : null)
+    if (willOpen && !linesByBooking[o.bookingId]) {
+      setLinesLoading(s => ({ ...s, [o.bookingId]: true }))
+      const lines = await getMyOrderLinesForBooking(o.bookingId)
+      setLinesByBooking(s => ({ ...s, [o.bookingId]: lines }))
+      setLinesLoading(s => ({ ...s, [o.bookingId]: false }))
+    }
+  }
+
+  async function markLineCompleted(bookingId: string, line: OrderLine) {
+    try {
+      await setLineFulfilment(line.id, 'fulfilled')
+      setLinesByBooking(s => ({
+        ...s,
+        [bookingId]: (s[bookingId] ?? []).map(l => l.id === line.id ? { ...l, fulfilment_status: 'fulfilled' } : l),
+      }))
+      toast.success('Marked as completed.')
+    } catch {
+      toast.error('Could not update. Please try again.')
     }
   }
 
@@ -116,7 +146,7 @@ export default function BookingsPage() {
                 {/* Summary row */}
                 <button
                   className="w-full text-left px-5 py-4 flex flex-wrap gap-4 items-center hover:bg-black/[0.02] transition-colors"
-                  onClick={() => setExpanded(expanded === o.id ? null : o.id)}
+                  onClick={() => toggleExpand(o)}
                 >
                   <div className="min-w-[120px]">
                     <p className="font-sans text-[10px] uppercase tracking-wider text-black/30 mb-0.5">Reference</p>
@@ -187,6 +217,40 @@ export default function BookingsPage() {
                           </div>
                         ))}
                       </div>
+                    </div>
+
+                    <div className="md:col-span-2">
+                      <p className="font-sans text-[10px] uppercase tracking-wider text-black/30 mb-3">Trip Status</p>
+                      {linesLoading[o.bookingId] ? (
+                        <p className="font-sans text-xs text-black/30">Loading…</p>
+                      ) : (linesByBooking[o.bookingId] ?? []).length === 0 ? (
+                        <p className="font-sans text-xs text-black/30">No fulfilment record for this booking yet.</p>
+                      ) : (
+                        <div className="space-y-1.5">
+                          {(linesByBooking[o.bookingId] ?? []).map(line => (
+                            <div key={line.id} className="flex items-center justify-between gap-3 bg-white border border-black/6 px-3 py-2">
+                              <div className="min-w-0">
+                                <p className="font-sans text-sm text-black/70 truncate">{line.title}</p>
+                                <p className="font-sans text-[11px] text-black/30 capitalize">{line.fulfilment_status.replace('_', ' ')}</p>
+                              </div>
+                              {line.fulfilment_status === 'fulfilled' ? (
+                                <span className="inline-flex items-center gap-1 font-sans text-xs text-emerald-600 shrink-0">
+                                  <CheckCircle2 size={13} /> Completed
+                                </span>
+                              ) : line.fulfilment_status === 'cancelled' ? (
+                                <span className="font-sans text-xs text-black/30 shrink-0">Cancelled</span>
+                              ) : (
+                                <button
+                                  onClick={() => markLineCompleted(o.bookingId, line)}
+                                  className="font-sans text-xs text-[#2d6a4f] border border-[#2d6a4f]/30 px-3 py-1.5 hover:bg-[#2d6a4f]/5 transition-colors shrink-0"
+                                >
+                                  Mark trip completed
+                                </button>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      )}
                     </div>
 
                     {o.specialRequests && (
