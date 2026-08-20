@@ -1,11 +1,20 @@
-'use client'
-
-import { useParams, notFound } from 'next/navigation'
+import type { Metadata } from 'next'
+import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import Footer from '@/components/layout/Footer'
 import { Clock, ArrowLeft, MapPin, Mountain, Bird, ChefHat, Sword, Leaf, ArrowRight } from 'lucide-react'
+import { publicSupabase } from '@/lib/supabase-public'
+import { getPostBySlug, getRelatedPosts, parseBody, estimateReadTime } from '@/lib/blog-posts'
 
-const ARTICLES: Record<string, {
+export const revalidate = 3600
+
+const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://visitdrakensberg.com'
+
+// ---------------------------------------------------------------------------
+// Hardcoded articles — served as fallback until CMS posts exist in the DB
+// ---------------------------------------------------------------------------
+
+type HardcodedArticle = {
   slug: string
   title: string
   excerpt: string
@@ -18,7 +27,9 @@ const ARTICLES: Record<string, {
   body: { heading?: string; text: string }[]
   relatedListings: { title: string; type: string; href: string; image: string; location: string }[]
   relatedArticles: { slug: string; title: string; category: string; image: string }[]
-}> = {
+}
+
+const ARTICLES: Record<string, HardcodedArticle> = {
   'san-bushmen-rock-art-giants-castle': {
     slug: 'san-bushmen-rock-art-giants-castle',
     title: "The Ancient Language of the San: Rock Art at Giant's Castle",
@@ -112,14 +123,127 @@ const CATEGORY_ICONS: Record<string, React.ReactNode> = {
   'Hiking Stories': <Mountain size={12} />,
 }
 
-export default function ArticleDetailPage() {
-  const params = useParams()
-  const slug = typeof params.slug === 'string' ? params.slug : Array.isArray(params.slug) ? params.slug[0] : ''
-  const article = ARTICLES[slug]
-  if (!article) notFound()
+// ---------------------------------------------------------------------------
+// generateMetadata
+// ---------------------------------------------------------------------------
+
+export async function generateMetadata({ params }: { params: { slug: string } }): Promise<Metadata> {
+  const dbPost = await getPostBySlug(params.slug, publicSupabase).catch(() => null)
+  const hardcoded = ARTICLES[params.slug]
+  if (!dbPost && !hardcoded) return {}
+
+  const title = dbPost?.seo_title || dbPost?.title || hardcoded?.title || ''
+  const description = dbPost?.seo_description || dbPost?.excerpt || hardcoded?.excerpt || ''
+  const image = dbPost?.featured_image || hardcoded?.image
+  const canonical = `${SITE_URL}/mydrakensberg/${params.slug}`
+
+  return {
+    title,
+    description,
+    alternates: { canonical },
+    openGraph: {
+      title,
+      description,
+      url: canonical,
+      type: 'article',
+      ...(image ? { images: [{ url: image }] } : {}),
+    },
+    twitter: { card: 'summary_large_image', title, description },
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Page
+// ---------------------------------------------------------------------------
+
+export default async function ArticleDetailPage({ params }: { params: { slug: string } }) {
+  // Try DB first, fall back to hardcoded
+  const dbPost = await getPostBySlug(params.slug, publicSupabase).catch(() => null)
+  const hardcoded = ARTICLES[params.slug]
+
+  if (!dbPost && !hardcoded) notFound()
+
+  // Build a unified view regardless of source
+  let article: {
+    slug: string
+    title: string
+    excerpt: string
+    category: string
+    author: string
+    authorRole: string
+    authorBio: string
+    readTime: string
+    image: string
+    body: { heading?: string; text: string }[]
+    relatedListings: { title: string; type: string; href: string; image: string; location: string }[]
+    relatedArticles: { slug: string; title: string; category: string; image: string }[]
+    publishedAt: string | null
+  }
+
+  if (dbPost) {
+    const related = await getRelatedPosts(params.slug, publicSupabase).catch(() => [])
+    article = {
+      slug: dbPost.slug,
+      title: dbPost.title,
+      excerpt: dbPost.excerpt ?? '',
+      category: dbPost.category ?? '',
+      author: dbPost.author_name ?? '',
+      authorRole: dbPost.author_role ?? '',
+      authorBio: dbPost.author_bio ?? '',
+      readTime: estimateReadTime(dbPost.body),
+      image: dbPost.featured_image ?? '',
+      body: parseBody(dbPost.body),
+      relatedListings: [],
+      relatedArticles: related.map(r => ({
+        slug: r.slug,
+        title: r.title,
+        category: r.category ?? '',
+        image: r.featured_image ?? '',
+      })),
+      publishedAt: dbPost.published_at,
+    }
+  } else {
+    article = { ...hardcoded!, publishedAt: null }
+  }
+
+  const canonical = `${SITE_URL}/mydrakensberg/${article.slug}`
+  const jsonLd = [
+    {
+      '@context': 'https://schema.org',
+      '@type': 'Article',
+      headline: article.title,
+      description: article.excerpt,
+      image: article.image || undefined,
+      author: {
+        '@type': 'Person',
+        name: article.author,
+        jobTitle: article.authorRole,
+      },
+      publisher: {
+        '@type': 'Organization',
+        name: 'Visit Drakensberg',
+        url: SITE_URL,
+      },
+      ...(article.publishedAt ? { datePublished: article.publishedAt } : {}),
+      mainEntityOfPage: { '@type': 'WebPage', '@id': canonical },
+    },
+    {
+      '@context': 'https://schema.org',
+      '@type': 'BreadcrumbList',
+      itemListElement: [
+        { '@type': 'ListItem', position: 1, name: 'Home', item: SITE_URL },
+        { '@type': 'ListItem', position: 2, name: 'MyDrakensberg', item: `${SITE_URL}/mydrakensberg` },
+        { '@type': 'ListItem', position: 3, name: article.title, item: canonical },
+      ],
+    },
+  ]
 
   return (
     <div className="min-h-screen bg-[#F7F5F2]">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+      />
 
       {/* Hero */}
       <section className="bg-[#000000] text-white pt-32 pb-0">
@@ -149,9 +273,11 @@ export default function ArticleDetailPage() {
         </div>
 
         {/* Hero image */}
-        <div className="w-full h-[50vh] lg:h-[60vh] overflow-hidden">
-          <img src={article.image} alt={article.title} className="w-full h-full object-cover opacity-80" />
-        </div>
+        {article.image && (
+          <div className="w-full h-[50vh] lg:h-[60vh] overflow-hidden">
+            <img src={article.image} alt={article.title} className="w-full h-full object-cover opacity-80" />
+          </div>
+        )}
       </section>
 
       {/* Content */}
@@ -172,55 +298,63 @@ export default function ArticleDetailPage() {
             </div>
 
             {/* Related articles */}
-            <div className="mt-14 pt-10 border-t border-gray-200">
-              <h3 className="font-display italic text-2xl text-[#000000] mb-6">More Stories</h3>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                {article.relatedArticles.map(rel => (
-                  <Link key={rel.slug} href={`/mydrakensberg/${rel.slug}`} className="group bg-white border border-gray-200 overflow-hidden hover:border-[#2d6a4f] transition-colors">
-                    <div className="h-36 overflow-hidden">
-                      <img src={rel.image} alt={rel.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
-                    </div>
-                    <div className="p-4">
-                      <span className="font-sans text-[10px] tracking-[0.14em] uppercase text-[#C9A96E] mb-2 block">{rel.category}</span>
-                      <p className="font-display italic text-base text-[#000000] leading-tight group-hover:text-[#2d6a4f] transition-colors">{rel.title}</p>
-                    </div>
-                  </Link>
-                ))}
+            {article.relatedArticles.length > 0 && (
+              <div className="mt-14 pt-10 border-t border-gray-200">
+                <h3 className="font-display italic text-2xl text-[#000000] mb-6">More Stories</h3>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  {article.relatedArticles.map(rel => (
+                    <Link key={rel.slug} href={`/mydrakensberg/${rel.slug}`} className="group bg-white border border-gray-200 overflow-hidden hover:border-[#2d6a4f] transition-colors">
+                      {rel.image && (
+                        <div className="h-36 overflow-hidden">
+                          <img src={rel.image} alt={rel.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+                        </div>
+                      )}
+                      <div className="p-4">
+                        <span className="font-sans text-[10px] tracking-[0.14em] uppercase text-[#C9A96E] mb-2 block">{rel.category}</span>
+                        <p className="font-display italic text-base text-[#000000] leading-tight group-hover:text-[#2d6a4f] transition-colors">{rel.title}</p>
+                      </div>
+                    </Link>
+                  ))}
+                </div>
               </div>
-            </div>
+            )}
           </div>
 
           {/* Sidebar */}
           <aside className="space-y-6">
 
             {/* Author card */}
-            <div className="bg-white border border-gray-200 p-6">
-              <span className="font-sans text-[10px] tracking-[0.2em] uppercase text-gray-400 block mb-4">About the Author</span>
-              <p className="font-display italic text-xl text-[#000000] mb-0.5">{article.author}</p>
-              <p className="font-sans text-xs text-[#C9A96E] mb-4">{article.authorRole}</p>
-              <p className="font-sans text-sm text-gray-600 leading-relaxed">{article.authorBio}</p>
-            </div>
+            {article.author && (
+              <div className="bg-white border border-gray-200 p-6">
+                <span className="font-sans text-[10px] tracking-[0.2em] uppercase text-gray-400 block mb-4">About the Author</span>
+                <p className="font-display italic text-xl text-[#000000] mb-0.5">{article.author}</p>
+                <p className="font-sans text-xs text-[#C9A96E] mb-4">{article.authorRole}</p>
+                <p className="font-sans text-sm text-gray-600 leading-relaxed">{article.authorBio}</p>
+              </div>
+            )}
 
             {/* Plan your visit */}
-            <div className="bg-[#000000] text-white p-6">
-              <span className="font-sans text-[10px] tracking-[0.2em] uppercase text-[#C9A96E] block mb-4">Plan Your Visit</span>
-              <p className="font-display italic text-xl mb-5">Listings mentioned in this article</p>
-              <div className="space-y-3">
-                {article.relatedListings.map(listing => (
-                  <Link key={listing.href} href={listing.href} className="group flex gap-3 border border-white/10 hover:border-[#C9A96E] transition-colors p-3">
-                    <div className="w-16 h-16 shrink-0 overflow-hidden">
-                      <img src={listing.image} alt={listing.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
-                    </div>
-                    <div className="min-w-0">
-                      <span className="font-sans text-[10px] tracking-[0.12em] uppercase text-[#C9A96E]">{listing.type}</span>
-                      <p className="font-display italic text-base text-white leading-tight mt-0.5">{listing.title}</p>
-                      <p className="font-sans text-xs text-white/40 flex items-center gap-1 mt-1"><MapPin size={9} />{listing.location}</p>
-                    </div>
-                    <ArrowRight size={14} className="shrink-0 text-white/20 group-hover:text-[#C9A96E] transition-colors self-center ml-auto" />
-                  </Link>
-                ))}
+            {article.relatedListings.length > 0 && (
+              <div className="bg-[#000000] text-white p-6">
+                <span className="font-sans text-[10px] tracking-[0.2em] uppercase text-[#C9A96E] block mb-4">Plan Your Visit</span>
+                <p className="font-display italic text-xl mb-5">Listings mentioned in this article</p>
+                <div className="space-y-3">
+                  {article.relatedListings.map(listing => (
+                    <Link key={listing.href + listing.title} href={listing.href} className="group flex gap-3 border border-white/10 hover:border-[#C9A96E] transition-colors p-3">
+                      <div className="w-16 h-16 shrink-0 overflow-hidden">
+                        <img src={listing.image} alt={listing.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+                      </div>
+                      <div className="min-w-0">
+                        <span className="font-sans text-[10px] tracking-[0.12em] uppercase text-[#C9A96E]">{listing.type}</span>
+                        <p className="font-display italic text-base text-white leading-tight mt-0.5">{listing.title}</p>
+                        <p className="font-sans text-xs text-white/40 flex items-center gap-1 mt-1"><MapPin size={9} />{listing.location}</p>
+                      </div>
+                      <ArrowRight size={14} className="shrink-0 text-white/20 group-hover:text-[#C9A96E] transition-colors self-center ml-auto" />
+                    </Link>
+                  ))}
+                </div>
               </div>
-            </div>
+            )}
 
             {/* Explore MyDrakensberg */}
             <div className="bg-white border border-gray-200 p-6">
