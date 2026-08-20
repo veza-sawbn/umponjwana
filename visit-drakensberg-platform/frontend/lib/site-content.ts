@@ -183,6 +183,18 @@ export const SITE_CONTENT_DEFAULTS = {
     essential_4_title: 'Safety',
     essential_4_body: 'Never hike alone above the escarpment. Register your route with the camp office. Carry a whistle, first aid kit, and a charged phone. Afternoon lightning is common in summer — be off exposed ridges by 1 pm.',
   },
+  // SEO overrides for static pages — edited via /admin/seo.
+  // Values here take precedence over the layout.tsx defaults for each route.
+  // Stored as a flat record keyed by page id.
+  seo_overrides: {
+    home:           { meta_title: 'Visit Drakensberg — Discover the Berg', meta_description: 'Explore accommodation, hiking trails, guided experiences and events in the Drakensberg mountains.', og_title: 'Visit Drakensberg', og_description: 'Plan your Drakensberg adventure.', canonical: 'https://visitdrakensberg.com/' },
+    stays:          { meta_title: 'Accommodation in the Drakensberg | Visit Drakensberg', meta_description: 'Browse lodges, camps, guesthouses and self-catering options across the Drakensberg.', og_title: 'Drakensberg Accommodation', og_description: 'Find the perfect stay in the Berg.', canonical: 'https://visitdrakensberg.com/stays' },
+    hikes:          { meta_title: '', meta_description: '', og_title: '', og_description: '', canonical: '' },
+    activities:     { meta_title: '', meta_description: '', og_title: '', og_description: '', canonical: '' },
+    events:         { meta_title: '', meta_description: '', og_title: '', og_description: '', canonical: '' },
+    guides:         { meta_title: '', meta_description: '', og_title: '', og_description: '', canonical: '' },
+    mydrakensberg:  { meta_title: '', meta_description: '', og_title: '', og_description: '', canonical: '' },
+  } as Record<string, { meta_title: string; meta_description: string; og_title: string; og_description: string; canonical: string }>,
   // Platform-wide settings edited on the main /admin/settings page, including
   // maintenance_mode, which middleware.ts reads to gate public traffic.
   platform_settings: {
