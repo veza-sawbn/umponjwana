@@ -84,7 +84,7 @@ export async function getPostBySlug(
     .eq('status', 'published')
     .maybeSingle()
   if (error) throw error
-  return (data ?? null) as BlogPost | null
+  return (data ?? null) as unknown as BlogPost | null
 }
 
 /** Fetch 3 other published posts to show as "More Stories". */
@@ -125,7 +125,7 @@ export async function upsertPost(
     .select(BLOG_SELECT)
     .single()
   if (error) throw error
-  return data as BlogPost
+  return data as unknown as BlogPost
 }
 
 export async function setPostStatus(
