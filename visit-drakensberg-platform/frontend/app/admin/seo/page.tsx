@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useMemo } from 'react'
+import Link from 'next/link'
 import {
   Loader2, Save, CheckCircle, ChevronUp, ChevronDown,
   ExternalLink, AlertTriangle, AlertCircle, TrendingUp,
@@ -452,6 +453,22 @@ export default function AdminSEOPage() {
                     )
                   })}
                 </div>
+              </div>
+
+              {/* Orphan detector CTA */}
+              <div className="bg-white border border-gray-200 p-5 flex items-center justify-between gap-4 flex-wrap">
+                <div>
+                  <p className="font-display italic text-lg text-[#000000] mb-0.5">Orphan Page Detector</p>
+                  <p className="font-sans text-sm text-gray-500">
+                    Find entities with few or no inbound links — the first signal that a page is hard to discover.
+                  </p>
+                </div>
+                <Link
+                  href="/admin/seo/orphans"
+                  className="shrink-0 border border-[#2d6a4f] text-[#2d6a4f] px-5 py-2.5 font-sans text-sm hover:bg-[#2d6a4f] hover:text-white transition-colors"
+                >
+                  View orphan report →
+                </Link>
               </div>
 
               {/* Score list — bottom 10 */}
