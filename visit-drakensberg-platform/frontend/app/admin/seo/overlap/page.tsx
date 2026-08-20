@@ -145,10 +145,18 @@ export default function OverlapPage() {
 
         const entities: OverlapEntity[] = []
 
-        // Trails
+        // Trails (published + robotsIndex not explicitly false)
         for (const t of trails) {
-          if (!t.is_indexable) continue
-          const { score } = computeSeoHealth(t, 'trail')
+          if (t.status !== 'published' || t.robotsIndex === false) continue
+          const { score } = computeSeoHealth({
+            seoTitle: t.seoTitle,
+            seoDescription: t.seoDescription,
+            slug: t.slug,
+            hasImage: !!t.image,
+            contentLength: t.description?.length ?? 0,
+            status: t.status,
+            robotsIndex: t.robotsIndex,
+          })
           entities.push({
             id: t.id,
             kind: 'trail',
@@ -156,22 +164,30 @@ export default function OverlapPage() {
             name: t.name,
             seoText: buildSeoText([
               t.name,
-              t.meta_title,
-              t.meta_description,
+              t.seoTitle,
+              t.seoDescription,
               t.region,
               t.trail_type,
               t.description,
             ]),
-            path: `/hikes/${t.slug}`,
+            path: `/hikes/${t.slug ?? t.id}`,
             score,
             editPath: `/admin/trails/${t.id}`,
           })
         }
 
-        // Properties
+        // Properties (active + robotsIndex not explicitly false)
         for (const p of properties) {
-          if (!p.is_indexable) continue
-          const { score } = computeSeoHealth(p, 'property')
+          if (p.status !== 'active' || p.robotsIndex === false) continue
+          const { score } = computeSeoHealth({
+            seoTitle: p.seoTitle,
+            seoDescription: p.seoDescription,
+            slug: p.slug,
+            hasImage: (p.photos?.length ?? 0) > 0,
+            contentLength: p.description?.length ?? 0,
+            status: p.status,
+            robotsIndex: p.robotsIndex,
+          })
           entities.push({
             id: p.id,
             kind: 'property',
@@ -179,22 +195,30 @@ export default function OverlapPage() {
             name: p.name,
             seoText: buildSeoText([
               p.name,
-              p.meta_title,
-              p.meta_description,
+              p.seoTitle,
+              p.seoDescription,
               p.region,
-              p.accommodation_type,
+              p.type,
               p.description,
             ]),
-            path: `/stays/${p.slug}`,
+            path: `/stays/${p.slug ?? p.id}`,
             score,
             editPath: `/admin/properties/${p.id}`,
           })
         }
 
-        // Activities
+        // Activities (active + robotsIndex not explicitly false)
         for (const a of activities) {
-          if (!a.is_indexable) continue
-          const { score } = computeSeoHealth(a, 'activity')
+          if (a.status !== 'active' || a.robotsIndex === false) continue
+          const { score } = computeSeoHealth({
+            seoTitle: a.seoTitle,
+            seoDescription: a.seoDescription,
+            slug: a.slug,
+            hasImage: (a.photos?.length ?? 0) > 0,
+            contentLength: a.description?.length ?? 0,
+            status: a.status,
+            robotsIndex: a.robotsIndex,
+          })
           entities.push({
             id: a.id,
             kind: 'activity',
@@ -202,22 +226,27 @@ export default function OverlapPage() {
             name: a.name,
             seoText: buildSeoText([
               a.name,
-              a.meta_title,
-              a.meta_description,
+              a.seoTitle,
+              a.seoDescription,
               a.region,
               a.category,
               a.description,
             ]),
-            path: `/activities/${a.slug}`,
+            path: `/activities/${a.slug ?? a.id}`,
             score,
             editPath: `/admin/activities/${a.id}`,
           })
         }
 
-        // Regions
+        // Regions (always indexable — no status/robotsIndex field on Region)
         for (const r of regions) {
-          if (!r.is_indexable) continue
-          const { score } = computeSeoHealth(r, 'region')
+          const { score } = computeSeoHealth({
+            seoTitle: r.seoTitle,
+            seoDescription: r.seoDescription,
+            slug: r.slug,
+            hasImage: !!r.heroImage,
+            contentLength: r.overview?.length ?? 0,
+          })
           entities.push({
             id: r.id,
             kind: 'region',
@@ -225,9 +254,9 @@ export default function OverlapPage() {
             name: r.name,
             seoText: buildSeoText([
               r.name,
-              r.meta_title,
-              r.meta_description,
-              r.description,
+              r.seoTitle,
+              r.seoDescription,
+              r.overview,
             ]),
             path: `/regions/${r.slug}`,
             score,
