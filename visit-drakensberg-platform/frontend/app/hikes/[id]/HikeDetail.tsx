@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import Footer from '@/components/layout/Footer'
-import { ArrowLeft, Mountain, Clock, TrendingUp, Users, Star, CheckCircle, ChevronRight, X } from 'lucide-react'
+import { ArrowLeft, Mountain, Clock, TrendingUp, Users, Star, CheckCircle, ChevronRight, X, Bed, Zap } from 'lucide-react'
 import { getTrails, Trail, trailCategory } from '@/lib/trails'
 import UpcomingDepartures from '@/components/tours/UpcomingDepartures'
 import TrailExperiences from '@/components/experiences/TrailExperiences'
@@ -14,6 +14,8 @@ import type { TourDate } from '@/components/tours/UpcomingDepartures'
 import { CalendarPlus } from 'lucide-react'
 import TrailPlanner from '@/components/trails/TrailPlanner'
 import RouteArtwork from '@/components/trails/RouteArtwork'
+import type { Property } from '@/lib/properties'
+import type { Activity } from '@/lib/activities'
 
 const DIFF_COLOR: Record<string, string> = { Easy: '#4A7251', Moderate: '#C9A96E', Hard: '#c0392b', Strenuous: '#c0392b', Extreme: '#7f1d1d' }
 const DIFF_BG: Record<string, string> = { Easy: '#4A725122', Moderate: '#C9A96E22', Hard: '#c0392b22', Strenuous: '#c0392b22', Extreme: '#7f1d1d22' }
@@ -41,7 +43,15 @@ const TRAIL_COLOR: Record<string, string> = {
  * neither of which needs to block the server response. See
  * docs/destination-graph/PHASE_B.md.
  */
-export default function HikeDetail({ trail }: { trail: Trail }) {
+export default function HikeDetail({
+  trail,
+  relatedProperties = [],
+  relatedActivities = [],
+}: {
+  trail: Trail
+  relatedProperties?: Property[]
+  relatedActivities?: Activity[]
+}) {
   const [allTrails, setAllTrails] = useState<Trail[]>([])
   const [lightboxImg, setLightboxImg] = useState<string | null>(null)
   const [departures, setDepartures] = useState<TourDate[]>([])
@@ -76,7 +86,17 @@ export default function HikeDetail({ trail }: { trail: Trail }) {
 
   const diff = trail.difficulty
   const headerBg = TRAIL_COLOR[diff] || 'bg-[#2d6a4f]'
-  const related = allTrails.filter(t => t.id !== trail.id && t.status === 'published').slice(0, 2)
+
+  // Honour admin-curated relatedTrailIds when present; otherwise fall back to
+  // any two other published trails (cheapest automatic related-content signal).
+  const related = (() => {
+    const published = allTrails.filter(t => t.status === 'published')
+    if ((trail.relatedTrailIds ?? []).length > 0) {
+      const ids = new Set(trail.relatedTrailIds!)
+      return published.filter(t => ids.has(t.id)).slice(0, 2)
+    }
+    return published.filter(t => t.id !== trail.id).slice(0, 2)
+  })()
 
   return (
     <div className="min-h-screen bg-[#F7F5F2]">
@@ -269,6 +289,69 @@ export default function HikeDetail({ trail }: { trail: Trail }) {
                       <CheckCircle size={14} className="text-[#2d6a4f] mt-0.5 shrink-0" />
                       <span className="font-sans text-sm text-gray-700">{item}</span>
                     </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Where to Stay */}
+            {relatedProperties.length > 0 && (
+              <div>
+                <div className="flex items-center gap-2 mb-4">
+                  <Bed size={18} className="text-[#C9A96E]" />
+                  <h2 className="font-display italic text-2xl text-[#000000]">Where to Stay</h2>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {relatedProperties.map(p => (
+                    <Link
+                      key={p.id}
+                      href={`/stay/${p.slug || p.id}`}
+                      className="block bg-white border border-gray-200 hover:border-[#C9A96E] transition-colors group overflow-hidden"
+                    >
+                      {p.photos?.[0] && (
+                        <div
+                          className="h-32 bg-cover bg-center"
+                          style={{ backgroundImage: `url(${p.photos[0]})` }}
+                        />
+                      )}
+                      <div className="p-4">
+                        <p className="font-display italic text-lg text-[#000000] group-hover:text-[#2d6a4f] transition-colors mb-0.5">
+                          {p.name}
+                        </p>
+                        <p className="font-sans text-xs text-gray-500">
+                          {p.type}
+                          {p.region ? ` · ${p.region}` : ''}
+                        </p>
+                      </div>
+                    </Link>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Things to Do Nearby */}
+            {relatedActivities.length > 0 && (
+              <div>
+                <div className="flex items-center gap-2 mb-4">
+                  <Zap size={18} className="text-[#C9A96E]" />
+                  <h2 className="font-display italic text-2xl text-[#000000]">Things to Do Nearby</h2>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {relatedActivities.map(a => (
+                    <Link
+                      key={a.id}
+                      href={`/activities/${a.slug || a.id}`}
+                      className="block bg-white border border-gray-200 hover:border-[#C9A96E] transition-colors group p-4"
+                    >
+                      <p className="font-display italic text-lg text-[#000000] group-hover:text-[#2d6a4f] transition-colors mb-0.5">
+                        {a.name}
+                      </p>
+                      <p className="font-sans text-xs text-gray-500">
+                        {a.category}
+                        {a.durationH ? ` · ${a.durationH}h` : ''}
+                        {a.region ? ` · ${a.region}` : ''}
+                      </p>
+                    </Link>
                   ))}
                 </div>
               </div>

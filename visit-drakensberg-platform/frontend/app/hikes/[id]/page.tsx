@@ -1,6 +1,8 @@
 import type { Metadata } from 'next'
 import { notFound } from 'next/navigation'
 import { getTrails, type Trail, DEFAULT_TRAILS } from '@/lib/trails'
+import { getProperties, type Property } from '@/lib/properties'
+import { getActivities, type Activity } from '@/lib/activities'
 import { publicSupabase } from '@/lib/supabase-public'
 import HikeDetail from './HikeDetail'
 
@@ -27,6 +29,45 @@ export const revalidate = 1800
 async function resolveTrail(id: string): Promise<Trail | null> {
   const trails = await getTrails(publicSupabase).catch(() => DEFAULT_TRAILS)
   return trails.find(t => t.id === id || t.slug === id) ?? null
+}
+
+/**
+ * Fetch properties to surface in "Where to Stay" on this trail's detail page.
+ * Explicit links (relatedPropertyIds) take priority; falls back to
+ * same-region active properties when no explicit links are set.
+ */
+async function resolveRelatedProperties(trail: Trail): Promise<Property[]> {
+  const all = await getProperties(publicSupabase).catch(() => [] as Property[])
+  const active = all.filter(p => p.status === 'active')
+
+  if ((trail.relatedPropertyIds ?? []).length > 0) {
+    const ids = new Set(trail.relatedPropertyIds!)
+    return active.filter(p => ids.has(p.id)).slice(0, 4)
+  }
+
+  // Fallback: same-region properties, max 3
+  return active
+    .filter(p => p.region === trail.region)
+    .slice(0, 3)
+}
+
+/**
+ * Fetch activities for "Things to Do Nearby". Same explicit-link-then-region
+ * fallback pattern as resolveRelatedProperties.
+ */
+async function resolveRelatedActivities(trail: Trail): Promise<Activity[]> {
+  const all = await getActivities(publicSupabase).catch(() => [] as Activity[])
+  const active = all.filter(a => a.status === 'active')
+
+  if ((trail.relatedActivityIds ?? []).length > 0) {
+    const ids = new Set(trail.relatedActivityIds!)
+    return active.filter(a => ids.has(a.id)).slice(0, 4)
+  }
+
+  // Fallback: same-region activities, max 3
+  return active
+    .filter(a => a.region === trail.region)
+    .slice(0, 3)
 }
 
 function buildDescription(trail: Trail): string | undefined {
@@ -66,6 +107,13 @@ export default async function HikePage({ params }: { params: { id: string } }) {
   const trail = await resolveTrail(params.id)
   if (!trail) notFound()
 
+  // Fetch related content in parallel — these never block the 404 check above.
+  // `trail!` because notFound() is typed as `never` but TS doesn't narrow past it.
+  const [relatedProperties, relatedActivities] = await Promise.all([
+    resolveRelatedProperties(trail!),
+    resolveRelatedActivities(trail!),
+  ])
+
   const canonicalUrl = `${SITE_URL}/hikes/${trail.slug || trail.id}`
 
   const attractionJsonLd = {
@@ -92,7 +140,11 @@ export default async function HikePage({ params }: { params: { id: string } }) {
     <>
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(attractionJsonLd) }} />
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbJsonLd) }} />
-      <HikeDetail trail={trail} />
+      <HikeDetail
+        trail={trail}
+        relatedProperties={relatedProperties}
+        relatedActivities={relatedActivities}
+      />
     </>
   )
 }
