@@ -18,7 +18,8 @@ import { getAllOrderLines, type OrderLine } from '@/lib/orders'
 const FULFILMENT_CHIP: Record<string, string> = {
   pending: 'bg-amber-50 text-amber-700',
   confirmed: 'bg-emerald-50 text-emerald-700',
-  delivered: 'bg-blue-50 text-blue-700',
+  in_progress: 'bg-blue-50 text-blue-700',
+  fulfilled: 'bg-[#2d6a4f]/10 text-[#2d6a4f]',
   cancelled: 'bg-red-50 text-red-600',
 }
 
@@ -186,7 +187,7 @@ export default function ConsolidatedBookingsPage() {
                         FULFILMENT_CHIP[l.fulfilment_status] ?? 'bg-gray-100 text-gray-600'
                       }`}
                     >
-                      {l.fulfilment_status}
+                      {l.fulfilment_status.replace('_', ' ')}
                     </span>
                   </td>
                   <td className="px-5 py-4 font-sans text-sm text-gray-900">
@@ -194,7 +195,7 @@ export default function ConsolidatedBookingsPage() {
                   </td>
                   <td className="px-5 py-4">
                     <Link
-                      href={`/operations/suppliers/${l.supplier_id}`}
+                      href={`/operations/bookings/${l.order_id}`}
                       className="font-sans text-xs text-[#2d6a4f] hover:underline"
                     >
                       Open

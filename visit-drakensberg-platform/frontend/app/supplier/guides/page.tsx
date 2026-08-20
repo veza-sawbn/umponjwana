@@ -30,7 +30,7 @@ export default function GuidesPage() {
   const [loading, setLoading] = useState(true)
   const [adding, setAdding] = useState(false)
   const [form, setForm] = useState({
-    name: '', certs: '', guideNo: '', speciality: '', languages: '',
+    name: '', email: '', certs: '', guideNo: '', speciality: '', languages: '',
     qualifications: '', yearsExperience: '', highestSummit: '', completedExpeditions: '', portrait: '', bio: '',
     guideType: 'certified' as 'certified' | 'trainee',
   })
@@ -50,7 +50,7 @@ export default function GuidesPage() {
       if (!user) throw new Error('no session')
       const saved = await addSupplierEntity<Guide>(ENTITY, {
         supplierId: effectiveSupplierId(user.id),
-        name: form.name, certs: form.certs, guideNo: form.guideNo,
+        name: form.name, email: form.email, certs: form.certs, guideNo: form.guideNo,
         speciality: form.speciality, languages: form.languages,
         qualifications: form.qualifications,
         yearsExperience: Number(form.yearsExperience) || 0,
@@ -61,7 +61,7 @@ export default function GuidesPage() {
         rating: 0, tours: 0, status: 'pending', blocked: [],
       } as unknown as Omit<Guide, 'id' | 'createdAt'>)
       setGuides(g => [...g, saved])
-      setForm({ name: '', certs: '', guideNo: '', speciality: '', languages: '', qualifications: '', yearsExperience: '', highestSummit: '', completedExpeditions: '', portrait: '', bio: '', guideType: 'certified' })
+      setForm({ name: '', email: '', certs: '', guideNo: '', speciality: '', languages: '', qualifications: '', yearsExperience: '', highestSummit: '', completedExpeditions: '', portrait: '', bio: '', guideType: 'certified' })
       setAdding(false)
       toast.success('Guide registered.')
     } catch {
@@ -120,6 +120,7 @@ export default function GuidesPage() {
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <F label="Full Name" required><input value={form.name} onChange={e => set('name', e.target.value)} className={inp} /></F>
+            <F label="Email"><input type="email" value={form.email} onChange={e => set('email', e.target.value)} placeholder="guide@example.com" className={inp} /></F>
             <F label={form.guideType === 'trainee' ? 'FGASA / Cert Number (optional)' : 'FGASA / Cert Number'}>
               <input value={form.certs} onChange={e => set('certs', e.target.value)} className={inp} />
             </F>

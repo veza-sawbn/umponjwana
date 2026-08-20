@@ -18,14 +18,14 @@ const STATUS_BADGE: Record<string, { label: string; Icon: typeof CheckCircle; cl
 }
 
 type FormState = {
-  name: string; certs: string; guideNo: string; speciality: string; languages: string
+  name: string; email: string; certs: string; guideNo: string; speciality: string; languages: string
   qualifications: string; yearsExperience: string; highestSummit: string
   completedExpeditions: string; portrait: string; bio: string
   guideType: 'certified' | 'trainee'
 }
 
 const EMPTY: FormState = {
-  name: '', certs: '', guideNo: '', speciality: '', languages: '',
+  name: '', email: '', certs: '', guideNo: '', speciality: '', languages: '',
   qualifications: '', yearsExperience: '', highestSummit: '', completedExpeditions: '',
   portrait: '', bio: '', guideType: 'certified',
 }
@@ -46,6 +46,7 @@ export default function EditGuidePage() {
       setStatus(guide.status ?? 'pending')
       setForm({
         name: guide.name ?? '',
+        email: guide.email ?? '',
         certs: guide.certs ?? '',
         guideNo: guide.guideNo ?? '',
         speciality: guide.speciality ?? '',
@@ -69,6 +70,7 @@ export default function EditGuidePage() {
     try {
       await updateSupplierEntity<GuideProfile>(ENTITY, id, {
         name: form.name.trim(),
+        email: form.email.trim(),
         certs: form.certs.trim(),
         guideNo: form.guideNo.trim(),
         speciality: form.speciality.trim(),
@@ -146,6 +148,8 @@ export default function EditGuidePage() {
         </F>
 
         <F label="Full Name" required><input value={form.name} onChange={e => set('name', e.target.value)} className={inp} /></F>
+
+        <F label="Email"><input type="email" value={form.email} onChange={e => set('email', e.target.value)} placeholder="guide@example.com" className={inp} /></F>
 
         <div className="grid grid-cols-2 gap-4">
           <F label={form.guideType === 'trainee' ? 'FGASA / Cert Number (optional)' : 'FGASA / Cert Number'}>

@@ -37,6 +37,8 @@ export type GuideProfile = SupplierEntity & {
   guideNo: string
   speciality: string
   languages: string
+  /** Not shown publicly — used only to notify the guide of an appointed booking. */
+  email?: string
   rating: number
   tours: number
   status: string
