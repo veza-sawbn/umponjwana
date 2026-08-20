@@ -70,7 +70,7 @@ export async function getPublishedPosts(client: SupabaseClient = publicSupabase)
     .eq('status', 'published')
     .order('published_at', { ascending: false })
   if (error) throw error
-  return (data ?? []) as BlogPost[]
+  return (data ?? []) as unknown as BlogPost[]
 }
 
 export async function getPostBySlug(
@@ -109,7 +109,7 @@ export async function getAllPostsAdmin(client: SupabaseClient): Promise<BlogPost
     .select(BLOG_SELECT)
     .order('created_at', { ascending: false })
   if (error) throw error
-  return (data ?? []) as BlogPost[]
+  return (data ?? []) as unknown as BlogPost[]
 }
 
 export async function upsertPost(
