@@ -7,6 +7,7 @@ import Navbar from '@/components/layout/Navbar'
 import { BookingProvider } from '@/lib/booking-context'
 import BookingBar from '@/components/booking/BookingBar'
 import EditModeGate from '@/components/editor/EditModeGate'
+import AnalyticsProvider from '@/components/analytics/AnalyticsProvider'
 
 export default function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
@@ -19,6 +20,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     <QueryClientProvider client={queryClient}>
       <BookingProvider>
         <EditModeGate>
+          <AnalyticsProvider />
           {!isAdmin && <Navbar />}
           {children}
           {!isAdmin && <BookingBar />}

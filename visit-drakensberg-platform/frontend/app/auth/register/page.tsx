@@ -5,7 +5,8 @@ import { useRouter } from 'next/navigation'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { signUp } from '@/lib/auth'
+import { signUp, supabase } from '@/lib/auth'
+import { trackEvent, AnalyticsEvent } from '@/lib/analytics'
 
 const schema = z.object({
   fullName: z.string().min(2, 'At least 2 characters'),
@@ -13,6 +14,7 @@ const schema = z.object({
   password: z.string().min(8, 'At least 8 characters').regex(/[A-Z]/, 'Needs an uppercase letter').regex(/[0-9]/, 'Needs a number'),
   confirmPassword: z.string(),
   role: z.enum(['visitor', 'supplier']),
+  marketingConsent: z.boolean().optional(),
 }).refine((d) => d.password === d.confirmPassword, { message: 'Passwords do not match', path: ['confirmPassword'] })
 
 type Form = z.infer<typeof schema>
@@ -22,7 +24,7 @@ export default function RegisterPage() {
   const [authError, setAuthError] = useState<string | null>(null)
   const { register, handleSubmit, watch, formState: { errors, isSubmitting } } = useForm<Form>({
     resolver: zodResolver(schema),
-    defaultValues: { role: 'visitor' },
+    defaultValues: { role: 'visitor', marketingConsent: false },
   })
 
   const role = watch('role')
@@ -31,6 +33,15 @@ export default function RegisterPage() {
     setAuthError(null)
     try {
       await signUp(data.email, data.password, data.fullName, data.role)
+      // Consent + funnel tracking are best-effort — never block account
+      // creation on them. vd_set_consent() writes an audit-trail row (§22);
+      // account_created feeds the Prospect -> Customer journey (§3, §21).
+      if (data.marketingConsent) {
+        supabase.rpc('vd_set_consent', {
+          p_email: data.email, p_consent_type: 'marketing_email', p_granted: true, p_source: 'registration',
+        }).then(({ error }) => { if (error) console.error('[register] consent record failed:', error) })
+      }
+      trackEvent(AnalyticsEvent.ACCOUNT_CREATED, { role: data.role })
       // Hard navigation so middleware sees the fresh session cookie.
       window.location.assign(data.role === 'supplier' ? '/supplier' : '/account')
     } catch (err: unknown) {
@@ -113,6 +124,14 @@ export default function RegisterPage() {
                 className={`w-full bg-white border px-4 py-3 font-sans text-sm text-forest placeholder:text-forest/25 focus:outline-none focus:border-forest transition-colors ${errors.confirmPassword ? 'border-red-400' : 'border-black/15'}`} />
               {errors.confirmPassword && <p className="font-sans text-xs text-red-500 mt-1.5">{errors.confirmPassword.message}</p>}
             </div>
+
+            <label className="flex items-start gap-2.5 cursor-pointer">
+              <input {...register('marketingConsent')} type="checkbox"
+                className="mt-0.5 h-4 w-4 border-black/20 text-forest focus:ring-forest" />
+              <span className="font-sans text-xs text-forest/50 leading-relaxed">
+                Send me trip inspiration, seasonal offers and Drakensberg updates. You can unsubscribe anytime.
+              </span>
+            </label>
 
             <button type="submit" disabled={isSubmitting}
               className="w-full bg-forest text-white py-3.5 font-sans text-sm hover:bg-sage transition-colors disabled:opacity-50 mt-2">
