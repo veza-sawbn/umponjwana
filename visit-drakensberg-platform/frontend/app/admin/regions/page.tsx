@@ -5,6 +5,7 @@ import { Plus, Trash2, Check } from 'lucide-react'
 import { getRegions, saveAllRegions, DEFAULT_REGIONS, type Region } from '@/lib/regions'
 import { adminMediaSource } from '@/lib/admin-supabase'
 import { MediaPicker } from '@/components/media/MediaPicker'
+import { SeoPanel } from '@/components/admin/SeoPanel'
 
 // Reads/writes lib/regions.ts directly — the same module the public site
 // renders from — matching app/admin/reserves/page.tsx and
@@ -198,13 +199,17 @@ export default function AdminRegionsPage() {
               ))}
             </div>
 
-            <div className="pt-4 border-t border-gray-100">
-              <p className="font-sans text-[10px] tracking-[0.14em] uppercase text-gray-400 mb-3">SEO</p>
-              <div className="space-y-4">
-                <div><label className={labelCls}>SEO Title</label><input value={data.seoTitle} onChange={e => update('seoTitle', e.target.value)} className={inputCls}/></div>
-                <div><label className={labelCls}>SEO Description</label><textarea value={data.seoDescription} onChange={e => update('seoDescription', e.target.value)} rows={2} className={`${inputCls} resize-none`}/></div>
-              </div>
-            </div>
+            <SeoPanel
+              seoTitle={data.seoTitle}
+              seoDescription={data.seoDescription}
+              previewTitle={data.name}
+              previewSlug={data.slug}
+              urlBase="regions"
+              hasImage={!!data.heroImage}
+              contentLength={(data.overview ?? '').length}
+              onChangeSeoTitle={v => update('seoTitle', v)}
+              onChangeSeoDescription={v => update('seoDescription', v)}
+            />
           </div>
           <div className="mt-8 pt-6 border-t border-gray-100 flex items-center gap-4">
             <button onClick={save} className="bg-[#2d6a4f] text-white px-6 py-2.5 font-sans text-sm">Save Region</button>
