@@ -527,6 +527,20 @@ export default function AdminSEOPage() {
                     View overlap report →
                   </Link>
                 </div>
+                <div className="bg-white border border-gray-200 p-5 flex items-center justify-between gap-4 flex-wrap">
+                  <div>
+                    <p className="font-display italic text-lg text-[#000000] mb-0.5">Sitemap Control</p>
+                    <p className="font-sans text-sm text-gray-500">
+                      Slug coverage, UUID fallback URLs, noindex exclusions, and recently changed pages.
+                    </p>
+                  </div>
+                  <Link
+                    href="/admin/seo/sitemap"
+                    className="shrink-0 border border-[#2d6a4f] text-[#2d6a4f] px-5 py-2.5 font-sans text-sm hover:bg-[#2d6a4f] hover:text-white transition-colors"
+                  >
+                    View sitemap report →
+                  </Link>
+                </div>
               </div>
 
               {/* Score list — bottom 10 */}
