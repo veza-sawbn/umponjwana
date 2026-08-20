@@ -456,7 +456,7 @@ export default function AdminSEOPage() {
               </div>
 
               {/* Tool CTAs */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 <div className="bg-white border border-gray-200 p-5 flex items-center justify-between gap-4 flex-wrap">
                   <div>
                     <p className="font-display italic text-lg text-[#000000] mb-0.5">Orphan Page Detector</p>
@@ -483,6 +483,20 @@ export default function AdminSEOPage() {
                     className="shrink-0 border border-[#2d6a4f] text-[#2d6a4f] px-5 py-2.5 font-sans text-sm hover:bg-[#2d6a4f] hover:text-white transition-colors"
                   >
                     View graph →
+                  </Link>
+                </div>
+                <div className="bg-white border border-gray-200 p-5 flex items-center justify-between gap-4 flex-wrap">
+                  <div>
+                    <p className="font-display italic text-lg text-[#000000] mb-0.5">Redirect Manager</p>
+                    <p className="font-sans text-sm text-gray-500">
+                      Add 301/302 redirects served by middleware — chains collapsed, loops rejected automatically.
+                    </p>
+                  </div>
+                  <Link
+                    href="/admin/seo/redirects"
+                    className="shrink-0 border border-[#2d6a4f] text-[#2d6a4f] px-5 py-2.5 font-sans text-sm hover:bg-[#2d6a4f] hover:text-white transition-colors"
+                  >
+                    Manage redirects →
                   </Link>
                 </div>
               </div>
