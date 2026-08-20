@@ -25,13 +25,46 @@ export async function middleware(req: NextRequest) {
   const pathname = req.nextUrl.pathname
 
   // Forwards refreshed auth cookies onto a redirect so the session isn't lost.
-  const redirectTo = (path: string) => {
-    const redirect = NextResponse.redirect(new URL(path, req.url))
+  const redirectTo = (path: string, status = 302) => {
+    const redirect = NextResponse.redirect(new URL(path, req.url), { status })
     res.headers.getSetCookie().forEach(cookie => {
       redirect.headers.append('Set-Cookie', cookie)
     })
     return redirect
   }
+
+  // ── Admin redirects (Tool 11) ──────────────────────────────────────────────
+  // Only apply to public GET requests that don't start with a protected or
+  // admin-controlled prefix — those paths are handled by auth guards below.
+  // Protected paths are already exempt from this check, and we avoid shadowing
+  // the auth/maintenance machinery.
+  const SKIP_REDIRECT_PREFIXES = ['/admin', '/supplier', '/operations', '/auth', '/api', '/_next']
+  const isPublicPath = req.method === 'GET' && !SKIP_REDIRECT_PREFIXES.some(p => pathname.startsWith(p))
+
+  if (isPublicPath) {
+    try {
+      const { data: rData } = await supabase
+        .from('site_content')
+        .select('value')
+        .eq('key', 'admin_redirects')
+        .maybeSingle()
+
+      if (Array.isArray(rData?.value?.items)) {
+        type RItem = { id: string; from: string; to: string; statusCode: number }
+        const items = rData.value.items as RItem[]
+        const match = items.find((r: RItem) => r.from === pathname)
+        if (match) {
+          const target = match.to.startsWith('http')
+            ? match.to
+            : new URL(match.to, req.url).toString()
+          return NextResponse.redirect(target, { status: match.statusCode ?? 301 })
+        }
+      }
+    } catch {
+      // redirect lookup must never block the request
+    }
+  }
+  // ──────────────────────────────────────────────────────────────────────────
 
   // Always call getSession so the helper has a chance to refresh the token and
   // write updated Set-Cookie headers onto `res`.
