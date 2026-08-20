@@ -8,6 +8,7 @@ import { analyseGpxAsync, ROUTE_TYPES } from '@/lib/gpx'
 import RouteArtwork from '@/components/trails/RouteArtwork'
 import { MediaPicker, MediaGalleryPicker } from '@/components/media/MediaPicker'
 import { adminMediaSource } from '@/lib/admin-supabase'
+import { SeoPanel } from '@/components/admin/SeoPanel'
 
 const REGIONS = ['Northern Drakensberg', 'Central Drakensberg', 'Southern Drakensberg', 'Royal Natal National Park', 'Champagne Valley', "Giant's Castle", 'Sani Pass']
 const DIFFICULTIES = ['Easy', 'Moderate', 'Strenuous', 'Extreme'] as const
@@ -399,6 +400,22 @@ function TrailForm({ trail, onChange, onSave, onCancel, saveLabel, saving }: {
           <DaysEditor days={trail.days} onChange={days => onChange('days', days)} />
         </div>
       )}
+
+      {/* SEO */}
+      <SeoPanel
+        seoTitle={trail.seoTitle ?? ''}
+        seoDescription={trail.seoDescription ?? ''}
+        robotsIndex={trail.robotsIndex}
+        previewTitle={trail.name}
+        previewSlug={trail.slug}
+        urlBase="hikes"
+        hasImage={!!trail.image}
+        contentLength={trail.description?.length ?? 0}
+        status={trail.status}
+        onChangeSeoTitle={v => onChange('seoTitle', v)}
+        onChangeSeoDescription={v => onChange('seoDescription', v)}
+        onChangeRobotsIndex={v => onChange('robotsIndex', v)}
+      />
 
       {/* Actions */}
       <div className="flex gap-3 border-t border-gray-100 pt-5">

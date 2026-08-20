@@ -17,6 +17,7 @@ import {
 import { getAdminSuppliers, adminMediaSource, type AdminSupplier } from '@/lib/admin-supabase'
 import { getTrails, type Trail } from '@/lib/trails'
 import { MediaPicker, MediaGalleryPicker } from '@/components/media/MediaPicker'
+import { SeoPanel } from '@/components/admin/SeoPanel'
 
 // Admin Package Builder: packages are curated by Visit Drakensberg from
 // services supplied by multiple businesses. Each component keeps its own
@@ -418,6 +419,23 @@ export default function AdminPackagesPage() {
                 <span className="text-gray-400">Margin: <span className={totals.margin >= 0 ? 'text-emerald-600' : 'text-red-500'}>R {totals.margin.toLocaleString()}</span></span>
               </div>
             )}
+          </div>
+
+          <div className="bg-white border border-gray-200 p-6">
+            <SeoPanel
+              seoTitle={draft.seoTitle ?? ''}
+              seoDescription={draft.seoDescription ?? ''}
+              robotsIndex={draft.robotsIndex}
+              previewTitle={draft.title}
+              previewSlug={draft.slug}
+              urlBase="packages"
+              hasImage={!!draft.image}
+              contentLength={(draft.description ?? '').length}
+              status={draft.packageStatus === 'published' ? 'published' : 'draft'}
+              onChangeSeoTitle={v => set('seoTitle', v)}
+              onChangeSeoDescription={v => set('seoDescription', v)}
+              onChangeRobotsIndex={v => set('robotsIndex', v)}
+            />
           </div>
 
           <div className="flex gap-3">
