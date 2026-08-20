@@ -9,6 +9,9 @@ import RouteArtwork from '@/components/trails/RouteArtwork'
 import { MediaPicker, MediaGalleryPicker } from '@/components/media/MediaPicker'
 import { adminMediaSource } from '@/lib/admin-supabase'
 import { SeoPanel } from '@/components/admin/SeoPanel'
+import { RelationshipPicker, type RelatedItem } from '@/components/admin/RelatedEntityManager'
+import { getProperties, type Property } from '@/lib/properties'
+import { getActivities, type Activity } from '@/lib/activities'
 
 const REGIONS = ['Northern Drakensberg', 'Central Drakensberg', 'Southern Drakensberg', 'Royal Natal National Park', 'Champagne Valley', "Giant's Castle", 'Sani Pass']
 const DIFFICULTIES = ['Easy', 'Moderate', 'Strenuous', 'Extreme'] as const
@@ -207,6 +210,26 @@ function TrailForm({ trail, onChange, onSave, onCancel, saveLabel, saving }: {
   saveLabel: string
   saving?: boolean
 }) {
+  const [availableProperties, setAvailableProperties] = useState<RelatedItem[]>([])
+  const [availableActivities, setAvailableActivities] = useState<RelatedItem[]>([])
+  const [availableTrails, setAvailableTrails] = useState<RelatedItem[]>([])
+
+  useEffect(() => {
+    getProperties().then(list =>
+      setAvailableProperties(list.map((p: Property) => ({ id: p.id, label: p.name, sublabel: p.region })))
+    ).catch(() => {})
+    getActivities().then(list =>
+      setAvailableActivities(list.map((a: Activity) => ({ id: a.id, label: a.name, sublabel: a.category })))
+    ).catch(() => {})
+    getTrails().then(list =>
+      setAvailableTrails(
+        list
+          .filter(t => t.id !== trail.id)
+          .map(t => ({ id: t.id, label: t.name, sublabel: t.region }))
+      )
+    ).catch(() => {})
+  }, [trail.id])
+
   return (
     <div className="bg-white border border-[#C9A96E] p-6 mt-6 space-y-6">
       {/* Core fields */}
@@ -400,6 +423,35 @@ function TrailForm({ trail, onChange, onSave, onCancel, saveLabel, saving }: {
           <DaysEditor days={trail.days} onChange={days => onChange('days', days)} />
         </div>
       )}
+
+      {/* Related entities */}
+      <div className="border-t border-gray-100 pt-6 space-y-5">
+        <p className="font-sans text-[10px] tracking-[0.14em] uppercase text-gray-400">Related Content</p>
+        <RelationshipPicker
+          label="Linked Accommodation"
+          description="Properties shown in the 'Where to Stay' section on this trail's detail page. Leave empty to auto-show same-region stays."
+          items={availableProperties}
+          selectedIds={trail.relatedPropertyIds ?? []}
+          onChange={ids => onChange('relatedPropertyIds', ids)}
+          placeholder="Search lodges, guesthouses…"
+        />
+        <RelationshipPicker
+          label="Linked Activities"
+          description="Activities shown in the 'Things to Do Nearby' section. Leave empty to auto-show same-region activities."
+          items={availableActivities}
+          selectedIds={trail.relatedActivityIds ?? []}
+          onChange={ids => onChange('relatedActivityIds', ids)}
+          placeholder="Search activities…"
+        />
+        <RelationshipPicker
+          label="Related Trails"
+          description="Overrides the automatic 'Related Trails' sidebar if set."
+          items={availableTrails}
+          selectedIds={trail.relatedTrailIds ?? []}
+          onChange={ids => onChange('relatedTrailIds', ids)}
+          placeholder="Search trails…"
+        />
+      </div>
 
       {/* SEO */}
       <SeoPanel
