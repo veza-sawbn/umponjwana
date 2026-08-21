@@ -147,7 +147,7 @@ export default function LinkSuggestionsPage() {
       for (const r of regions) {
         items.push({
           id: r.id, kind: 'region', kindLabel: 'Region', name: r.name,
-          slug: r.slug, region: r.name, status: r.status ?? 'active',
+          slug: r.slug, region: r.name, status: 'published',
           seoTitle: r.seoTitle, seoDescription: r.seoDescription,
           focusTopic: (r as Record<string, unknown>).focusTopic as string ?? null,
           path: `/regions/${r.slug ?? r.id}`,
