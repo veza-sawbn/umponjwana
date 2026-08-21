@@ -131,9 +131,16 @@ create index if not exists vd_customer_profiles_stage_idx on vd_customer_profile
 
 alter table vd_customer_profiles enable row level security;
 drop policy if exists "Users read own customer profile"   on vd_customer_profiles;
+drop policy if exists "Users update own customer profile" on vd_customer_profiles;
 drop policy if exists "Admins read all customer profiles" on vd_customer_profiles;
 drop policy if exists "Admins manage customer profiles"   on vd_customer_profiles;
 create policy "Users read own customer profile"   on vd_customer_profiles for select using (user_id = auth.uid());
+-- Column grants below only decide *which* columns an update may touch; RLS
+-- still needs its own policy permitting the update at all, or every attempt
+-- is rejected regardless of the grant (same shape as `profiles`' own
+-- "Users can update own profile" policy).
+create policy "Users update own customer profile" on vd_customer_profiles for update
+  using (user_id = auth.uid()) with check (user_id = auth.uid());
 create policy "Admins read all customer profiles" on vd_customer_profiles for select using (is_admin());
 create policy "Admins manage customer profiles"   on vd_customer_profiles for all    using (is_admin());
 
@@ -179,7 +186,27 @@ language plpgsql security definer set search_path = public as $$
 declare
   v_user uuid := auth.uid();
   v_email text := lower(trim(coalesce(p_email, '')));
+  v_account_email text;
 begin
+  -- A logged-in caller can only ever assert consent for their OWN account —
+  -- never trust a client-supplied email once we know who's calling. This is
+  -- a partial mitigation (closes forgery-while-authenticated); the harder
+  -- case — an anonymous caller asserting consent for an email they don't
+  -- own — needs a signed, address-bound confirmation link (double opt-in),
+  -- which is real new surface (token issuance + a confirmation route) left
+  -- for the email-infrastructure phase rather than folded in here. Until
+  -- then this carries the same trust level as the pre-existing
+  -- vd_newsletter_subscribers insert-only policy for the opt-in direction,
+  -- and unauthenticated opt-out (unsubscribe) is deliberately frictionless
+  -- by design (see the /unsubscribe page) — its worst case is someone else
+  -- being opted out of marketing, not a data exposure.
+  if v_user is not null then
+    select email into v_account_email from profiles where id = v_user;
+    if v_account_email is not null and v_account_email <> '' then
+      v_email := lower(trim(v_account_email));
+    end if;
+  end if;
+
   if v_email = '' or v_email !~ '^[^\s@]+@[^\s@]+\.[^\s@]+$' then
     raise exception 'a valid email is required';
   end if;
@@ -479,20 +506,49 @@ insert into vd_customer_profiles (user_id, first_seen_at, lifecycle_stage)
 select id, created_at, 'prospect' from profiles
 on conflict (user_id) do nothing;
 
--- Re-declares the same handle_new_user() function from 20260704 (same name,
--- trigger stays attached) with one addition: seed the CRM profile too.
+-- Re-declares handle_new_user() (same name, trigger stays attached) —
+-- extends the *latest* body (20260811_delegated_management.sql, which seeds
+-- staff_role/ops_role/organisation for invited staff) rather than the
+-- original four-column version from 20260704. Reverting to the older body
+-- would silently stop seeding those fields for every new staff invite —
+-- middleware and RLS read them, so those accounts would land as ordinary
+-- visitors with no access to their intended workspace.
 create or replace function handle_new_user()
 returns trigger language plpgsql security definer set search_path = public as $$
 declare
-  v_role user_role := 'visitor';
+  v_role       user_role := 'visitor';
+  v_staff_role text      := null;
+  v_ops_role   text      := null;
+  v_org        text      := null;
 begin
   begin
     v_role := coalesce((new.raw_user_meta_data->>'role')::user_role, 'visitor');
   exception when others then
     v_role := 'visitor';
   end;
-  insert into profiles (id, full_name, email, role)
-  values (new.id, coalesce(new.raw_user_meta_data->>'full_name', ''), new.email, v_role)
+
+  if new.raw_user_meta_data->>'staff_role' in ('finance', 'operations') then
+    v_staff_role := new.raw_user_meta_data->>'staff_role';
+  end if;
+
+  if new.raw_user_meta_data->>'ops_role' in (
+    'reservation_agent', 'reservations_manager', 'asset_manager', 'ops_administrator'
+  ) then
+    v_ops_role   := new.raw_user_meta_data->>'ops_role';
+    v_org        := coalesce(new.raw_user_meta_data->>'organisation', 'vd_operations');
+    v_staff_role := 'operations';
+  end if;
+
+  insert into profiles (id, full_name, email, role, staff_role, ops_role, organisation)
+  values (
+    new.id,
+    coalesce(new.raw_user_meta_data->>'full_name', ''),
+    new.email,
+    v_role,
+    v_staff_role,
+    v_ops_role,
+    v_org
+  )
   on conflict (id) do nothing;
 
   insert into vd_customer_profiles (user_id, acquisition_source, first_seen_at, lifecycle_stage)

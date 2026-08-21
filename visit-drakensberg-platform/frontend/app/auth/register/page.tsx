@@ -33,15 +33,19 @@ export default function RegisterPage() {
     setAuthError(null)
     try {
       await signUp(data.email, data.password, data.fullName, data.role)
-      // Consent + funnel tracking are best-effort — never block account
-      // creation on them. vd_set_consent() writes an audit-trail row (§22);
-      // account_created feeds the Prospect -> Customer journey (§3, §21).
+      // Consent + funnel tracking never block account creation on failure —
+      // both are awaited (not fire-and-forget) purely so the hard navigation
+      // right after doesn't tear the page down mid-request and silently
+      // drop them; a failed write here still doesn't stop signup.
+      // vd_set_consent() writes an audit-trail row (§22); account_created
+      // feeds the Prospect -> Customer journey (§3, §21).
       if (data.marketingConsent) {
-        supabase.rpc('vd_set_consent', {
+        const { error } = await supabase.rpc('vd_set_consent', {
           p_email: data.email, p_consent_type: 'marketing_email', p_granted: true, p_source: 'registration',
-        }).then(({ error }) => { if (error) console.error('[register] consent record failed:', error) })
+        })
+        if (error) console.error('[register] consent record failed:', error)
       }
-      trackEvent(AnalyticsEvent.ACCOUNT_CREATED, { role: data.role })
+      await trackEvent(AnalyticsEvent.ACCOUNT_CREATED, { role: data.role })
       // Hard navigation so middleware sees the fresh session cookie.
       window.location.assign(data.role === 'supplier' ? '/supplier' : '/account')
     } catch (err: unknown) {

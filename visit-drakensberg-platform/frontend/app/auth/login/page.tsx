@@ -48,7 +48,9 @@ export default function LoginPage() {
         }
       }
 
-      trackEvent(AnalyticsEvent.LOGIN, { role })
+      // Awaited so the hard navigation below doesn't tear the page down
+      // mid-request and silently drop the event (same fix as registration).
+      await trackEvent(AnalyticsEvent.LOGIN, { role })
 
       const redirect = new URLSearchParams(window.location.search).get('redirect')
       // Operations employees have role='visitor' but belong in their own

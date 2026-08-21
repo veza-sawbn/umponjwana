@@ -97,24 +97,30 @@ let sessionReady: Promise<string> | null = null
 /**
  * Returns the current session id, creating one (and capturing first-touch
  * landing page / referrer / UTM parameters) the first time it's called, or
- * after SESSION_IDLE_TIMEOUT_MS of inactivity. Concurrent callers share one
- * in-flight request instead of racing to create duplicate sessions.
+ * after SESSION_IDLE_TIMEOUT_MS of inactivity. The freshness check runs on
+ * every call — `sessionReady` only dedupes calls that race while a *new*
+ * session is actually being created, and is cleared as soon as that
+ * settles, so a later idle check isn't permanently shadowed by the first
+ * call's cached promise (which would otherwise pin the whole tab to one
+ * session for its entire lifetime, corrupting session counts/durations for
+ * any visit longer than the idle window).
  */
 function ensureSession(): Promise<string> {
   if (typeof window === 'undefined') return Promise.resolve('server')
+
+  const now = Date.now()
+  const existingId = localStorage.getItem(SESSION_ID_KEY)
+  const lastActive = Number(sessionStorage.getItem(SESSION_LAST_ACTIVE_KEY) || 0)
+  const idle = !lastActive || now - lastActive > SESSION_IDLE_TIMEOUT_MS
+
+  if (existingId && !idle) {
+    sessionStorage.setItem(SESSION_LAST_ACTIVE_KEY, String(now))
+    return Promise.resolve(existingId)
+  }
+
   if (sessionReady) return sessionReady
 
   sessionReady = (async () => {
-    const now = Date.now()
-    const existingId = localStorage.getItem(SESSION_ID_KEY)
-    const lastActive = Number(sessionStorage.getItem(SESSION_LAST_ACTIVE_KEY) || 0)
-    const idle = !lastActive || now - lastActive > SESSION_IDLE_TIMEOUT_MS
-
-    if (existingId && !idle) {
-      sessionStorage.setItem(SESSION_LAST_ACTIVE_KEY, String(now))
-      return existingId
-    }
-
     const params = new URLSearchParams(window.location.search)
     try {
       const { data, error } = await supabase.rpc('vd_touch_session', {
@@ -137,6 +143,8 @@ function ensureSession(): Promise<string> {
     } catch (e) {
       console.error('[analytics] session init failed:', e)
       return existingId || ''
+    } finally {
+      sessionReady = null
     }
   })()
 
