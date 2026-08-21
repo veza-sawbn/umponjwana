@@ -22,9 +22,13 @@ function UnsubscribeForm() {
 
   useEffect(() => {
     if (!emailParam) return
+    // .rpc() returns a thenable, not a full Promise — no .catch() to chain,
+    // so errors are handled via the second .then() callback instead.
     supabase.rpc('vd_is_subscribed', { p_email: emailParam, p_consent_type: CONSENT_TYPE })
-      .then(({ data }) => { setAlreadyOptedOut(data === false); setAlreadyChecked(true) })
-      .catch(() => setAlreadyChecked(true))
+      .then(
+        ({ data }) => { setAlreadyOptedOut(data === false); setAlreadyChecked(true) },
+        () => setAlreadyChecked(true),
+      )
   }, [emailParam])
 
   async function handleUnsubscribe() {
