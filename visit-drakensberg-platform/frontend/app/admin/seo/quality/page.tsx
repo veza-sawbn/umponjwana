@@ -165,13 +165,13 @@ export default function QualityChecklistPage() {
       for (const a of activities) {
         const { score } = computeSeoHealth({
           seoTitle: a.seoTitle, seoDescription: a.seoDescription, slug: a.slug,
-          hasImage: !!a.image, contentLength: a.description?.length ?? 0,
+          hasImage: (a.photos?.length ?? 0) > 0, contentLength: a.description?.length ?? 0,
           status: a.status, robotsIndex: a.robotsIndex,
         })
         const entity: ChecklistEntity = {
           id: a.id, kind: 'activity', name: a.name,
           slug: a.slug, status: a.status, description: a.description,
-          region: a.region, hasImage: !!a.image,
+          region: a.region, hasImage: (a.photos?.length ?? 0) > 0,
           hasOgImage: !!(a as Record<string, unknown>).ogImage,
           seoTitle: a.seoTitle, seoDescription: a.seoDescription,
           robotsIndex: a.robotsIndex,
@@ -185,21 +185,21 @@ export default function QualityChecklistPage() {
       for (const r of regions) {
         const { score } = computeSeoHealth({
           seoTitle: r.seoTitle, seoDescription: r.seoDescription, slug: r.slug,
-          hasImage: !!r.image, contentLength: r.description?.length ?? 0,
-          status: r.status ?? 'active', robotsIndex: r.robotsIndex,
+          hasImage: !!r.heroImage, contentLength: r.overview?.length ?? 0,
+          status: 'published', robotsIndex: undefined,
         })
         const entity: ChecklistEntity = {
           id: r.id, kind: 'region', name: r.name,
-          slug: r.slug, status: r.status ?? 'active', description: r.description,
-          region: r.name, hasImage: !!r.image,
+          slug: r.slug, status: 'published', description: r.overview,
+          region: r.name, hasImage: !!r.heroImage,
           hasOgImage: !!(r as Record<string, unknown>).ogImage,
           seoTitle: r.seoTitle, seoDescription: r.seoDescription,
-          robotsIndex: r.robotsIndex,
+          robotsIndex: undefined,
           relatedCount: 0,
           focusTopic: (r as Record<string, unknown>).focusTopic as string ?? null,
           editPath: `/admin/regions/${r.id}`,
         }
-        all.push({ id: r.id, kind: 'region', kindLabel: 'Region', name: r.name, region: undefined, status: r.status ?? 'active', entity })
+        all.push({ id: r.id, kind: 'region', kindLabel: 'Region', name: r.name, region: undefined, status: 'published', entity })
       }
 
       all.sort((a, b) => a.name.localeCompare(b.name))

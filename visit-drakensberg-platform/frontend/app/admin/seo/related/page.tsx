@@ -254,7 +254,7 @@ export default function RelatedEntityManagerPage() {
       })
       for (const r of regions) refs.push({
         id: r.id, kind: 'region', kindLabel: 'Region', name: r.name,
-        slug: r.slug, region: r.name, status: r.status ?? 'active',
+        slug: r.slug, region: r.name, status: 'published',
         path: `/regions/${r.slug ?? r.id}`, editPath: `/admin/regions/${r.id}`,
       })
       refs.sort((a, b) => a.name.localeCompare(b.name))

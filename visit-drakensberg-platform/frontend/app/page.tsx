@@ -18,6 +18,7 @@ import { getTrails, type Trail } from '@/lib/trails'
 import { getUpcomingExperiences, type TrekkingExperience } from '@/lib/experiences'
 import { getSupplierEntities } from '@/lib/supplier-entities'
 import { getActivities, type Activity } from '@/lib/activities'
+import { trackEvent, AnalyticsEvent } from '@/lib/analytics'
 
 /* ─── Data ─────────────────────────────────────────────────────────────────── */
 
@@ -262,6 +263,12 @@ export default function HomePage() {
       const { error } = await supabase.from('vd_newsletter_subscribers').insert({ email })
       // 23505 = already subscribed; treat as success.
       if (error && error.code !== '23505') throw error
+      // Record explicit marketing consent (§22) and the funnel event (§3) —
+      // best-effort, never blocks the subscribe confirmation the visitor sees.
+      supabase.rpc('vd_set_consent', {
+        p_email: email, p_consent_type: 'marketing_email', p_granted: true, p_source: 'newsletter_footer',
+      }).then(({ error: consentError }) => { if (consentError) console.error('[newsletter] consent record failed:', consentError) })
+      trackEvent(AnalyticsEvent.NEWSLETTER_SIGNUP, { source: 'home_footer' })
       toast.success('You’re on the list — see you in the next dispatch.')
       setNewsletterEmail('')
     } catch {

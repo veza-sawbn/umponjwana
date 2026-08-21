@@ -6,6 +6,7 @@ import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { signIn, supabase } from '@/lib/auth'
+import { trackEvent, AnalyticsEvent } from '@/lib/analytics'
 
 const schema = z.object({
   email: z.string().email('Enter a valid email'),
@@ -46,6 +47,10 @@ export default function LoginPage() {
           staffRole = profile.staff_role ?? staffRole
         }
       }
+
+      // Awaited so the hard navigation below doesn't tear the page down
+      // mid-request and silently drop the event (same fix as registration).
+      await trackEvent(AnalyticsEvent.LOGIN, { role })
 
       const redirect = new URLSearchParams(window.location.search).get('redirect')
       // Operations employees have role='visitor' but belong in their own

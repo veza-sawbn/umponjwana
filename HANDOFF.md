@@ -488,3 +488,55 @@ Run `frontend/supabase/migrations/20260718_transport_marketplace.sql` (adds
   fields ready, neutral 4.0 prior).
 - Shuttle money still flows through the existing booking/master-order path;
   transport requests reference the booking but carry no separate settlement.
+
+## UPDATE 6 — Customer Intelligence Foundation, Phase 1 (2026-08-20)
+
+**Branch:** `claude/drakensberg-customer-intelligence-dlw5rg`
+Run `frontend/supabase/migrations/20260824_customer_intelligence_foundation.sql`
+after `20260823_blog_author_fields.sql`. Purely additive.
+
+This is Phase 1 ("Data Foundation") of the multi-phase Customer Intelligence,
+CRM & Marketing Automation system described in the handoff brief. **Read
+`docs/customer-intelligence/ARCHITECTURE_AUDIT.md` first** — it audits the
+existing schema/booking/auth/email/analytics systems (the platform already
+had a mature order/ledger system and zero behavioural analytics — confirmed
+by `PRODUCTION_READINESS_REPORT.md` §7) and records exactly what's reused vs.
+newly built, and what Phases 2–7 still need.
+
+### New (all additive, RLS-enabled, write-only-via-SECURITY-DEFINER-function)
+- `vd_sessions` / `vd_analytics_events` — first-party session + the single
+  behavioural event stream (`trackEvent()`, §21 of the brief). Named
+  `vd_analytics_events` rather than a bare "events" table — the codebase
+  already uses "Event" for ticketed calendar events (`lib/events.ts`).
+- `vd_customer_profiles` — 1:1 CRM extension of `profiles` (country, tags,
+  interests, favourites, acquisition source, `lifecycle_stage`: visitor →
+  prospect → customer → upcoming_traveller → traveller →
+  returning_customer → advocate). Seeded for every existing account; the
+  signup trigger seeds new ones.
+- `vd_customer_consents` — append-only consent log + `vd_set_consent()` /
+  `vd_is_subscribed()`. Source of truth for `marketing_consent`; transactional
+  mail (receipts/invoices/quotes/waivers) is untouched and never checks it.
+- `vd_customer_segments` / `vd_customer_segment_members` — 8 of the brief's
+  §9 segments (Prospects, First-time, Returning, Upcoming/Recent Travellers,
+  High-value, International, Dormant), computed by `vd_recompute_segments()`
+  straight from existing `vd_orders` data — real membership from the moment
+  the migration runs. Recomputed daily via `/api/cron/recompute-segments`
+  (new `vercel.json` entry, mirrors `expire-pending-bookings`).
+- `vd_touch_session()` / `vd_track_event()` — the public write API.
+
+### Frontend
+`lib/analytics.ts` (client `trackEvent()`/`trackPageView()`, anon/session id
+management) + `components/analytics/AnalyticsProvider.tsx` (mounted in
+`AppShell`, fires `page_view` on every route change, excludes
+`/admin`, `/supplier`, `/operations`). Newsletter signup and registration now
+record real consent (`vd_set_consent`) alongside their existing behaviour;
+registration gained an unchecked-by-default marketing-consent checkbox;
+login/registration fire `login`/`account_created`. New public `/unsubscribe`
+page (no login required).
+
+### Deliberately not in this branch
+Full event instrumentation across the ~90 route pages (`trail_view`,
+`booking_started`, `favourite_added`, etc.), analytics/funnel dashboards, the
+CRM timeline/segmentation UI, Wix migration tooling, email campaign tables,
+and the automation workflow engine — see the architecture doc's §3 "Next
+steps" for the intended order (matches the brief's own §23 phasing).
