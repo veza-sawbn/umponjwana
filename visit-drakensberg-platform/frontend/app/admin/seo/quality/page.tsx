@@ -165,13 +165,13 @@ export default function QualityChecklistPage() {
       for (const a of activities) {
         const { score } = computeSeoHealth({
           seoTitle: a.seoTitle, seoDescription: a.seoDescription, slug: a.slug,
-          hasImage: !!a.image, contentLength: a.description?.length ?? 0,
+          hasImage: (a.photos?.length ?? 0) > 0, contentLength: a.description?.length ?? 0,
           status: a.status, robotsIndex: a.robotsIndex,
         })
         const entity: ChecklistEntity = {
           id: a.id, kind: 'activity', name: a.name,
           slug: a.slug, status: a.status, description: a.description,
-          region: a.region, hasImage: !!a.image,
+          region: a.region, hasImage: (a.photos?.length ?? 0) > 0,
           hasOgImage: !!(a as Record<string, unknown>).ogImage,
           seoTitle: a.seoTitle, seoDescription: a.seoDescription,
           robotsIndex: a.robotsIndex,
