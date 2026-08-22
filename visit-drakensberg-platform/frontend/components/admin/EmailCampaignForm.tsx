@@ -20,13 +20,26 @@ const CAMPAIGN_TYPE_OPTIONS: { value: EmailCampaign['campaignType']; label: stri
   { value: 'lifecycle', label: 'Lifecycle', hint: 'Trigger-driven — recorded here, sent by the automation engine' },
 ]
 
+/** `<input type="datetime-local">` reads/writes local wall-clock time with
+ *  no timezone info. Slicing a stored UTC ISO string to 16 chars puts its
+ *  UTC clock value straight into that field instead — e.g. a schedule
+ *  stored as 08:00Z would show (and, on the next save, be silently
+ *  re-interpreted as) 08:00 local rather than the correct 10:00 in SAST.
+ *  Converting through Date's local getters keeps what the admin sees and
+ *  re-saves consistent with the instant actually stored. */
+function toLocalDateTimeInputValue(iso: string): string {
+  const d = new Date(iso)
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
+}
+
 export default function EmailCampaignForm({ campaign }: { campaign: EmailCampaign | null }) {
   const router = useRouter()
   const [name, setName] = useState(campaign?.name ?? '')
   const [campaignType, setCampaignType] = useState<EmailCampaign['campaignType']>(campaign?.campaignType ?? 'broadcast')
   const [templateId, setTemplateId] = useState<string | ''>(campaign?.templateId ?? '')
   const [audienceSegmentId, setAudienceSegmentId] = useState<string | ''>(campaign?.audienceSegmentId ?? '')
-  const [scheduledAt, setScheduledAt] = useState(campaign?.scheduledAt?.slice(0, 16) ?? '')
+  const [scheduledAt, setScheduledAt] = useState(campaign?.scheduledAt ? toLocalDateTimeInputValue(campaign.scheduledAt) : '')
   const [notes, setNotes] = useState(campaign?.notes ?? '')
 
   const [templates, setTemplates] = useState<EmailTemplate[]>([])

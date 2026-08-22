@@ -119,17 +119,35 @@ create policy "Admins read email events" on vd_email_events for select using (is
 -- count query, done server-side so the admin builder's live "N recipients"
 -- preview never needs to pull membership rows to the client just to count
 -- them (and so it's correct at any table size, no pagination needed).
+--
+-- Admin-gated like every other function in this file: as SECURITY DEFINER
+-- it runs with the owner's privileges and so bypasses the admin-only RLS on
+-- vd_customer_profiles/vd_customer_segment_members entirely — without an
+-- explicit is_admin() check, any authenticated (and, since Postgres grants
+-- EXECUTE to PUBLIC by default on new functions, actually any anonymous)
+-- caller could use it to read aggregate marketing-consent and segment-size
+-- counts straight through the RLS that's supposed to keep that admin-only.
 create or replace function public.vd_count_consented_audience(p_segment_id text default null)
 returns integer
-language sql stable security definer set search_path = public as $$
-  select case when p_segment_id is not null then (
-    select count(*)::integer
+language plpgsql stable security definer set search_path = public as $$
+declare
+  v_count integer;
+begin
+  if not is_admin() then
+    raise exception 'admin only';
+  end if;
+
+  if p_segment_id is not null then
+    select count(*)::integer into v_count
     from vd_customer_segment_members m
     join vd_customer_profiles cp on cp.user_id = m.user_id and cp.marketing_consent
-    where m.segment_id = p_segment_id
-  ) else (
-    select count(*)::integer from vd_customer_profiles cp where cp.marketing_consent
-  ) end
+    where m.segment_id = p_segment_id;
+  else
+    select count(*)::integer into v_count from vd_customer_profiles cp where cp.marketing_consent;
+  end if;
+
+  return v_count;
+end;
 $$;
 grant execute on function public.vd_count_consented_audience(text) to authenticated;
 
