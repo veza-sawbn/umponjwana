@@ -41,24 +41,57 @@ export type CustomerTimelineEntry = {
   detail: string
 }
 
-/** Roles that are staff, not customers — excluded from the directory. */
+/** Roles that are staff, not customers — excluded from the directory.
+ *  Finance/operations collaborators keep base role='visitor' and are
+ *  identified separately via profiles.staff_role (see
+ *  20260716_order_management.sql / 20260811_delegated_management.sql) — role
+ *  alone doesn't catch them, staff_role has to be checked too. */
 const STAFF_ROLES = new Set(['admin', 'supplier'])
+const isStaff = (p: { role: string; staff_role: string | null }) => STAFF_ROLES.has(p.role) || !!p.staff_role
+
+/** PostgREST caps a single response at its configured max-rows (1000 by
+ *  default) — an unbounded select on a table that grows past that silently
+ *  returns only the first page. Every whole-table read this module does for
+ *  cross-customer aggregation goes through this instead of a bare .select(). */
+async function fetchAllRows<T>(
+  page: (from: number, to: number) => PromiseLike<{ data: T[] | null; error: { message: string } | null }>,
+  label: string,
+): Promise<T[]> {
+  const PAGE_SIZE = 1000
+  const all: T[] = []
+  let from = 0
+  for (;;) {
+    const { data, error } = await page(from, from + PAGE_SIZE - 1)
+    if (error) { console.error(`[customers-admin] ${label} fetch failed:`, error); break }
+    const rows = data ?? []
+    all.push(...rows)
+    if (rows.length < PAGE_SIZE) break
+    from += PAGE_SIZE
+  }
+  return all
+}
 
 export async function getCustomerDirectory(): Promise<CustomerDirectoryEntry[]> {
-  const [{ data: profiles, error: pErr }, { data: crm, error: cErr }, { data: orders, error: oErr }] = await Promise.all([
-    supabase.from('profiles').select('id, full_name, email, phone, role, created_at'),
-    supabase.from('vd_customer_profiles').select('user_id, country, lifecycle_stage, marketing_consent, tags, last_seen_at'),
-    supabase.from('vd_orders').select('user_id, total_value, booking_status, travel_start, created_at'),
+  const [profiles, crm, orders] = await Promise.all([
+    fetchAllRows(
+      (from, to) => supabase.from('profiles').select('id, full_name, email, phone, role, staff_role, created_at').range(from, to),
+      'profiles',
+    ),
+    fetchAllRows(
+      (from, to) => supabase.from('vd_customer_profiles').select('user_id, country, lifecycle_stage, marketing_consent, tags, last_seen_at').range(from, to),
+      'vd_customer_profiles',
+    ),
+    fetchAllRows(
+      (from, to) => supabase.from('vd_orders').select('user_id, total_value, booking_status, travel_start, created_at').range(from, to),
+      'vd_orders',
+    ),
   ])
-  if (pErr) { console.error('[customers-admin] profiles fetch failed:', pErr); return [] }
-  if (cErr) console.error('[customers-admin] vd_customer_profiles fetch failed:', cErr)
-  if (oErr) console.error('[customers-admin] vd_orders fetch failed:', oErr)
 
-  const crmByUser = new Map((crm ?? []).map(c => [c.user_id, c]))
+  const crmByUser = new Map(crm.map(c => [c.user_id, c]))
 
   type OrderFact = { tripCount: number; lifetimeSpend: number; upcomingTravel: string | null; lastActivityAt: string }
   const factsByUser = new Map<string, OrderFact>()
-  for (const o of orders ?? []) {
+  for (const o of orders) {
     if (!o.user_id || o.booking_status === 'cancelled') continue
     const f = factsByUser.get(o.user_id) ?? { tripCount: 0, lifetimeSpend: 0, upcomingTravel: null, lastActivityAt: o.created_at }
     f.tripCount += 1
@@ -70,11 +103,19 @@ export async function getCustomerDirectory(): Promise<CustomerDirectoryEntry[]> 
     factsByUser.set(o.user_id, f)
   }
 
-  return (profiles ?? [])
-    .filter(p => !STAFF_ROLES.has(p.role))
+  return profiles
+    .filter(p => !isStaff(p))
     .map(p => {
       const crmProfile = crmByUser.get(p.id)
       const facts = factsByUser.get(p.id)
+      // Neither source is unconditionally newer — a browsing session can
+      // land after a customer's last order (or vice versa) — so the real
+      // "last activity" is whichever timestamp is actually later, not a
+      // fixed preference between the two sources.
+      const lastActivityAt = [facts?.lastActivityAt, crmProfile?.last_seen_at]
+        .filter((d): d is string => Boolean(d))
+        .sort()
+        .pop() ?? null
       return {
         id: p.id,
         fullName: p.full_name?.trim() || p.email || 'Unnamed',
@@ -89,31 +130,34 @@ export async function getCustomerDirectory(): Promise<CustomerDirectoryEntry[]> 
         tripCount: facts?.tripCount ?? 0,
         lifetimeSpend: facts?.lifetimeSpend ?? 0,
         upcomingTravel: facts?.upcomingTravel ?? null,
-        lastActivityAt: facts?.lastActivityAt ?? crmProfile?.last_seen_at ?? null,
+        lastActivityAt,
       }
     })
 }
 
 export async function getCustomerById(userId: string): Promise<CustomerProfile | null> {
   const [{ data: profile, error: pErr }, { data: crm, error: cErr }, { data: orders, error: oErr }] = await Promise.all([
-    supabase.from('profiles').select('id, full_name, email, phone, role, created_at').eq('id', userId).maybeSingle(),
+    supabase.from('profiles').select('id, full_name, email, phone, role, staff_role, created_at').eq('id', userId).maybeSingle(),
     supabase.from('vd_customer_profiles').select('*').eq('user_id', userId).maybeSingle(),
     supabase.from('vd_orders').select('total_value, booking_status, travel_start, created_at').eq('user_id', userId),
   ])
   if (pErr) console.error('[customers-admin] profile fetch failed:', pErr)
   if (cErr) console.error('[customers-admin] vd_customer_profiles fetch failed:', cErr)
   if (oErr) console.error('[customers-admin] vd_orders fetch failed:', oErr)
-  if (!profile) return null
+  if (!profile || isStaff(profile)) return null
 
-  let tripCount = 0, lifetimeSpend = 0, upcomingTravel: string | null = null, lastActivityAt = profile.created_at
+  let tripCount = 0, lifetimeSpend = 0, upcomingTravel: string | null = null, lastOrderAt: string | null = null
   const today = new Date().toISOString().slice(0, 10)
   for (const o of orders ?? []) {
     if (o.booking_status === 'cancelled') continue
     tripCount += 1
     lifetimeSpend += Number(o.total_value) || 0
     if (o.travel_start && o.travel_start >= today && (!upcomingTravel || o.travel_start < upcomingTravel)) upcomingTravel = o.travel_start
-    if (o.created_at > lastActivityAt) lastActivityAt = o.created_at
+    if (!lastOrderAt || o.created_at > lastOrderAt) lastOrderAt = o.created_at
   }
+  // See the matching comment in getCustomerDirectory() — neither source is
+  // unconditionally newer, so take whichever timestamp is actually later.
+  const lastActivityAt = [lastOrderAt, crm?.last_seen_at].filter((d): d is string => Boolean(d)).sort().pop() ?? profile.created_at
 
   return {
     id: profile.id,
@@ -129,7 +173,7 @@ export async function getCustomerById(userId: string): Promise<CustomerProfile |
     tripCount,
     lifetimeSpend,
     upcomingTravel,
-    lastActivityAt: crm?.last_seen_at ?? lastActivityAt,
+    lastActivityAt,
     interests: crm?.interests ?? [],
     favouriteDestinations: crm?.favourite_destinations ?? [],
     favouriteActivities: crm?.favourite_activities ?? [],
@@ -151,15 +195,17 @@ export async function getCustomerSegmentNames(userId: string): Promise<string[]>
 }
 
 export async function getSegmentCounts(): Promise<SegmentCount[]> {
-  const [{ data: segments, error: sErr }, { data: members, error: mErr }] = await Promise.all([
+  const [{ data: segments, error: sErr }, members] = await Promise.all([
     supabase.from('vd_customer_segments').select('id, name').order('name'),
-    supabase.from('vd_customer_segment_members').select('segment_id'),
+    fetchAllRows(
+      (from, to) => supabase.from('vd_customer_segment_members').select('segment_id').range(from, to),
+      'vd_customer_segment_members',
+    ),
   ])
   if (sErr) { console.error('[customers-admin] segments fetch failed:', sErr); return [] }
-  if (mErr) console.error('[customers-admin] segment members fetch failed:', mErr)
 
   const counts = new Map<string, number>()
-  for (const m of members ?? []) counts.set(m.segment_id, (counts.get(m.segment_id) ?? 0) + 1)
+  for (const m of members) counts.set(m.segment_id, (counts.get(m.segment_id) ?? 0) + 1)
   return (segments ?? []).map(s => ({ id: s.id, name: s.name, count: counts.get(s.id) ?? 0 }))
 }
 
