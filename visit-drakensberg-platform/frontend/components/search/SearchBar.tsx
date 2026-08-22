@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { ArrowRight, Mic } from 'lucide-react'
 import { useBooking } from '@/lib/booking-context'
+import { trackEvent, AnalyticsEvent } from '@/lib/analytics'
 
 /* ------------------------------------------------------------------
    Discovery search bar — sits inside the home hero photo.
@@ -40,6 +41,7 @@ export default function SearchBar() {
     setSearch('', '', '', 2)
     const params = new URLSearchParams({ q: term, region: 'drakensberg' })
     router.push(`/search?${params.toString()}`)
+    trackEvent(AnalyticsEvent.SEARCH_PERFORMED, { query: term, source: 'hero' })
   }
 
   return (

@@ -5,6 +5,7 @@ import { notify } from './notifications'
 import { createOrdersForBooking, cancelOrdersForBooking } from './booking-orders'
 import { createOrderForBooking, cancelOrderForBooking } from './orders'
 import { createTransportRequestForBooking } from './transport-dispatch'
+import { trackEvent, AnalyticsEvent } from './analytics'
 
 export type SavedBooking = {
   id: string
@@ -28,6 +29,13 @@ export type SavedBooking = {
   total: number
   status: 'pending' | 'confirmed' | 'cancelled'
   createdAt: string
+  /** The visitor session that created this booking (§21), carried through
+   *  to payment confirmation so the server-side iKhokha webhook — which has
+   *  no browser session of its own — can still fire booking_completed
+   *  against the right session once payment actually clears. Optional:
+   *  bookings saved before this existed simply don't get attributed. */
+  analyticsAnonId?: string
+  analyticsSessionId?: string | null
 }
 
 type Row = {
@@ -171,6 +179,19 @@ export async function addBooking(
         `${newBooking.customerName} booked with you (${newBooking.guests} guest${newBooking.guests !== 1 ? 's' : ''}). Open your bookings for details.`,
         '/supplier/bookings')
     ))
+
+    // Booking funnel completion (§3/§5) only fires here, immediately, for a
+    // booking created already-confirmed (no payment step to wait on — same
+    // condition that gates the supplier notification above). A checkout
+    // booking is created 'pending' instead and isn't actually paid for yet;
+    // for that path booking_completed fires from the iKhokha webhook once
+    // payment is verified (see app/api/payments/ikhokha/webhook/route.ts) —
+    // firing it here unconditionally would count every abandoned or
+    // declined payment as a completed booking.
+    trackEvent(AnalyticsEvent.BOOKING_COMPLETED, {
+      booking_id: newBooking.id, reference: newBooking.reference,
+      region: newBooking.region, guests: newBooking.guests, total: newBooking.total,
+    })
   }
 
   return { booking: newBooking, invoiceId }

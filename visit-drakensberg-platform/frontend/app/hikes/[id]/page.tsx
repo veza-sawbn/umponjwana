@@ -5,6 +5,7 @@ import { getProperties, type Property } from '@/lib/properties'
 import { getActivities, type Activity } from '@/lib/activities'
 import { publicSupabase } from '@/lib/supabase-public'
 import HikeDetail from './HikeDetail'
+import TrackView from '@/components/analytics/TrackView'
 
 // Server shell — same pattern as app/regions/[slug]/page.tsx. Trail has no
 // seoTitle/seoDescription populated yet (GraphFields fields exist but
@@ -140,6 +141,7 @@ export default async function HikePage({ params }: { params: { id: string } }) {
     <>
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(attractionJsonLd) }} />
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbJsonLd) }} />
+      <TrackView event="trail_view" properties={{ id: trail.id, name: trail.name, region: trail.region, difficulty: trail.difficulty }} />
       <HikeDetail
         trail={trail}
         relatedProperties={relatedProperties}
