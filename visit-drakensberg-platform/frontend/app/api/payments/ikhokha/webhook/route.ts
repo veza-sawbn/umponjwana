@@ -122,7 +122,10 @@ export async function POST(req: Request) {
       // service-role client since there's no customer session here to
       // notify() through.
       if (confirmedBooking) {
-        const value = confirmedBooking.value as { customerName?: string; guests?: number } | null
+        const value = confirmedBooking.value as {
+          customerName?: string; guests?: number; userId?: string; region?: string; total?: number
+          analyticsAnonId?: string; analyticsSessionId?: string | null
+        } | null
         const guests = value?.guests ?? 1
         const rows = (confirmedBooking.supplier_ids ?? []).map((sid: string) => ({
           user_id: sid,
@@ -132,6 +135,30 @@ export async function POST(req: Request) {
           link: '/supplier/bookings',
         }))
         if (rows.length > 0) await admin.from('vd_notifications').insert(rows)
+
+        // Booking funnel completion (§3/§5) — fires here, on actual payment
+        // confirmation, not at checkout submission (which only creates a
+        // 'pending' hold; see lib/bookings.ts). No browser session exists in
+        // a webhook, so this inserts directly (service role bypasses RLS —
+        // vd_analytics_events has no client-facing insert path by design)
+        // using the anon/session ids the checkout page stamped onto the
+        // booking when it was created, so this still attributes correctly
+        // to the visitor session that started the booking. Best-effort:
+        // never lets an analytics hiccup fail the payment confirmation.
+        if (value?.analyticsAnonId) {
+          await admin.from('vd_analytics_events').insert({
+            session_id: value.analyticsSessionId ?? null,
+            anon_id: value.analyticsAnonId,
+            user_id: value.userId ?? null,
+            event_name: 'booking_completed',
+            properties: {
+              booking_id: order.booking_id, reference: confirmedBooking.reference,
+              region: value.region, guests, total: value.total,
+            },
+          }).then(({ error }) => {
+            if (error) console.error('[ikhokha webhook] booking_completed tracking failed:', error)
+          })
+        }
       }
     }
 

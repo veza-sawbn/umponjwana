@@ -11,7 +11,7 @@ import { addBooking } from '@/lib/bookings'
 import { getDepartures, bookDepartureSeats, releaseDepartureSeats } from '@/lib/departures'
 import { getSupplierEntities } from '@/lib/supplier-entities'
 import { supabase } from '@/lib/auth'
-import { trackEvent, AnalyticsEvent } from '@/lib/analytics'
+import { trackEvent, AnalyticsEvent, getAnalyticsIds } from '@/lib/analytics'
 
 function formatDate(iso: string) {
   if (!iso) return ''
@@ -127,6 +127,12 @@ export default function CheckoutPage() {
         return
       }
 
+      // Carried through to payment confirmation (§21) so the iKhokha webhook
+      // — a server route with no browser session — can still attribute the
+      // eventual booking_completed event to the session that created this
+      // booking, once payment actually clears.
+      const { anonId: analyticsAnonId, sessionId: analyticsSessionId } = await getAnalyticsIds()
+
       // Persist booking as 'pending' — holds the room/seats, but isn't
       // confirmed until iKhokha verifies a real payment (see the webhook).
       const { booking: saved, invoiceId } = await addBooking({
@@ -141,6 +147,8 @@ export default function CheckoutPage() {
         vat: tax,
         total,
         status: 'pending',
+        analyticsAnonId,
+        analyticsSessionId,
       })
 
       completedRef.current = true

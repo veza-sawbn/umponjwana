@@ -178,3 +178,16 @@ export async function trackEvent(
 export function trackPageView(pathname: string): Promise<void> {
   return trackEvent(AnalyticsEvent.PAGE_VIEW, {}, pathname)
 }
+
+/**
+ * The current anon/session ids, for code that needs to hand them to a later,
+ * server-side step it can't call trackEvent() from directly — e.g. stamping
+ * a booking with the ids that created it, so a payment webhook (no browser
+ * session) can still attribute the eventual booking_completed event to the
+ * right visitor session instead of firing it blind or not at all.
+ */
+export async function getAnalyticsIds(): Promise<{ anonId: string; sessionId: string | null }> {
+  if (typeof window === 'undefined') return { anonId: '', sessionId: null }
+  const sessionId = await ensureSession()
+  return { anonId: getAnonId(), sessionId: sessionId || null }
+}

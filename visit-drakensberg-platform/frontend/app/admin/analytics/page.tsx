@@ -171,8 +171,15 @@ export default function AdminAnalyticsPage() {
     const m = new Map<string, { label: string; kind: string; views: number }>()
     for (const e of events) {
       if (!CATALOG_VIEW_EVENTS.has(e.event_name)) continue
-      const name = (e.properties?.name as string) || (e.properties?.id as string) || 'Unnamed'
-      const key = `${e.event_name}:${name}`
+      // Keyed by entity id, not display name — two listings can share a
+      // name, and renaming one must not split its view history into a
+      // second row. Every catalog view event carries a stable properties.id
+      // (see components/analytics/TrackView.tsx call sites); id-less rows
+      // (only possible from events fired before that existed) fall back to
+      // grouping by name so they don't silently vanish.
+      const id = (e.properties?.id as string) || null
+      const name = (e.properties?.name as string) || id || 'Unnamed'
+      const key = `${e.event_name}:${id ?? name}`
       const entry = m.get(key) ?? { label: name, kind: catalogEventLabel(e.event_name), views: 0 }
       entry.views += 1
       m.set(key, entry)
@@ -196,15 +203,30 @@ export default function AdminAnalyticsPage() {
   // Funnel stages counted by distinct session, not raw event count — a
   // visitor who views a trail three times still only counts once at that
   // stage, matching the drop-off table shape in the handoff (§5).
+  //
+  // Each stage is intersected with the one before it, not counted
+  // independently: a session can reach a later stage (e.g. checkout,
+  // restored from a saved cart) without an event for an earlier one landing
+  // in the *same* session, and vd_sessions/vd_analytics_events are windowed
+  // by different timestamp columns (started_at vs occurred_at), so their
+  // raw session-id sets aren't guaranteed nested near the window boundary.
+  // Without the intersection a downstream stage could exceed its
+  // predecessor and "% of previous" would stop meaning drop-off.
   const funnel = useMemo(() => {
     const sessionsWithCatalogView = new Set(events.filter(e => CATALOG_VIEW_EVENTS.has(e.event_name) && e.session_id).map(e => e.session_id))
     const sessionsStarted = new Set(events.filter(e => e.event_name === 'booking_started' && e.session_id).map(e => e.session_id))
     const sessionsCompleted = new Set(events.filter(e => e.event_name === 'booking_completed' && e.session_id).map(e => e.session_id))
+
+    const visitors = new Set(sessions.map(s => s.id))
+    const viewed = new Set([...visitors].filter(id => sessionsWithCatalogView.has(id)))
+    const started = new Set([...viewed].filter(id => sessionsStarted.has(id)))
+    const completed = new Set([...started].filter(id => sessionsCompleted.has(id)))
+
     const stages = [
-      { label: 'Website Visitors', count: sessions.length },
-      { label: 'Product Viewed', count: sessionsWithCatalogView.size },
-      { label: 'Booking Started', count: sessionsStarted.size },
-      { label: 'Booking Completed', count: sessionsCompleted.size },
+      { label: 'Website Visitors', count: visitors.size },
+      { label: 'Product Viewed', count: viewed.size },
+      { label: 'Booking Started', count: started.size },
+      { label: 'Booking Completed', count: completed.size },
     ]
     const top = stages[0].count || 1
     return stages.map((s, i) => ({
