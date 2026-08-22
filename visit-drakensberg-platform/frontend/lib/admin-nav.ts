@@ -36,6 +36,7 @@ export const ADMIN_NAV: AdminNavItem[] = [
   { href: '/admin/operations/managed-suppliers', label: 'Managed Suppliers', icon: Briefcase },
   { href: '/admin/transport', label: 'Transport', icon: Bus },
   { href: '/admin/messages', label: 'Communications', icon: MessageSquare },
+  { href: '/admin/campaigns', label: 'Email Campaigns', icon: Send },
   { href: '/admin/marketplace', label: 'Marketplace', icon: Store },
   { href: '/admin/packages', label: 'Package Builder', icon: Package },
   { href: '/admin/blog', label: 'Blog & Content', icon: FileText },
@@ -65,7 +66,7 @@ function group(title: string, hrefs: string[]) {
 export const ADMIN_NAV_GROUPS = [
   group('Daily Work', [
     '/admin', '/admin/customers', '/admin/invoices', '/admin/quotes', '/admin/orders',
-    '/admin/bookings', '/admin/messages', '/admin/operations', '/admin/transport',
+    '/admin/bookings', '/admin/messages', '/admin/campaigns', '/admin/operations', '/admin/transport',
     '/admin/operations/managed-suppliers',
   ]),
   group('Money', ['/admin/finance', '/admin/settlements']),
