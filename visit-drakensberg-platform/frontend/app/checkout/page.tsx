@@ -11,6 +11,7 @@ import { addBooking } from '@/lib/bookings'
 import { getDepartures, bookDepartureSeats, releaseDepartureSeats } from '@/lib/departures'
 import { getSupplierEntities } from '@/lib/supplier-entities'
 import { supabase } from '@/lib/auth'
+import { trackEvent, AnalyticsEvent } from '@/lib/analytics'
 
 function formatDate(iso: string) {
   if (!iso) return ''
@@ -41,6 +42,20 @@ export default function CheckoutPage() {
   useEffect(() => {
     if (booking.hydrated && isEmpty && !completedRef.current) router.replace('/trip')
   }, [booking.hydrated, isEmpty, router])
+
+  // Booking funnel start (§3/§5): the visitor has a real cart and reached
+  // checkout. Fires once per mount, only once the cart has hydrated so it
+  // never fires on the transient "empty" first render.
+  const startedRef = useRef(false)
+  useEffect(() => {
+    if (!booking.hydrated || isEmpty || startedRef.current) return
+    startedRef.current = true
+    trackEvent(AnalyticsEvent.BOOKING_STARTED, {
+      region: booking.region, guests: booking.guests, total,
+      has_stay: !!booking.stay, addon_count: booking.addons.length, shuttle_count: booking.shuttles.length,
+    })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [booking.hydrated, isEmpty])
 
   const nights = booking.nights
   const stayTotal = booking.stay ? booking.stay.price_per_night * nights : 0

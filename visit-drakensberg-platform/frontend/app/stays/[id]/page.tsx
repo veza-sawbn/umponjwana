@@ -4,6 +4,7 @@ import { getPropertyById, type Property } from '@/lib/properties'
 import { getRoomsByProperty, type Room } from '@/lib/rooms'
 import { publicSupabase } from '@/lib/supabase-public'
 import StayDetail from './StayDetail'
+import TrackView from '@/components/analytics/TrackView'
 
 // Server shell — same pattern as the other converted detail routes. Property
 // has no seoTitle/seoDescription populated yet, so title/description are
@@ -105,6 +106,7 @@ export default async function StayPage({ params }: { params: { id: string } }) {
     <>
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(lodgingJsonLd) }} />
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbJsonLd) }} />
+      <TrackView event="accommodation_view" properties={{ id: property.id, name: property.name, region: property.region }} />
       <StayDetail property={property} rooms={rooms} id={params.id} />
     </>
   )

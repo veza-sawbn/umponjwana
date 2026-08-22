@@ -5,6 +5,7 @@ import { notify } from './notifications'
 import { createOrdersForBooking, cancelOrdersForBooking } from './booking-orders'
 import { createOrderForBooking, cancelOrderForBooking } from './orders'
 import { createTransportRequestForBooking } from './transport-dispatch'
+import { trackEvent, AnalyticsEvent } from './analytics'
 
 export type SavedBooking = {
   id: string
@@ -172,6 +173,15 @@ export async function addBooking(
         '/supplier/bookings')
     ))
   }
+
+  // Booking funnel completion (§3/§5) — fired here rather than at each
+  // checkout call site so every path that creates a real booking through
+  // this function is counted exactly once, with no risk of a call site
+  // forgetting to track it.
+  trackEvent(AnalyticsEvent.BOOKING_COMPLETED, {
+    booking_id: newBooking.id, reference: newBooking.reference,
+    region: newBooking.region, guests: newBooking.guests, total: newBooking.total,
+  })
 
   return { booking: newBooking, invoiceId }
 }

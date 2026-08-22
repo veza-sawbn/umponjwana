@@ -14,6 +14,7 @@ import { getActivities, type Activity } from '@/lib/activities'
 import { getTrails, trailStartPoint, type Trail } from '@/lib/trails'
 import { getSupplierEntities } from '@/lib/supplier-entities'
 import { StayDistance } from '@/lib/stay-distance'
+import { trackEvent, AnalyticsEvent } from '@/lib/analytics'
 
 type LiveStay = {
   id: string
@@ -217,6 +218,10 @@ function SearchResults() {
     if (checkOut) p.set('check_out', checkOut)
     p.set('guests', String(guests))
     router.push(`/search?${p.toString()}`)
+    trackEvent(AnalyticsEvent.SEARCH_PERFORMED, {
+      query: query.trim() || null, region: region || null,
+      check_in: checkIn || null, check_out: checkOut || null, guests,
+    })
   }
 
   // Once a stay is selected, every suggestion below is scoped to ITS region
@@ -329,7 +334,10 @@ function SearchResults() {
           {showFilters && (
             <div className="mt-3 pt-3 border-t border-gray-100 flex flex-wrap gap-4 items-center">
               <label className="flex items-center gap-2 font-sans text-sm text-gray-700 cursor-pointer">
-                <input type="checkbox" checked={availableOnly} onChange={e => setAvailableOnly(e.target.checked)} className="accent-[#2d6a4f]" />
+                <input type="checkbox" checked={availableOnly} onChange={e => {
+                  setAvailableOnly(e.target.checked)
+                  trackEvent(AnalyticsEvent.FILTER_USED, { filter: 'available_only', value: e.target.checked })
+                }} className="accent-[#2d6a4f]" />
                 Available stays only
               </label>
             </div>

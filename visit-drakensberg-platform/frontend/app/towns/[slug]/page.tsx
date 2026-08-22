@@ -9,6 +9,7 @@ import { publicSupabase } from '@/lib/supabase-public'
 import { getNearbyTrails, getNearbyStays } from '@/lib/modules'
 import RelatedTrailsModule from '@/components/modules/RelatedTrailsModule'
 import NearbyStaysModule from '@/components/modules/NearbyStaysModule'
+import TrackView from '@/components/analytics/TrackView'
 
 // New route — same rationale as app/nature-reserves/[slug]/page.tsx: Town
 // already had slug + seoTitle + seoDescription with admin CRUD, but no
@@ -101,6 +102,7 @@ export default async function TownPage({ params }: { params: { slug: string } })
     <main className="bg-mist min-h-screen pt-16">
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(placeJsonLd) }} />
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbJsonLd) }} />
+      <TrackView event="destination_view" properties={{ id: town.id, name: town.name, kind: 'town', region: regionName }} />
 
       <div className="px-6 lg:px-12 pt-8">
         <nav className="flex items-center gap-2 font-sans text-[11px] text-forest/40 max-w-[1440px] mx-auto">
