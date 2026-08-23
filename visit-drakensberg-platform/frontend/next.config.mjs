@@ -13,6 +13,19 @@ const nextConfig = {
     NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL,
     NEXT_PUBLIC_SITE_URL: process.env.NEXT_PUBLIC_SITE_URL,
   },
+  async redirects() {
+    return [
+      {
+        // The listing journey started out stays-only and lived at
+        // /list-your-property. It now covers activities, tours, transport and
+        // experiences, so the name was wrong — but that URL has been shared
+        // and has already taken a real application, so it keeps working.
+        source: '/list-your-property',
+        destination: '/list-with-us',
+        permanent: true,
+      },
+    ]
+  },
 }
 
 export default nextConfig

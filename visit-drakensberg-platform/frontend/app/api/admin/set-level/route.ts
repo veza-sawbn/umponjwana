@@ -34,9 +34,14 @@ export async function POST(req: Request) {
   const { error: staffError } = await supabase.rpc('admin_set_staff_role', { p_user: body.userId, p_staff_role: staffRole })
   if (staffError) return NextResponse.json({ error: staffError.message || 'Could not update staff role' }, { status: 400 })
 
+  // app_metadata, not user_metadata: the user can rewrite their own
+  // user_metadata via auth.updateUser, so a level stored there would be a
+  // level they could grant themselves. app_metadata is service-role only.
+  // Any role/staff_role left in user_metadata by the old code is now inert —
+  // neither the signup trigger nor the middleware reads it any more.
   const { data: existing } = await supabaseAdmin().auth.admin.getUserById(body.userId)
   const { error: metaError } = await supabaseAdmin().auth.admin.updateUserById(body.userId, {
-    user_metadata: { ...existing?.user?.user_metadata, role, staff_role: staffRole },
+    app_metadata: { ...existing?.user?.app_metadata, role, staff_role: staffRole },
   })
   if (metaError) {
     // profiles/RLS already reflect the change — this only means the user's

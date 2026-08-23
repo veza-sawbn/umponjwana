@@ -34,8 +34,12 @@ export async function POST(req: Request) {
   const staffRole = body.level === 'finance' || body.level === 'operations' ? body.level : null
   const origin = getSiteOrigin(req)
 
+  // The invite itself carries only the name. Privileged fields never travel in
+  // `data` (user_metadata) — the signup trigger ignores a role from there,
+  // because user_metadata is writable by anyone holding the public anon key.
+  // See 20260809_signup_role_hardening.sql.
   const { data, error } = await supabaseAdmin().auth.admin.inviteUserByEmail(email, {
-    data: { full_name: body.fullName || '', role, staff_role: staffRole },
+    data: { full_name: body.fullName || '' },
     redirectTo: `${origin}/admin`,
   })
   if (error) {
@@ -43,5 +47,34 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: error.message || 'Could not send invite' }, { status: 500 })
   }
 
-  return NextResponse.json({ userId: data.user?.id })
+  const userId = data.user?.id
+  if (!userId) return NextResponse.json({ error: 'Invite created no user' }, { status: 500 })
+
+  // inviteUserByEmail forwards only { email, data } to GoTrue, so app_metadata
+  // cannot ride along with it — and the signup trigger has already run by the
+  // time this returns, landing the invitee as a plain visitor. Grant the level
+  // in the two places that matter: app_metadata (what the JWT and middleware
+  // read, service-role only) and profiles (what RLS reads, via the admin RPCs
+  // the caller's own session is entitled to call).
+  const { error: metaError } = await supabaseAdmin().auth.admin.updateUserById(userId, {
+    app_metadata: { role, staff_role: staffRole },
+  })
+  if (metaError) {
+    console.error('[invite] app_metadata grant failed:', metaError)
+    return NextResponse.json({ error: 'Invited, but the access level could not be granted.' }, { status: 500 })
+  }
+
+  const { error: roleError } = await supabase.rpc('admin_set_role', { p_user: userId, p_role: role })
+  if (roleError) {
+    console.error('[invite] role grant failed:', roleError)
+    return NextResponse.json({ error: 'Invited, but the access level could not be granted.' }, { status: 500 })
+  }
+
+  const { error: staffError } = await supabase.rpc('admin_set_staff_role', { p_user: userId, p_staff_role: staffRole })
+  if (staffError) {
+    console.error('[invite] staff role grant failed:', staffError)
+    return NextResponse.json({ error: 'Invited, but the access level could not be granted.' }, { status: 500 })
+  }
+
+  return NextResponse.json({ userId })
 }

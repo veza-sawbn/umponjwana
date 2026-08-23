@@ -1,17 +1,209 @@
 import { supabase } from './auth'
 
-// Public "List your property" applications (see
+// Public "list with us" applications (see
 // supabase/migrations/20260807_listing_applications.sql).
 //
 // An application is a lead, not a listing. Anyone — signed in or not — may
 // lodge one; nobody but an admin can read one back. Approving an application
 // is a human step that ends with a real supplier account and a vd_entities
-// property row, so nothing written here can reach the public catalog on its
-// own.
+// row, so nothing written here can reach the public catalog on its own.
+//
+// The journey covers every supplier type the platform runs, not just stays:
+// an applicant says what they operate, and answers a short block per type.
+// Deliberately short — the supplier portal already has a full wizard for each
+// type, so this only has to carry what a reviewer needs to say yes or no.
+// What ends up in profiles.supplier_type is the comma-joined list of the
+// types chosen here (see lib/supplier-context.tsx, which parses it back).
 
 export type ApplicationActivity = {
   name: string
-  difficulty: 'Easy' | 'Moderate' | 'Strenuous'
+  category: string
+  difficulty: string
+  durationHours: string
+  maxGroup: string
+  minAge: string
+  pricePerPerson: string
+  included: string[]
+  description: string
+}
+
+export function emptyActivity(): ApplicationActivity {
+  return {
+    name: '', category: '', difficulty: 'Moderate',
+    durationHours: '', maxGroup: '', minAge: '', pricePerPerson: '',
+    included: [], description: '',
+  }
+}
+
+/* ── Supplier types ──────────────────────────────────────────────────────── */
+
+// Mirrors SupplierType in lib/supplier-config.ts. Kept as plain strings here
+// because an application is data, not a live supplier — but the values must
+// match exactly, since approval joins them into profiles.supplier_type.
+export const APPLICANT_TYPES = [
+  {
+    id: 'Accommodation',
+    label: 'Somewhere to stay',
+    blurb: 'Lodge, guesthouse, hotel, cottage or campsite',
+  },
+  {
+    id: 'Activity',
+    label: 'Activities',
+    blurb: 'Abseiling, zip-line, horseback, guided day walks',
+  },
+  {
+    id: 'Guided Tours',
+    label: 'Guided tours',
+    blurb: 'Multi-day hikes, summit attempts, cultural tours',
+  },
+  {
+    id: 'Shuttle',
+    label: 'Transport',
+    blurb: 'Airport runs, trailhead drops, 4×4 transfers',
+  },
+  {
+    id: 'Experience',
+    label: 'Experiences',
+    blurb: 'Photography workshops, stargazing, wellness retreats',
+  },
+] as const
+
+export type ApplicantTypeId = (typeof APPLICANT_TYPES)[number]['id']
+
+/* ── Per-type detail. Enough for a reviewer to decide; the portal wizard
+      collects the rest once the account exists. ─────────────────────────── */
+
+export type StayDetails = {
+  propertyName: string
+  propertyType: string
+  elevation: string
+  amenities: string[]
+  roomCount: string
+}
+
+export type TourDetails = {
+  tourStyle: string
+  typicalDurationDays: string
+  guideCount: string
+  certifications: string
+}
+
+export type ShuttleDetails = {
+  fleetSize: string
+  vehicleTypes: string[]
+  routesServed: string
+  operatingLicence: string
+}
+
+export type ExperienceDetails = {
+  experienceStyle: string
+  typicalGroupSize: string
+  durationHours: string
+  setting: string
+}
+
+export const STAY_ROOM_BANDS = ['1–5', '6–15', '16–40', '40+']
+export const TOUR_STYLES = ['Day hikes', 'Multi-day trekking', 'Summit attempts', 'Cultural & heritage', 'Wildlife & birding']
+export const VEHICLE_TYPES = ['Sedan', 'Minibus (≤14)', 'Coach (15+)', '4×4', 'Trailer / luggage']
+export const EXPERIENCE_SETTINGS = ['Outdoors', 'Indoors', 'Both']
+
+export function emptyStay(): StayDetails {
+  return { propertyName: '', propertyType: '', elevation: '', amenities: [], roomCount: '' }
+}
+export function emptyTour(): TourDetails {
+  return { tourStyle: '', typicalDurationDays: '', guideCount: '', certifications: '' }
+}
+export function emptyShuttle(): ShuttleDetails {
+  return { fleetSize: '', vehicleTypes: [], routesServed: '', operatingLicence: '' }
+}
+export function emptyExperience(): ExperienceDetails {
+  return { experienceStyle: '', typicalGroupSize: '', durationHours: '', setting: '' }
+}
+
+/**
+ * Commission ladder offered on the application.
+ *
+ * `rate` is the TOTAL platform fee on a booking, not a surcharge on top of a
+ * base rate — Standard's 12% is the whole of it (10% booking + 2% payment
+ * handling), and it mirrors the seeded `default_commission_rate` in
+ * vd_finance_settings. Keep the two in sync: change one and the other has to
+ * move with it, or an applicant is quoted a rate the ledger will not use.
+ *
+ * Every tier above the floor buys *eligibility* for placement and promotion —
+ * never a guaranteed ranking or booking. Say it that way in any copy that
+ * describes them.
+ *
+ * What an applicant picks here is a preference recorded on the application.
+ * It binds nothing on its own: commission is enforced server-side from
+ * vd_supplier_terms, which only an admin can write, and that happens when an
+ * application is approved.
+ */
+export type CommissionTier = {
+  id: string
+  name: string
+  rate: number          // whole percent
+  elevation: string
+  tagline: string
+  benefits: string[]
+  isFloor?: boolean
+}
+
+export const COMMISSION_TIERS: CommissionTier[] = [
+  {
+    id: 'standard', name: 'Standard', rate: 12, elevation: '1 200 m', tagline: 'Base camp',
+    isFloor: true,
+    benefits: [
+      'Standard listing and normal search visibility',
+      'Includes 10% booking commission + 2% payment handling',
+    ],
+  },
+  {
+    id: 'enhanced', name: 'Enhanced', rate: 15, elevation: '1 800 m', tagline: 'Tree line',
+    benefits: [
+      'Improved placement in relevant search results',
+      'Eligible for selected campaigns and newsletters',
+      'Increased promotional exposure',
+    ],
+  },
+  {
+    id: 'priority', name: 'Priority', rate: 18, elevation: '2 400 m', tagline: 'Escarpment',
+    benefits: [
+      'Priority ranking within category and region',
+      'Inclusion in featured accommodation sections',
+      'Greater access to promotional campaigns',
+    ],
+  },
+  {
+    id: 'premium', name: 'Premium', rate: 22, elevation: '2 900 m', tagline: 'High plateau',
+    benefits: [
+      'Homepage features and seasonal campaigns',
+      'Curated package inclusion',
+      'Dedicated promotional opportunities',
+    ],
+  },
+  {
+    id: 'elite', name: 'Elite', rate: 26, elevation: '3 200 m', tagline: 'Alpine zone',
+    benefits: [
+      'Top-of-category placement',
+      'Cross-platform promotion (social, newsletter takeovers)',
+      'Priority tie-break against lower tiers',
+    ],
+  },
+  {
+    id: 'signature', name: 'Signature', rate: 30, elevation: '3 482 m', tagline: 'Summit',
+    benefits: [
+      'First look at new marketing initiatives',
+      'Dedicated account support',
+      'Maximum promotional allocation',
+    ],
+  },
+]
+
+export const COMMISSION_MIN_RATE = COMMISSION_TIERS[0].rate
+export const COMMISSION_MAX_RATE = COMMISSION_TIERS[COMMISSION_TIERS.length - 1].rate
+
+export function tierById(id: string): CommissionTier {
+  return COMMISSION_TIERS.find(t => t.id === id) ?? COMMISSION_TIERS[0]
 }
 
 export type ListingApplicationStatus = 'new' | 'in_review' | 'approved' | 'declined'
@@ -26,17 +218,30 @@ export type ListingApplication = {
   contactPhone: string
   businessName: string
   contactRole: string
-  // What they are listing
-  propertyName: string
-  propertyType: string
+  // What they operate — one or more of APPLICANT_TYPES. Joined with commas
+  // into profiles.supplier_type on approval.
+  supplierTypes: string[]
+  // Shared across every type
+  tradingName: string
   region: string
-  elevation: string
+  baseTown: string
   description: string
-  amenities: string[]
   photos: string[]
-  // Activities they run themselves
+  // Per-type blocks. Each is present in the record whatever the applicant
+  // picked — the ones for unselected types simply stay empty, which keeps the
+  // shape stable for anything reading an application back.
+  stay: StayDetails
+  tour: TourDetails
+  shuttle: ShuttleDetails
+  experience: ExperienceDetails
+  // Activities: the Activity type's own list, and also what a stay or tour
+  // operator adds when they run guided activities alongside the main offering.
   offersActivities: boolean
   activities: ApplicationActivity[]
+  // Commercial terms the applicant asked for (see COMMISSION_TIERS — a
+  // preference, not a binding rate)
+  commissionTier: string
+  commissionAcknowledged: boolean
   createdAt: string
 }
 
@@ -51,8 +256,6 @@ export const APPLICATION_STATUS_LABELS: Record<ListingApplicationStatus, string>
   approved: 'Approved',
   declined: 'Declined',
 }
-
-export const ACTIVITY_DIFFICULTIES: ApplicationActivity['difficulty'][] = ['Easy', 'Moderate', 'Strenuous']
 
 const TABLE = 'vd_listing_applications'
 
@@ -84,15 +287,30 @@ export async function submitListingApplication(draft: ListingApplicationDraft): 
     createdAt: new Date().toISOString(),
   }
 
-  const { error } = await supabase.from(TABLE).insert({
+  const row = {
     id: application.id,
     reference: application.reference,
     status: application.status,
-    property_name: application.propertyName,
+    // The mirrored name is whatever the applicant calls the thing they are
+    // listing: a stay has a property name, everyone else is known by their
+    // trading name.
+    property_name: application.stay.propertyName || application.tradingName,
     contact_email: application.contactEmail,
     region: application.region,
     value: application,
-  })
+  }
+
+  // commission_tier is a mirror of value->>'commissionTier', added by a later
+  // migration than the table itself. Deploys and migrations do not land in
+  // lockstep, so a build carrying the tier can reach a database that has not
+  // run 20260808 yet — and this form is live with real applicants. Mirror it
+  // when the column is there, and fall back to the JSON-only row when it is
+  // not, rather than losing the application over a column that only helps the
+  // review queue sort.
+  let { error } = await supabase.from(TABLE).insert({ ...row, commission_tier: application.commissionTier })
+  if (error && isMissingColumn(error.message, 'commission_tier')) {
+    ({ error } = await supabase.from(TABLE).insert(row))
+  }
 
   if (error) {
     const message = String(error.message || '')
@@ -105,6 +323,12 @@ export async function submitListingApplication(draft: ListingApplicationDraft): 
   }
 
   return application
+}
+
+/** PostgREST reports an unknown column either from its schema cache or straight from Postgres. */
+function isMissingColumn(message: string | undefined, column: string): boolean {
+  const m = String(message || '')
+  return m.includes(column) && /could not find|does not exist|schema cache/i.test(m)
 }
 
 export const PHOTO_MAX_BYTES = 8 * 1024 * 1024

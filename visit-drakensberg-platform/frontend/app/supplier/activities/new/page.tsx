@@ -4,16 +4,13 @@ import { useRouter } from 'next/navigation'
 import { ChevronLeft, ChevronRight, Plus, Trash2 } from 'lucide-react'
 import { supabase } from '@/lib/auth'
 import { effectiveSupplierId } from '@/lib/effective-supplier'
-import { addActivity, ACTIVITY_CATEGORIES } from '@/lib/activities'
+import { addActivity, ACTIVITY_CATEGORIES, ACTIVITY_DIFFICULTIES, ACTIVITY_INCLUSIONS } from '@/lib/activities'
 import { getRegionNames } from '@/lib/regions'
 import { SEASONS, SEASON_META, SEASON_TOPICS, SEASON_TOPIC_META, type Season, type SeasonTopic } from '@/lib/seasons'
 import { GoogleAddressField } from '@/components/maps/GoogleAddressField'
 import { supplierMediaSource } from '@/lib/supplier-media'
 import { MediaGalleryPicker } from '@/components/media/MediaPicker'
 
-const CATEGORIES: readonly string[] = ACTIVITY_CATEGORIES
-const DIFFICULTY = ['Easy', 'Moderate', 'Challenging', 'Extreme']
-const INCLUDED = ['Helmet & Harness', 'Guide', 'Safety Briefing', 'Refreshments', 'Transport to Site', 'Photos/Video', 'Equipment']
 const STEPS = ['Activity Details', 'Logistics', 'Inclusions & Safety', 'Pricing', 'Review']
 
 function ImageList({ images, onChange }: { images: string[]; onChange: (v: string[]) => void }) {
@@ -122,7 +119,7 @@ export default function NewActivityPage() {
             <F label="Category" required>
               <select value={form.category} onChange={e => set('category', e.target.value)} className={inp}>
                 <option value="">Select…</option>
-                {CATEGORIES.map(c => <option key={c}>{c}</option>)}
+                {ACTIVITY_CATEGORIES.map(c => <option key={c}>{c}</option>)}
               </select>
             </F>
             <F label="Region" required>
@@ -133,7 +130,7 @@ export default function NewActivityPage() {
             </F>
             <F label="Difficulty">
               <div className="flex gap-2 flex-wrap">
-                {DIFFICULTY.map(d => (
+                {ACTIVITY_DIFFICULTIES.map(d => (
                   <button key={d} onClick={() => set('difficulty', d)} className={`font-sans text-xs px-3 py-1.5 rounded-full border transition-colors ${form.difficulty === d ? 'bg-[#C9A96E] text-white border-[#C9A96E]' : 'border-black/15 text-black/60 hover:border-[#C9A96E]/40'}`}>{d}</button>
                 ))}
               </div>
@@ -182,7 +179,7 @@ export default function NewActivityPage() {
             <div>
               <p className="font-sans text-sm font-medium text-black/70 mb-3">What&apos;s Included</p>
               <div className="flex flex-wrap gap-2">
-                {INCLUDED.map(item => (
+                {ACTIVITY_INCLUSIONS.map(item => (
                   <button key={item} onClick={() => toggleIncluded(item)} className={`font-sans text-xs px-3 py-1.5 rounded-full border transition-colors ${form.included.includes(item) ? 'bg-[#C9A96E] text-white border-[#C9A96E]' : 'border-black/15 text-black/60 hover:border-[#C9A96E]/40'}`}>{item}</button>
                 ))}
               </div>

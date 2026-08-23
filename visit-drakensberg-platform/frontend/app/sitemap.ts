@@ -37,7 +37,7 @@ const STATIC_ROUTES = [
   { path: '/plan', priority: 0.6 },
   { path: '/mydrakensberg', priority: 0.6 },
   { path: '/about', priority: 0.4 },
-  { path: '/list-your-property', priority: 0.4 },
+  { path: '/list-with-us', priority: 0.4 },
   { path: '/privacy', priority: 0.2 },
   { path: '/terms', priority: 0.2 },
 ]

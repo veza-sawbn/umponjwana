@@ -2,16 +2,13 @@
 import { useState, useEffect } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { ChevronLeft, Plus, Trash2 } from 'lucide-react'
-import { getActivityById, updateActivity, ACTIVITY_CATEGORIES } from '@/lib/activities'
+import { getActivityById, updateActivity, ACTIVITY_CATEGORIES, ACTIVITY_DIFFICULTIES, ACTIVITY_INCLUSIONS } from '@/lib/activities'
 import { getRegionNames } from '@/lib/regions'
 import { SEASONS, SEASON_META, SEASON_TOPICS, SEASON_TOPIC_META, type Season, type SeasonTopic } from '@/lib/seasons'
 import { GoogleAddressField } from '@/components/maps/GoogleAddressField'
 import { supplierMediaSource } from '@/lib/supplier-media'
 import { MediaGalleryPicker } from '@/components/media/MediaPicker'
 
-const CATEGORIES: readonly string[] = ACTIVITY_CATEGORIES
-const DIFFICULTIES = ['Easy', 'Moderate', 'Challenging', 'Extreme']
-const INCLUDED_OPTIONS = ['Helmet & Harness', 'Guide', 'Safety Briefing', 'Refreshments', 'Transport to Site', 'Photos/Video', 'Equipment']
 const HOURS = Array.from({ length: 13 }, (_, i) => i)
 const MINUTES = [0, 15, 30, 45]
 
@@ -118,7 +115,7 @@ export default function EditActivityPage() {
 
         <F label="Category">
           <div className="flex flex-wrap gap-2">
-            {CATEGORIES.map(c => <button key={c} onClick={() => set('category', c)} className={chip(form.category === c)}>{c}</button>)}
+            {ACTIVITY_CATEGORIES.map(c => <button key={c} onClick={() => set('category', c)} className={chip(form.category === c)}>{c}</button>)}
           </div>
         </F>
 
@@ -131,7 +128,7 @@ export default function EditActivityPage() {
 
         <F label="Difficulty">
           <div className="flex gap-2 flex-wrap">
-            {DIFFICULTIES.map(d => <button key={d} onClick={() => set('difficulty', d)} className={chip(form.difficulty === d)}>{d}</button>)}
+            {ACTIVITY_DIFFICULTIES.map(d => <button key={d} onClick={() => set('difficulty', d)} className={chip(form.difficulty === d)}>{d}</button>)}
           </div>
         </F>
 
@@ -178,7 +175,7 @@ export default function EditActivityPage() {
 
         <F label="What's Included">
           <div className="flex flex-wrap gap-2">
-            {INCLUDED_OPTIONS.map(item => <button key={item} onClick={() => toggle(item)} className={chip(form.included.includes(item))}>{item}</button>)}
+            {ACTIVITY_INCLUSIONS.map(item => <button key={item} onClick={() => toggle(item)} className={chip(form.included.includes(item))}>{item}</button>)}
           </div>
         </F>
 

@@ -20,6 +20,16 @@ export const ACTIVITY_CATEGORIES = [
 
 export type ActivityCategory = typeof ACTIVITY_CATEGORIES[number]
 
+// The other two halves of that shared vocabulary, on the same footing as the
+// categories above: the supplier wizard, the activity edit form and the public
+// listing application all read these rather than keeping their own copies.
+export const ACTIVITY_DIFFICULTIES = ['Easy', 'Moderate', 'Challenging', 'Extreme']
+
+export const ACTIVITY_INCLUSIONS = [
+  'Helmet & Harness', 'Guide', 'Safety Briefing', 'Refreshments',
+  'Transport to Site', 'Photos/Video', 'Equipment',
+]
+
 export type Activity = {
   id: string
   supplierId: string
