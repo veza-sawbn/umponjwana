@@ -135,13 +135,34 @@ begin
     select
       nullif(trim(r->>'name'), '')  as name,
       nullif(trim(r->>'email'), '') as email,
-      nullif(trim(r->>'phone'), '') as phone
-    from jsonb_array_elements(coalesce(p_rows, '[]'::jsonb)) r
+      nullif(trim(r->>'phone'), '') as phone,
+      ord
+    from jsonb_array_elements(coalesce(p_rows, '[]'::jsonb)) with ordinality as t(r, ord)
     where nullif(trim(r->>'name'), '') is not null or nullif(trim(r->>'email'), '') is not null
+  ),
+  -- A single INSERT ... ON CONFLICT DO UPDATE can't affect the same target
+  -- row twice — a CSV with the same email appearing more than once (any
+  -- case) would otherwise abort the whole import with "ON CONFLICT DO
+  -- UPDATE command cannot affect row a second time". Rows with no email
+  -- have no conflict target at all, so they're never in contention and are
+  -- all kept as-is; only same-email rows are deduplicated, keeping
+  -- whichever occurs last in the file (later rows read as corrections).
+  deduped as (
+    select name, email, phone from (
+      select name, email, phone,
+             row_number() over (partition by lower(email) order by ord desc) as rn
+      from rows
+      where email is not null
+      union all
+      select name, email, phone, 1 as rn
+      from rows
+      where email is null
+    ) x
+    where rn = 1
   )
   insert into vd_supplier_contacts (supplier_id, customer_user_id, name, email, phone, source, updated_at)
   select p_supplier_id, null, name, email, phone, 'imported', now()
-  from rows
+  from deduped
   on conflict (supplier_id, lower(email)) where source = 'imported' and email is not null do update set
     name = excluded.name,
     phone = excluded.phone,
