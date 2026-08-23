@@ -63,6 +63,34 @@ export async function POST(req: Request) {
         .neq('status', 'paid') // never overwrite an already-settled invoice
     }
 
+    // A declined attempt used to be silent beyond the ?payment=failed redirect
+    // param, which disappears after the first page load — neither the
+    // customer nor staff heard about it again. Tell both now.
+    const { data: declinedOrder } = await admin
+      .from('vd_orders').select('order_number, customer_name').eq('id', link.order_id).maybeSingle()
+    const invoiceUrl = `/invoices/${link.invoice_id ?? link.order_id}`
+
+    if (link.user_id) {
+      await admin.from('vd_notifications').insert({
+        user_id: link.user_id,
+        type: 'payment',
+        title: `Payment declined — ${declinedOrder?.order_number ?? link.order_id}`,
+        body: 'Your card payment was declined and no charge was made. You can try again from your invoice.',
+        link: invoiceUrl,
+      })
+    }
+    const { data: financeStaff } = await admin
+      .from('profiles').select('id').or('role.eq.admin,staff_role.eq.finance')
+    if (financeStaff && financeStaff.length > 0) {
+      await admin.from('vd_notifications').insert(financeStaff.map(f => ({
+        user_id: (f as { id: string }).id,
+        type: 'payment',
+        title: `Payment declined — ${declinedOrder?.order_number ?? link.order_id}`,
+        body: `${declinedOrder?.customer_name || 'A customer'}'s online payment attempt of ${link.amount} ${link.currency} was declined.`,
+        link: '/admin/orders',
+      })))
+    }
+
     return NextResponse.json({ ok: true })
   }
 

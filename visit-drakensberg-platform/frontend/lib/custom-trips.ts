@@ -206,9 +206,16 @@ export async function rejectTripRequest(request: TripRequest, reason: string): P
   return updated
 }
 
-/** Customer accepts the quote → payment step. */
+/** Customer accepts the quote → payment step; operator is told right away. */
 export async function acceptQuote(request: TripRequest): Promise<TripRequest> {
-  return saveTransition(request, 'awaiting_payment', {}, 'Quote accepted by customer')
+  const updated = await saveTransition(request, 'awaiting_payment', {}, 'Quote accepted by customer')
+  if (request.operatorId) {
+    await notify(request.operatorId, 'approval',
+      `Quote accepted — ${request.reference}`,
+      `${request.customerName} accepted the quote for their ${request.trailName} trip (${request.startDate} → ${request.endDate}). Awaiting payment.`,
+      '/supplier/requests')
+  }
+  return updated
 }
 
 /** Customer pays → booking confirmed; operator is notified. */

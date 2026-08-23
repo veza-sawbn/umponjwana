@@ -540,3 +540,61 @@ Full event instrumentation across the ~90 route pages (`trail_view`,
 CRM timeline/segmentation UI, Wix migration tooling, email campaign tables,
 and the automation workflow engine — see the architecture doc's §3 "Next
 steps" for the intended order (matches the brief's own §23 phasing).
+
+## UPDATE 7 — Journey notifications + "next step" console, Phase 1 (2026-08-23)
+
+**Branch:** `claude/invoice-orders-notifications-alerts-gcs1k7`
+Run `frontend/supabase/migrations/20260828_journey_notifications.sql` after
+`20260827_supplier_contacts_import.sql`. Purely additive triggers — no
+existing RPC body was edited.
+
+Investigated four staff-reported gaps; root cause for all four was the same
+shape: `vd_create_order`, `vd_accept_quote`, `vd_record_order_payment` and
+`vd_waiver_submit` never write to `vd_notifications`, and the admin invoice
+UI (`/admin/invoices`) only ever calls `lib/orders.ts` — never
+`lib/booking-orders.ts` or `lib/notifications.ts`, which is how a normal
+checkout booking tells its supplier anything. `notify()` and the manual
+`vd_notifications` inserts in `app/api/receipts/send` and the iKhokha
+webhook were the *only* things ever writing a notification row; nothing on
+the SQL side did.
+
+- **Orders from an invoice not reaching the supplier.** An admin-created
+  invoice (walk-in/phone booking, or a quote a customer accepted) allocates
+  `vd_order_lines.supplier_id` correctly, but never inserted a
+  `vd_booking_orders` row (no `bookingId` exists for these) and never
+  notified anyone — the supplier's only path to seeing the work was
+  stumbling onto `/supplier/earnings` unprompted. Added
+  `vd_notify_supplier_new_order_line` (trigger on `vd_order_lines`,
+  one notification per order+supplier, skipped for checkout-originated
+  orders which already notify via `lib/bookings.ts` / the iKhokha webhook).
+  **Still true:** these orders still don't appear on `/supplier/bookings`
+  (that page reads `vd_booking_orders`, which is booking-id only) — the
+  supplier now gets told and can act from `/supplier/earnings`, but merging
+  that view with `/supplier/bookings` is follow-up work, not done here.
+- **Payment/journey milestones were silent.** Added: quote acceptance now
+  notifies the operator immediately (`lib/custom-trips.ts`, custom-trip
+  quotes) and the staff member who sent it (`vd_notify_quote_status` trigger,
+  business quotes via `/admin/quotes`); an online (iKhokha) payment now
+  notifies finance/admin staff (`vd_notify_finance_online_payment` trigger —
+  manual EFT/cash payments don't, since the staff member recording one
+  already knows); a **declined** online payment now notifies both the
+  customer and finance staff (previously silent beyond a `?payment=failed`
+  redirect param that disappears on the next page load) —
+  `app/api/payments/ikhokha/webhook/route.ts`.
+- **Suppliers not told when a waiver is signed.** `vd_notify_waiver_signed`
+  trigger on `vd_waiver_submissions` notifies the request's supplier.
+- **"Next step" philosophy in the admin console.** New `lib/next-step.ts`:
+  a pure function over data already loaded (`getOrderNextStep`,
+  `getQuoteNextStep`) that turns an order/quote's several independent status
+  columns into the one question staff actually asked for — what do I do
+  about this, now (`Collect payment` / `Confirm with supplier` / `Follow up
+  for balance` / `On track`…, urgency-coloured, escalating to `urgent` inside
+  3 days of travel). Wired into `/admin/orders` (list badge in both the
+  mobile card and desktop table, plus a banner at the top of the order
+  detail panel) and `/admin/quotes` (list badge, both layouts). Phase 1 only
+  — custom-trip requests (`/supplier/requests`, `/admin/marketplace`) are the
+  natural next caller, same shape, not wired yet.
+
+`Notification['type']` (`lib/notifications.ts`) gained `'payment'` — rows
+with that type already existed (`app/api/receipts/send`, the iKhokha
+webhook), the type just didn't say so.
