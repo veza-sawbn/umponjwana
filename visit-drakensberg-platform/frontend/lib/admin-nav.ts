@@ -4,7 +4,7 @@ import {
   Globe, MapPin, Image, Store, Package, ShieldCheck,
   Receipt, Landmark, Banknote, ClipboardList, MessageSquare, Bus,
   TreePine, Building2, FileSignature, UserCog, Wallet, Send, Briefcase,
-  UserCircle,
+  UserCircle, BookUser,
 } from 'lucide-react'
 
 // Single source of truth for admin navigation. The desktop sidebar renders
@@ -23,6 +23,7 @@ export type AdminNavItem = {
 export const ADMIN_NAV: AdminNavItem[] = [
   { href: '/admin', label: 'Overview', short: 'Home', icon: LayoutDashboard, exact: true },
   { href: '/admin/customers', label: 'Customers', icon: UserCircle },
+  { href: '/admin/contacts', label: 'Contacts', icon: BookUser },
   { href: '/admin/listings', label: 'Listings', icon: ListChecks },
   { href: '/admin/suppliers', label: 'Suppliers', icon: Users },
   { href: '/admin/verification', label: 'Verification', icon: ShieldCheck },
@@ -65,7 +66,7 @@ function group(title: string, hrefs: string[]) {
 /** Mobile drawer grouping — daily work first, everything else below it. */
 export const ADMIN_NAV_GROUPS = [
   group('Daily Work', [
-    '/admin', '/admin/customers', '/admin/invoices', '/admin/quotes', '/admin/orders',
+    '/admin', '/admin/customers', '/admin/contacts', '/admin/invoices', '/admin/quotes', '/admin/orders',
     '/admin/bookings', '/admin/messages', '/admin/campaigns', '/admin/operations', '/admin/transport',
     '/admin/operations/managed-suppliers',
   ]),
