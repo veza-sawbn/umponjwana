@@ -14,6 +14,16 @@ function fmt(d: string | null) {
   return d ? new Date(d).toLocaleDateString('en-ZA', { day: 'numeric', month: 'short', year: 'numeric' }) : '—'
 }
 
+/** Only ever shown for source: 'imported' contacts — a booking-derived
+ *  contact has nothing to flag, it speaks for itself. */
+function SourceBadge() {
+  return (
+    <span className="inline-block font-sans text-[9px] tracking-[0.08em] uppercase px-1.5 py-0.5 rounded bg-amber-50 text-amber-700">
+      Imported
+    </span>
+  )
+}
+
 export default function SupplierContactsPage() {
   const [contacts, setContacts] = useState<SupplierContact[]>([])
   const [search, setSearch] = useState('')
@@ -66,7 +76,10 @@ export default function SupplierContactsPage() {
           <div className="md:hidden bg-white border border-gray-200 rounded-xl divide-y divide-gray-100">
             {filtered.map(c => (
               <div key={c.id} className="p-4">
-                <p className="font-sans text-sm font-medium">{c.name || 'Guest'}</p>
+                <div className="flex items-center gap-2">
+                  <p className="font-sans text-sm font-medium">{c.name || 'Guest'}</p>
+                  {c.source === 'imported' && <SourceBadge />}
+                </div>
                 {c.email && <p className="font-sans text-xs text-gray-400 mt-0.5">{c.email}</p>}
                 {c.phone && <p className="font-sans text-xs text-gray-400">{c.phone}</p>}
                 <div className="flex items-end justify-between gap-3 mt-3">
@@ -89,7 +102,9 @@ export default function SupplierContactsPage() {
               <tbody className="divide-y divide-gray-100">
                 {filtered.map(c => (
                   <tr key={c.id} className="hover:bg-[#F7F5F2] transition-colors">
-                    <td className="px-5 py-4 font-sans text-sm font-medium">{c.name || 'Guest'}</td>
+                    <td className="px-5 py-4 font-sans text-sm font-medium">
+                      <span className="inline-flex items-center gap-2">{c.name || 'Guest'} {c.source === 'imported' && <SourceBadge />}</span>
+                    </td>
                     <td className="px-5 py-4">
                       <div className="space-y-0.5">
                         {c.email && <p className="font-sans text-xs text-gray-500 inline-flex items-center gap-1.5"><Mail size={11} className="text-gray-300" />{c.email}</p>}
