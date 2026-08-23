@@ -61,41 +61,51 @@ create or replace function public.vd_recompute_supplier_contacts()
 returns integer
 language plpgsql security definer set search_path = public as $$
 declare
-  v_count integer;
+  v_upserted integer;
+  v_deleted  integer;
 begin
   if not (is_admin() or auth.role() = 'service_role') then
     raise exception 'admin only';
   end if;
 
+  -- Materialised once so both the upsert and the stale-row cleanup below
+  -- see exactly the same snapshot of "who currently has an active line".
+  create temporary table _vd_contact_agg on commit drop as
   with lines as (
+    -- bk.value->>'customerPhone' is the number actually supplied for
+    -- fulfilment at checkout (see lib/bookings.ts/lib/orders.ts) —
+    -- profiles.phone is never populated by the normal signup or account-
+    -- settings flow (that writes to auth user_metadata instead), so it
+    -- would leave this address book's phone blank for real customers.
     select l.supplier_id, l.user_id, l.order_id, l.created_at, l.gross_amount, l.discount_amount,
-           l.share_customer_name, l.customer_name, o.customer_email
+           l.share_customer_name, l.customer_name, o.customer_email, bk.value->>'customerPhone' as customer_phone
     from vd_order_lines l
     join vd_orders o on o.id = l.order_id
+    left join vd_bookings bk on bk.id = o.booking_id
     where l.user_id is not null and l.supplier_id is not null and l.fulfilment_status <> 'cancelled'
-  ),
-  agg as (
-    select
-      supplier_id, user_id,
-      count(distinct order_id) as booking_count,
-      sum(gross_amount - discount_amount) as lifetime_spend,
-      min(created_at) as first_booking_at,
-      max(created_at) as last_booking_at,
-      (array_agg(customer_name order by created_at desc)
-        filter (where share_customer_name and customer_name is not null and customer_name <> ''))[1] as name,
-      (array_agg(customer_email order by created_at desc)
-        filter (where customer_email is not null and customer_email <> ''))[1] as email
-    from lines
-    group by supplier_id, user_id
   )
+  select
+    supplier_id, user_id,
+    count(distinct order_id) as booking_count,
+    sum(gross_amount - discount_amount) as lifetime_spend,
+    min(created_at) as first_booking_at,
+    max(created_at) as last_booking_at,
+    (array_agg(customer_name order by created_at desc)
+      filter (where share_customer_name and customer_name is not null and customer_name <> ''))[1] as name,
+    (array_agg(customer_email order by created_at desc)
+      filter (where customer_email is not null and customer_email <> ''))[1] as email,
+    (array_agg(customer_phone order by created_at desc)
+      filter (where customer_phone is not null and customer_phone <> ''))[1] as phone
+  from lines
+  group by supplier_id, user_id;
+
   insert into vd_supplier_contacts (
     supplier_id, customer_user_id, name, email, phone,
     first_booking_at, last_booking_at, booking_count, lifetime_spend, updated_at
   )
-  select a.supplier_id, a.user_id, a.name, a.email, p.phone,
+  select a.supplier_id, a.user_id, a.name, a.email, a.phone,
          a.first_booking_at, a.last_booking_at, a.booking_count, a.lifetime_spend, now()
-  from agg a
-  left join profiles p on p.id = a.user_id
+  from _vd_contact_agg a
   on conflict (supplier_id, customer_user_id) do update set
     name = excluded.name,
     email = excluded.email,
@@ -105,9 +115,21 @@ begin
     booking_count = excluded.booking_count,
     lifetime_spend = excluded.lifetime_spend,
     updated_at = now();
+  get diagnostics v_upserted = row_count;
 
-  get diagnostics v_count = row_count;
-  return v_count;
+  -- A pair with no row in the snapshot at all (every line for that
+  -- supplier/customer got cancelled since the last recompute) needs a full
+  -- removal, not just a skipped upsert — otherwise a cancelled customer's
+  -- contact details and stale booking_count/spend keep showing up
+  -- indefinitely.
+  delete from vd_supplier_contacts c
+  where not exists (
+    select 1 from _vd_contact_agg a
+    where a.supplier_id = c.supplier_id and a.user_id = c.customer_user_id
+  );
+  get diagnostics v_deleted = row_count;
+
+  return v_upserted + v_deleted;
 end;
 $$;
 grant execute on function public.vd_recompute_supplier_contacts() to authenticated;

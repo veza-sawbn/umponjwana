@@ -1,4 +1,5 @@
 import { supabase } from './auth'
+import { fetchAllRows } from './customers-admin'
 
 /* ────────────────────────────────────────────────────────────────────────────
  * Supplier contacts — every customer a supplier has actually transacted with,
@@ -33,12 +34,18 @@ function rowToContact(r: any): SupplierContact {
 }
 
 /** The signed-in supplier's own contacts only — RLS enforces this even if
- *  the query below didn't filter explicitly. */
+ *  the query below didn't filter explicitly. Paginated via fetchAllRows:
+ *  a busy supplier can have more contacts than PostgREST's single-response
+ *  row cap (1000 by default), same reasoning as the admin cross-supplier
+ *  read in lib/admin-supplier-contacts.ts. */
 export async function getMyContacts(): Promise<SupplierContact[]> {
-  const { data, error } = await supabase
-    .from('vd_supplier_contacts')
-    .select('*')
-    .order('last_booking_at', { ascending: false, nullsFirst: false })
-  if (error) { console.error('[supplier-contacts] fetch failed:', error); return [] }
-  return (data ?? []).map(rowToContact)
+  const rows = await fetchAllRows<any>(
+    (from, to) => supabase
+      .from('vd_supplier_contacts')
+      .select('*')
+      .order('last_booking_at', { ascending: false, nullsFirst: false })
+      .range(from, to),
+    'vd_supplier_contacts',
+  )
+  return rows.map(rowToContact)
 }
