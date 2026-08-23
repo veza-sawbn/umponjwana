@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { ArrowRight, Bus, Calendar, Check, Clock, MapPin, Phone, Plane, Play, Route, Truck, Users, X } from 'lucide-react'
 import { supabase } from '@/lib/auth'
+import { effectiveSupplierId } from '@/lib/effective-supplier'
 import {
   acceptTransportRequest, assignDriverToRequest, completeTrip, declineTransportRequest,
   driverAvailable, getFleet, getMyTransportCompany, getTransportRequests, startTrip,
@@ -49,11 +50,12 @@ export default function TransportJobsPage() {
   const load = useCallback(async () => {
     const { data } = await supabase.auth.getUser()
     if (!data.user) { setLoading(false); return }
-    setUserId(data.user.id)
+    const ownerId = effectiveSupplierId(data.user.id)
+    setUserId(ownerId)
     const [myCompany, myRequests, fleet] = await Promise.all([
-      getMyTransportCompany(data.user.id),
+      getMyTransportCompany(ownerId),
       getTransportRequests(),
-      getFleet(data.user.id),
+      getFleet(ownerId),
     ])
     setCompany(myCompany)
     setRequests(myRequests)

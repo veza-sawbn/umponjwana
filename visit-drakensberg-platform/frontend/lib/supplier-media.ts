@@ -1,5 +1,6 @@
 import { supabase } from './auth'
-import { listEntities, insertEntity, deleteEntity, newEntityId } from './entities'
+import { getEffectiveSupplierId, effectiveSupplierId } from './effective-supplier'
+import { listEntities, insertEntity, deleteEntity, newEntityId, listEntitiesByOwner } from './entities'
 
 // A supplier's own uploaded media — real Supabase Storage files (bucket
 // `media`, path supplier/{uid}/...), indexed as vd_entities rows so RLS
@@ -24,10 +25,13 @@ export type MediaItem = {
 const KIND = 'media'
 
 export async function getMyMedia(): Promise<MediaItem[]> {
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return []
-  const all = await listEntities<MediaItem>(KIND)
-  return all.filter(m => m.supplierId === user.id).sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+  // Owner-scoped at the database: filtering listEntities() in JS would ship
+  // every supplier's media library to the browser. Resolves to the managed
+  // supplier when an operations employee is acting on one's behalf.
+  const ownerId = await getEffectiveSupplierId()
+  if (!ownerId) return []
+  const mine = await listEntitiesByOwner<MediaItem>(KIND, ownerId)
+  return mine.sort((a, b) => b.createdAt.localeCompare(a.createdAt))
 }
 
 function imageDimensions(file: File): Promise<string> {
@@ -44,8 +48,16 @@ function imageDimensions(file: File): Promise<string> {
 export async function uploadMedia(file: File): Promise<MediaItem> {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) throw new Error('You must be signed in to upload media.')
+  // The media belongs to the SUPPLIER, not whoever is uploading it. When an
+  // operations employee is acting-as a managed supplier, this resolves to
+  // the supplier's own id — uploading under the raw signed-in user id would
+  // both misattribute the file (the supplier would never see it in their own
+  // library) and fail RLS, since the storage policies check the folder
+  // segment against a supplier the caller is authorised for, not against
+  // whichever id happens to be in the path.
+  const ownerId = effectiveSupplierId(user.id)
   const ext = (file.name.split('.').pop() || 'bin').toLowerCase().replace(/[^a-z0-9]/g, '') || 'bin'
-  const path = `supplier/${user.id}/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`
+  const path = `supplier/${ownerId}/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`
   const { error } = await supabase.storage.from('media').upload(path, file, {
     contentType: file.type || undefined,
     cacheControl: '31536000',
@@ -56,14 +68,14 @@ export async function uploadMedia(file: File): Promise<MediaItem> {
       throw new Error('Storage bucket "media" does not exist. Run supabase/migrations/20260719_media_storage.sql in the Supabase SQL editor.')
     }
     if (/row-level security|not authoriz/i.test(message)) {
-      throw new Error('Uploads aren’t enabled for your account yet. Run supabase/migrations/20260726_supplier_media.sql in the Supabase SQL editor.')
+      throw new Error('Uploads aren’t enabled for your account yet. Run supabase/migrations/20260726_supplier_media.sql and 20260820_ops_delete_and_managed_media.sql in the Supabase SQL editor.')
     }
     throw new Error(message || 'Upload failed')
   }
   const { data } = supabase.storage.from('media').getPublicUrl(path)
   const item: MediaItem = {
     id: newEntityId('media'),
-    supplierId: user.id,
+    supplierId: ownerId,
     type: file.type.startsWith('video/') ? 'video' : 'image',
     name: file.name,
     url: data.publicUrl,

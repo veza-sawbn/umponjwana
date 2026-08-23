@@ -3,8 +3,10 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { ChevronLeft, ChevronRight, Plus, Trash2 } from 'lucide-react'
 import { supabase } from '@/lib/auth'
+import { effectiveSupplierId } from '@/lib/effective-supplier'
 import { addActivity, ACTIVITY_CATEGORIES, ACTIVITY_DIFFICULTIES, ACTIVITY_INCLUSIONS } from '@/lib/activities'
 import { getRegionNames } from '@/lib/regions'
+import { SEASONS, SEASON_META, SEASON_TOPICS, SEASON_TOPIC_META, type Season, type SeasonTopic } from '@/lib/seasons'
 import { GoogleAddressField } from '@/components/maps/GoogleAddressField'
 import { supplierMediaSource } from '@/lib/supplier-media'
 import { MediaGalleryPicker } from '@/components/media/MediaPicker'
@@ -32,6 +34,7 @@ export default function NewActivityPage() {
     meetingPoint: '', gpsLat: '', gpsLng: '', whatToWear: '', photos: [] as string[],
     included: [] as string[], safetyNotes: '',
     pricePerPerson: '', priceGroup: '', depositRequired: false, depositPercent: '30',
+    seasons: [] as Season[], topics: [] as SeasonTopic[],
   })
 
   useEffect(() => {
@@ -42,6 +45,10 @@ export default function NewActivityPage() {
 
   const toggleIncluded = (item: string) =>
     setForm(f => ({ ...f, included: f.included.includes(item) ? f.included.filter(x => x !== item) : [...f.included, item] }))
+  const toggleSeason = (s: Season) =>
+    setForm(f => ({ ...f, seasons: f.seasons.includes(s) ? f.seasons.filter(x => x !== s) : [...f.seasons, s] }))
+  const toggleTopic = (t: SeasonTopic) =>
+    setForm(f => ({ ...f, topics: f.topics.includes(t) ? f.topics.filter(x => x !== t) : [...f.topics, t] }))
 
   async function handleSubmit() {
     if (!form.name.trim()) { setError('Activity name is required.'); return }
@@ -52,7 +59,7 @@ export default function NewActivityPage() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) { setError('Not signed in'); return }
       await addActivity({
-        supplierId: user.id,
+        supplierId: effectiveSupplierId(user.id),
         supplierName: user.user_metadata?.full_name || user.email || '',
         name: form.name,
         category: form.category,
@@ -74,6 +81,8 @@ export default function NewActivityPage() {
         priceGroup: +form.priceGroup || 0,
         depositRequired: form.depositRequired,
         depositPercent: form.depositPercent,
+        seasons: form.seasons,
+        topics: form.topics,
         status: 'active',
       })
       router.push('/supplier/activities')
@@ -128,6 +137,22 @@ export default function NewActivityPage() {
             </F>
             <F label="Description" required>
               <textarea value={form.description} onChange={e => set('description', e.target.value)} rows={4} className={`${inp} resize-none`} placeholder="What participants will experience…" />
+            </F>
+            <F label="Best Seasons">
+              <div className="flex gap-2 flex-wrap">
+                {SEASONS.map(s => (
+                  <button key={s} onClick={() => toggleSeason(s)} className={`font-sans text-xs px-3 py-1.5 rounded-full border transition-colors ${form.seasons.includes(s) ? 'bg-[#C9A96E] text-white border-[#C9A96E]' : 'border-black/15 text-black/60 hover:border-[#C9A96E]/40'}`}>{SEASON_META[s].label}</button>
+                ))}
+              </div>
+              <p className="mt-1.5 font-sans text-[11px] text-black/35">Shown on the region's "When to Go" pages for whichever seasons you pick — leave blank if it doesn't vary by season.</p>
+            </F>
+            <F label="Topics">
+              <div className="flex gap-2 flex-wrap">
+                {SEASON_TOPICS.map(t => (
+                  <button key={t} onClick={() => toggleTopic(t)} className={`font-sans text-xs px-3 py-1.5 rounded-full border transition-colors ${form.topics.includes(t) ? 'bg-[#C9A96E] text-white border-[#C9A96E]' : 'border-black/15 text-black/60 hover:border-[#C9A96E]/40'}`}>{SEASON_TOPIC_META[t].label}</button>
+                ))}
+              </div>
+              <p className="mt-1.5 font-sans text-[11px] text-black/35">Which "When to Go" groupings this activity should appear under.</p>
             </F>
           </>
         )}

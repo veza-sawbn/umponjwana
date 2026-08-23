@@ -93,8 +93,23 @@ export async function POST(req: Request) {
   const email = order.customer_email as string
   if (!email) return NextResponse.json({ sent: false, error: 'order has no customer email' })
 
+  // Emailing a revoked link would send the customer to an error and quietly
+  // undo the revocation's intent. Staff withdrew it deliberately, so ask them
+  // to re-issue rather than guessing on their behalf.
+  if (invoice.share_revoked_at) {
+    return NextResponse.json({
+      sent: false,
+      error: 'This invoice\'s share link has been revoked. Re-issue it before sending.',
+    })
+  }
+
   const origin = process.env.NEXT_PUBLIC_SITE_URL || new URL(req.url).origin
   const featured = await getFeaturedExperiences(origin)
+
+  // Just the invoice's address. The id in it is 'inv-' + a v4 UUID, which is
+  // credential enough to open and pay without signing in — so there is no
+  // query string for a mail client or chat app to truncate away.
+  const invoiceUrl = `${origin}/invoices/${invoice.id}`
 
   const { sent, error } = await sendMail({
     to: email,
@@ -109,7 +124,7 @@ export async function POST(req: Request) {
       amountPaid: Number(invoice.amount_paid),
       balance: Number(invoice.balance),
       issuedAt: invoice.issued_at,
-      invoiceUrl: `${origin}/invoices/${invoice.id}`,
+      invoiceUrl,
       origin,
       featured,
     }),

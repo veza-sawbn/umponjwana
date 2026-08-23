@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react'
 import toast from 'react-hot-toast'
 import { Tag, Plus, Trash2 } from 'lucide-react'
 import { supabase } from '@/lib/auth'
+import { effectiveSupplierId } from '@/lib/effective-supplier'
 import { getPropertiesBySupplier } from '@/lib/properties'
 import { getActivitiesBySupplier } from '@/lib/activities'
 import {
@@ -32,9 +33,9 @@ export default function DiscountsPage() {
     supabase.auth.getUser().then(async ({ data: { user } }) => {
       if (!user) { setLoading(false); return }
       const [mine, props, acts] = await Promise.all([
-        getSupplierEntities<Discount>(ENTITY, user.id),
-        getPropertiesBySupplier(user.id),
-        getActivitiesBySupplier(user.id),
+        getSupplierEntities<Discount>(ENTITY, effectiveSupplierId(user.id)),
+        getPropertiesBySupplier(effectiveSupplierId(user.id)),
+        getActivitiesBySupplier(effectiveSupplierId(user.id)),
       ])
       setRows(mine)
       setListings([...props.map(p => p.name), ...acts.map(a => a.name)])
@@ -49,7 +50,7 @@ export default function DiscountsPage() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) throw new Error('no session')
       const saved = await addSupplierEntity<Discount>(ENTITY, {
-        supplierId: user.id,
+        supplierId: effectiveSupplierId(user.id),
         code: form.code.toUpperCase(),
         type: form.type,
         value: +form.value,

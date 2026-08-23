@@ -2,10 +2,16 @@
 
 import { useEffect, useState, useCallback, useMemo, Suspense } from 'react'
 import { useParams, useRouter, useSearchParams } from 'next/navigation'
-import { Printer, ArrowLeft, CreditCard, Loader2 } from 'lucide-react'
-import { getInvoiceById, getReceipts, getFinanceSettings, type Invoice, type Receipt } from '@/lib/invoices'
-import { getOrderById, type MasterOrder } from '@/lib/orders'
+import { Printer, ArrowLeft, CreditCard, Loader2, Copy, Check } from 'lucide-react'
+import {
+  getInvoiceById, getInvoicePublic, getInvoiceByToken, getReceipts, getFinanceSettings,
+  markInvoiceViewed, invoiceShareUrl,
+  type Invoice, type InvoiceCustomerOrder, type Receipt,
+} from '@/lib/invoices'
+import { getOrderById } from '@/lib/orders'
 import { getSiteContent, SITE_CONTENT_DEFAULTS } from '@/lib/site-content'
+import { supabase } from '@/lib/auth'
+import { copyToClipboard } from '@/lib/clipboard'
 import { formatMoney } from '@/lib/allocation'
 import { DEFAULT_TIP_PRESETS, maxTip, tipForPercent, tippableTotal } from '@/lib/tips'
 import Logo from '@/components/Logo'
@@ -13,8 +19,17 @@ import Logo from '@/components/Logo'
 type BusinessDetails = typeof SITE_CONTENT_DEFAULTS.business_details
 
 // Printable customer invoice. One invoice per Master Order — every purchased
-// service on a single document, no supplier payout information. Access is
-// governed by RLS: customers open their own invoices, staff open any.
+// service on a single document, no supplier payout information.
+//
+// It opens on its own address, with no session: the id in the URL is
+// 'inv-' + a v4 UUID, which vd_invoice_public accepts as the credential.
+// Most customers have no account, and a guest order has no user_id for RLS to
+// match at all, so requiring a login here locked out the very people the
+// invoice is for.
+//
+// Two fallbacks behind that, in order: a ?t= share token (links emailed
+// while the token was the credential), then the signed-in RLS path — which is
+// what lets staff open an invoice by its number rather than its id.
 
 function fmt(d?: string | null) {
   return d ? new Date(d).toLocaleDateString('en-ZA', { day: 'numeric', month: 'long', year: 'numeric' }) : '—'
@@ -42,16 +57,39 @@ function TipOption({ label, sub, selected, onClick }: {
   )
 }
 
+/** Hands the current invoice link to any channel — email, WhatsApp, SMS. */
+function CopyLinkButton({ url, className = '', label = 'Copy link' }: {
+  url: string
+  className?: string
+  label?: string
+}) {
+  const [state, setState] = useState<'idle' | 'copied' | 'failed'>('idle')
+
+  async function copy() {
+    setState(await copyToClipboard(url) ? 'copied' : 'failed')
+    setTimeout(() => setState('idle'), 2500)
+  }
+
+  return (
+    <button onClick={copy} title={url} className={className}>
+      {state === 'copied' ? <Check size={14} /> : <Copy size={14} />}
+      {state === 'copied' ? 'Link copied' : state === 'failed' ? 'Press ⌘/Ctrl+C' : label}
+    </button>
+  )
+}
+
 function PrintableInvoiceInner() {
   const params = useParams<{ id: string }>()
   const router = useRouter()
   const searchParams = useSearchParams()
   const paymentResult = searchParams.get('payment') // success|failed|cancelled
+  const shareToken = searchParams.get('t')
   const [invoice, setInvoice] = useState<Invoice | null>(null)
-  const [order, setOrder] = useState<MasterOrder | null>(null)
+  const [order, setOrder] = useState<InvoiceCustomerOrder | null>(null)
   const [receipts, setReceipts] = useState<Receipt[]>([])
   const [business, setBusiness] = useState<BusinessDetails>(SITE_CONTENT_DEFAULTS.business_details)
   const [loading, setLoading] = useState(true)
+  const [signedIn, setSignedIn] = useState<boolean | null>(null)
   const [paying, setPaying] = useState(false)
   const [payError, setPayError] = useState('')
   const [tipping, setTipping] = useState({ enabled: false, presets: DEFAULT_TIP_PRESETS })
@@ -63,22 +101,44 @@ function PrintableInvoiceInner() {
   useEffect(() => {
     getFinanceSettings().then(s => setTipping({ enabled: s.tippingEnabled, presets: s.tipPresets }))
   }, [])
-
-  const load = useCallback((id: string) => {
-    return getInvoiceById(decodeURIComponent(id)).then(async inv => {
-      setInvoice(inv)
-      if (inv) {
-        const [o, r] = await Promise.all([getOrderById(inv.order_id), getReceipts(inv.order_id)])
-        setOrder(o); setReceipts(r)
-      }
-      return inv
-    })
+  // Only used to word the failure state — never to gate the token path.
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data }) => setSignedIn(!!data.user)).catch(() => setSignedIn(false))
   }, [])
+
+  const load = useCallback(async (rawId: string): Promise<Invoice | null> => {
+    const id = decodeURIComponent(rawId)
+
+    // The address itself, first — this is the path every customer takes, and
+    // the only one that works when they have no account.
+    const shared = await getInvoicePublic(id) ?? (shareToken ? await getInvoiceByToken(shareToken) : null)
+    if (shared) {
+      setInvoice(shared.invoice); setOrder(shared.order); setReceipts(shared.receipts)
+      return shared.invoice
+    }
+
+    // Signed-in fallback: staff, the invoice's own account holder, and
+    // lookups by invoice number, which is never a public credential.
+    const inv = await getInvoiceById(id)
+    setInvoice(inv)
+    if (inv) {
+      const [o, r] = await Promise.all([getOrderById(inv.order_id), getReceipts(inv.order_id)])
+      setOrder(o); setReceipts(r)
+    }
+    return inv
+  }, [shareToken])
 
   useEffect(() => {
     if (!params?.id) return
-    load(params.id).finally(() => setLoading(false))
-  }, [params?.id, load])
+    load(params.id)
+      .then(inv => {
+        // Tell the team the customer opened it. Staff opens are dropped by
+        // the database function, so this stays a customer signal.
+        if (inv) markInvoiceViewed({ token: shareToken, invoiceId: inv.id })
+      })
+      .finally(() => setLoading(false))
+    // Runs once per invoice: `load` changes only when the token does.
+  }, [params?.id, load, shareToken])
 
   // A successful gateway redirect can arrive slightly before the webhook has
   // reconciled the payment — poll briefly so the balance updates without a
@@ -118,7 +178,9 @@ function PrintableInvoiceInner() {
       const res = await fetch('/api/payments/ikhokha/create', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ invoiceId: invoice.id, tip }),
+        // The token goes with it: a customer who opened the invoice from a
+        // link has no session for the API to authorise them by.
+        body: JSON.stringify({ invoiceId: invoice.id, tip, shareToken: shareToken || undefined }),
       })
       const json = await res.json()
       if (!res.ok || !json.paylinkUrl) throw new Error(json.error || 'Could not start payment')
@@ -129,17 +191,59 @@ function PrintableInvoiceInner() {
     }
   }
 
-  if (loading) {
+  // Hold the spinner until the session check lands too — the failure state
+  // below is worded from it, and flashing the wrong reason at someone who
+  // just wants their invoice helps nobody.
+  if (loading || (!invoice && signedIn === null)) {
     return <div className="min-h-screen bg-[#F7F5F2] flex items-center justify-center pt-24 font-sans text-sm text-gray-400">Loading invoice…</div>
   }
   if (!invoice) {
+    // An invoice opens on its own address now, so reaching here means the
+    // address leads nowhere: mistyped, cut short in transit, or withdrawn.
+    // None of that is fixable by signing in — telling customers to was the
+    // complaint — so this asks us for a working link instead, and mentions
+    // signing in only as an aside for the minority who have an account.
+    const currentPath = typeof window !== 'undefined'
+      ? window.location.pathname + window.location.search
+      : `/invoices/${params?.id ?? ''}`
+
     return (
-      <div className="min-h-screen bg-[#F7F5F2] flex flex-col items-center justify-center pt-24 gap-3">
-        <p className="font-sans text-sm text-gray-500">Invoice not found, or you don't have access to it.</p>
-        <button onClick={() => router.back()} className="font-sans text-sm text-[#2d6a4f] hover:underline">Go back</button>
+      <div className="min-h-screen bg-[#F7F5F2] flex items-center justify-center px-4 pt-24 pb-16">
+        <div className="bg-white border border-gray-200 p-8 sm:p-10 max-w-md w-full text-center">
+          <p className="font-sans text-[10px] tracking-[0.14em] uppercase text-gray-400">Invoice</p>
+          <h1 className="font-display italic text-2xl text-[#000000] mt-1">This invoice link isn&apos;t working</h1>
+          <p className="font-sans text-sm text-gray-500 mt-3 leading-relaxed">
+            The address didn&apos;t lead to an invoice. It may have been cut short on its way to you,
+            or replaced with a newer one.
+          </p>
+          <p className="font-sans text-sm text-gray-500 mt-3 leading-relaxed">
+            Send us a message and we&apos;ll get a working link to you right away
+            {business.email ? <> — <a href={`mailto:${business.email}?subject=${encodeURIComponent('Invoice link')}`} className="text-[#2d6a4f] hover:underline">{business.email}</a></> : null}
+            {business.phone ? <> or {business.phone}</> : null}.
+          </p>
+          <div className="flex flex-col gap-2 mt-6">
+            {/* A link opened from an email has no history to go back to. */}
+            <a href="/" className="bg-[#2d6a4f] text-white px-5 py-2.5 font-sans text-sm hover:bg-[#245741] transition-colors">
+              Go to Visit Drakensberg
+            </a>
+            {!signedIn && (
+              <a
+                href={`/auth/login?redirect=${encodeURIComponent(currentPath)}`}
+                className="font-sans text-xs text-gray-400 hover:text-[#2d6a4f] hover:underline py-1"
+              >
+                Have an account with us? Sign in
+              </a>
+            )}
+          </div>
+        </div>
       </div>
     )
   }
+
+  // The address in the browser bar is the shareable link, so there is always
+  // one to offer — unless staff have withdrawn it, in which case passing it
+  // on would only send someone to the error above.
+  const shareUrl = invoice.share_revoked_at ? '' : invoiceShareUrl(invoice)
 
   return (
     <div className="min-h-screen bg-[#F7F5F2] pt-28 pb-16 px-4">
@@ -162,12 +266,21 @@ function PrintableInvoiceInner() {
         )}
         {paymentResult === 'failed' && (
           <div className="mb-4 print:hidden bg-red-50 border border-red-200 text-red-600 font-sans text-sm px-4 py-3">
-            The payment didn't go through. You can try again below.
+            The payment didn't go through — your card was declined. Please check your card details and try again below.
           </div>
         )}
         {paymentResult === 'cancelled' && (
           <div className="mb-4 print:hidden bg-amber-50 border border-amber-200 text-amber-700 font-sans text-sm px-4 py-3">
             Payment cancelled — your invoice balance is unchanged.
+          </div>
+        )}
+        {/* Persistent decline notice: shown when the gateway declined a previous
+            payment attempt and the invoice is still unpaid, but the customer is
+            not arriving directly from that declined attempt (which shows the
+            more specific ?payment=failed banner above). */}
+        {!paymentResult && invoice.payment_declined_at && invoice.status !== 'paid' && (
+          <div className="mb-4 print:hidden bg-red-50 border border-red-200 text-red-600 font-sans text-sm px-4 py-3">
+            A recent payment attempt was declined. Please check your card details and try again below, or contact us if you need help.
           </div>
         )}
 
@@ -228,11 +341,19 @@ function PrintableInvoiceInner() {
           </div>
         )}
 
-        <div className="flex items-center justify-between mb-4 print:hidden">
+        {/* Wraps rather than squeezes: on a phone this row now carries a
+            third action. */}
+        <div className="flex flex-wrap items-center justify-between gap-3 mb-4 print:hidden">
           <button onClick={() => router.back()} className="inline-flex items-center gap-2 font-sans text-sm text-gray-500 hover:text-[#2d6a4f] transition-colors">
             <ArrowLeft size={14} /> Back
           </button>
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+            {shareUrl && (
+              <CopyLinkButton
+                url={shareUrl}
+                className="inline-flex items-center gap-2 border border-gray-200 bg-white text-gray-600 px-4 py-2.5 font-sans text-sm hover:border-[#2d6a4f] hover:text-[#2d6a4f] transition-colors"
+              />
+            )}
             {payable && (
               <button
                 onClick={payNow}

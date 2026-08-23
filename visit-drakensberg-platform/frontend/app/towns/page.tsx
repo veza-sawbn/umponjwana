@@ -57,16 +57,20 @@ export default function TownsPage() {
               <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
                 {group.towns.map(town => (
                   <div key={town.id} className="group border border-forest/10 bg-mist/40 hover:border-gold/40 transition-colors overflow-hidden">
-                    {town.image && (
-                      <div className="aspect-[16/9] overflow-hidden bg-forest/10">
-                        <img src={town.image} alt={town.name} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" />
-                      </div>
-                    )}
+                    <Link href={`/towns/${town.slug}`}>
+                      {town.image && (
+                        <div className="aspect-[16/9] overflow-hidden bg-forest/10">
+                          <img src={town.image} alt={town.name} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" />
+                        </div>
+                      )}
+                    </Link>
                     <div className="p-5">
                       {town.gateway && <p className="font-sans text-[10px] tracking-[0.15em] uppercase text-gold mb-2">{town.gateway}</p>}
-                      <h3 className="font-display text-xl text-forest mb-2 flex items-center gap-2">
-                        <MapPin className="w-4 h-4 text-forest/30" /> {town.name}
-                      </h3>
+                      <Link href={`/towns/${town.slug}`}>
+                        <h3 className="font-display text-xl text-forest mb-2 flex items-center gap-2 group-hover:text-sage transition-colors">
+                          <MapPin className="w-4 h-4 text-forest/30" /> {town.name}
+                        </h3>
+                      </Link>
                       {town.description && <p className="font-sans text-sm text-forest/55 leading-relaxed">{town.description}</p>}
                       {town.highlights.length > 0 && (
                         <ul className="mt-3 space-y-1.5">

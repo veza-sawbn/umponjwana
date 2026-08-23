@@ -3,12 +3,17 @@
 import { useState, useEffect, useRef } from 'react'
 import { Plus, Pencil, Trash2, Star, X, Check, GripVertical, CalendarDays } from 'lucide-react'
 import { Trail, TrailDay, TrailCategory, getTrails, saveTrails, DEFAULT_TRAILS, trailCategory, SPECIALITY_WALK_TYPES } from '@/lib/trails'
+import { SEASONS, SEASON_META, SEASON_TOPICS, SEASON_TOPIC_META, type Season, type SeasonTopic } from '@/lib/seasons'
 import { analyseGpxAsync, ROUTE_TYPES } from '@/lib/gpx'
 import RouteArtwork from '@/components/trails/RouteArtwork'
 import { MediaPicker, MediaGalleryPicker } from '@/components/media/MediaPicker'
 import { adminMediaSource } from '@/lib/admin-supabase'
+import { SeoPanel } from '@/components/admin/SeoPanel'
+import { RelationshipPicker, type RelatedItem } from '@/components/admin/RelatedEntityManager'
+import { getProperties, type Property } from '@/lib/properties'
+import { getActivities, type Activity } from '@/lib/activities'
 
-const REGIONS = ['Northern Berg', 'Central Berg', 'Southern Berg', 'Royal Natal National Park', 'Champagne Valley', "Giant's Castle", 'Sani Pass']
+const REGIONS = ['Northern Drakensberg', 'Central Drakensberg', 'Southern Drakensberg', 'Royal Natal National Park', 'Champagne Valley', "Giant's Castle", 'Sani Pass']
 const DIFFICULTIES = ['Easy', 'Moderate', 'Strenuous', 'Extreme'] as const
 
 const TRAIL_CATEGORIES: { value: TrailCategory; label: string }[] = [
@@ -205,6 +210,26 @@ function TrailForm({ trail, onChange, onSave, onCancel, saveLabel, saving }: {
   saveLabel: string
   saving?: boolean
 }) {
+  const [availableProperties, setAvailableProperties] = useState<RelatedItem[]>([])
+  const [availableActivities, setAvailableActivities] = useState<RelatedItem[]>([])
+  const [availableTrails, setAvailableTrails] = useState<RelatedItem[]>([])
+
+  useEffect(() => {
+    getProperties().then(list =>
+      setAvailableProperties(list.map((p: Property) => ({ id: p.id, label: p.name, sublabel: p.region })))
+    ).catch(() => {})
+    getActivities().then(list =>
+      setAvailableActivities(list.map((a: Activity) => ({ id: a.id, label: a.name, sublabel: a.category })))
+    ).catch(() => {})
+    getTrails().then(list =>
+      setAvailableTrails(
+        list
+          .filter(t => t.id !== trail.id)
+          .map(t => ({ id: t.id, label: t.name, sublabel: t.region }))
+      )
+    ).catch(() => {})
+  }, [trail.id])
+
   return (
     <div className="bg-white border border-[#C9A96E] p-6 mt-6 space-y-6">
       {/* Core fields */}
@@ -303,6 +328,46 @@ function TrailForm({ trail, onChange, onSave, onCancel, saveLabel, saving }: {
         <textarea value={trail.description} onChange={e => onChange('description', e.target.value)} rows={4} className={`${inputCls} resize-none`} />
       </div>
 
+      {/* Best seasons / topics — powers the "When to Go" seasonal pages, see docs/destination-graph/PHASE_I.md */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div>
+          <label className={labelCls}>Best Seasons</label>
+          <div className="flex flex-wrap gap-2 mt-1">
+            {SEASONS.map(s => {
+              const active = (trail.seasons ?? []).includes(s)
+              return (
+                <button
+                  key={s}
+                  type="button"
+                  onClick={() => onChange('seasons', active ? (trail.seasons ?? []).filter(x => x !== s) : [...(trail.seasons ?? []), s])}
+                  className={`font-sans text-xs px-3 py-1.5 rounded-full border capitalize transition-colors ${active ? 'bg-[#C9A96E] text-white border-[#C9A96E]' : 'border-black/15 text-black/60 hover:border-[#C9A96E]/40'}`}
+                >
+                  {SEASON_META[s].label}
+                </button>
+              )
+            })}
+          </div>
+        </div>
+        <div>
+          <label className={labelCls}>Topics</label>
+          <div className="flex flex-wrap gap-2 mt-1">
+            {SEASON_TOPICS.map(t => {
+              const active = (trail.topics ?? []).includes(t)
+              return (
+                <button
+                  key={t}
+                  type="button"
+                  onClick={() => onChange('topics', active ? (trail.topics ?? []).filter(x => x !== t) : [...(trail.topics ?? []), t])}
+                  className={`font-sans text-xs px-3 py-1.5 rounded-full border capitalize transition-colors ${active ? 'bg-[#C9A96E] text-white border-[#C9A96E]' : 'border-black/15 text-black/60 hover:border-[#C9A96E]/40'}`}
+                >
+                  {SEASON_TOPIC_META[t].label}
+                </button>
+              )
+            })}
+          </div>
+        </div>
+      </div>
+
       {/* Hero image */}
       <div>
         <label className={labelCls}>Hero Image</label>
@@ -359,6 +424,51 @@ function TrailForm({ trail, onChange, onSave, onCancel, saveLabel, saving }: {
         </div>
       )}
 
+      {/* Related entities */}
+      <div className="border-t border-gray-100 pt-6 space-y-5">
+        <p className="font-sans text-[10px] tracking-[0.14em] uppercase text-gray-400">Related Content</p>
+        <RelationshipPicker
+          label="Linked Accommodation"
+          description="Properties shown in the 'Where to Stay' section on this trail's detail page. Leave empty to auto-show same-region stays."
+          items={availableProperties}
+          selectedIds={trail.relatedPropertyIds ?? []}
+          onChange={ids => onChange('relatedPropertyIds', ids)}
+          placeholder="Search lodges, guesthouses…"
+        />
+        <RelationshipPicker
+          label="Linked Activities"
+          description="Activities shown in the 'Things to Do Nearby' section. Leave empty to auto-show same-region activities."
+          items={availableActivities}
+          selectedIds={trail.relatedActivityIds ?? []}
+          onChange={ids => onChange('relatedActivityIds', ids)}
+          placeholder="Search activities…"
+        />
+        <RelationshipPicker
+          label="Related Trails"
+          description="Overrides the automatic 'Related Trails' sidebar if set."
+          items={availableTrails}
+          selectedIds={trail.relatedTrailIds ?? []}
+          onChange={ids => onChange('relatedTrailIds', ids)}
+          placeholder="Search trails…"
+        />
+      </div>
+
+      {/* SEO */}
+      <SeoPanel
+        seoTitle={trail.seoTitle ?? ''}
+        seoDescription={trail.seoDescription ?? ''}
+        robotsIndex={trail.robotsIndex}
+        previewTitle={trail.name}
+        previewSlug={trail.slug}
+        urlBase="hikes"
+        hasImage={!!trail.image}
+        contentLength={trail.description?.length ?? 0}
+        status={trail.status}
+        onChangeSeoTitle={v => onChange('seoTitle', v)}
+        onChangeSeoDescription={v => onChange('seoDescription', v)}
+        onChangeRobotsIndex={v => onChange('robotsIndex', v)}
+      />
+
       {/* Actions */}
       <div className="flex gap-3 border-t border-gray-100 pt-5">
         <button onClick={onSave} disabled={saving} className="bg-[#2d6a4f] text-white px-6 py-2.5 font-sans text-sm hover:bg-[#235a3f] transition-colors disabled:opacity-50">
@@ -371,9 +481,10 @@ function TrailForm({ trail, onChange, onSave, onCancel, saveLabel, saving }: {
 }
 
 const BLANK_TRAIL: Trail = {
-  id: '', name: '', region: 'Northern Berg', difficulty: 'Moderate', distance: '', duration: '', elevation: '',
+  id: '', name: '', region: 'Northern Drakensberg', difficulty: 'Moderate', distance: '', duration: '', elevation: '',
   status: 'draft', featured: false, image: '', gallery: [], description: '', trailhead: '', slug: '', park: '', visibility: 'public', trail_type: 'Out and back',
   permit_required: false, permit_cost: 0, what_to_bring: [], highlights: [], is_multi_day: false, days: [], category: 'day_hike',
+  seasons: [], topics: [],
 }
 
 export default function AdminTrailsPage() {

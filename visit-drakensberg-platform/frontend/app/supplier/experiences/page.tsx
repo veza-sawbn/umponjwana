@@ -3,12 +3,13 @@ import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { Sparkles, Plus, Clock, Users, Star } from 'lucide-react'
 import { supabase } from '@/lib/auth'
+import { effectiveSupplierId } from '@/lib/effective-supplier'
 import { getActivitiesBySupplier, type Activity } from '@/lib/activities'
 
 export default function ExperiencesPage() {
   const [items, setItems] = useState<Activity[]>([])
   const [loading, setLoading] = useState(true)
-  useEffect(() => { async function load() { const { data } = await supabase.auth.getUser(); if (data.user) setItems(await getActivitiesBySupplier(data.user.id)); setLoading(false) } load() }, [])
+  useEffect(() => { async function load() { const { data } = await supabase.auth.getUser(); if (data.user) setItems(await getActivitiesBySupplier(effectiveSupplierId(data.user.id))); setLoading(false) } load() }, [])
   return (
     <div className="p-8 space-y-6">
       <div className="flex items-center justify-between"><div className="flex items-center gap-3"><Sparkles size={20} className="text-[#C9A96E]" /><h1 className="font-display italic text-2xl text-black/90">Experiences</h1></div><Link href="/supplier/activities/new" className="flex items-center gap-2 bg-[#C9A96E] text-white font-sans text-sm px-4 py-2 rounded-lg hover:bg-[#b8965d] transition-colors"><Plus size={15} /> Add Experience</Link></div>

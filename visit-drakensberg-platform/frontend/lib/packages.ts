@@ -1,4 +1,7 @@
 import { listEntities, getEntity, insertEntity, updateEntity, deleteEntity, newEntityId } from './entities'
+import type { GraphFields } from './graph-fields'
+import { slugify, uniqueSlug } from './slugify'
+import type { SupabaseClient } from '@supabase/supabase-js'
 
 // Marketplace packages are administrator-managed products, curated by Visit
 // Drakensberg from services supplied by multiple businesses. Suppliers cannot
@@ -18,6 +21,34 @@ export type PackageStatus =
   | 'completed'
   | 'cancelled'
   | 'archived'
+
+// Trip-length / occasion categories a package can be filed under, chosen by
+// the admin in the Package Builder (/admin/packages) and used to power the
+// category tabs on the public /packages listing. A package may sit in more
+// than one category (e.g. a hiking-led family trip).
+export type PackageCategory =
+  | 'weekend_trips'
+  | 'three_day_trips'
+  | 'five_day_trips'
+  | 'seven_day_trips'
+  | 'family_trips'
+  | 'adventure_trips'
+  | 'hiking_trips'
+  | 'romantic_getaways'
+
+export const PACKAGE_CATEGORY_LABELS: Record<PackageCategory, string> = {
+  weekend_trips: 'Weekend Trips',
+  three_day_trips: '3-Day Trips',
+  five_day_trips: '5-Day Trips',
+  seven_day_trips: '7-Day Trips',
+  family_trips: 'Family Trips',
+  adventure_trips: 'Adventure Trips',
+  hiking_trips: 'Hiking Trips',
+  romantic_getaways: 'Romantic Getaways',
+}
+
+/** Ordered for consistent rendering of category chips/tabs everywhere. */
+export const PACKAGE_CATEGORIES = Object.keys(PACKAGE_CATEGORY_LABELS) as PackageCategory[]
 
 export const PACKAGE_STATUS_LABELS: Record<PackageStatus, string> = {
   draft: 'Draft',
@@ -59,6 +90,13 @@ export const COMPONENT_TYPE_LABELS: Record<PackageComponentType, string> = {
   insurance: 'Insurance (future)',
 }
 
+/** Component types visual enough to carry their own photo gallery — stays,
+ *  hikes, activities, experiences, local experiences and restaurants. Shown
+ *  on the public package page (/packages/[id]) alongside each component. */
+export const GALLERY_COMPONENT_TYPES: PackageComponentType[] = [
+  'accommodation', 'trail', 'activity', 'experience', 'local_experience', 'restaurant',
+]
+
 export type PackageComponent = {
   id: string
   type: PackageComponentType
@@ -77,6 +115,7 @@ export type PackageComponent = {
   notes: string               // operational notes forwarded to the supplier
   trailId?: string            // set when the component references a hiking trail
   refId?: string              // linked catalog entity (property/activity/tour id)
+  gallery?: string[]          // photo gallery — see GALLERY_COMPONENT_TYPES; shown on /packages/[id]
 }
 
 export function componentMargin(c: PackageComponent): number {
@@ -96,6 +135,7 @@ export type MarketplacePackage = {
   originalPrice?: number
   tag?: string
   featured: boolean
+  categories: PackageCategory[] // trip-length/occasion tabs shown on /packages
   trailIds: string[]          // packages may contain one or more Trail IDs
   components: PackageComponent[]
   packageStatus: PackageStatus
@@ -105,7 +145,7 @@ export type MarketplacePackage = {
   supplierId?: string         // owner (admin account) for the entity row
   createdAt: string
   updatedAt?: string
-}
+} & GraphFields
 
 const KIND = 'package'
 
@@ -117,8 +157,8 @@ export function packageTotals(pkg: MarketplacePackage) {
   return { cost, sell, margin: sell - cost }
 }
 
-export async function getPackages(): Promise<MarketplacePackage[]> {
-  return listEntities<MarketplacePackage>(KIND)
+export async function getPackages(client?: SupabaseClient): Promise<MarketplacePackage[]> {
+  return client ? listEntities<MarketplacePackage>(KIND, client) : listEntities<MarketplacePackage>(KIND)
 }
 
 /** Packages visible on the public site (published, inside their window). */
@@ -131,16 +171,21 @@ export async function getPublishedPackages(): Promise<MarketplacePackage[]> {
   )
 }
 
-export async function getPackageById(id: string): Promise<MarketplacePackage | null> {
-  return getEntity<MarketplacePackage>(KIND, id)
+export async function getPackageById(id: string, client?: SupabaseClient): Promise<MarketplacePackage | null> {
+  return client ? getEntity<MarketplacePackage>(KIND, id, client) : getEntity<MarketplacePackage>(KIND, id)
 }
 
 export async function addPackage(
   pkg: Omit<MarketplacePackage, 'id' | 'status' | 'createdAt'>,
   adminId: string,
 ): Promise<MarketplacePackage> {
+  // Slug population (see lib/slugify.ts) — auto-generated from the package
+  // title unless already supplied, unique against every other package's
+  // canonical URL segment (slug || id).
+  const slug = pkg.slug || uniqueSlug(slugify(pkg.title), (await getPackages()).map(e => e.slug || e.id))
   const item: MarketplacePackage = {
     ...pkg,
+    slug,
     id: newEntityId('pkg'),
     status: publicStatus(pkg.packageStatus),
     supplierId: adminId,
@@ -163,7 +208,10 @@ export async function setPackageStatus(id: string, packageStatus: PackageStatus)
 export async function duplicatePackage(id: string, adminId: string): Promise<MarketplacePackage | null> {
   const original = await getPackageById(id)
   if (!original) return null
-  const { id: _id, createdAt: _c, updatedAt: _u, ...rest } = original
+  // Drop `slug` along with the identity fields — a copy must get its own
+  // freshly generated slug (addPackage's auto-slug branch only fires when
+  // slug is absent), not silently share the original's canonical URL.
+  const { id: _id, createdAt: _c, updatedAt: _u, slug: _s, ...rest } = original
   return addPackage(
     { ...rest, title: `${original.title} (copy)`, packageStatus: 'draft', featured: false },
     adminId,

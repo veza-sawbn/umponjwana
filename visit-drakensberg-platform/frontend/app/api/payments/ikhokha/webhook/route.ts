@@ -37,12 +37,32 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: false }, { status: 502 })
   }
 
-  const paid = /success|paid|complete/i.test(String(status?.status ?? status?.responseCode ?? ''))
+  // Use word-boundary matching so "complete" never matches "completed".
+  // iKhokha sets the payment link's lifecycle status to "completed" when the
+  // customer finishes the payment flow — regardless of whether the card was
+  // approved or declined. The previous substring pattern /success|paid|complete/i
+  // therefore matched "completed" for both outcomes, causing declined payments
+  // to be recorded as paid. \b anchors require the matched word to stand alone,
+  // so "completed", "uncompleted", "unpaid", etc. are all rejected.
+  const paid = /\b(success|paid|complete)\b/i.test(
+    String(status?.status ?? status?.responseCode ?? ''),
+  )
 
   if (!paid) {
     await admin.from('vd_payment_links')
       .update({ status: 'failed', raw_status_response: status, updated_at: new Date().toISOString() })
       .eq('id', link.id)
+
+    // Stamp the decline on the invoice itself so the customer sees accurate
+    // status when they return to the invoice page later — not only via the
+    // ?payment=failed redirect that disappears after the first page load.
+    if (link.invoice_id) {
+      await admin.from('vd_invoices')
+        .update({ payment_declined_at: new Date().toISOString(), updated_at: new Date().toISOString() })
+        .eq('id', link.invoice_id)
+        .neq('status', 'paid') // never overwrite an already-settled invoice
+    }
+
     return NextResponse.json({ ok: true })
   }
 
@@ -102,7 +122,10 @@ export async function POST(req: Request) {
       // service-role client since there's no customer session here to
       // notify() through.
       if (confirmedBooking) {
-        const value = confirmedBooking.value as { customerName?: string; guests?: number } | null
+        const value = confirmedBooking.value as {
+          customerName?: string; guests?: number; userId?: string; region?: string; total?: number
+          analyticsAnonId?: string; analyticsSessionId?: string | null
+        } | null
         const guests = value?.guests ?? 1
         const rows = (confirmedBooking.supplier_ids ?? []).map((sid: string) => ({
           user_id: sid,
@@ -112,6 +135,30 @@ export async function POST(req: Request) {
           link: '/supplier/bookings',
         }))
         if (rows.length > 0) await admin.from('vd_notifications').insert(rows)
+
+        // Booking funnel completion (§3/§5) — fires here, on actual payment
+        // confirmation, not at checkout submission (which only creates a
+        // 'pending' hold; see lib/bookings.ts). No browser session exists in
+        // a webhook, so this inserts directly (service role bypasses RLS —
+        // vd_analytics_events has no client-facing insert path by design)
+        // using the anon/session ids the checkout page stamped onto the
+        // booking when it was created, so this still attributes correctly
+        // to the visitor session that started the booking. Best-effort:
+        // never lets an analytics hiccup fail the payment confirmation.
+        if (value?.analyticsAnonId) {
+          await admin.from('vd_analytics_events').insert({
+            session_id: value.analyticsSessionId ?? null,
+            anon_id: value.analyticsAnonId,
+            user_id: value.userId ?? null,
+            event_name: 'booking_completed',
+            properties: {
+              booking_id: order.booking_id, reference: confirmedBooking.reference,
+              region: value.region, guests, total: value.total,
+            },
+          }).then(({ error }) => {
+            if (error) console.error('[ikhokha webhook] booking_completed tracking failed:', error)
+          })
+        }
       }
     }
 

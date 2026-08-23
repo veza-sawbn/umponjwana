@@ -66,17 +66,17 @@ export const SITE_CONTENT_DEFAULTS = {
     ] as HomeCard[],
     regions: [
       {
-        id: 'reg-north', name: 'North Berg', subtitle: 'Royal Natal · Bergville · Amphitheatre',
+        id: 'reg-north', name: 'Northern Drakensberg', subtitle: 'Royal Natal · Bergville · Amphitheatre',
         desc: 'Home to the iconic Amphitheatre and Tugela Falls — the second highest waterfall in the world. Gateway town: Bergville.',
         img: 'https://images.unsplash.com/photo-1590098563548-8f14eed3a47f?w=900&q=80', href: '/regions#northern', visible: true,
       },
       {
-        id: 'reg-central', name: 'Central Berg', subtitle: 'Cathedral Peak · Winterton · Champagne Valley',
+        id: 'reg-central', name: 'Central Drakensberg', subtitle: 'Cathedral Peak · Winterton · Champagne Valley',
         desc: 'Alpine meadows, the richest San rock art in the world and dramatic escarpment views stretching to Lesotho. Gateway town: Winterton.',
         img: 'https://images.unsplash.com/photo-1542587222-e14b891ee40b?w=900&q=80', href: '/regions#central', visible: true,
       },
       {
-        id: 'reg-south', name: 'South Berg', subtitle: 'Sani Pass · Underberg · Himeville',
+        id: 'reg-south', name: 'Southern Drakensberg', subtitle: 'Sani Pass · Underberg · Himeville',
         desc: 'The legendary Sani Pass climbs to Lesotho through a raw mountain landscape. Boutique villages Himeville and Underberg sit at its foot.',
         img: 'https://images.unsplash.com/photo-1503614472-8c93d56e92ce?w=900&q=80', href: '/regions#southern', visible: true,
       },
@@ -134,6 +134,16 @@ export const SITE_CONTENT_DEFAULTS = {
     heading: 'Activities',
     subheading: 'Guided experiences, tours and adventures across the Drakensberg',
   },
+  tours_page: {
+    eyebrow: 'Guided departures',
+    heading: 'Guided Tours',
+    subheading: 'Multi-day treks and tours led by verified local operators, with scheduled departures you can join or book privately',
+  },
+  transport_page: {
+    eyebrow: 'Getting around',
+    heading: 'Shuttle Routes',
+    subheading: 'Fixed-price transfers between towns, trailheads and valleys, run by verified transport partners',
+  },
   reserves_page: {
     eyebrow: 'Protected wilderness',
     heading: 'Nature Reserves',
@@ -165,7 +175,7 @@ export const SITE_CONTENT_DEFAULTS = {
     itineraries_eyebrow: 'Itineraries', itineraries_heading: 'How long to stay',
     essentials_eyebrow: 'Need to know', essentials_heading: 'Essentials',
     essential_1_title: 'Getting there',
-    essential_1_body: 'Fly to Durban (King Shaka) or Johannesburg (OR Tambo). From Durban it\'s a 3.5-hour drive to the Northern Berg, 2.5 hours to the Central Berg. Car hire is recommended.',
+    essential_1_body: 'Fly to Durban (King Shaka) or Johannesburg (OR Tambo). From Durban it\'s a 3.5-hour drive to the Northern Drakensberg, 2.5 hours to the Central Drakensberg. Car hire is recommended.',
     essential_2_title: 'Entry & permits',
     essential_2_body: 'A daily conservation fee applies in all KZN Wildlife reserves. Hiking permits for overnight trails must be pre-booked. No entry visa required for most nationalities for stays under 90 days.',
     essential_3_title: 'What to bring',
@@ -173,6 +183,18 @@ export const SITE_CONTENT_DEFAULTS = {
     essential_4_title: 'Safety',
     essential_4_body: 'Never hike alone above the escarpment. Register your route with the camp office. Carry a whistle, first aid kit, and a charged phone. Afternoon lightning is common in summer — be off exposed ridges by 1 pm.',
   },
+  // SEO overrides for static pages — edited via /admin/seo.
+  // Values here take precedence over the layout.tsx defaults for each route.
+  // Stored as a flat record keyed by page id.
+  seo_overrides: {
+    home:           { meta_title: 'Visit Drakensberg — Discover the Berg', meta_description: 'Explore accommodation, hiking trails, guided experiences and events in the Drakensberg mountains.', og_title: 'Visit Drakensberg', og_description: 'Plan your Drakensberg adventure.', canonical: 'https://visitdrakensberg.com/' },
+    stays:          { meta_title: 'Accommodation in the Drakensberg | Visit Drakensberg', meta_description: 'Browse lodges, camps, guesthouses and self-catering options across the Drakensberg.', og_title: 'Drakensberg Accommodation', og_description: 'Find the perfect stay in the Berg.', canonical: 'https://visitdrakensberg.com/stays' },
+    hikes:          { meta_title: '', meta_description: '', og_title: '', og_description: '', canonical: '' },
+    activities:     { meta_title: '', meta_description: '', og_title: '', og_description: '', canonical: '' },
+    events:         { meta_title: '', meta_description: '', og_title: '', og_description: '', canonical: '' },
+    guides:         { meta_title: '', meta_description: '', og_title: '', og_description: '', canonical: '' },
+    mydrakensberg:  { meta_title: '', meta_description: '', og_title: '', og_description: '', canonical: '' },
+  } as Record<string, { meta_title: string; meta_description: string; og_title: string; og_description: string; canonical: string }>,
   // Platform-wide settings edited on the main /admin/settings page, including
   // maintenance_mode, which middleware.ts reads to gate public traffic.
   platform_settings: {
@@ -215,6 +237,18 @@ export const SITE_CONTENT_DEFAULTS = {
     suppliers_cta: 'List your property',
     contact_heading: 'Contact',
     contact_email: 'hello@visitdrakensberg.com',
+  },
+  // Hero images shown in the right panel of the super menu overlay.
+  // Editable from Admin → Website → Navigation & Menu Images.
+  nav_menu: {
+    stays_image:      'https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=1200&q=80',
+    hikes_image:      'https://images.unsplash.com/photo-1551632811-561732d1e306?w=1200&q=80',
+    activities_image: 'https://images.unsplash.com/photo-1533130061792-64b345e4a833?w=1200&q=80',
+    shuttles_image:   'https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?w=1200&q=80',
+    regions_image:    'https://images.unsplash.com/photo-1516026672322-bc52d61a55d5?w=1200&q=80',
+    stories_image:    'https://images.unsplash.com/photo-1501854140801-50d01698950b?w=1200&q=80',
+    plan_image:       'https://images.unsplash.com/photo-1441974231531-c6227db76b6e?w=1200&q=80',
+    tours_image:      'https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?w=1200&q=80',
   },
 }
 

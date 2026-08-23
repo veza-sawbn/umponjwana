@@ -64,6 +64,11 @@ export default function ListWithUsPage() {
   const [done, setDone] = useState<{ reference: string; email: string } | null>(null)
   const [draftSavedAt, setDraftSavedAt] = useState<Date | null>(null)
   const restored = useRef(false)
+  // Password fields — deliberately kept out of the localStorage draft.
+  const [password, setPassword] = useState('')
+  const [confirmPassword, setConfirmPassword] = useState('')
+  // Whether the visitor already has a session (skip signUp on submit).
+  const [isSignedIn, setIsSignedIn] = useState(false)
 
   const set = useCallback(<K extends keyof Draft>(key: K, value: Draft[K]) => {
     setForm(f => ({ ...f, [key]: value }))
@@ -101,6 +106,7 @@ export default function ListWithUsPage() {
 
     supabase.auth.getUser().then(({ data: { user } }) => {
       if (!user) return
+      setIsSignedIn(true)
       const meta = (user.user_metadata ?? {}) as { full_name?: string }
       setForm(f => ({
         ...f,
@@ -215,6 +221,11 @@ export default function ListWithUsPage() {
       if (!form.contactName.trim()) return 'Tell us who we should speak to.'
       if (!/^\S+@\S+\.\S+$/.test(form.contactEmail.trim())) return 'Enter a valid email address.'
       if (!form.businessName.trim()) return 'Enter the registered or trading name of the business.'
+      // Password only required when creating a new account
+      if (!isSignedIn) {
+        if (password.length < 8) return 'Your password must be at least 8 characters.'
+        if (password !== confirmPassword) return 'Passwords do not match — please re-enter.'
+      }
       if (form.supplierTypes.length === 0) return 'Choose at least one thing you operate.'
     }
     if (current === 1) {
@@ -284,6 +295,36 @@ export default function ListWithUsPage() {
     setSubmitting(true)
     setError('')
     try {
+      // ── Step 1: create the supplier account if not already signed in ──────
+      // role: 'supplier' is the one elevated value a signup payload may ask
+      // for, and it grants nothing until an admin approves the account — see
+      // 20260809_signup_role_hardening.sql.
+      if (!isSignedIn) {
+        const { error: signUpError } = await supabase.auth.signUp({
+          email: form.contactEmail.trim().toLowerCase(),
+          password,
+          options: {
+            data: {
+              full_name: form.contactName.trim(),
+              role: 'supplier',
+              supplier_type: form.supplierTypes.join(','),
+            },
+          },
+        })
+        if (signUpError) {
+          const msg = signUpError.message.toLowerCase()
+          if (msg.includes('already registered') || msg.includes('already been registered')) {
+            setError(
+              'This email address already has an account. Sign in first, then return here to submit your application. If you forgot your password, use the "Forgot password" link on the sign-in page.',
+            )
+            setSubmitting(false)
+            return
+          }
+          throw signUpError
+        }
+      }
+
+      // ── Step 2: submit the listing application ────────────────────────────
       const application = await submitListingApplication({
         ...form,
         contactName: form.contactName.trim(),
@@ -320,10 +361,17 @@ export default function ListWithUsPage() {
           <p className="font-sans text-sm text-gray-500 mb-2">
             Reference <span className="text-[#2d6a4f] font-medium">{done.reference}</span>
           </p>
-          <p className="font-sans text-sm text-gray-500 max-w-md mx-auto mb-8 leading-relaxed">
+          <p className="font-sans text-sm text-gray-500 max-w-md mx-auto mb-4 leading-relaxed">
             Our team reviews every operator before they go live — usually within two business days.
-            We&apos;ll email <span className="text-black">{done.email}</span> with the outcome and, once approved,
-            an invitation to set up your supplier portal.
+            We&apos;ll email <span className="text-black">{done.email}</span> with the outcome.
+          </p>
+          <p className="font-sans text-sm text-gray-500 max-w-md mx-auto mb-8 leading-relaxed">
+            Your supplier account is ready — please confirm your email address first (check your inbox),
+            then{' '}
+            <Link href="/auth/login" className="text-[#2d6a4f] underline underline-offset-2 hover:text-[#235a3f]">
+              sign in
+            </Link>
+            {' '}to access your portal once approved.
           </p>
           <div className="flex items-center justify-center gap-3 flex-wrap">
             <Link href="/" className="bg-[#2d6a4f] text-white px-6 py-3 font-sans text-sm hover:bg-[#235a3f] transition-colors">
@@ -424,6 +472,31 @@ export default function ListWithUsPage() {
                   The entity that will invoice and be paid out. You can give a different public-facing name next.
                 </p>
               </div>
+
+              {/* Password — only when the visitor doesn't already have an account */}
+              {!isSignedIn && (
+                <div className="border border-gray-100 bg-gray-50/60 px-4 py-4 space-y-4">
+                  <div>
+                    <p className="font-sans text-xs font-medium text-gray-700 mb-0.5">Create your supplier account</p>
+                    <p className="font-sans text-[11px] text-gray-400 leading-relaxed">
+                      This gives you immediate access once your application is approved — no separate invite needed.
+                      Confirm your email address after submitting.
+                    </p>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className={labelCls}>Password</label>
+                      <input type="password" value={password} onChange={e => setPassword(e.target.value)}
+                        autoComplete="new-password" placeholder="Min. 8 characters" className={inputCls} />
+                    </div>
+                    <div>
+                      <label className={labelCls}>Confirm password</label>
+                      <input type="password" value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)}
+                        autoComplete="new-password" placeholder="Re-enter password" className={inputCls} />
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
 
             <div className="bg-white border border-gray-200 p-6 lg:p-8 space-y-5">

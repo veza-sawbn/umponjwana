@@ -5,7 +5,8 @@ import { useRouter } from 'next/navigation'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { signIn } from '@/lib/auth'
+import { signIn, supabase } from '@/lib/auth'
+import { trackEvent, AnalyticsEvent } from '@/lib/analytics'
 
 const schema = z.object({
   email: z.string().email('Enter a valid email'),
@@ -24,9 +25,41 @@ export default function LoginPage() {
     setAuthError(null)
     try {
       const result = await signIn(data.email, data.password)
-      const role = result?.user?.app_metadata?.role ?? result?.user?.user_metadata?.role
+      let role = result?.user?.app_metadata?.role ?? result?.user?.user_metadata?.role
+      let staffRole = result?.user?.app_metadata?.staff_role ?? result?.user?.user_metadata?.staff_role
+
+      // Auth metadata is set at invite/creation time and can be incomplete —
+      // e.g. accounts created outside the standard invite flow, or ones where
+      // only user_metadata (not app_metadata) was ever set. profiles is the
+      // authoritative record for both fields, so confirm against it rather
+      // than trust metadata alone: this is the same fallback middleware.ts
+      // already uses, kept in sync here so the very first navigation lands
+      // in the right place instead of bouncing through a wrong default and
+      // back.
+      if (result?.user?.id) {
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('role, staff_role')
+          .eq('id', result.user.id)
+          .maybeSingle()
+        if (profile) {
+          role = profile.role ?? role
+          staffRole = profile.staff_role ?? staffRole
+        }
+      }
+
+      // Awaited so the hard navigation below doesn't tear the page down
+      // mid-request and silently drop the event (same fix as registration).
+      await trackEvent(AnalyticsEvent.LOGIN, { role })
+
       const redirect = new URLSearchParams(window.location.search).get('redirect')
-      const defaultPath = role === 'supplier' ? '/supplier' : role === 'admin' ? '/admin' : '/account'
+      // Operations employees have role='visitor' but belong in their own
+      // /operations environment — not the admin console.
+      const defaultPath =
+        role === 'supplier' ? '/supplier'
+        : role === 'admin' ? '/admin'
+        : staffRole === 'operations' ? '/operations'
+        : '/account'
       const targetPath = redirect?.startsWith('/') && !redirect.startsWith('//') ? redirect : defaultPath
       // Hard navigation: guarantees the middleware sees the fresh session
       // cookie and bypasses any prefetched redirect cached by the router.

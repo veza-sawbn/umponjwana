@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { ChevronRight, ChevronLeft, Plus, Trash2 } from 'lucide-react'
 import { supabase } from '@/lib/auth'
+import { effectiveSupplierId } from '@/lib/effective-supplier'
 import { getPropertiesBySupplier, type Property } from '@/lib/properties'
 import { addRoom } from '@/lib/rooms'
 import { supplierMediaSource } from '@/lib/supplier-media'
@@ -94,7 +95,7 @@ export default function NewRoomPage() {
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data: { user } }) => {
-      if (user) getPropertiesBySupplier(user.id).then(setProperties)
+      if (user) getPropertiesBySupplier(effectiveSupplierId(user.id)).then(setProperties)
     })
   }, [])
 
@@ -127,7 +128,7 @@ export default function NewRoomPage() {
       await addRoom({
         propertyId: form.propertyId,
         propertyName: prop?.name ?? '',
-        supplierId: user.id,
+        supplierId: effectiveSupplierId(user.id),
         name: form.name,
         bedConfig: form.bedConfig,
         maxOccupancy: +form.maxOccupancy || 1,

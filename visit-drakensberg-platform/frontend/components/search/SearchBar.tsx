@@ -1,148 +1,90 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
-import { MapPin, Calendar, Users, Search, ChevronDown } from 'lucide-react'
+import { ArrowRight, Mic } from 'lucide-react'
 import { useBooking } from '@/lib/booking-context'
-import { getRegionNames } from '@/lib/regions'
+import { trackEvent, AnalyticsEvent } from '@/lib/analytics'
 
-const DEFAULT_REGION_LABELS = ['All Drakensberg']
+/* ------------------------------------------------------------------
+   Discovery search bar — sits inside the home hero photo.
+   Keeps the same export name (SearchBar) and useBooking integration
+   so page.tsx and any other consumers need no changes at all.
+------------------------------------------------------------------- */
+
+const PLACEHOLDERS = [
+  'Where do you want to explore?',
+  'Search hikes, stays, guides…',
+  'Tugela Falls, Sani Pass, Cathedral Peak…',
+  'Find your Drakensberg adventure…',
+]
 
 export default function SearchBar() {
-  const router = useRouter()
-  const { setSearch, region: savedRegion, checkIn: savedCheckIn, checkOut: savedCheckOut, guests: savedGuests } = useBooking()
-  const [query, setQuery] = useState('')
-  const [region, setRegion] = useState(savedRegion || '')
-  const [regions, setRegions] = useState(DEFAULT_REGION_LABELS)
-  const [checkIn, setCheckIn] = useState(savedCheckIn || '')
-  const [checkOut, setCheckOut] = useState(savedCheckOut || '')
-  const [guests, setGuests] = useState(savedGuests || 2)
-  const [isMobileExpanded, setIsMobileExpanded] = useState(false)
+  const router    = useRouter()
+  const { setSearch } = useBooking()
+  const inputRef  = useRef<HTMLInputElement>(null)
 
-  const today = new Date().toISOString().split('T')[0]
+  const [query,   setQuery]   = useState('')
+  const [focused, setFocused] = useState(false)
+  const [phIndex, setPhIndex] = useState(0)
 
+  /* rotate placeholder while the bar is idle */
   useEffect(() => {
-    getRegionNames().then(names => setRegions(['All Drakensberg', ...names]))
-  }, [])
+    if (focused || query) return
+    const t = setInterval(() => setPhIndex(i => (i + 1) % PLACEHOLDERS.length), 4000)
+    return () => clearInterval(t)
+  }, [focused, query])
 
   function handleSearch() {
-    setSearch(region, checkIn, checkOut, guests)
-    const params = new URLSearchParams()
-    if (query.trim()) params.set('q', query.trim())
-    if (region) params.set('region', region)
-    if (checkIn) params.set('check_in', checkIn)
-    if (checkOut) params.set('check_out', checkOut)
-    params.set('guests', String(guests))
+    const term = query.trim()
+    if (!term) return
+    setSearch('', '', '', 2)
+    const params = new URLSearchParams({ q: term, region: 'drakensberg' })
     router.push(`/search?${params.toString()}`)
+    trackEvent(AnalyticsEvent.SEARCH_PERFORMED, { query: term, source: 'hero' })
   }
 
   return (
-    <div className="bg-white/50 backdrop-blur-md border border-white/20 shadow-lg">
-      <button
-        type="button"
-        onClick={() => setIsMobileExpanded(open => !open)}
-        aria-expanded={isMobileExpanded}
-        aria-controls="home-search-availability-fields"
-        className="md:hidden w-full bg-[#2d6a4f] text-white px-5 py-4 flex items-center justify-between gap-3 font-sans text-sm tracking-[0.08em] uppercase"
-      >
-        <span className="flex items-center gap-2.5">
-          <Search size={15} />
-          Search Availability
-        </span>
-        <ChevronDown size={16} className={`transition-transform ${isMobileExpanded ? 'rotate-180' : ''}`} />
-      </button>
+    <div className="w-full">
+      <div className={[
+        'flex items-center gap-3',
+        'bg-black/40 backdrop-blur-lg',
+        'border rounded-full',
+        'px-4 py-2.5',
+        'transition-all duration-300',
+        focused
+          ? 'border-gold shadow-[0_0_0_3px_rgba(201,169,110,0.22),0_16px_48px_rgba(0,0,0,0.55)]'
+          : 'border-white/20 shadow-[0_8px_36px_rgba(0,0,0,0.5)]',
+      ].join(' ')}>
 
-      <div id="home-search-availability-fields" className={`${isMobileExpanded ? 'block' : 'hidden'} md:block`}>
-      {/* Free-text query */}
-      <div className="px-5 py-4 border-b border-black/5 flex items-center gap-3">
-        <Search size={14} className="text-gray-400 shrink-0" />
         <input
-          type="search"
+          ref={inputRef}
           value={query}
           onChange={e => setQuery(e.target.value)}
-          onKeyDown={e => { if (e.key === 'Enter') handleSearch() }}
-          placeholder="Search lodges, hikes, activities, towns…"
+          onFocus={() => setFocused(true)}
+          onBlur={() =>  setFocused(false)}
+          onKeyDown={e => e.key === 'Enter' && handleSearch()}
+          placeholder={PLACEHOLDERS[phIndex]}
           aria-label="Search the Drakensberg"
-          className="w-full font-sans text-sm text-[#111] placeholder:text-gray-400 bg-transparent focus:outline-none"
+          className="flex-1 min-w-0 bg-transparent border-0 outline-none font-sans text-[15px] font-light text-white placeholder:text-white/50 caret-gold"
         />
-      </div>
 
-      {/* Fields row */}
-      <div className="grid grid-cols-1 md:grid-cols-4 divide-y md:divide-y-0 md:divide-x divide-black/5">
+        <button
+          type="button"
+          aria-label="Voice search"
+          className="flex-none text-white/38 hover:text-gold transition-colors p-1"
+        >
+          <Mic size={16} />
+        </button>
 
-        {/* Region */}
-        <div className="px-5 py-4">
-          <p className="font-sans text-[10px] tracking-[0.14em] uppercase text-gray-400 mb-1.5 flex items-center gap-1.5">
-            <MapPin size={10} /> Where
-          </p>
-          <select
-            value={region}
-            onChange={e => setRegion(e.target.value)}
-            className="w-full font-sans text-sm text-[#111] bg-transparent focus:outline-none appearance-none cursor-pointer"
-          >
-            {regions.map(r => (
-              <option key={r} value={r === 'All Drakensberg' ? '' : r}>{r}</option>
-            ))}
-          </select>
-        </div>
-
-        {/* Check in */}
-        <div className="px-5 py-4">
-          <p className="font-sans text-[10px] tracking-[0.14em] uppercase text-gray-400 mb-1.5 flex items-center gap-1.5">
-            <Calendar size={10} /> Check in
-          </p>
-          <input
-            type="date"
-            value={checkIn}
-            onChange={e => setCheckIn(e.target.value)}
-            min={today}
-            className="w-full font-sans text-sm text-[#111] bg-transparent focus:outline-none"
-          />
-        </div>
-
-        {/* Check out */}
-        <div className="px-5 py-4">
-          <p className="font-sans text-[10px] tracking-[0.14em] uppercase text-gray-400 mb-1.5 flex items-center gap-1.5">
-            <Calendar size={10} /> Check out
-          </p>
-          <input
-            type="date"
-            value={checkOut}
-            onChange={e => setCheckOut(e.target.value)}
-            min={checkIn || today}
-            className="w-full font-sans text-sm text-[#111] bg-transparent focus:outline-none"
-          />
-        </div>
-
-        {/* Guests */}
-        <div className="px-5 py-4">
-          <p className="font-sans text-[10px] tracking-[0.14em] uppercase text-gray-400 mb-1.5 flex items-center gap-1.5">
-            <Users size={10} /> Guests
-          </p>
-          <div className="flex items-center gap-3">
-            <button
-              onClick={() => setGuests(g => Math.max(1, g - 1))}
-              aria-label="Remove one guest"
-              className="w-6 h-6 border border-gray-300 text-gray-500 hover:border-[#2d6a4f] hover:text-[#2d6a4f] text-sm transition-colors flex items-center justify-center"
-            >−</button>
-            <span className="font-sans text-sm text-[#111] min-w-[2ch] text-center" aria-live="polite">{guests}</span>
-            <button
-              onClick={() => setGuests(g => g + 1)}
-              aria-label="Add one guest"
-              className="w-6 h-6 border border-gray-300 text-gray-500 hover:border-[#2d6a4f] hover:text-[#2d6a4f] text-sm transition-colors flex items-center justify-center"
-            >+</button>
-          </div>
-        </div>
-      </div>
-
-      {/* Search button — full-width bottom strip */}
-      <button
-        onClick={handleSearch}
-        className="w-full bg-[#2d6a4f] hover:bg-[#235a3f] transition-colors text-white py-4 flex items-center justify-center gap-2.5 font-sans text-sm tracking-[0.08em] uppercase"
-      >
-        <Search size={15} />
-        Search Availability
-      </button>
+        <button
+          type="button"
+          onClick={handleSearch}
+          aria-label="Search"
+          className="flex-none w-9 h-9 rounded-full flex items-center justify-center bg-gold hover:bg-[#b8935a] transition-colors"
+        >
+          <ArrowRight size={16} className="text-white" strokeWidth={2.2} />
+        </button>
       </div>
     </div>
   )

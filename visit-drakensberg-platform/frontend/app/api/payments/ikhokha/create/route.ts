@@ -33,7 +33,7 @@ function isMissingTipColumn(error: { code?: string; message?: string } | null): 
 // returned paylinkUrl; the actual "mark as paid" happens later, in the
 // webhook route, once iKhokha confirms the payment really went through.
 export async function POST(req: Request) {
-  let body: { invoiceId?: string; bookingId?: string; tip?: unknown }
+  let body: { invoiceId?: string; bookingId?: string; tip?: unknown; shareToken?: unknown }
   try {
     body = await req.json()
   } catch {
@@ -47,16 +47,36 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'Online payment is not set up yet — please contact us to arrange payment.' }, { status: 503 })
   }
 
+  // A customer paying from an emailed or pasted invoice link has no session.
+  // Their credential is the link itself — the invoice id, which is 'inv-'
+  // plus a v4 UUID (or, on older links, the ?t= share token). The database
+  // decides what qualifies, via vd_invoice_payable: it demands a UUID-bearing
+  // reference, so a sequential invoice number buys nothing, and it refuses a
+  // revoked link.
+  const linkRef = typeof body.shareToken === 'string' && body.shareToken.length >= 32
+    ? body.shareToken
+    : (typeof body.invoiceId === 'string' ? body.invoiceId : '')
+
   const supabase = createRouteHandlerClient({ cookies })
   const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return NextResponse.json({ error: 'unauthorized' }, { status: 401 })
+  if (!user && !linkRef) return NextResponse.json({ error: 'unauthorized' }, { status: 401 })
 
   // RLS scopes every read below to the caller's own rows, or staff.
   let invoice: {
     id: string; order_id: string; invoice_number: string; balance: unknown
     currency: string; status: string; lines: InvoiceLine[] | null
+    user_id: string | null; share_revoked_at?: string | null
   } | null = null
-  if (body.invoiceId) {
+  if (!user && linkRef) {
+    const { data } = await supabaseAdmin().rpc('vd_invoice_payable', { p_ref: linkRef })
+    invoice = data as typeof invoice
+    if (!invoice) {
+      return NextResponse.json(
+        { error: "We couldn't find that invoice. Ask us to send you a fresh link." },
+        { status: 404 },
+      )
+    }
+  } else if (body.invoiceId) {
     const { data } = await supabase.from('vd_invoices').select('*').eq('id', body.invoiceId).maybeSingle()
     invoice = data
   } else {
@@ -92,7 +112,9 @@ export async function POST(req: Request) {
           { status: 400 },
         )
       }
-      const { data: setting } = await supabase
+      // Read with the service client: this is the server enforcing the
+      // setting, and the caller may have no session to read it under.
+      const { data: setting } = await supabaseAdmin()
         .from('vd_finance_settings').select('value').eq('key', 'tipping_enabled').maybeSingle()
       if (setting?.value === false) {
         return NextResponse.json({ error: 'Tipping is currently switched off.' }, { status: 400 })
@@ -112,6 +134,8 @@ export async function POST(req: Request) {
         cancelUrl: `${origin}/checkout/success?id=${body.bookingId}&payment=cancelled`,
       }
     : {
+        // The invoice's own address, which opens without a session — so the
+        // customer lands back on their paid invoice rather than on an error.
         successPageUrl: `${origin}/invoices/${invoice.id}?payment=success`,
         failurePageUrl: `${origin}/invoices/${invoice.id}?payment=failed`,
         cancelUrl: `${origin}/invoices/${invoice.id}?payment=cancelled`,
@@ -158,7 +182,9 @@ export async function POST(req: Request) {
     id: `plink-${randomUUID()}`,
     order_id: invoice.order_id,
     invoice_id: invoice.id,
-    user_id: user.id,
+    // Null for a guest order — vd_payment_links.user_id is nullable for
+    // exactly that case, and the webhook reconciles off the order either way.
+    user_id: user?.id ?? invoice.user_id ?? null,
     gateway: 'ikhokha',
     mode: process.env.IKHOKHA_MODE === 'live' ? 'live' : 'test',
     paylink_id: link.paylinkID,

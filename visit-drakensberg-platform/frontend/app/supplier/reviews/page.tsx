@@ -2,6 +2,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Star } from 'lucide-react'
 import { supabase } from '@/lib/auth'
+import { effectiveSupplierId } from '@/lib/effective-supplier'
 import { getSupplierEntities, type SupplierEntity } from '@/lib/supplier-entities'
 
 type Review = SupplierEntity & { guest: string; item: string; rating: number; date: string; comment: string }
@@ -17,7 +18,7 @@ export default function ReviewsPage() {
   useEffect(() => {
     async function load() {
       const { data } = await supabase.auth.getUser()
-      if (data.user) setReviews(await getSupplierEntities<Review>('reviews', data.user.id))
+      if (data.user) setReviews(await getSupplierEntities<Review>('reviews', effectiveSupplierId(data.user.id)))
       setLoading(false)
     }
     load()

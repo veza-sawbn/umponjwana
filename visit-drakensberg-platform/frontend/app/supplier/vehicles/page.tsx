@@ -3,6 +3,7 @@ import { useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
 import { CalendarOff, MapPin, Plus, Truck, Users, Wrench } from 'lucide-react'
 import { supabase } from '@/lib/auth'
+import { effectiveSupplierId } from '@/lib/effective-supplier'
 import {
   addVehicleBlock, getSupplierVehicles, removeVehicleBlock, setVehicleFleetStatus,
   vehicleFleetStatus, vehicleSeats, type FleetStatus, type TransportVehicle,
@@ -35,7 +36,7 @@ export default function VehiclesPage() {
 
   const load = useCallback(async () => {
     const { data } = await supabase.auth.getUser()
-    if (data.user) setVehicles(await getSupplierVehicles(data.user.id))
+    if (data.user) setVehicles(await getSupplierVehicles(effectiveSupplierId(data.user.id)))
     setLoading(false)
   }, [])
 

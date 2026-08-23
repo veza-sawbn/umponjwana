@@ -1,7 +1,7 @@
 import {
   LayoutDashboard, List, Building2, BedDouble, Zap, Map, Users, Truck,
   Sparkles, CalendarDays, Tag, BarChart2, Image, MessageSquare, Star, Clock,
-  Calculator, CalendarPlus, Wallet,
+  Calculator, CalendarPlus, Wallet, FileSignature, BookUser,
   type LucideIcon,
 } from 'lucide-react'
 
@@ -22,6 +22,7 @@ export interface SupplierTypeConfig {
 
 const SHARED_NAV: NavItem[] = [
   { href: '/supplier/bookings',     label: 'Bookings',      icon: CalendarDays },
+  { href: '/supplier/contacts',     label: 'Contacts',      icon: BookUser },
   { href: '/supplier/earnings',     label: 'Earnings',      icon: Wallet },
   { href: '/supplier/availability', label: 'Availability',  icon: Clock },
   { href: '/supplier/discounts',    label: 'Discounts',     icon: Tag },
@@ -50,6 +51,7 @@ export const SUPPLIER_CONFIG: Record<SupplierType, SupplierTypeConfig> = {
     nav: [
       { href: '/supplier',            label: 'Overview',      icon: LayoutDashboard },
       { href: '/supplier/activities', label: 'Activities',    icon: Zap },
+      { href: '/supplier/waivers',    label: 'Waivers',       icon: FileSignature },
       ...SHARED_NAV,
     ],
   },
@@ -65,6 +67,7 @@ export const SUPPLIER_CONFIG: Record<SupplierType, SupplierTypeConfig> = {
       { href: '/supplier/requests',   label: 'Trip Requests', icon: CalendarPlus },
       { href: '/supplier/company',    label: 'Company Profile', icon: Building2 },
       { href: '/supplier/staff',      label: 'Staff',         icon: List },
+      { href: '/supplier/waivers',    label: 'Waivers',       icon: FileSignature },
       ...SHARED_NAV,
     ],
   },

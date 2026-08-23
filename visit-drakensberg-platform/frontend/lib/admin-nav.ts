@@ -3,7 +3,8 @@ import {
   FileText, BarChart2, Search, Settings, Mountain,
   Globe, MapPin, Image, Store, Package, ShieldCheck,
   Receipt, Landmark, Banknote, ClipboardList, MessageSquare, Bus,
-  TreePine, Building2, FileSignature, UserCog, Wallet, Send,
+  TreePine, Building2, FileSignature, UserCog, Wallet, Send, Briefcase,
+  UserCircle, BookUser,
 } from 'lucide-react'
 
 // Single source of truth for admin navigation. The desktop sidebar renders
@@ -21,6 +22,8 @@ export type AdminNavItem = {
 
 export const ADMIN_NAV: AdminNavItem[] = [
   { href: '/admin', label: 'Overview', short: 'Home', icon: LayoutDashboard, exact: true },
+  { href: '/admin/customers', label: 'Customers', icon: UserCircle },
+  { href: '/admin/contacts', label: 'Contacts', icon: BookUser },
   { href: '/admin/listings', label: 'Listings', icon: ListChecks },
   { href: '/admin/suppliers', label: 'Suppliers', icon: Users },
   { href: '/admin/verification', label: 'Verification', icon: ShieldCheck },
@@ -31,8 +34,10 @@ export const ADMIN_NAV: AdminNavItem[] = [
   { href: '/admin/finance', label: 'Finance', icon: Landmark },
   { href: '/admin/settlements', label: 'Settlements', icon: Banknote },
   { href: '/admin/operations', label: 'Operations', icon: ClipboardList },
+  { href: '/admin/operations/managed-suppliers', label: 'Managed Suppliers', icon: Briefcase },
   { href: '/admin/transport', label: 'Transport', icon: Bus },
   { href: '/admin/messages', label: 'Communications', icon: MessageSquare },
+  { href: '/admin/campaigns', label: 'Email Campaigns', icon: Send },
   { href: '/admin/marketplace', label: 'Marketplace', icon: Store },
   { href: '/admin/packages', label: 'Package Builder', icon: Package },
   { href: '/admin/blog', label: 'Blog & Content', icon: FileText },
@@ -61,8 +66,9 @@ function group(title: string, hrefs: string[]) {
 /** Mobile drawer grouping — daily work first, everything else below it. */
 export const ADMIN_NAV_GROUPS = [
   group('Daily Work', [
-    '/admin', '/admin/invoices', '/admin/quotes', '/admin/orders',
-    '/admin/bookings', '/admin/messages', '/admin/operations', '/admin/transport',
+    '/admin', '/admin/customers', '/admin/contacts', '/admin/invoices', '/admin/quotes', '/admin/orders',
+    '/admin/bookings', '/admin/messages', '/admin/campaigns', '/admin/operations', '/admin/transport',
+    '/admin/operations/managed-suppliers',
   ]),
   group('Money', ['/admin/finance', '/admin/settlements']),
   group('Supply', ['/admin/listings', '/admin/suppliers', '/admin/verification', '/admin/marketplace', '/admin/packages']),

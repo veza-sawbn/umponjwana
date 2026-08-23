@@ -2,7 +2,7 @@
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { Map, Plus, Clock, Users, Mountain, Trash2 } from 'lucide-react'
-import { getTours, deleteTour, type Tour } from '@/lib/tours'
+import { getMyTours, deleteTour, type Tour } from '@/lib/tours'
 
 const DIFF_STYLE: Record<string, string> = {
   Easy: 'bg-emerald-100 text-emerald-700',
@@ -16,7 +16,8 @@ export default function ToursPage() {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    getTours().then(t => { setTours(t); setLoading(false) })
+    // Scoped to this supplier only — getTours() is the public catalog read.
+    getMyTours().then(t => { setTours(t); setLoading(false) })
   }, [])
 
   async function handleDelete(id: string) {

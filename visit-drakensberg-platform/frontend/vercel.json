@@ -7,6 +7,14 @@
     {
       "path": "/api/cron/expire-pending-bookings",
       "schedule": "0 3 * * *"
+    },
+    {
+      "path": "/api/cron/recompute-segments",
+      "schedule": "30 3 * * *"
+    },
+    {
+      "path": "/api/cron/recompute-supplier-contacts",
+      "schedule": "0 4 * * *"
     }
   ]
 }

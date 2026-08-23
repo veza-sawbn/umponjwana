@@ -14,6 +14,7 @@ const COLUMNS = [
       { label: 'Stays', href: '/stays' },
       { label: 'Hikes', href: '/hikes' },
       { label: 'Activities', href: '/activities' },
+      { label: 'Guided Tours', href: '/tours' },
       { label: 'Packages', href: '/packages' },
       { label: 'Nature Reserves', href: '/nature-reserves' },
     ],
@@ -21,9 +22,9 @@ const COLUMNS = [
   {
     heading: 'Regions',
     links: [
-      { label: 'Northern Berg', href: '/regions#northern' },
-      { label: 'Central Berg', href: '/regions#central' },
-      { label: 'Southern Berg', href: '/regions#southern' },
+      { label: 'Northern Drakensberg', href: '/regions#northern' },
+      { label: 'Central Drakensberg', href: '/regions#central' },
+      { label: 'Southern Drakensberg', href: '/regions#southern' },
       { label: 'Royal Natal', href: '/regions#royal-natal' },
     ],
   },
@@ -34,6 +35,7 @@ const COLUMNS = [
       { label: 'Plan Your Trip', href: '/plan' },
       { label: 'Trail Map', href: '/hikes' },
       { label: 'Rock Art', href: '/activities' },
+      { label: 'Shuttle Routes', href: '/transport' },
     ],
   },
   {

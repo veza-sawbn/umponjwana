@@ -1,5 +1,9 @@
 import { supabase } from './auth'
-import { listEntities, insertEntity, updateEntity, deleteEntity, newEntityId } from './entities'
+import {
+  listEntities, listEntitiesByOwner, insertEntity, updateEntity, deleteEntity, newEntityId,
+} from './entities'
+import { getEffectiveSupplierId } from './effective-supplier'
+import type { SupabaseClient } from '@supabase/supabase-js'
 
 // A rate package is one way to buy a seat on a departure — e.g. "Self-Sufficient"
 // vs "Portered" on the same scheduled hike, each with its own price and its own
@@ -10,6 +14,25 @@ export type DeparturePackage = {
   pricePerPerson: number
   inclusions: string[]
   description?: string
+  // Links this package back to the tour pricing tier it was selected from
+  // (PricingTier in lib/tours.ts). Absent for freeform custom packages typed
+  // directly on the departure. When present, name/inclusions and price are
+  // resolved live from the current tour tier at read time — see
+  // composePackages() in lib/experiences.ts — so editing a tour tier updates
+  // every departure using it automatically, unless overridden below.
+  tierId?: string
+  // Per-departure override of a tier-linked package's price (e.g. a
+  // peak-season surcharge for one date). Ignored for freeform packages.
+  // Absent means "follow the tour tier's current price."
+  priceOverride?: number
+  // How many of the parent tour's itinerary days (lib/tours.ts, from Day 1)
+  // this rate package includes — see packageItinerary() in lib/tours.ts.
+  // E.g. a "Standard" package might cover just days 1-2 of a tour whose
+  // "Shuttle + Extra Night" package covers all 3 (the extra day carrying the
+  // shuttle transfer and the additional night's accommodation). Absent means
+  // "every authored day" — a package that never set this shows the tour's
+  // full itinerary, unchanged from before this field existed.
+  dayCount?: number
 }
 
 export type Departure = {
@@ -43,8 +66,27 @@ export function newDeparturePackageId(): string {
   return newEntityId('pkg')
 }
 
-export async function getDepartures(): Promise<Departure[]> {
-  return listEntities<Departure>(KIND)
+/**
+ * Public catalog read — every bookable departure on the platform.
+ * Use only on public-facing pages and in the admin console.
+ * Supplier-portal screens must use getMyDepartures() / getDeparturesBySupplier().
+ */
+export async function getDepartures(client?: SupabaseClient): Promise<Departure[]> {
+  return client ? listEntities<Departure>(KIND, client) : listEntities<Departure>(KIND)
+}
+
+/** Only the departures owned by `supplierId`. */
+export async function getDeparturesBySupplier(supplierId: string): Promise<Departure[]> {
+  return listEntitiesByOwner<Departure>(KIND, supplierId)
+}
+
+/**
+ * The signed-in supplier's own departures — or, for operations staff who have
+ * entered a managed supplier, that supplier's departures.
+ */
+export async function getMyDepartures(): Promise<Departure[]> {
+  const ownerId = await getEffectiveSupplierId()
+  return ownerId ? getDeparturesBySupplier(ownerId) : []
 }
 
 export async function addDeparture(dep: Omit<Departure, 'id' | 'createdAt'>): Promise<Departure> {

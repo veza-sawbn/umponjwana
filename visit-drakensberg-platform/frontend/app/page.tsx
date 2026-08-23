@@ -1,5 +1,5 @@
 'use client'
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useRef, useMemo } from 'react'
 import Link from 'next/link'
 import toast from 'react-hot-toast'
 import { ArrowRight, ChevronDown, X } from 'lucide-react'
@@ -18,6 +18,7 @@ import { getTrails, type Trail } from '@/lib/trails'
 import { getUpcomingExperiences, type TrekkingExperience } from '@/lib/experiences'
 import { getSupplierEntities } from '@/lib/supplier-entities'
 import { getActivities, type Activity } from '@/lib/activities'
+import { trackEvent, AnalyticsEvent } from '@/lib/analytics'
 
 /* ─── Data ─────────────────────────────────────────────────────────────────── */
 
@@ -70,36 +71,37 @@ function cardDimClass(card: HomeCard, inEditor: boolean) {
   return inEditor && card.visible === false ? 'opacity-35' : ''
 }
 
-/* ─── Edit-mode hero ─────────────────────────────────────────────────────────── */
+/* ─── Hero ───────────────────────────────────────────────────────────────────── */
 
-// Crossfades through a list of images, each with its own slow continuous
-// parallax drift (a fixed slight overscale panning slowly side to side —
-// not a zoom, the scale never changes) that restarts from scratch every
-// time a slide comes back around. Below two images this is indistinguishable
-// from a static hero image, so callers only reach for it once there's an
-// actual carousel to show.
 const HERO_SLIDE_SECONDS = 7
 const HERO_FADE_SECONDS = 1.5
-const HERO_OVERSCALE = 1.12 // headroom for the pan so it never reveals an edge
+const HERO_OVERSCALE = 1.12
 
 function HeroCarousel({ images }: { images: string[] }) {
   const [index, setIndex] = useState(0)
+  const hasCycledRef = useRef(false)
 
   useEffect(() => {
     setIndex(0)
+    hasCycledRef.current = false
+    images.forEach(src => { const img = new window.Image(); img.src = src })
     if (images.length < 2) return
-    const id = setInterval(() => setIndex(i => (i + 1) % images.length), HERO_SLIDE_SECONDS * 1000)
+    const id = setInterval(() => {
+      hasCycledRef.current = true
+      setIndex(i => (i + 1) % images.length)
+    }, HERO_SLIDE_SECONDS * 1000)
     return () => clearInterval(id)
   }, [images])
 
   const panFromLeft = index % 2 === 0
+  const isFirstSlide = !hasCycledRef.current
 
   return (
     <AnimatePresence>
       <motion.div
         key={index}
         className="absolute inset-0 overflow-hidden"
-        initial={{ opacity: 0 }}
+        initial={{ opacity: isFirstSlide ? 1 : 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
         transition={{ duration: HERO_FADE_SECONDS, ease: 'easeInOut' }}
@@ -108,6 +110,8 @@ function HeroCarousel({ images }: { images: string[] }) {
           src={images[index]}
           alt="Drakensberg mountains"
           className="w-full h-full object-cover"
+          fetchPriority={isFirstSlide ? 'high' : 'auto'}
+          loading="eager"
           initial={{ scale: HERO_OVERSCALE, x: panFromLeft ? '-3%' : '3%', y: '-2%' }}
           animate={{ scale: HERO_OVERSCALE, x: panFromLeft ? '3%' : '-3%', y: '2%' }}
           transition={{ duration: HERO_SLIDE_SECONDS + HERO_FADE_SECONDS, ease: 'linear' }}
@@ -128,14 +132,20 @@ function HeroSection({ hero }: { hero: typeof SITE_CONTENT_DEFAULTS.hero }) {
 
   return (
     <EditableSection id="hero" label="Hero" className="relative h-screen min-h-[600px] flex flex-col">
-      <div className="absolute inset-0">
+      <div className="absolute inset-0 bg-slate-900">
         {hero.video_url ? (
           <video src={hero.video_url} autoPlay muted loop playsInline className="w-full h-full object-cover" />
         ) : carouselImages.length > 1 ? (
           <HeroCarousel images={carouselImages} />
         ) : (
           <Editable section="hero" fieldKey="image_url" value={imageUrl} label="Background Image" type="image">
-            <img src={imageUrl} alt="Drakensberg mountains" className="w-full h-full object-cover" />
+            <img
+              src={imageUrl}
+              alt="Drakensberg mountains"
+              className="w-full h-full object-cover"
+              fetchPriority="high"
+              loading="eager"
+            />
           </Editable>
         )}
         <div
@@ -253,6 +263,12 @@ export default function HomePage() {
       const { error } = await supabase.from('vd_newsletter_subscribers').insert({ email })
       // 23505 = already subscribed; treat as success.
       if (error && error.code !== '23505') throw error
+      // Record explicit marketing consent (§22) and the funnel event (§3) —
+      // best-effort, never blocks the subscribe confirmation the visitor sees.
+      supabase.rpc('vd_set_consent', {
+        p_email: email, p_consent_type: 'marketing_email', p_granted: true, p_source: 'newsletter_footer',
+      }).then(({ error: consentError }) => { if (consentError) console.error('[newsletter] consent record failed:', consentError) })
+      trackEvent(AnalyticsEvent.NEWSLETTER_SIGNUP, { source: 'home_footer' })
       toast.success('You’re on the list — see you in the next dispatch.')
       setNewsletterEmail('')
     } catch {
@@ -632,7 +648,7 @@ export default function HomePage() {
         </div>
       )}
 
-      {/* ── Hero (fixed at the top) ── */}
+      {/* ── Hero ── */}
       <HeroSection hero={hero} />
 
       {/* ── Reorderable sections ── */}

@@ -1,8 +1,9 @@
-import { getTours, type Tour } from './tours'
+import { getTours, packageItinerary, type Tour, type ItineraryDay } from './tours'
 import { getDepartures, type Departure, type DeparturePackage } from './departures'
 import { getTrails, type Trail } from './trails'
+import type { SupabaseClient } from '@supabase/supabase-js'
 
-export type { DeparturePackage }
+export type { DeparturePackage, ItineraryDay }
 
 // A "Trekking Experience" is the marketplace view of one scheduled departure
 // joined with its parent tour product. Suppliers keep creating Tours and
@@ -53,6 +54,18 @@ export type TrekkingExperience = {
   // Always has at least one entry — a single "Standard" package synthesized
   // from pricePerPerson when the supplier hasn't configured packages.
   packages: DeparturePackage[]
+  // The tour's full day-by-day plan (every day, unfiltered). A given
+  // package only covers a prefix of it — see packageItinerary() in
+  // lib/tours.ts and DeparturePackage.dayCount — so callers filtering per
+  // selected package should always go through that helper rather than
+  // reading this array directly. Empty on tours with no itinerary authored.
+  itinerary: ItineraryDay[]
+}
+
+/** The days a specific rate package's guests should see/receive, filtered from `exp.itinerary`. */
+export function packageDurationDays(exp: Pick<TrekkingExperience, 'itinerary' | 'durationDays'>, pkg: DeparturePackage | undefined): number {
+  if (!pkg || exp.itinerary.length === 0) return exp.durationDays
+  return packageItinerary(exp.itinerary, pkg.dayCount).length
 }
 
 function addDays(iso: string, days: number): string {
@@ -61,8 +74,23 @@ function addDays(iso: string, days: number): string {
   return d.toISOString().slice(0, 10)
 }
 
+// A package linked to a tour pricing tier (DeparturePackage.tierId) always
+// shows that tier's *current* name/inclusions/price — editing a tour tier
+// updates every departure using it automatically — except price, which the
+// supplier can freeze per departure via priceOverride (e.g. a peak-season
+// surcharge). A package whose tier was since deleted falls back to its own
+// stored snapshot, and a freeform custom package is returned unchanged.
+function resolveTierPackages(packages: DeparturePackage[], tour: Tour): DeparturePackage[] {
+  return packages.map(p => {
+    if (!p.tierId) return p
+    const tier = tour.pricingTiers?.find(t => t.id === p.tierId)
+    if (!tier) return p
+    return { ...p, name: tier.name, inclusions: tier.inclusions, pricePerPerson: p.priceOverride ?? tier.pricePerPerson }
+  })
+}
+
 function composePackages(dep: Departure, tour: Tour): DeparturePackage[] {
-  if (dep.packages && dep.packages.length > 0) return dep.packages
+  if (dep.packages && dep.packages.length > 0) return resolveTierPackages(dep.packages, tour)
   return [{
     id: 'standard',
     name: 'Standard',
@@ -111,11 +139,15 @@ function compose(dep: Departure, tour: Tour, trail?: Trail): TrekkingExperience 
     equipmentIncluded: tour.equipmentIncluded ?? !!tour.included?.includes('Equipment'),
     guideExperienceYears: tour.guideExperienceYears ?? null,
     status: dep.status,
+    itinerary: tour.itinerary ?? [],
   }
 }
 
-async function loadAll(): Promise<TrekkingExperience[]> {
-  const [departures, tours, trails] = await Promise.all([getDepartures(), getTours(), getTrails()])
+// Every entry point accepts an optional Supabase client so Server
+// Components can pass a session-less client (lib/supabase-public.ts) — same
+// pattern as lib/regions.ts's getRegions(). Existing callers are unaffected.
+async function loadAll(client?: SupabaseClient): Promise<TrekkingExperience[]> {
+  const [departures, tours, trails] = await Promise.all([getDepartures(client), getTours(client), getTrails(client)])
   const tourById = new Map(tours.filter(t => t.status === 'active').map(t => [t.id, t]))
   const trailById = new Map(trails.map(t => [t.id, t]))
   const list: TrekkingExperience[] = []
@@ -128,19 +160,19 @@ async function loadAll(): Promise<TrekkingExperience[]> {
 }
 
 /** All published upcoming experiences, soonest first. */
-export async function getUpcomingExperiences(): Promise<TrekkingExperience[]> {
+export async function getUpcomingExperiences(client?: SupabaseClient): Promise<TrekkingExperience[]> {
   const today = new Date().toISOString().slice(0, 10)
-  return (await loadAll())
+  return (await loadAll(client))
     .filter(e => e.departureDate >= today)
     .sort((a, b) => a.departureDate.localeCompare(b.departureDate))
 }
 
 /** Published upcoming experiences that use a specific hiking trail. */
-export async function getExperiencesByTrail(trailId: string): Promise<TrekkingExperience[]> {
-  return (await getUpcomingExperiences()).filter(e => e.trailId === trailId)
+export async function getExperiencesByTrail(trailId: string, client?: SupabaseClient): Promise<TrekkingExperience[]> {
+  return (await getUpcomingExperiences(client)).filter(e => e.trailId === trailId)
 }
 
 /** One experience by its id (departure id) — includes past departures. */
-export async function getExperienceById(id: string): Promise<TrekkingExperience | null> {
-  return (await loadAll()).find(e => e.id === id) ?? null
+export async function getExperienceById(id: string, client?: SupabaseClient): Promise<TrekkingExperience | null> {
+  return (await loadAll(client)).find(e => e.id === id) ?? null
 }

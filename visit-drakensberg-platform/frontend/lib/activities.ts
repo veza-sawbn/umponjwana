@@ -1,9 +1,28 @@
-import { listEntities, getEntity, insertEntity, updateEntity, deleteEntity, newEntityId } from './entities'
+import { listEntities, getEntity, insertEntity, updateEntity, deleteEntity, newEntityId, listEntitiesByOwner } from './entities'
+import type { GraphFields } from './graph-fields'
+import { slugify, uniqueSlug } from './slugify'
+import type { Season, SeasonTopic } from './seasons'
+import type { SupabaseClient } from '@supabase/supabase-js'
 
-// Shared vocabulary for every surface that describes an activity: the supplier
-// wizard, the activity edit form and the public listing application.
-export const ACTIVITY_CATEGORIES = ['Adventure', 'Nature', 'Water', 'Cultural', 'Wellness', 'Family']
+// Single canonical activity-category vocabulary — imported by both the
+// supplier creation/edit forms and the public /activities filter tabs.
+// Previously these were two independently hand-maintained lists that had
+// drifted apart: the supplier form offered 'Nature'/'Water' (which the
+// public page never showed, making activities tagged with them
+// unreachable via the public filter), and the public page offered
+// 'Wildlife' (which no supplier could ever select, so the tab always
+// returned zero results). This list is their union, plus the destination
+// graph's new "Things to Do" taxonomy values.
+export const ACTIVITY_CATEGORIES = [
+  'Adventure', 'Nature', 'Water', 'Wildlife', 'Cultural', 'Wellness', 'Family',
+  'Photography', 'Horse Riding', 'Fishing', 'Rock Climbing', 'Cycling',
+] as const
 
+export type ActivityCategory = typeof ACTIVITY_CATEGORIES[number]
+
+// The other two halves of that shared vocabulary, on the same footing as the
+// categories above: the supplier wizard, the activity edit form and the public
+// listing application all read these rather than keeping their own copies.
 export const ACTIVITY_DIFFICULTIES = ['Easy', 'Moderate', 'Challenging', 'Extreme']
 
 export const ACTIVITY_INCLUSIONS = [
@@ -37,25 +56,36 @@ export type Activity = {
   depositPercent: string
   status: 'active' | 'draft'
   createdAt: string
-}
+  /** Which seasons this activity suits — powers the region "When to Go"
+   *  module and /regions/[slug]/[season] pages. See lib/seasons.ts. */
+  seasons?: Season[]
+  /** Which season-page topic groups ("By Water", "In the Mountains", …)
+   *  this activity should appear under. See lib/seasons.ts. */
+  topics?: SeasonTopic[]
+} & GraphFields
 
 const KIND = 'activity'
 
-export async function getActivities(): Promise<Activity[]> {
-  return listEntities<Activity>(KIND)
+export async function getActivities(client?: SupabaseClient): Promise<Activity[]> {
+  return client ? listEntities<Activity>(KIND, client) : listEntities<Activity>(KIND)
 }
 
 export async function getActivitiesBySupplier(supplierId: string): Promise<Activity[]> {
-  const all = await listEntities<Activity>(KIND)
-  return all.filter(a => a.supplierId === supplierId)
+  // Owner-scoped at the database — see the note in lib/entities.ts on why
+  // listEntities() must not be used for supplier-facing reads.
+  return listEntitiesByOwner<Activity>(KIND, supplierId)
 }
 
-export async function getActivityById(id: string): Promise<Activity | null> {
-  return getEntity<Activity>(KIND, id)
+export async function getActivityById(id: string, client?: SupabaseClient): Promise<Activity | null> {
+  return client ? getEntity<Activity>(KIND, id, client) : getEntity<Activity>(KIND, id)
 }
 
 export async function addActivity(a: Omit<Activity, 'id' | 'createdAt'>): Promise<Activity> {
-  const activity: Activity = { ...a, id: newEntityId('act'), createdAt: new Date().toISOString() }
+  // Slug population (see lib/slugify.ts) — auto-generated from the
+  // activity name unless already supplied, unique against every other
+  // activity's canonical URL segment (slug || id).
+  const slug = a.slug || uniqueSlug(slugify(a.name), (await getActivities()).map(e => e.slug || e.id))
+  const activity: Activity = { ...a, slug, id: newEntityId('act'), createdAt: new Date().toISOString() }
   return insertEntity(KIND, activity)
 }
 

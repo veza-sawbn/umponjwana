@@ -112,6 +112,13 @@ export type OrderLine = {
   destination: string
   value: Record<string, unknown>
   created_at: string
+  // Staff appointed from the supplier's own roster (guide/driver) to deliver
+  // this line — see vd_assign_line_staff(). Null until someone is assigned.
+  assigned_kind: string | null
+  assigned_entity_id: string | null
+  assigned_name: string | null
+  assigned_email: string | null
+  assigned_at: string | null
 }
 
 export type OrderNote = {
@@ -418,6 +425,73 @@ export async function setLineFulfilment(lineId: string, status: string): Promise
     p_line_id: lineId,
     p_status: status,
   })
+  if (error) throw new Error(error.message)
+}
+
+/**
+ * Supplier portal: this supplier's order lines for one specific booking,
+ * found by joining through vd_orders.booking_id (order lines don't carry a
+ * booking id of their own). Used to let a supplier act on the same booking
+ * they see on /supplier/bookings (which reads the older vd_booking_orders
+ * table) without exposing the rest of the platform's order data.
+ */
+export async function getMyOrderLinesForBooking(bookingId: string): Promise<OrderLine[]> {
+  try {
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return []
+    const { data } = await supabase
+      .from('vd_order_lines')
+      .select('*, vd_orders!inner(booking_id)')
+      .eq('supplier_id', user.id)
+      .eq('vd_orders.booking_id', bookingId)
+    if (Array.isArray(data)) {
+      return (data as Array<OrderLine & { vd_orders?: unknown }>).map(({ vd_orders: _vd_orders, ...line }) => line)
+    }
+  } catch {}
+  return []
+}
+
+// ── Staff assignment (appoint a supplier's own guide/driver to a booking) ───
+
+export type AssignedStaff = { name: string; email: string }
+
+/**
+ * Ops (with manage_bookings) or the owning supplier appoints a roster entry
+ * (guide/driver) to deliver this line, then emails them directly — roster
+ * entities aren't platform users, so this can't go through lib/notifications.
+ * Assignment succeeding but the email failing is reported, not thrown: the
+ * appointment itself is the durable part.
+ */
+export async function assignLineStaff(
+  lineId: string,
+  kind: 'guides' | 'drivers',
+  entityId: string,
+): Promise<{ assigned: AssignedStaff; emailed: boolean }> {
+  const { data, error } = await supabase.rpc('vd_assign_line_staff', {
+    p_line_id: lineId,
+    p_kind: kind,
+    p_entity_id: entityId,
+  })
+  if (error) throw new Error(error.message)
+  const row = Array.isArray(data) ? data[0] : data
+  const assigned: AssignedStaff = { name: row.name, email: row.email }
+
+  let emailed = false
+  try {
+    const res = await fetch('/api/notifications/staff-assignment', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ lineId }),
+    })
+    emailed = res.ok && (await res.json())?.sent === true
+  } catch {}
+
+  return { assigned, emailed }
+}
+
+/** Remove a line's staff assignment (reassign from scratch, or the trip fell through). */
+export async function clearLineStaff(lineId: string): Promise<void> {
+  const { error } = await supabase.rpc('vd_clear_line_staff', { p_line_id: lineId })
   if (error) throw new Error(error.message)
 }
 

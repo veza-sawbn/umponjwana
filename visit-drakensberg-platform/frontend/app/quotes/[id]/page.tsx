@@ -39,6 +39,7 @@ export default function QuotePage() {
     setBusy('accept'); setError('')
     try {
       const { invoiceId } = await acceptQuote(quote.id)
+      // Opens without an account, which is what a guest accepting a quote has.
       router.push(`/invoices/${invoiceId}`)
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Could not accept this quote')

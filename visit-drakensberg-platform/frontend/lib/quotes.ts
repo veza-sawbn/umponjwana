@@ -152,6 +152,10 @@ export async function acceptQuote(id: string): Promise<{ orderId: string; invoic
   return { orderId: data.orderId, invoiceId: data.invoiceId }
 }
 
+// A guest who accepts a quote used to need the resulting invoice's share
+// token handed back to them (vd_quote_invoice_link). An invoice now opens on
+// its own address, so accepting simply redirects there.
+
 export async function declineQuote(id: string): Promise<void> {
   const { error } = await supabase.rpc('vd_decline_quote', { p_quote_id: id })
   if (error) throw new Error(error.message || 'Could not decline quote')
