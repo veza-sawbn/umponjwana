@@ -187,16 +187,27 @@ export async function submitListingApplication(draft: ListingApplicationDraft): 
     createdAt: new Date().toISOString(),
   }
 
-  const { error } = await supabase.from(TABLE).insert({
+  const row = {
     id: application.id,
     reference: application.reference,
     status: application.status,
     property_name: application.propertyName,
     contact_email: application.contactEmail,
     region: application.region,
-    commission_tier: application.commissionTier,
     value: application,
-  })
+  }
+
+  // commission_tier is a mirror of value->>'commissionTier', added by a later
+  // migration than the table itself. Deploys and migrations do not land in
+  // lockstep, so a build carrying the tier can reach a database that has not
+  // run 20260808 yet — and this form is live with real applicants. Mirror it
+  // when the column is there, and fall back to the JSON-only row when it is
+  // not, rather than losing the application over a column that only helps the
+  // review queue sort.
+  let { error } = await supabase.from(TABLE).insert({ ...row, commission_tier: application.commissionTier })
+  if (error && isMissingColumn(error.message, 'commission_tier')) {
+    ({ error } = await supabase.from(TABLE).insert(row))
+  }
 
   if (error) {
     const message = String(error.message || '')
@@ -209,6 +220,12 @@ export async function submitListingApplication(draft: ListingApplicationDraft): 
   }
 
   return application
+}
+
+/** PostgREST reports an unknown column either from its schema cache or straight from Postgres. */
+function isMissingColumn(message: string | undefined, column: string): boolean {
+  const m = String(message || '')
+  return m.includes(column) && /could not find|does not exist|schema cache/i.test(m)
 }
 
 export const PHOTO_MAX_BYTES = 8 * 1024 * 1024
