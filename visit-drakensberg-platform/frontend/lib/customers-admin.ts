@@ -53,7 +53,7 @@ const isStaff = (p: { role: string; staff_role: string | null }) => STAFF_ROLES.
  *  default) — an unbounded select on a table that grows past that silently
  *  returns only the first page. Every whole-table read this module does for
  *  cross-customer aggregation goes through this instead of a bare .select(). */
-async function fetchAllRows<T>(
+export async function fetchAllRows<T>(
   page: (from: number, to: number) => PromiseLike<{ data: T[] | null; error: { message: string } | null }>,
   label: string,
 ): Promise<T[]> {
