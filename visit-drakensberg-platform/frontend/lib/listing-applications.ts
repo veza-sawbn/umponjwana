@@ -1,13 +1,19 @@
 import { supabase } from './auth'
 
-// Public "List your property" applications (see
+// Public "list with us" applications (see
 // supabase/migrations/20260807_listing_applications.sql).
 //
 // An application is a lead, not a listing. Anyone — signed in or not — may
 // lodge one; nobody but an admin can read one back. Approving an application
 // is a human step that ends with a real supplier account and a vd_entities
-// property row, so nothing written here can reach the public catalog on its
-// own.
+// row, so nothing written here can reach the public catalog on its own.
+//
+// The journey covers every supplier type the platform runs, not just stays:
+// an applicant says what they operate, and answers a short block per type.
+// Deliberately short — the supplier portal already has a full wizard for each
+// type, so this only has to carry what a reviewer needs to say yes or no.
+// What ends up in profiles.supplier_type is the comma-joined list of the
+// types chosen here (see lib/supplier-context.tsx, which parses it back).
 
 export type ApplicationActivity = {
   name: string
@@ -27,6 +33,91 @@ export function emptyActivity(): ApplicationActivity {
     durationHours: '', maxGroup: '', minAge: '', pricePerPerson: '',
     included: [], description: '',
   }
+}
+
+/* ── Supplier types ──────────────────────────────────────────────────────── */
+
+// Mirrors SupplierType in lib/supplier-config.ts. Kept as plain strings here
+// because an application is data, not a live supplier — but the values must
+// match exactly, since approval joins them into profiles.supplier_type.
+export const APPLICANT_TYPES = [
+  {
+    id: 'Accommodation',
+    label: 'Somewhere to stay',
+    blurb: 'Lodge, guesthouse, hotel, cottage or campsite',
+  },
+  {
+    id: 'Activity',
+    label: 'Activities',
+    blurb: 'Abseiling, zip-line, horseback, guided day walks',
+  },
+  {
+    id: 'Guided Tours',
+    label: 'Guided tours',
+    blurb: 'Multi-day hikes, summit attempts, cultural tours',
+  },
+  {
+    id: 'Shuttle',
+    label: 'Transport',
+    blurb: 'Airport runs, trailhead drops, 4×4 transfers',
+  },
+  {
+    id: 'Experience',
+    label: 'Experiences',
+    blurb: 'Photography workshops, stargazing, wellness retreats',
+  },
+] as const
+
+export type ApplicantTypeId = (typeof APPLICANT_TYPES)[number]['id']
+
+/* ── Per-type detail. Enough for a reviewer to decide; the portal wizard
+      collects the rest once the account exists. ─────────────────────────── */
+
+export type StayDetails = {
+  propertyName: string
+  propertyType: string
+  elevation: string
+  amenities: string[]
+  roomCount: string
+}
+
+export type TourDetails = {
+  tourStyle: string
+  typicalDurationDays: string
+  guideCount: string
+  certifications: string
+}
+
+export type ShuttleDetails = {
+  fleetSize: string
+  vehicleTypes: string[]
+  routesServed: string
+  operatingLicence: string
+}
+
+export type ExperienceDetails = {
+  experienceStyle: string
+  typicalGroupSize: string
+  durationHours: string
+  setting: string
+}
+
+export const STAY_ROOM_BANDS = ['1–5', '6–15', '16–40', '40+']
+export const TOUR_STYLES = ['Day hikes', 'Multi-day trekking', 'Summit attempts', 'Cultural & heritage', 'Wildlife & birding']
+export const VEHICLE_TYPES = ['Sedan', 'Minibus (≤14)', 'Coach (15+)', '4×4', 'Trailer / luggage']
+export const EXPERIENCE_SETTINGS = ['Outdoors', 'Indoors', 'Both']
+
+export function emptyStay(): StayDetails {
+  return { propertyName: '', propertyType: '', elevation: '', amenities: [], roomCount: '' }
+}
+export function emptyTour(): TourDetails {
+  return { tourStyle: '', typicalDurationDays: '', guideCount: '', certifications: '' }
+}
+export function emptyShuttle(): ShuttleDetails {
+  return { fleetSize: '', vehicleTypes: [], routesServed: '', operatingLicence: '' }
+}
+export function emptyExperience(): ExperienceDetails {
+  return { experienceStyle: '', typicalGroupSize: '', durationHours: '', setting: '' }
 }
 
 /**
@@ -127,15 +218,24 @@ export type ListingApplication = {
   contactPhone: string
   businessName: string
   contactRole: string
-  // What they are listing
-  propertyName: string
-  propertyType: string
+  // What they operate — one or more of APPLICANT_TYPES. Joined with commas
+  // into profiles.supplier_type on approval.
+  supplierTypes: string[]
+  // Shared across every type
+  tradingName: string
   region: string
-  elevation: string
+  baseTown: string
   description: string
-  amenities: string[]
   photos: string[]
-  // Activities they run themselves
+  // Per-type blocks. Each is present in the record whatever the applicant
+  // picked — the ones for unselected types simply stay empty, which keeps the
+  // shape stable for anything reading an application back.
+  stay: StayDetails
+  tour: TourDetails
+  shuttle: ShuttleDetails
+  experience: ExperienceDetails
+  // Activities: the Activity type's own list, and also what a stay or tour
+  // operator adds when they run guided activities alongside the main offering.
   offersActivities: boolean
   activities: ApplicationActivity[]
   // Commercial terms the applicant asked for (see COMMISSION_TIERS — a
@@ -191,7 +291,10 @@ export async function submitListingApplication(draft: ListingApplicationDraft): 
     id: application.id,
     reference: application.reference,
     status: application.status,
-    property_name: application.propertyName,
+    // The mirrored name is whatever the applicant calls the thing they are
+    // listing: a stay has a property name, everyone else is known by their
+    // trading name.
+    property_name: application.stay.propertyName || application.tradingName,
     contact_email: application.contactEmail,
     region: application.region,
     value: application,
