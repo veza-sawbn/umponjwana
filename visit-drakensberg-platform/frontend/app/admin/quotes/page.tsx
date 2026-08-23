@@ -9,6 +9,7 @@ import { getFinanceSettings } from '@/lib/invoices'
 import { formatMoney } from '@/lib/allocation'
 import { useQuickParam } from '@/lib/admin-quick-param'
 import { supabase } from '@/lib/auth'
+import { getQuoteNextStep, nextStepBadgeClass } from '@/lib/next-step'
 
 // Quote module: build a sales quote for a prospective or existing customer,
 // send it, and let them accept it themselves — acceptance converts it into
@@ -316,6 +317,11 @@ export default function AdminQuotesPage() {
               <p className="font-display italic text-xl text-[#2d6a4f]">{formatMoney(Number(q.total), q.currency)}</p>
               <p className="font-sans text-xs text-gray-400">Valid until {fmt(q.valid_until)}</p>
             </div>
+            {(() => { const step = getQuoteNextStep(q); return (
+              <p title={step.detail} className={`inline-block mt-2 border font-sans text-[10px] tracking-[0.06em] uppercase px-2 py-0.5 ${nextStepBadgeClass(step.urgency)}`}>
+                Next: {step.label}
+              </p>
+            ) })()}
 
             <div className="flex gap-2 mt-3">
               <Link href={`/quotes/${q.id}`} className="flex-1 inline-flex items-center justify-center gap-1.5 border border-gray-200 py-2.5 font-sans text-sm text-[#2d6a4f]">
@@ -341,7 +347,7 @@ export default function AdminQuotesPage() {
       <div className="hidden md:block bg-white border border-gray-200 overflow-x-auto">
         <table className="w-full min-w-[860px]">
           <thead><tr className="border-b border-gray-100">
-            {['Quote', 'Customer', 'Trip', 'Total', 'Status', 'Valid Until', ''].map(h =>
+            {['Quote', 'Customer', 'Trip', 'Total', 'Status', 'Next Step', 'Valid Until', ''].map(h =>
               <th key={h} className="text-left px-5 py-3 font-sans text-[10px] tracking-[0.12em] uppercase text-gray-400">{h}</th>)}
           </tr></thead>
           <tbody className="divide-y divide-gray-100">
@@ -353,6 +359,13 @@ export default function AdminQuotesPage() {
                 <td className="px-5 py-4 font-display italic text-[#2d6a4f]">{formatMoney(Number(q.total), q.currency)}</td>
                 <td className="px-5 py-4">
                   <span className={`font-sans text-[10px] tracking-[0.1em] uppercase px-2.5 py-1 ${STATUS_BADGE[q.status] ?? STATUS_BADGE.draft}`}>{q.status}</span>
+                </td>
+                <td className="px-5 py-4">
+                  {(() => { const step = getQuoteNextStep(q); return (
+                    <span title={step.detail} className={`inline-block border font-sans text-[10px] tracking-[0.06em] uppercase px-2 py-0.5 ${nextStepBadgeClass(step.urgency)}`}>
+                      {step.label}
+                    </span>
+                  ) })()}
                 </td>
                 <td className="px-5 py-4 font-sans text-xs text-gray-500">{fmt(q.valid_until)}</td>
                 <td className="px-5 py-4">

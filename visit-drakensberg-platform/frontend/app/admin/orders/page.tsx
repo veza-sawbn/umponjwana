@@ -16,6 +16,7 @@ import { recordOrderPayment, getOrderPayments, type OrderPayment, PAYMENT_TYPES,
 import { getLedgerEntries, type LedgerEntry } from '@/lib/ledger'
 import { formatMoney } from '@/lib/allocation'
 import { supabase } from '@/lib/auth'
+import { getOrderNextStep, nextStepBadgeClass, type NextStep } from '@/lib/next-step'
 
 const STATUS_BADGE: Record<string, string> = {
   paid: 'bg-[#2d6a4f]/10 text-[#2d6a4f]',
@@ -47,6 +48,19 @@ function Badge({ v }: { v: string }) {
 
 function fmt(d?: string | null) {
   return d ? new Date(d).toLocaleDateString('en-ZA', { day: 'numeric', month: 'short', year: 'numeric' }) : '—'
+}
+
+// The single "what do I do about this one" read staff asked for, instead of
+// cross-referencing payment/supplier/trip status themselves. See lib/next-step.ts.
+function NextStepBadge({ step, className = '' }: { step: NextStep; className?: string }) {
+  return (
+    <span
+      title={step.detail}
+      className={`inline-flex items-center gap-1.5 border font-sans text-[10px] tracking-[0.06em] uppercase px-2 py-0.5 whitespace-nowrap ${nextStepBadgeClass(step.urgency)} ${className}`}
+    >
+      {step.label}
+    </span>
+  )
 }
 
 function OrderDetail({ order, onChanged }: { order: MasterOrder; onChanged: () => void }) {
@@ -118,8 +132,18 @@ function OrderDetail({ order, onChanged }: { order: MasterOrder; onChanged: () =
     { id: 'notes', label: `Internal Notes (${notes.length})` },
   ] as const
 
+  const nextStep = getOrderNextStep(order)
+
   return (
     <div className="border-t border-gray-100 bg-[#F7F5F2] px-4 sm:px-5 py-4 sm:py-5">
+      {/* Next step — the one thing to do about this order right now. */}
+      <div className={`flex items-start gap-3 border px-4 py-3 mb-4 ${nextStepBadgeClass(nextStep.urgency)}`}>
+        <div className="min-w-0">
+          <p className="font-sans text-xs font-semibold uppercase tracking-[0.08em]">Next step: {nextStep.label}</p>
+          <p className="font-sans text-xs mt-0.5 opacity-80">{nextStep.detail}</p>
+        </div>
+      </div>
+
       {/* Status controls */}
       <div className="flex flex-wrap gap-3 mb-4">
         {([
@@ -431,6 +455,7 @@ export default function AdminOrdersPage() {
               </div>
               <div className="flex items-end justify-between gap-3 mt-3">
                 <div className="flex flex-wrap gap-1.5">
+                  <NextStepBadge step={getOrderNextStep(o)} />
                   <Badge v={o.payment_status} />
                   <Badge v={o.booking_status} />
                 </div>
@@ -449,9 +474,9 @@ export default function AdminOrdersPage() {
 
       <div className="hidden md:block bg-white border border-gray-200">
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[1000px]">
+          <table className="w-full min-w-[1120px]">
             <thead><tr className="border-b border-gray-100">
-              {['Order', 'Customer', 'Trip', 'Travel Dates', 'Total', 'Paid', 'Outstanding', 'Payment', 'Booking', ''].map(h =>
+              {['Order', 'Customer', 'Trip', 'Travel Dates', 'Total', 'Paid', 'Outstanding', 'Next Step', 'Payment', 'Booking', ''].map(h =>
                 <th key={h} className="text-left px-5 py-3 font-sans text-[10px] tracking-[0.12em] uppercase text-gray-400">{h}</th>)}
             </tr></thead>
             <tbody className="divide-y divide-gray-100">
@@ -468,19 +493,20 @@ export default function AdminOrdersPage() {
                     <td className="px-5 py-4 font-display italic text-[#2d6a4f]">{formatMoney(Number(o.total_value), o.currency)}</td>
                     <td className="px-5 py-4 font-sans text-sm text-gray-600">{formatMoney(Number(o.amount_paid), o.currency)}</td>
                     <td className="px-5 py-4 font-sans text-sm text-gray-600">{formatMoney(Number(o.outstanding_balance), o.currency)}</td>
+                    <td className="px-5 py-4"><NextStepBadge step={getOrderNextStep(o)} /></td>
                     <td className="px-5 py-4"><Badge v={o.payment_status} /></td>
                     <td className="px-5 py-4"><Badge v={o.booking_status} /></td>
                     <td className="px-5 py-4 text-gray-400">{expanded === o.id ? <ChevronUp size={15} /> : <ChevronDown size={15} />}</td>
                   </tr>
                   {expanded === o.id && (
                     <tr>
-                      <td colSpan={10} className="p-0"><OrderDetail order={o} onChanged={load} /></td>
+                      <td colSpan={11} className="p-0"><OrderDetail order={o} onChanged={load} /></td>
                     </tr>
                   )}
                 </Fragment>
               ))}
-              {!loading && filtered.length === 0 && <tr><td colSpan={10} className="px-5 py-12 text-center font-sans text-sm text-gray-400">No orders found. Orders are created automatically at checkout.</td></tr>}
-              {loading && <tr><td colSpan={10} className="px-5 py-12 text-center font-sans text-sm text-gray-400">Loading orders…</td></tr>}
+              {!loading && filtered.length === 0 && <tr><td colSpan={11} className="px-5 py-12 text-center font-sans text-sm text-gray-400">No orders found. Orders are created automatically at checkout.</td></tr>}
+              {loading && <tr><td colSpan={11} className="px-5 py-12 text-center font-sans text-sm text-gray-400">Loading orders…</td></tr>}
             </tbody>
           </table>
         </div>

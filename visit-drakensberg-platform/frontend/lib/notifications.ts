@@ -3,7 +3,10 @@ import { supabase } from './auth'
 export type Notification = {
   id: string
   userId: string
-  type: 'booking' | 'cancellation' | 'message' | 'approval' | 'info'
+  // 'payment' rows are written directly (app/api/receipts/send, the iKhokha
+  // webhook, and vd_notify_finance_online_payment) rather than through
+  // notify() below, since those callers run without a customer session.
+  type: 'booking' | 'cancellation' | 'message' | 'approval' | 'info' | 'payment'
   title: string
   body: string
   link: string | null
