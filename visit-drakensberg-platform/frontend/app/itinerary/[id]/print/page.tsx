@@ -4,12 +4,21 @@ import { useEffect, useMemo, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { Printer, ArrowLeft } from 'lucide-react'
 import { getBookingById, type SavedBooking } from '@/lib/bookings'
+import { getTours, packageItinerary, type Tour } from '@/lib/tours'
+import { getDepartures, type Departure } from '@/lib/departures'
+import { resolveLivePackages } from '@/components/tours/PackageEditor'
 import Logo from '@/components/Logo'
 
 // Printable trip itinerary — a proper travel document, not a screen dump:
 // trip summary, guest details, accommodation, a chronological day-by-day
 // schedule, transfers, payment summary and emergency numbers. Access is
 // scoped by RLS on vd_bookings (the traveller and admins).
+
+function addDaysIso(iso: string, days: number) {
+  const d = new Date(iso)
+  d.setDate(d.getDate() + days)
+  return d.toISOString().slice(0, 10)
+}
 
 function fmtLong(iso?: string) {
   if (!iso) return '—'
@@ -33,7 +42,7 @@ const EMERGENCY = [
 
 type DayEvent = { time: string; title: string; detail: string }
 
-function buildSchedule(b: SavedBooking): Array<{ date: string; label: string; events: DayEvent[] }> {
+function buildSchedule(b: SavedBooking, departures: Departure[], tours: Tour[]): Array<{ date: string; label: string; events: DayEvent[] }> {
   const days = new Map<string, DayEvent[]>()
   const push = (date: string | undefined, ev: DayEvent) => {
     const key = date || ''
@@ -59,15 +68,36 @@ function buildSchedule(b: SavedBooking): Array<{ date: string; label: string; ev
     })
   }
   for (const a of b.addons) {
-    push(a.date, {
-      time: a.type === 'event' ? 'Event' : 'Activity',
-      title: a.title,
-      detail: [
-        a.operator ? `with ${a.operator}` : '',
-        `${a.guests} guest${a.guests !== 1 ? 's' : ''}`,
-        a.location || '',
-      ].filter(Boolean).join(' · '),
-    })
+    // A multi-day hike with an authored day-by-day plan (lib/tours.ts) gets
+    // one schedule entry per day, anchored from the departure date and
+    // scoped to exactly the rate package this guest booked (dayCount) — so
+    // a shorter rate simply doesn't show the trailing days a longer one
+    // would. Anything else (or a hike with no itinerary authored) falls
+    // back to the single generic line it always got.
+    const dep = departures.find(d => d.id === a.id)
+    const tour = dep ? tours.find(t => t.id === dep.tourId) : undefined
+    const pkg = dep?.packages ? resolveLivePackages(dep.packages, tour).find(p => p.id === a.packageId) : undefined
+    const itineraryDays = tour ? packageItinerary(tour.itinerary, pkg?.dayCount) : []
+    if (itineraryDays.length > 0 && a.date) {
+      itineraryDays.forEach((day, i) => {
+        push(addDaysIso(a.date!, i), {
+          time: i === 0 ? 'Departure' : `Day ${i + 1}`,
+          title: day.title || `${a.title} — Day ${i + 1}`,
+          detail: [day.description, day.accommodation ? `Overnight: ${day.accommodation}` : '', day.transport || '', day.meals || '']
+            .filter(Boolean).join(' · '),
+        })
+      })
+    } else {
+      push(a.date, {
+        time: a.type === 'event' ? 'Event' : 'Activity',
+        title: a.title,
+        detail: [
+          a.operator ? `with ${a.operator}` : '',
+          `${a.guests} guest${a.guests !== 1 ? 's' : ''}`,
+          a.location || '',
+        ].filter(Boolean).join(' · '),
+      })
+    }
   }
   if (b.stay && b.checkOut) {
     push(b.checkOut, {
@@ -89,14 +119,25 @@ export default function PrintableItineraryPage() {
   const params = useParams<{ id: string }>()
   const router = useRouter()
   const [booking, setBooking] = useState<SavedBooking | null>(null)
+  const [departures, setDepartures] = useState<Departure[]>([])
+  const [tours, setTours] = useState<Tour[]>([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     if (!params?.id) return
-    getBookingById(decodeURIComponent(params.id)).then(b => { setBooking(b); setLoading(false) })
+    Promise.all([
+      getBookingById(decodeURIComponent(params.id)),
+      getDepartures(),
+      getTours(),
+    ]).then(([b, deps, trs]) => {
+      setBooking(b)
+      setDepartures(deps)
+      setTours(trs)
+      setLoading(false)
+    })
   }, [params?.id])
 
-  const schedule = useMemo(() => booking ? buildSchedule(booking) : [], [booking])
+  const schedule = useMemo(() => booking ? buildSchedule(booking, departures, tours) : [], [booking, departures, tours])
 
   if (loading) {
     return <div className="min-h-screen bg-[#F7F5F2] flex items-center justify-center pt-24 font-sans text-sm text-gray-400">Preparing your itinerary…</div>

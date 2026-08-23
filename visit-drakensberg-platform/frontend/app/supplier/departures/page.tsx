@@ -36,11 +36,13 @@ function packagesFromTiers(tiers: PricingTier[]): PackageForm[] {
 }
 
 function RatesFieldset({
-  inclusions, onChangeInclusions, packages, onChangePackages,
+  inclusions, onChangeInclusions, packages, onChangePackages, tour,
 }: {
   inclusions: string[]; onChangeInclusions: (next: string[]) => void
   packages: PackageForm[]; onChangePackages: (next: PackageForm[]) => void
+  tour?: Tour
 }) {
+  const itineraryDayCount = tour?.itinerary?.length ?? 0
   return (
     <div className="space-y-5">
       <div className="space-y-1.5">
@@ -49,7 +51,14 @@ function RatesFieldset({
       </div>
       <div className="space-y-1.5">
         <label className="font-sans text-sm font-medium text-black/70">Rate Packages <span className="font-normal text-black/30">(different prices for the same departure)</span></label>
-        <PackagesEditor packages={packages} onChange={onChangePackages} />
+        {itineraryDayCount > 0 && (
+          <p className="font-sans text-xs text-black/40">
+            &quot;{tour!.name}&quot; has a {itineraryDayCount}-day itinerary. Set each rate&apos;s trip length below to
+            control how many of those days its guests see on their itinerary — e.g. a shorter rate can leave off
+            a trailing day that adds a shuttle and an extra night.
+          </p>
+        )}
+        <PackagesEditor packages={packages} onChange={onChangePackages} itineraryDayCount={itineraryDayCount} />
       </div>
     </div>
   )
@@ -109,7 +118,7 @@ function ConfigureModal({ dep, tour, onClose, onSaved }: { dep: Departure; tour:
           </div>
         )}
 
-        <RatesFieldset inclusions={inclusions} onChangeInclusions={setInclusions} packages={packages} onChangePackages={setPackages} />
+        <RatesFieldset inclusions={inclusions} onChangeInclusions={setInclusions} packages={packages} onChangePackages={setPackages} tour={tour} />
 
         <div className="flex gap-3 pt-2">
           <button onClick={save} disabled={saving} className="flex-1 bg-[#C9A96E] text-white font-sans text-sm py-2.5 rounded-lg disabled:opacity-50">
@@ -420,6 +429,7 @@ function DeparturesInner() {
             onChangeInclusions={next => setForm(f => ({ ...f, inclusions: next }))}
             packages={form.packages}
             onChangePackages={next => setForm(f => ({ ...f, packages: next }))}
+            tour={tours.find(t => t.id === form.tourId)}
           />
 
           <div className="flex gap-3">

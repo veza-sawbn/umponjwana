@@ -25,6 +25,14 @@ export type DeparturePackage = {
   // peak-season surcharge for one date). Ignored for freeform packages.
   // Absent means "follow the tour tier's current price."
   priceOverride?: number
+  // How many of the parent tour's itinerary days (lib/tours.ts, from Day 1)
+  // this rate package includes — see packageItinerary() in lib/tours.ts.
+  // E.g. a "Standard" package might cover just days 1-2 of a tour whose
+  // "Shuttle + Extra Night" package covers all 3 (the extra day carrying the
+  // shuttle transfer and the additional night's accommodation). Absent means
+  // "every authored day" — a package that never set this shows the tour's
+  // full itinerary, unchanged from before this field existed.
+  dayCount?: number
 }
 
 export type Departure = {

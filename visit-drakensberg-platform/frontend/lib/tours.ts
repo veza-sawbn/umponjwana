@@ -19,6 +19,23 @@ export type PricingTier = {
   inclusions: string[]
 }
 
+// One authored day of a multi-day tour's day-by-day plan, in trip order
+// (array index 0 = Day 1). Shared across every departure/package of the
+// tour — see DeparturePackage.dayCount in lib/departures.ts for how a rate
+// package on a departure narrows this down to just the days its guests get
+// (e.g. a 2-day "Standard" rate vs a 3-day "Shuttle + Extra Night" rate that
+// includes one more of these days).
+export type ItineraryDay = {
+  id: string
+  title: string
+  description: string
+  /** Where guests overnight after this day, e.g. "Sentinel Cave" or "Karma Lodge, Bergville". */
+  accommodation?: string
+  /** Transport for this day, e.g. "Shuttle pickup 06:00 from Johannesburg (Sandton)". */
+  transport?: string
+  meals?: string
+}
+
 export type Tour = {
   id: string
   trailId: string
@@ -41,6 +58,11 @@ export type Tour = {
   // unchanged. Only a true stored value when pricingTiers is empty.
   pricePerPerson: number
   pricingTiers?: PricingTier[]
+  // Ordered day-by-day plan for this tour. Absent/empty on tours predating
+  // this field, and on any tour the supplier hasn't authored one for yet —
+  // every reader must treat that as "no day-by-day content to show" and
+  // fall back to the flat `days` count, exactly as before this field existed.
+  itinerary?: ItineraryDay[]
   /** @deprecated Removed from the supplier forms; retained so stored tours still parse. */
   groupDiscount?: number
   status: 'active' | 'draft'
@@ -64,6 +86,23 @@ const KIND = 'tour'
 
 export function newPricingTierId(): string {
   return newEntityId('tier')
+}
+
+export function newItineraryDayId(): string {
+  return newEntityId('day')
+}
+
+// Given a tour's full day-by-day plan and a package's configured day count
+// (DeparturePackage.dayCount — how many of the tour's leading days that rate
+// includes), returns just the days that package's guests should see/receive.
+// `dayCount` absent, or no itinerary authored at all, means "every day" —
+// so a tour/package that never used this feature keeps behaving exactly as
+// it did before it existed.
+export function packageItinerary(itinerary: ItineraryDay[] | undefined, dayCount: number | undefined): ItineraryDay[] {
+  const days = itinerary ?? []
+  if (days.length === 0) return []
+  const count = dayCount != null ? Math.min(Math.max(1, dayCount), days.length) : days.length
+  return days.slice(0, count)
 }
 
 /**

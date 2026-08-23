@@ -2,9 +2,10 @@
 import { useState, useEffect } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { ChevronLeft, Plus, X } from 'lucide-react'
-import { getMyTours, updateTour } from '@/lib/tours'
+import { getMyTours, updateTour, type ItineraryDay } from '@/lib/tours'
 import { GoogleAddressField } from '@/components/maps/GoogleAddressField'
 import { PackagesEditor, emptyTier, tiersToForm, formToTiers, cheapest, type PackageForm } from '@/components/tours/PackageEditor'
+import ItineraryEditor from '@/components/tours/ItineraryEditor'
 
 const DIFFICULTIES = ['Easy', 'Moderate', 'Challenging', 'Extreme']
 const CANCELLATIONS = ['48h', '72h', '7 days', '14 days']
@@ -13,10 +14,10 @@ type FormState = {
   name: string; difficulty: string; days: number; minAge: number; maxGroup: number;
   meetingPoint: string; gpsLat: string; gpsLng: string; description: string;
   included: string[]; fitnessNotes: string; cancellation: string;
-  pricingTiers: PackageForm[]; status: 'active' | 'draft'
+  pricingTiers: PackageForm[]; itinerary: ItineraryDay[]; status: 'active' | 'draft'
 }
 
-const EMPTY: Omit<FormState, 'pricingTiers'> = {
+const EMPTY: Omit<FormState, 'pricingTiers' | 'itinerary'> = {
   name: '', difficulty: 'Moderate', days: 1, minAge: 0, maxGroup: 10,
   meetingPoint: '', gpsLat: '', gpsLng: '', description: '',
   included: [], fitnessNotes: '', cancellation: '48h',
@@ -29,7 +30,7 @@ export default function EditTourPage() {
   // Lazy initializer so each mount gets a fresh tier id — EMPTY is a module
   // singleton and would otherwise hand every mount the same placeholder id
   // (overwritten once the real tour loads below, but never while loading===true).
-  const [form, setForm] = useState<FormState>(() => ({ ...EMPTY, pricingTiers: [emptyTier('Standard')] }))
+  const [form, setForm] = useState<FormState>(() => ({ ...EMPTY, pricingTiers: [emptyTier('Standard')], itinerary: [] }))
   const [includedDraft, setIncludedDraft] = useState('')
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -49,6 +50,7 @@ export default function EditTourPage() {
           description: tour.description, included: tour.included,
           fitnessNotes: tour.fitnessNotes, cancellation: tour.cancellation,
           pricingTiers: tiersToForm(tour.pricingTiers, tour.pricePerPerson),
+          itinerary: tour.itinerary ?? [],
           status: tour.status,
         })
       }
@@ -72,9 +74,10 @@ export default function EditTourPage() {
     const pricingTiers = formToTiers(form.pricingTiers)
     if (pricingTiers.length === 0) { setError('At least one pricing tier with a name and price is required.'); return }
     setError('')
+    const itinerary = form.itinerary.filter(d => d.title.trim() || d.description.trim())
     setSaving(true)
     try {
-      await updateTour(id, { ...form, pricingTiers, pricePerPerson: cheapest(pricingTiers) })
+      await updateTour(id, { ...form, pricingTiers, itinerary, pricePerPerson: cheapest(pricingTiers) })
       router.push('/supplier/tours')
     } catch {
       setError('Failed to save changes. Please try again.')
@@ -182,6 +185,15 @@ export default function EditTourPage() {
           />
           <p className="font-sans text-xs text-black/35 mt-1">
             Each departure can offer a subset of these tiers — e.g. Shuttled on one date, Self-Drive on another.
+          </p>
+        </F>
+
+        <F label="Day-by-Day Itinerary">
+          <ItineraryEditor days={form.itinerary} onChange={next => set('itinerary', next)} />
+          <p className="font-sans text-xs text-black/35 mt-1">
+            Optional, but recommended for multi-day hikes. Each rate package on a departure can later be scoped to
+            just the first N days here — e.g. a 2-day &quot;Standard&quot; rate vs. a 3-day rate that adds a shuttle
+            and an extra night — so each guest only sees the itinerary for what they actually booked.
           </p>
         </F>
 
