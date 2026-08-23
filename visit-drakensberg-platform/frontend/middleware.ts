@@ -36,14 +36,16 @@ export async function middleware(req: NextRequest) {
   let role: string | undefined
   let staffRole: string | undefined
   if (session) {
-    // Prefer app_metadata.role (only settable server-side) over
-    // user_metadata.role, which a user can edit on their own account via
-    // supabase.auth.updateUser. Roles should be assigned in app_metadata.
-    role = session.user.app_metadata?.role ?? session.user.user_metadata?.role
-    staffRole = session.user.app_metadata?.staff_role ?? session.user.user_metadata?.staff_role
+    // Only app_metadata (service-role writable) and profiles (RLS-guarded,
+    // written solely by the admin_set_* RPCs) are trusted here.
+    // user_metadata is NOT consulted: a user can rewrite their own via
+    // supabase.auth.updateUser, so reading a level from it would let anyone
+    // grant themselves the console. It used to be the fallback below.
+    role = session.user.app_metadata?.role
+    staffRole = session.user.app_metadata?.staff_role
     if (!role) {
-      // Accounts created outside the signup form may have no role in auth
-      // metadata at all — fall back to the profiles table (RLS: own row).
+      // Accounts created outside the invite flow carry no grant in
+      // app_metadata — fall back to the profiles table (RLS: own row).
       const { data: profile } = await supabase
         .from('profiles')
         .select('role, staff_role')

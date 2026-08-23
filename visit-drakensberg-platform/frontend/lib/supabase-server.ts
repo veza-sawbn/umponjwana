@@ -25,8 +25,21 @@ export async function requireAuth() {
 
 export async function requireRole(role: 'admin' | 'supplier' | 'visitor') {
   const session = await requireAuth()
-  // app_metadata is only settable server-side; user_metadata is self-editable.
-  const userRole = session.user.app_metadata?.role ?? session.user.user_metadata?.role ?? 'visitor'
+  // app_metadata is service-role only; user_metadata is self-editable and is
+  // therefore never consulted for authorisation — reading it here would let a
+  // caller grant themselves the role they are being checked for. Accounts
+  // without an app_metadata grant fall back to profiles, which only the
+  // admin_set_* RPCs write. See 20260809_signup_role_hardening.sql.
+  let userRole: string | undefined = session.user.app_metadata?.role
+  if (!userRole) {
+    const supabase = createServerClient()
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('role')
+      .eq('id', session.user.id)
+      .maybeSingle()
+    userRole = profile?.role ?? 'visitor'
+  }
   if (userRole !== role && !(role === 'visitor')) {
     throw new Error(`Forbidden: requires ${role} role`)
   }
