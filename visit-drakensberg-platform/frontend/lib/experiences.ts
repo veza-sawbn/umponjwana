@@ -1,9 +1,9 @@
-import { getTours, type Tour } from './tours'
+import { getTours, packageItinerary, type Tour, type ItineraryDay } from './tours'
 import { getDepartures, type Departure, type DeparturePackage } from './departures'
 import { getTrails, type Trail } from './trails'
 import type { SupabaseClient } from '@supabase/supabase-js'
 
-export type { DeparturePackage }
+export type { DeparturePackage, ItineraryDay }
 
 // A "Trekking Experience" is the marketplace view of one scheduled departure
 // joined with its parent tour product. Suppliers keep creating Tours and
@@ -54,6 +54,18 @@ export type TrekkingExperience = {
   // Always has at least one entry — a single "Standard" package synthesized
   // from pricePerPerson when the supplier hasn't configured packages.
   packages: DeparturePackage[]
+  // The tour's full day-by-day plan (every day, unfiltered). A given
+  // package only covers a prefix of it — see packageItinerary() in
+  // lib/tours.ts and DeparturePackage.dayCount — so callers filtering per
+  // selected package should always go through that helper rather than
+  // reading this array directly. Empty on tours with no itinerary authored.
+  itinerary: ItineraryDay[]
+}
+
+/** The days a specific rate package's guests should see/receive, filtered from `exp.itinerary`. */
+export function packageDurationDays(exp: Pick<TrekkingExperience, 'itinerary' | 'durationDays'>, pkg: DeparturePackage | undefined): number {
+  if (!pkg || exp.itinerary.length === 0) return exp.durationDays
+  return packageItinerary(exp.itinerary, pkg.dayCount).length
 }
 
 function addDays(iso: string, days: number): string {
@@ -127,6 +139,7 @@ function compose(dep: Departure, tour: Tour, trail?: Trail): TrekkingExperience 
     equipmentIncluded: tour.equipmentIncluded ?? !!tour.included?.includes('Equipment'),
     guideExperienceYears: tour.guideExperienceYears ?? null,
     status: dep.status,
+    itinerary: tour.itinerary ?? [],
   }
 }
 

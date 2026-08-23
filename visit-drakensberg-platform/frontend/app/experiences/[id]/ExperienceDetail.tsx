@@ -8,7 +8,8 @@ import {
   ArrowLeft, Calendar, Clock, Users, MapPin, Star, CheckCircle, Award,
   UserCircle, Mountain, Shield, Plus, Minus, Check, GitCompareArrows,
 } from 'lucide-react'
-import { getExperiencesByTrail, type TrekkingExperience } from '@/lib/experiences'
+import { getExperiencesByTrail, packageDurationDays, type TrekkingExperience } from '@/lib/experiences'
+import { packageItinerary } from '@/lib/tours'
 import { useBooking } from '@/lib/booking-context'
 
 const DIFF_COLOR: Record<string, string> = {
@@ -49,13 +50,19 @@ export default function ExperienceDetail({ exp }: { exp: TrekkingExperience }) {
   const selectedPackage = exp.packages.find(p => p.id === packageId) ?? exp.packages[0]
   const hasMultiplePackages = exp.packages.length > 1
   const combinedInclusions = Array.from(new Set([...exp.inclusions, ...(selectedPackage?.inclusions ?? [])]))
+  // The selected rate can cover fewer of the tour's authored days than the
+  // departure's nominal length (see DeparturePackage.dayCount) — trip length,
+  // return date and the itinerary shown below all follow that package.
+  const effectiveDurationDays = packageDurationDays(exp, selectedPackage)
+  const effectiveReturnDate = addDays(exp.departureDate, Math.max(0, effectiveDurationDays - 1))
+  const itineraryDays = packageItinerary(exp.itinerary, selectedPackage?.dayCount)
 
   function handleBook() {
     if (full || isAdded || !selectedPackage) return
     booking.setSearch(
       exp.region || booking.region,
       addDays(exp.departureDate, -1),
-      addDays(exp.departureDate, exp.durationDays),
+      addDays(exp.departureDate, effectiveDurationDays),
       clampedGuests,
     )
     booking.addAddon({
@@ -66,6 +73,7 @@ export default function ExperienceDetail({ exp }: { exp: TrekkingExperience }) {
       date: exp.departureDate,
       price_per_person: selectedPackage.pricePerPerson,
       guests: clampedGuests,
+      packageId: selectedPackage.id,
     })
     router.push('/trip')
   }
@@ -114,8 +122,8 @@ export default function ExperienceDetail({ exp }: { exp: TrekkingExperience }) {
         <div className="max-w-[1440px] mx-auto px-6 lg:px-12 py-5 grid grid-cols-2 md:grid-cols-4 gap-6">
           {[
             { icon: Calendar, label: 'Departure', value: new Date(exp.departureDate).toLocaleDateString('en-ZA', { day: 'numeric', month: 'short', year: 'numeric' }) },
-            { icon: Calendar, label: 'Return', value: new Date(exp.returnDate).toLocaleDateString('en-ZA', { day: 'numeric', month: 'short', year: 'numeric' }) },
-            { icon: Clock, label: 'Duration', value: `${exp.durationDays} day${exp.durationDays !== 1 ? 's' : ''}` },
+            { icon: Calendar, label: 'Return', value: new Date(effectiveReturnDate).toLocaleDateString('en-ZA', { day: 'numeric', month: 'short', year: 'numeric' }) },
+            { icon: Clock, label: 'Duration', value: `${effectiveDurationDays} day${effectiveDurationDays !== 1 ? 's' : ''}` },
             { icon: Users, label: 'Available Spaces', value: full ? 'Fully booked' : `${exp.spacesAvailable} of ${exp.spacesTotal}` },
           ].map((stat, i) => {
             const Icon = stat.icon
@@ -152,6 +160,43 @@ export default function ExperienceDetail({ exp }: { exp: TrekkingExperience }) {
                     <div key={s} className="flex items-start gap-2.5 bg-white border border-gray-200 px-4 py-3">
                       <CheckCircle size={14} className="text-[#2d6a4f] mt-0.5 shrink-0" />
                       <span className="font-sans text-sm text-gray-700">{s}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Day-by-day itinerary — scoped to the selected rate package */}
+            {itineraryDays.length > 0 && (
+              <div>
+                <h2 className="font-display italic text-2xl text-[#000000] mb-1">
+                  Day-by-Day Itinerary{hasMultiplePackages && selectedPackage ? ` — ${selectedPackage.name}` : ''}
+                </h2>
+                <p className="font-sans text-xs text-gray-400 mb-4">
+                  {itineraryDays.length} day{itineraryDays.length !== 1 ? 's' : ''}
+                  {hasMultiplePackages ? ' for this rate — choose a different rate below to see its itinerary.' : ''}
+                </p>
+                <div className="space-y-3">
+                  {itineraryDays.map((day, i) => (
+                    <div key={day.id} className="bg-white border border-gray-200 p-5">
+                      <div className="flex items-baseline gap-3 mb-1.5 flex-wrap">
+                        <span className="font-display italic text-lg text-[#2d6a4f] shrink-0">Day {i + 1}</span>
+                        {day.title && <span className="font-sans text-sm font-medium text-gray-800">{day.title}</span>}
+                      </div>
+                      {day.description && <p className="font-sans text-sm text-gray-600 leading-relaxed">{day.description}</p>}
+                      {(day.accommodation || day.transport || day.meals) && (
+                        <div className="flex flex-wrap gap-x-5 gap-y-1.5 mt-3 pt-3 border-t border-gray-100">
+                          {day.accommodation && (
+                            <span className="font-sans text-xs text-gray-500"><span className="text-gray-400">Overnight:</span> {day.accommodation}</span>
+                          )}
+                          {day.transport && (
+                            <span className="font-sans text-xs text-gray-500"><span className="text-gray-400">Transport:</span> {day.transport}</span>
+                          )}
+                          {day.meals && (
+                            <span className="font-sans text-xs text-gray-500"><span className="text-gray-400">Meals:</span> {day.meals}</span>
+                          )}
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>
@@ -304,8 +349,8 @@ export default function ExperienceDetail({ exp }: { exp: TrekkingExperience }) {
                 <div className="flex justify-between gap-4"><span className="text-gray-400">Tour Operator</span><span className="text-right">{exp.operator}</span></div>
                 {exp.leadGuide && <div className="flex justify-between gap-4"><span className="text-gray-400">Lead Guide</span><span className="text-right">{exp.leadGuide}</span></div>}
                 <div className="flex justify-between gap-4"><span className="text-gray-400">Departure</span><span className="text-right">{formatDate(exp.departureDate)}</span></div>
-                <div className="flex justify-between gap-4"><span className="text-gray-400">Return</span><span className="text-right">{formatDate(exp.returnDate)}</span></div>
-                <div className="flex justify-between gap-4"><span className="text-gray-400">Duration</span><span>{exp.durationDays} day{exp.durationDays !== 1 ? 's' : ''}</span></div>
+                <div className="flex justify-between gap-4"><span className="text-gray-400">Return</span><span className="text-right">{formatDate(effectiveReturnDate)}</span></div>
+                <div className="flex justify-between gap-4"><span className="text-gray-400">Duration</span><span>{effectiveDurationDays} day{effectiveDurationDays !== 1 ? 's' : ''}</span></div>
                 <div className="flex justify-between gap-4 items-center"><span className="text-gray-400">Difficulty</span>
                   <span className="px-2.5 py-1 text-xs" style={{ color: DIFF_COLOR[exp.difficulty] || '#2d6a4f', background: (DIFF_COLOR[exp.difficulty] || '#2d6a4f') + '22' }}>{exp.difficulty}</span>
                 </div>

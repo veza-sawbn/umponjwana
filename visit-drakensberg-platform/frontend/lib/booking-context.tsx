@@ -15,6 +15,13 @@ export type BookingAddon = {
   location?: string
   lat?: string
   lng?: string
+  // Which DeparturePackage (lib/departures.ts) this addon's guest booked, for
+  // a `type: 'hike'` addon on a Trekking Experience with multiple rate
+  // packages. Absent for addons booked before this existed, or booked via a
+  // flow that doesn't offer package choice — itinerary rendering treats a
+  // missing packageId as "show every authored day", same as before this
+  // field existed.
+  packageId?: string
 }
 
 export type BookingStay = {

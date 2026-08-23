@@ -11,7 +11,7 @@ import {
   Info, Backpack, Clock, UserCircle, Send, Star,
 } from 'lucide-react'
 import { getBookingById, type SavedBooking } from '@/lib/bookings'
-import { getTours, type Tour } from '@/lib/tours'
+import { getTours, packageItinerary, type Tour } from '@/lib/tours'
 import { getDepartures, type Departure } from '@/lib/departures'
 import { getTrails, type Trail } from '@/lib/trails'
 import { getPropertyById } from '@/lib/properties'
@@ -21,6 +21,7 @@ import {
   type MessageThread,
 } from '@/lib/messages'
 import SupplierMessageBlock from '@/components/messaging/SupplierMessageBlock'
+import { resolveLivePackages } from '@/components/tours/PackageEditor'
 
 /* ── helpers ────────────────────────────────────────────── */
 function fmtLong(iso: string) {
@@ -205,6 +206,14 @@ function ExperienceSection({
   const resolvedSupplierId = addon.supplierId || departure?.supplierId || tour?.supplierId || ''
   const resolvedSupplierName = addon.operator || tour?.supplierName || departure?.supplierName || 'Visit Drakensberg'
 
+  // Which rate package this guest actually booked (if any), so the
+  // day-by-day itinerary below — and the duration fact — shows exactly what
+  // they paid for, not every day the tour has ever had authored.
+  const livePackages = departure?.packages ? resolveLivePackages(departure.packages, tour ?? undefined) : []
+  const bookedPackage = livePackages.find(p => p.id === addon.packageId)
+  const itineraryDays = packageItinerary(tour?.itinerary, bookedPackage?.dayCount)
+  const displayDays = itineraryDays.length || tour?.days || departure?.tourDays
+
   async function openMessages() {
     if (!currentUser) return
     setShowMsg(true)
@@ -250,10 +259,10 @@ function ExperienceSection({
             <p className="font-sans text-[10px] uppercase tracking-wider text-gray-400 mb-1">Participants</p>
             <p className="font-sans text-sm font-medium">{addon.guests} {addon.guests === 1 ? 'person' : 'people'}</p>
           </div>
-          {(tour?.days || departure?.tourDays) && (
+          {displayDays && (
             <div className="bg-[#F7F5F2] p-3">
               <p className="font-sans text-[10px] uppercase tracking-wider text-gray-400 mb-1">Duration</p>
-              <p className="font-sans text-sm font-medium">{tour?.days ?? departure?.tourDays} day{(tour?.days ?? departure?.tourDays ?? 1) !== 1 ? 's' : ''}</p>
+              <p className="font-sans text-sm font-medium">{displayDays} day{displayDays !== 1 ? 's' : ''}</p>
             </div>
           )}
           {tour?.difficulty && (
@@ -318,6 +327,39 @@ function ExperienceSection({
           <div>
             <p className="font-sans text-[10px] uppercase tracking-wider text-gray-400 mb-2">About this Experience</p>
             <p className="font-sans text-sm text-gray-700 leading-relaxed">{tour.description}</p>
+          </div>
+        )}
+
+        {/* ── Day-by-day itinerary — scoped to the package this guest booked ── */}
+        {itineraryDays.length > 0 && (
+          <div>
+            <p className="font-sans text-[10px] uppercase tracking-wider text-gray-400 mb-2 flex items-center gap-1.5">
+              <Clock size={11} />Day-by-Day Itinerary{bookedPackage ? ` — ${bookedPackage.name}` : ''}
+            </p>
+            <div className="space-y-3">
+              {itineraryDays.map((day, i) => (
+                <div key={day.id} className="border border-gray-200 p-4">
+                  <div className="flex items-baseline gap-3 mb-1 flex-wrap">
+                    <span className="font-display italic text-base text-[#2d6a4f] shrink-0">Day {i + 1}</span>
+                    {day.title && <span className="font-sans text-sm font-medium text-gray-800">{day.title}</span>}
+                  </div>
+                  {day.description && <p className="font-sans text-sm text-gray-600 leading-relaxed">{day.description}</p>}
+                  {(day.accommodation || day.transport || day.meals) && (
+                    <div className="flex flex-wrap gap-x-5 gap-y-1.5 mt-2.5 pt-2.5 border-t border-gray-100">
+                      {day.accommodation && (
+                        <span className="font-sans text-xs text-gray-500"><span className="text-gray-400">Overnight:</span> {day.accommodation}</span>
+                      )}
+                      {day.transport && (
+                        <span className="font-sans text-xs text-gray-500"><span className="text-gray-400">Transport:</span> {day.transport}</span>
+                      )}
+                      {day.meals && (
+                        <span className="font-sans text-xs text-gray-500"><span className="text-gray-400">Meals:</span> {day.meals}</span>
+                      )}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
           </div>
         )}
 

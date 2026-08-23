@@ -18,7 +18,9 @@ export const chip = (active: boolean) => `font-sans text-xs px-3 py-1.5 rounded-
 // One editable row — a departure rate package or a tour pricing tier.
 // `tierId` is only ever set on departure rows materialized from a tour tier
 // (see app/supplier/departures/page.tsx); tour tier rows never carry it.
-export type PackageForm = { id: string; name: string; pricePerPerson: string; inclusions: string[]; tierId?: string }
+// `dayCount` is only meaningful on departure rate packages (the tour's
+// itinerary lives at the tour level, so pricing-tier rows never set it).
+export type PackageForm = { id: string; name: string; pricePerPerson: string; inclusions: string[]; tierId?: string; dayCount?: string }
 
 export function emptyPackage(name = ''): PackageForm {
   return { id: newDeparturePackageId(), name, pricePerPerson: '', inclusions: [] }
@@ -30,7 +32,7 @@ export function emptyTier(name = ''): PackageForm {
 
 export function packagesToForm(packages: DeparturePackage[] | undefined): PackageForm[] {
   if (!packages || packages.length === 0) return [emptyPackage('Standard')]
-  return packages.map(p => ({ id: p.id, name: p.name, pricePerPerson: String(p.pricePerPerson || ''), inclusions: p.inclusions ?? [], tierId: p.tierId }))
+  return packages.map(p => ({ id: p.id, name: p.name, pricePerPerson: String(p.pricePerPerson || ''), inclusions: p.inclusions ?? [], tierId: p.tierId, dayCount: p.dayCount ? String(p.dayCount) : '' }))
 }
 
 export function formToPackages(packages: PackageForm[]): DeparturePackage[] {
@@ -42,6 +44,7 @@ export function formToPackages(packages: PackageForm[]): DeparturePackage[] {
       pricePerPerson: +p.pricePerPerson,
       inclusions: p.inclusions,
       ...(p.tierId ? { tierId: p.tierId } : {}),
+      ...(p.dayCount && +p.dayCount > 0 ? { dayCount: +p.dayCount } : {}),
     }))
 }
 
@@ -131,6 +134,7 @@ export function PackagesEditor({
   inclusionsLabel = 'Extra inclusions for this rate',
   addLabel = 'Add another rate package',
   makeRow = emptyPackage,
+  itineraryDayCount = 0,
 }: {
   packages: PackageForm[]
   onChange: (next: PackageForm[]) => void
@@ -139,6 +143,13 @@ export function PackagesEditor({
   inclusionsLabel?: string
   addLabel?: string
   makeRow?: () => PackageForm
+  // The parent tour's authored itinerary day count. > 0 unlocks a "trip
+  // length for this rate" field per row, so e.g. a "Standard" package can
+  // cover just the first 2 of a 3-day tour's itinerary while a "Shuttle +
+  // Extra Night" package covers all 3. 0 (tour has no itinerary yet, or
+  // this editor is for tour pricing tiers, which have no day pool of their
+  // own) hides the field entirely — same layout as before this existed.
+  itineraryDayCount?: number
 }) {
   function update(id: string, patch: Partial<PackageForm>) {
     onChange(packages.map(p => (p.id === id ? { ...p, ...patch } : p)))
@@ -164,9 +175,22 @@ export function PackagesEditor({
               </button>
             )}
           </div>
-          <div className="w-44">
-            <label className="font-sans text-xs text-black/40 block mb-1">{priceLabel}</label>
-            <input type="number" value={pkg.pricePerPerson} onChange={e => update(pkg.id, { pricePerPerson: e.target.value })} placeholder="0" min="0" className={inp} />
+          <div className="flex gap-3 flex-wrap">
+            <div className="w-44">
+              <label className="font-sans text-xs text-black/40 block mb-1">{priceLabel}</label>
+              <input type="number" value={pkg.pricePerPerson} onChange={e => update(pkg.id, { pricePerPerson: e.target.value })} placeholder="0" min="0" className={inp} />
+            </div>
+            {itineraryDayCount > 0 && (
+              <div className="w-44">
+                <label className="font-sans text-xs text-black/40 block mb-1">Trip length for this rate</label>
+                <select value={pkg.dayCount || ''} onChange={e => update(pkg.id, { dayCount: e.target.value })} className={inp}>
+                  <option value="">All {itineraryDayCount} days</option>
+                  {Array.from({ length: itineraryDayCount }, (_, i) => i + 1).map(n => (
+                    <option key={n} value={n}>{n} day{n !== 1 ? 's' : ''}</option>
+                  ))}
+                </select>
+              </div>
+            )}
           </div>
           <div>
             <label className="font-sans text-xs text-black/40 block mb-1">{inclusionsLabel}</label>
