@@ -37,7 +37,7 @@ function ImportModal({ suppliers, onClose, onImported }: {
     file.text().then(text => {
       const parsed = parseContactsCsv(text)
       if (parsed.length === 0) {
-        setError('No usable rows found — the CSV needs a "name" or "email" column, with a header row.')
+        setError('No usable rows found — the CSV needs a header row with a name (or first/last name) and/or email column.')
         setRows([])
       } else {
         setRows(parsed)
@@ -84,7 +84,10 @@ function ImportModal({ suppliers, onClose, onImported }: {
           <Upload size={24} className="mx-auto mb-2 text-gray-300" />
           {fileName || 'Choose a .csv file — needs a name and/or email column'}
         </button>
-        <p className="font-sans text-[11px] text-gray-400 mb-4">Recognised columns: name, email, phone (any order, case-insensitive).</p>
+        <p className="font-sans text-[11px] text-gray-400 mb-4">
+          Recognised columns: name (or First Name/Last Name), email, phone — any order, case-insensitive.
+          Exports with numbered columns like Email 1/Email 2 (e.g. Wix) work too.
+        </p>
 
         {rows.length > 0 && (
           <div className="border border-gray-200 bg-[#F7F5F2] px-4 py-3 mb-4">
