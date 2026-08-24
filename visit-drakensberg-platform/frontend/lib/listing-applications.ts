@@ -259,6 +259,69 @@ export const APPLICATION_STATUS_LABELS: Record<ListingApplicationStatus, string>
 
 const TABLE = 'vd_listing_applications'
 
+/**
+ * Coerce a stored `value` blob into the current ListingApplication shape.
+ *
+ * The journey used to be stays-only: no supplierTypes, no per-type blocks,
+ * and activities carried only name/difficulty. A row submitted before the
+ * multi-type reconstruction — there is a real one in production, reference
+ * LP-TYM4AV — has none of those fields, and every reader added since
+ * (the review queue, the admin dashboard widget, the approval route) assumes
+ * they exist. Reading that row without this would throw on
+ * `supplierTypes.includes(...)` and, worse, silently approve the applicant
+ * with an empty supplier_type since nothing would infer 'Accommodation' from
+ * the old-shape fields it does carry.
+ *
+ * Every reader of a stored application — client or server — should go through
+ * this rather than casting `value` directly.
+ */
+export function normalizeListingApplication(raw: Record<string, unknown>): Omit<ListingApplication, 'status'> {
+  const r = raw as Partial<ListingApplication> & {
+    propertyName?: string; propertyType?: string; elevation?: string; amenities?: string[]
+  }
+  const looksLikeOldStay = !r.supplierTypes && Boolean(r.propertyName || r.propertyType || r.amenities?.length)
+  const supplierTypes = Array.isArray(r.supplierTypes) && r.supplierTypes.length > 0
+    ? r.supplierTypes
+    : looksLikeOldStay ? ['Accommodation'] : []
+
+  const stay: StayDetails = r.stay ?? {
+    propertyName: r.propertyName ?? '',
+    propertyType: r.propertyType ?? '',
+    elevation: r.elevation ?? '',
+    amenities: r.amenities ?? [],
+    roomCount: '',
+  }
+
+  const activities = Array.isArray(r.activities)
+    ? r.activities.map(a => ({ ...emptyActivity(), ...a }))
+    : []
+
+  return {
+    id: String(r.id ?? ''),
+    reference: String(r.reference ?? ''),
+    contactName: r.contactName ?? '',
+    contactEmail: r.contactEmail ?? '',
+    contactPhone: r.contactPhone ?? '',
+    businessName: r.businessName ?? '',
+    contactRole: r.contactRole ?? '',
+    supplierTypes,
+    tradingName: r.tradingName ?? '',
+    region: r.region ?? '',
+    baseTown: r.baseTown ?? '',
+    description: r.description ?? '',
+    photos: Array.isArray(r.photos) ? r.photos : [],
+    stay,
+    tour: r.tour ?? emptyTour(),
+    shuttle: r.shuttle ?? emptyShuttle(),
+    experience: r.experience ?? emptyExperience(),
+    offersActivities: r.offersActivities ?? activities.length > 0,
+    activities,
+    commissionTier: r.commissionTier ?? COMMISSION_TIERS[0].id,
+    commissionAcknowledged: r.commissionAcknowledged ?? false,
+    createdAt: r.createdAt ?? '',
+  }
+}
+
 /** Short, sayable handle for the applicant to quote when they follow up. */
 function newReference(): string {
   const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789' // no I/O/0/1
@@ -379,7 +442,7 @@ export async function getListingApplications(): Promise<ListingApplication[]> {
       .order('created_at', { ascending: false })
     if (!Array.isArray(data)) return []
     return (data as Row[]).map(row => ({
-      ...(row.value as unknown as ListingApplication),
+      ...normalizeListingApplication(row.value as Record<string, unknown>),
       status: row.status as ListingApplicationStatus,
     }))
   } catch {
