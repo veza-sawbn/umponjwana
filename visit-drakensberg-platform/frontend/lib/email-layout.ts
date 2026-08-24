@@ -203,3 +203,41 @@ export function detailTable(rows: [string, string][]): string {
   return `<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%"
     style="border-top:1px solid ${BORDER};border-bottom:1px solid ${BORDER};margin:4px 0 0;">${body}</table>`
 }
+
+export type EmailItineraryDay = {
+  dayNumber: number
+  dateLabel: string
+  label?: string
+  description?: string
+  accommodation?: string
+  transport?: string
+  meals?: string
+}
+
+/** Day-by-day itinerary cards — used by the departure-guest confirmation email (app/api/departure-guests/send-confirmation). */
+export function itineraryBlock(days: EmailItineraryDay[]): string {
+  if (days.length === 0) return ''
+  const rows = days.map(d => {
+    const facts = [
+      d.accommodation ? `Overnight: ${d.accommodation}` : '',
+      d.transport ? `Transport: ${d.transport}` : '',
+      d.meals ? `Meals: ${d.meals}` : '',
+    ].filter(Boolean)
+    return `
+    <tr>
+      <td style="padding:0 0 12px;">
+        <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="border:1px solid ${BORDER};">
+          <tr>
+            <td style="padding:12px 14px;">
+              <p style="margin:0 0 3px;font-family:${SANS};font-size:10px;letter-spacing:1px;text-transform:uppercase;color:${GOLD};">Day ${d.dayNumber} &middot; ${esc(d.dateLabel)}</p>
+              ${d.label ? `<p style="margin:0 0 5px;font-family:${SERIF};font-size:14px;font-style:italic;color:${INK};">${esc(d.label)}</p>` : ''}
+              ${d.description ? `<p style="margin:0 0 6px;font-family:${SANS};font-size:12px;color:${BODY_TEXT};line-height:1.5;">${esc(d.description)}</p>` : ''}
+              ${facts.map(f => `<p style="margin:2px 0 0;font-family:${SANS};font-size:11px;color:${MUTED};">${esc(f)}</p>`).join('')}
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>`
+  }).join('')
+  return `<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="margin:8px 0 0;">${rows}</table>`
+}

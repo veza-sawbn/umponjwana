@@ -8,18 +8,20 @@ import { formatMoney } from '@/lib/allocation'
 // Every customer who has actually booked with this supplier, automatically
 // kept up to date — row-level security guarantees these are this supplier's
 // own contacts only, no other supplier's. There's no way to add a contact
-// by hand here: it only exists because a real booking created it.
+// directly from this page: a 'booking' row only exists because a real
+// booking created it; a 'manual' row comes from adding a guest by hand on a
+// departure (Departures → Guests) instead.
 
 function fmt(d: string | null) {
   return d ? new Date(d).toLocaleDateString('en-ZA', { day: 'numeric', month: 'short', year: 'numeric' }) : '—'
 }
 
-/** Only ever shown for source: 'imported' contacts — a booking-derived
- *  contact has nothing to flag, it speaks for itself. */
-function SourceBadge() {
+/** Flags a contact that didn't come from a real booking — 'booking' rows
+ *  have nothing to flag, they speak for itself. */
+function SourceBadge({ source }: { source: 'imported' | 'manual' }) {
   return (
     <span className="inline-block font-sans text-[9px] tracking-[0.08em] uppercase px-1.5 py-0.5 rounded bg-amber-50 text-amber-700">
-      Imported
+      {source === 'imported' ? 'Imported' : 'Manual'}
     </span>
   )
 }
@@ -78,7 +80,7 @@ export default function SupplierContactsPage() {
               <div key={c.id} className="p-4">
                 <div className="flex items-center gap-2">
                   <p className="font-sans text-sm font-medium">{c.name || 'Guest'}</p>
-                  {c.source === 'imported' && <SourceBadge />}
+                  {c.source !== 'booking' && <SourceBadge source={c.source} />}
                 </div>
                 {c.email && <p className="font-sans text-xs text-gray-400 mt-0.5">{c.email}</p>}
                 {c.phone && <p className="font-sans text-xs text-gray-400">{c.phone}</p>}
@@ -103,7 +105,7 @@ export default function SupplierContactsPage() {
                 {filtered.map(c => (
                   <tr key={c.id} className="hover:bg-[#F7F5F2] transition-colors">
                     <td className="px-5 py-4 font-sans text-sm font-medium">
-                      <span className="inline-flex items-center gap-2">{c.name || 'Guest'} {c.source === 'imported' && <SourceBadge />}</span>
+                      <span className="inline-flex items-center gap-2">{c.name || 'Guest'} {c.source !== 'booking' && <SourceBadge source={c.source} />}</span>
                     </td>
                     <td className="px-5 py-4">
                       <div className="space-y-0.5">

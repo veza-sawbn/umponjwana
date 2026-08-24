@@ -23,7 +23,7 @@ function rowToContact(r: any): SupplierContact & { supplierId: string } {
     name: r.name, email: r.email, phone: r.phone,
     firstBookingAt: r.first_booking_at, lastBookingAt: r.last_booking_at,
     bookingCount: r.booking_count, lifetimeSpend: Number(r.lifetime_spend) || 0,
-    source: r.source === 'imported' ? 'imported' : 'booking',
+    source: r.source === 'imported' ? 'imported' : r.source === 'manual' ? 'manual' : 'booking',
   }
 }
 
