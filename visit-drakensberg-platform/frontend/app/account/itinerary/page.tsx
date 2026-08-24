@@ -11,7 +11,7 @@ import {
   Info, Backpack, Clock, UserCircle, Send, Star,
 } from 'lucide-react'
 import { getBookingById, type SavedBooking } from '@/lib/bookings'
-import { getTours, packageItinerary, type Tour } from '@/lib/tours'
+import { getTours, resolveItinerary, type Tour } from '@/lib/tours'
 import { getDepartures, type Departure } from '@/lib/departures'
 import { getTrails, type Trail } from '@/lib/trails'
 import { getPropertyById } from '@/lib/properties'
@@ -207,12 +207,23 @@ function ExperienceSection({
   const resolvedSupplierName = addon.operator || tour?.supplierName || departure?.supplierName || 'Visit Drakensberg'
 
   // Which rate package this guest actually booked (if any), so the
-  // day-by-day itinerary below — and the duration fact — shows exactly what
-  // they paid for, not every day the tour has ever had authored.
+  // day-by-day itinerary below — and the duration/date facts — show exactly
+  // what they paid for: the trail's default plan (edited at /admin/trails),
+  // narrowed/customized/extended by that package's pricing tier.
   const livePackages = departure?.packages ? resolveLivePackages(departure.packages, tour ?? undefined) : []
   const bookedPackage = livePackages.find(p => p.id === addon.packageId)
-  const itineraryDays = packageItinerary(tour?.itinerary, bookedPackage?.dayCount)
+  const itineraryDays = resolveItinerary(trail?.days, tour?.pricingTiers, bookedPackage)
   const displayDays = itineraryDays.length || tour?.days || departure?.tourDays
+  // addon.date is the departure's "hiking date" (the anchor every day's
+  // dateOffset is measured from) — a tier's extra day before it can push
+  // the guest's actual trip start earlier than that.
+  function dateForOffset(offset: number): string {
+    if (!addon.date) return ''
+    const d = new Date(addon.date)
+    d.setDate(d.getDate() + offset)
+    return d.toISOString().slice(0, 10)
+  }
+  const tripStartDate = itineraryDays.length > 0 ? dateForOffset(itineraryDays[0].dateOffset) : addon.date
 
   async function openMessages() {
     if (!currentUser) return
@@ -253,7 +264,7 @@ function ExperienceSection({
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           <div className="bg-[#F7F5F2] p-3">
             <p className="font-sans text-[10px] uppercase tracking-wider text-gray-400 mb-1">Date</p>
-            <p className="font-sans text-sm font-medium">{addon.date ? fmtLong(addon.date) : '—'}</p>
+            <p className="font-sans text-sm font-medium">{tripStartDate ? fmtLong(tripStartDate) : '—'}</p>
           </div>
           <div className="bg-[#F7F5F2] p-3">
             <p className="font-sans text-[10px] uppercase tracking-wider text-gray-400 mb-1">Participants</p>
@@ -338,10 +349,11 @@ function ExperienceSection({
             </p>
             <div className="space-y-3">
               {itineraryDays.map((day, i) => (
-                <div key={day.id} className="border border-gray-200 p-4">
+                <div key={i} className="border border-gray-200 p-4">
                   <div className="flex items-baseline gap-3 mb-1 flex-wrap">
                     <span className="font-display italic text-base text-[#2d6a4f] shrink-0">Day {i + 1}</span>
-                    {day.title && <span className="font-sans text-sm font-medium text-gray-800">{day.title}</span>}
+                    <span className="font-sans text-xs text-gray-400">{fmtLong(dateForOffset(day.dateOffset))}</span>
+                    {day.label && <span className="font-sans text-sm font-medium text-gray-800">{day.label}</span>}
                   </div>
                   {day.description && <p className="font-sans text-sm text-gray-600 leading-relaxed">{day.description}</p>}
                   {(day.accommodation || day.transport || day.meals) && (

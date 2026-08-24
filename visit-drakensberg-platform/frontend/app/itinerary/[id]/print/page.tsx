@@ -4,8 +4,9 @@ import { useEffect, useMemo, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { Printer, ArrowLeft } from 'lucide-react'
 import { getBookingById, type SavedBooking } from '@/lib/bookings'
-import { getTours, packageItinerary, type Tour } from '@/lib/tours'
+import { getTours, resolveItinerary, type Tour } from '@/lib/tours'
 import { getDepartures, type Departure } from '@/lib/departures'
+import { getTrails, type Trail } from '@/lib/trails'
 import { resolveLivePackages } from '@/components/tours/PackageEditor'
 import Logo from '@/components/Logo'
 
@@ -42,7 +43,7 @@ const EMERGENCY = [
 
 type DayEvent = { time: string; title: string; detail: string }
 
-function buildSchedule(b: SavedBooking, departures: Departure[], tours: Tour[]): Array<{ date: string; label: string; events: DayEvent[] }> {
+function buildSchedule(b: SavedBooking, departures: Departure[], tours: Tour[], trails: Trail[]): Array<{ date: string; label: string; events: DayEvent[] }> {
   const days = new Map<string, DayEvent[]>()
   const push = (date: string | undefined, ev: DayEvent) => {
     const key = date || ''
@@ -68,21 +69,25 @@ function buildSchedule(b: SavedBooking, departures: Departure[], tours: Tour[]):
     })
   }
   for (const a of b.addons) {
-    // A multi-day hike with an authored day-by-day plan (lib/tours.ts) gets
-    // one schedule entry per day, anchored from the departure date and
-    // scoped to exactly the rate package this guest booked (dayCount) — so
-    // a shorter rate simply doesn't show the trailing days a longer one
-    // would. Anything else (or a hike with no itinerary authored) falls
-    // back to the single generic line it always got.
+    // A multi-day hike gets one schedule entry per day of its trail's
+    // default plan (Trail.days, /admin/trails), narrowed/customized/
+    // extended by exactly the rate package this guest booked — see
+    // resolveItinerary() in lib/tours.ts. Each day lands on its real
+    // calendar date, offset from the departure's "hiking date"; a tier
+    // that adds a day before it can start the guest's schedule earlier
+    // than the hiking date itself. Anything else (or a hike whose trail
+    // has no day-by-day plan authored) falls back to the single generic
+    // line it always got.
     const dep = departures.find(d => d.id === a.id)
     const tour = dep ? tours.find(t => t.id === dep.tourId) : undefined
+    const trail = tour ? trails.find(t => t.id === (dep?.trailId || tour.trailId)) : undefined
     const pkg = dep?.packages ? resolveLivePackages(dep.packages, tour).find(p => p.id === a.packageId) : undefined
-    const itineraryDays = tour ? packageItinerary(tour.itinerary, pkg?.dayCount) : []
+    const itineraryDays = resolveItinerary(trail?.days, tour?.pricingTiers, pkg)
     if (itineraryDays.length > 0 && a.date) {
       itineraryDays.forEach((day, i) => {
-        push(addDaysIso(a.date!, i), {
-          time: i === 0 ? 'Departure' : `Day ${i + 1}`,
-          title: day.title || `${a.title} — Day ${i + 1}`,
+        push(addDaysIso(a.date!, day.dateOffset), {
+          time: day.dateOffset === 0 ? 'Departure' : `Day ${i + 1}`,
+          title: day.label || `${a.title} — Day ${i + 1}`,
           detail: [day.description, day.accommodation ? `Overnight: ${day.accommodation}` : '', day.transport || '', day.meals || '']
             .filter(Boolean).join(' · '),
         })
@@ -121,6 +126,7 @@ export default function PrintableItineraryPage() {
   const [booking, setBooking] = useState<SavedBooking | null>(null)
   const [departures, setDepartures] = useState<Departure[]>([])
   const [tours, setTours] = useState<Tour[]>([])
+  const [trails, setTrails] = useState<Trail[]>([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -129,15 +135,17 @@ export default function PrintableItineraryPage() {
       getBookingById(decodeURIComponent(params.id)),
       getDepartures(),
       getTours(),
-    ]).then(([b, deps, trs]) => {
+      getTrails(),
+    ]).then(([b, deps, trs, trls]) => {
       setBooking(b)
       setDepartures(deps)
       setTours(trs)
+      setTrails(trls)
       setLoading(false)
     })
   }, [params?.id])
 
-  const schedule = useMemo(() => booking ? buildSchedule(booking, departures, tours) : [], [booking, departures, tours])
+  const schedule = useMemo(() => booking ? buildSchedule(booking, departures, tours, trails) : [], [booking, departures, tours, trails])
 
   if (loading) {
     return <div className="min-h-screen bg-[#F7F5F2] flex items-center justify-center pt-24 font-sans text-sm text-gray-400">Preparing your itinerary…</div>

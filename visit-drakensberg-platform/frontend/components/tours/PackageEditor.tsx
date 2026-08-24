@@ -2,7 +2,10 @@
 import { useState } from 'react'
 import { Plus, Trash2 } from 'lucide-react'
 import { newDeparturePackageId, type DeparturePackage } from '@/lib/departures'
-import { newPricingTierId, type PricingTier, type Tour } from '@/lib/tours'
+import {
+  newPricingTierId, type PricingTier, type Tour,
+  type ItineraryDayOverride, type ExtraItineraryDay,
+} from '@/lib/tours'
 
 // Shared rate/add-ons editor. A tour pricing tier and a departure rate
 // package are the same shape (name + price + inclusions), so both the
@@ -18,9 +21,19 @@ export const chip = (active: boolean) => `font-sans text-xs px-3 py-1.5 rounded-
 // One editable row — a departure rate package or a tour pricing tier.
 // `tierId` is only ever set on departure rows materialized from a tour tier
 // (see app/supplier/departures/page.tsx); tour tier rows never carry it.
-// `dayCount` is only meaningful on departure rate packages (the tour's
-// itinerary lives at the tour level, so pricing-tier rows never set it).
-export type PackageForm = { id: string; name: string; pricePerPerson: string; inclusions: string[]; tierId?: string; dayCount?: string }
+// `dayCount` is only meaningful on freeform departure rate packages (no
+// tierId) — a plain trip-length truncation of the trail's default plan.
+// The `itinerary*` fields are only meaningful on tour tier rows: full
+// itinerary customization built on top of the tour's linked trail's
+// default day-by-day plan — see composeTierItinerary() in lib/tours.ts.
+export type PackageForm = {
+  id: string; name: string; pricePerPerson: string; inclusions: string[]; tierId?: string
+  dayCount?: string
+  itineraryDayCount?: string
+  itineraryOverrides?: ItineraryDayOverride[]
+  itineraryDaysBefore?: ExtraItineraryDay[]
+  itineraryDaysAfter?: ExtraItineraryDay[]
+}
 
 export function emptyPackage(name = ''): PackageForm {
   return { id: newDeparturePackageId(), name, pricePerPerson: '', inclusions: [] }
@@ -53,13 +66,25 @@ export function formToPackages(packages: PackageForm[]): DeparturePackage[] {
 // flat price, so editing an old tour never starts from an empty state.
 export function tiersToForm(tiers: PricingTier[] | undefined, fallbackPrice?: number): PackageForm[] {
   if (!tiers || tiers.length === 0) return [{ ...emptyTier('Standard'), pricePerPerson: fallbackPrice ? String(fallbackPrice) : '' }]
-  return tiers.map(t => ({ id: t.id, name: t.name, pricePerPerson: String(t.pricePerPerson || ''), inclusions: t.inclusions ?? [] }))
+  return tiers.map(t => ({
+    id: t.id, name: t.name, pricePerPerson: String(t.pricePerPerson || ''), inclusions: t.inclusions ?? [],
+    itineraryDayCount: t.itineraryDayCount ? String(t.itineraryDayCount) : '',
+    itineraryOverrides: t.itineraryOverrides ?? [],
+    itineraryDaysBefore: t.itineraryDaysBefore ?? [],
+    itineraryDaysAfter: t.itineraryDaysAfter ?? [],
+  }))
 }
 
 export function formToTiers(rows: PackageForm[]): PricingTier[] {
   return rows
     .filter(r => r.name.trim() && +r.pricePerPerson > 0)
-    .map(r => ({ id: r.id, name: r.name.trim(), pricePerPerson: +r.pricePerPerson, inclusions: r.inclusions }))
+    .map(r => ({
+      id: r.id, name: r.name.trim(), pricePerPerson: +r.pricePerPerson, inclusions: r.inclusions,
+      ...(r.itineraryDayCount && +r.itineraryDayCount > 0 ? { itineraryDayCount: +r.itineraryDayCount } : {}),
+      ...(r.itineraryOverrides?.length ? { itineraryOverrides: r.itineraryOverrides } : {}),
+      ...(r.itineraryDaysBefore?.length ? { itineraryDaysBefore: r.itineraryDaysBefore } : {}),
+      ...(r.itineraryDaysAfter?.length ? { itineraryDaysAfter: r.itineraryDaysAfter } : {}),
+    }))
 }
 
 export function cheapest(rows: { pricePerPerson: number }[]): number {
@@ -135,6 +160,7 @@ export function PackagesEditor({
   addLabel = 'Add another rate package',
   makeRow = emptyPackage,
   itineraryDayCount = 0,
+  renderExtra,
 }: {
   packages: PackageForm[]
   onChange: (next: PackageForm[]) => void
@@ -143,13 +169,19 @@ export function PackagesEditor({
   inclusionsLabel?: string
   addLabel?: string
   makeRow?: () => PackageForm
-  // The parent tour's authored itinerary day count. > 0 unlocks a "trip
-  // length for this rate" field per row, so e.g. a "Standard" package can
-  // cover just the first 2 of a 3-day tour's itinerary while a "Shuttle +
-  // Extra Night" package covers all 3. 0 (tour has no itinerary yet, or
-  // this editor is for tour pricing tiers, which have no day pool of their
-  // own) hides the field entirely — same layout as before this existed.
+  // The linked trail's authored day count. > 0 unlocks a "trip length for
+  // this rate" field on *freeform* rows only (no tierId) — a plain
+  // truncation of the trail's default plan. Tier-linked rows get their
+  // itinerary from the tour's pricing tier instead (see `renderExtra`), so
+  // never show this field regardless. 0 (trail has no day-by-day plan, or
+  // this editor is for tour tiers, which don't truncate a departure-level
+  // trail directly) hides it entirely — same layout as before this existed.
   itineraryDayCount?: number
+  // Optional extra content rendered inside each row, below inclusions —
+  // used by the tour tier editor to inject that tier's itinerary
+  // customization (see TierItineraryEditor). Receives a per-row updater
+  // scoped to that row, same as the row's own fields use internally.
+  renderExtra?: (pkg: PackageForm, update: (patch: Partial<PackageForm>) => void) => React.ReactNode
 }) {
   function update(id: string, patch: Partial<PackageForm>) {
     onChange(packages.map(p => (p.id === id ? { ...p, ...patch } : p)))
@@ -180,7 +212,7 @@ export function PackagesEditor({
               <label className="font-sans text-xs text-black/40 block mb-1">{priceLabel}</label>
               <input type="number" value={pkg.pricePerPerson} onChange={e => update(pkg.id, { pricePerPerson: e.target.value })} placeholder="0" min="0" className={inp} />
             </div>
-            {itineraryDayCount > 0 && (
+            {itineraryDayCount > 0 && !pkg.tierId && (
               <div className="w-44">
                 <label className="font-sans text-xs text-black/40 block mb-1">Trip length for this rate</label>
                 <select value={pkg.dayCount || ''} onChange={e => update(pkg.id, { dayCount: e.target.value })} className={inp}>
@@ -191,11 +223,15 @@ export function PackagesEditor({
                 </select>
               </div>
             )}
+            {itineraryDayCount > 0 && pkg.tierId && (
+              <p className="font-sans text-xs text-black/35 self-end pb-2">Trip length &amp; itinerary follow this rate&apos;s pricing tier — edit on the tour.</p>
+            )}
           </div>
           <div>
             <label className="font-sans text-xs text-black/40 block mb-1">{inclusionsLabel}</label>
             <InclusionChips value={pkg.inclusions} onChange={next => update(pkg.id, { inclusions: next })} />
           </div>
+          {renderExtra?.(pkg, patch => update(pkg.id, patch))}
         </div>
       ))}
       <button type="button" onClick={() => onChange([...packages, makeRow()])} className="flex items-center gap-1.5 font-sans text-xs text-[#C9A96E] hover:text-[#b8965d]">

@@ -9,8 +9,7 @@ import { effectiveSupplierId } from '@/lib/effective-supplier'
 import { getMyOperatorProfile } from '@/lib/operators'
 import { GoogleAddressField } from '@/components/maps/GoogleAddressField'
 import { PackagesEditor, emptyTier, formToTiers, cheapest, type PackageForm } from '@/components/tours/PackageEditor'
-import ItineraryEditor from '@/components/tours/ItineraryEditor'
-import type { ItineraryDay } from '@/lib/tours'
+import TierItineraryEditor from '@/components/tours/TierItineraryEditor'
 
 const DIFFICULTIES = ['Easy', 'Moderate', 'Challenging', 'Extreme']
 const CANCELLATIONS = ['48h', '72h', '7 days', '14 days']
@@ -28,7 +27,7 @@ export default function NewTourPage() {
   // Lazy initializer so each mount gets a fresh tier id — EMPTY is a module
   // singleton and would otherwise hand every "New Tour" visit in the same
   // session the same id.
-  const [form, setForm] = useState(() => ({ ...EMPTY, pricingTiers: [emptyTier('Standard')] as PackageForm[], itinerary: [] as ItineraryDay[] }))
+  const [form, setForm] = useState(() => ({ ...EMPTY, pricingTiers: [emptyTier('Standard')] as PackageForm[] }))
   const [trails, setTrails] = useState<Trail[]>([])
   const [trailOpen, setTrailOpen] = useState(false)
   const [saving, setSaving] = useState(false)
@@ -101,9 +100,6 @@ export default function NewTourPage() {
     const included = pending && !snapshot.included.includes(pending)
       ? [...snapshot.included, pending]
       : snapshot.included
-    // Drop fully-blank itinerary rows (added then left untouched) — every
-    // other row just needs a title to be worth keeping.
-    const itinerary = snapshot.itinerary.filter(d => d.title.trim() || d.description.trim())
     setSaving(true)
     try {
       const { data: { user } } = await supabase.auth.getUser()
@@ -113,7 +109,6 @@ export default function NewTourPage() {
         ...snapshot,
         included,
         pricingTiers,
-        itinerary,
         pricePerPerson: cheapest(pricingTiers),
         supplierId: ownerId,
         supplierName: companyName,
@@ -286,18 +281,15 @@ export default function NewTourPage() {
             inclusionsLabel="Add-ons for this tier"
             addLabel="Add another pricing tier"
             makeRow={emptyTier}
+            renderExtra={(pkg, update) => (
+              <TierItineraryEditor trailDays={selectedTrail?.days ?? []} pkg={pkg} update={update} />
+            )}
           />
           <p className="font-sans text-xs text-black/35 mt-1">
             Each departure can offer a subset of these tiers — e.g. Shuttled on one date, Self-Drive on another.
-          </p>
-        </F>
-
-        <F label="Day-by-Day Itinerary">
-          <ItineraryEditor days={form.itinerary} onChange={next => set('itinerary', next)} />
-          <p className="font-sans text-xs text-black/35 mt-1">
-            Optional, but recommended for multi-day hikes. Each rate package on a departure can later be scoped to
-            just the first N days here — e.g. a 2-day &quot;Standard&quot; rate vs. a 3-day rate that adds a shuttle
-            and an extra night — so each guest only sees the itinerary for what they actually booked.
+            {selectedTrail && selectedTrail.days.length > 0
+              ? ' Each tier starts from the trail’s day-by-day plan (Admin → Trails) — customize it per tier above.'
+              : ' Add a day-by-day plan to this trail at Admin → Trails to let tiers customize their itinerary.'}
           </p>
         </F>
 

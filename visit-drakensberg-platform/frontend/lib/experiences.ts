@@ -1,9 +1,9 @@
-import { getTours, packageItinerary, type Tour, type ItineraryDay } from './tours'
+import { getTours, resolveItinerary, type Tour, type PricingTier, type ComposedItineraryDay } from './tours'
 import { getDepartures, type Departure, type DeparturePackage } from './departures'
-import { getTrails, type Trail } from './trails'
+import { getTrails, type Trail, type TrailDay } from './trails'
 import type { SupabaseClient } from '@supabase/supabase-js'
 
-export type { DeparturePackage, ItineraryDay }
+export type { DeparturePackage, ComposedItineraryDay }
 
 // A "Trekking Experience" is the marketplace view of one scheduled departure
 // joined with its parent tour product. Suppliers keep creating Tours and
@@ -54,24 +54,55 @@ export type TrekkingExperience = {
   // Always has at least one entry — a single "Standard" package synthesized
   // from pricePerPerson when the supplier hasn't configured packages.
   packages: DeparturePackage[]
-  // The tour's full day-by-day plan (every day, unfiltered). A given
-  // package only covers a prefix of it — see packageItinerary() in
-  // lib/tours.ts and DeparturePackage.dayCount — so callers filtering per
-  // selected package should always go through that helper rather than
-  // reading this array directly. Empty on tours with no itinerary authored.
-  itinerary: ItineraryDay[]
+  // The tour's pricing tiers, exposed so resolvePackageItinerary() can look
+  // up a booked package's tier-level itinerary customization (dayCount,
+  // per-day overrides, extra days) without every caller having to fetch the
+  // raw Tour separately.
+  pricingTiers: PricingTier[]
+  // The linked trail's admin-authored day-by-day plan (Trail.days,
+  // /admin/trails) — the default itinerary every rate package's own
+  // itinerary is built from. Empty when the trail has none authored (e.g.
+  // it isn't a multi-day trail). See resolvePackageItinerary().
+  trailDays: TrailDay[]
 }
 
-/** The days a specific rate package's guests should see/receive, filtered from `exp.itinerary`. */
-export function packageDurationDays(exp: Pick<TrekkingExperience, 'itinerary' | 'durationDays'>, pkg: DeparturePackage | undefined): number {
-  if (!pkg || exp.itinerary.length === 0) return exp.durationDays
-  return packageItinerary(exp.itinerary, pkg.dayCount).length
+// A specific rate package's guest-facing itinerary: the composed days (see
+// composeTierItinerary() in lib/tours.ts) plus the trip's actual start/end
+// calendar dates — which, once a tier adds a day before the departure's
+// "hiking date", can be earlier than `exp.departureDate` itself.
+export type PackageItinerary = {
+  days: ComposedItineraryDay[]
+  durationDays: number
+  startDate: string
+  endDate: string
 }
 
 function addDays(iso: string, days: number): string {
   const d = new Date(iso)
   d.setDate(d.getDate() + days)
   return d.toISOString().slice(0, 10)
+}
+
+/** Resolves the itinerary — days, trip length, and actual start/end dates — a specific rate package's guests should see. */
+export function resolvePackageItinerary(
+  exp: Pick<TrekkingExperience, 'departureDate' | 'durationDays' | 'trailDays' | 'pricingTiers'>,
+  pkg: DeparturePackage | undefined,
+): PackageItinerary {
+  const composed = resolveItinerary(exp.trailDays, exp.pricingTiers, pkg)
+  if (composed.length === 0) {
+    return {
+      days: [],
+      durationDays: exp.durationDays,
+      startDate: exp.departureDate,
+      endDate: addDays(exp.departureDate, Math.max(0, exp.durationDays - 1)),
+    }
+  }
+  return {
+    days: composed,
+    durationDays: composed.length,
+    startDate: addDays(exp.departureDate, composed[0].dateOffset),
+    endDate: addDays(exp.departureDate, composed[composed.length - 1].dateOffset),
+  }
 }
 
 // A package linked to a tour pricing tier (DeparturePackage.tierId) always
@@ -139,7 +170,8 @@ function compose(dep: Departure, tour: Tour, trail?: Trail): TrekkingExperience 
     equipmentIncluded: tour.equipmentIncluded ?? !!tour.included?.includes('Equipment'),
     guideExperienceYears: tour.guideExperienceYears ?? null,
     status: dep.status,
-    itinerary: tour.itinerary ?? [],
+    pricingTiers: tour.pricingTiers ?? [],
+    trailDays: trail?.days ?? [],
   }
 }
 
