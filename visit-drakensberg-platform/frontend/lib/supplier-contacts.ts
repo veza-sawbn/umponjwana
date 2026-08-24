@@ -15,6 +15,11 @@ import { fetchAllRows } from './customers-admin'
  * RLS scopes vd_supplier_contacts to the signed-in supplier's own rows —
  * getMyContacts() relies on that, the same way lib/orders.ts's
  * getMyOrderLines() does, rather than filtering client-side.
+ *
+ * A third source, 'manual', was added in the 20260828 migration: a guest
+ * the supplier recorded by hand on a departure (lib/departure-guests.ts,
+ * "migrating from Wix Events") via vd_add_supplier_contact() — never
+ * touched by vd_recompute_supplier_contacts(), same isolation as 'imported'.
  * ──────────────────────────────────────────────────────────────────────────── */
 
 export type SupplierContact = {
@@ -27,7 +32,7 @@ export type SupplierContact = {
   lastBookingAt: string | null
   bookingCount: number
   lifetimeSpend: number
-  source: 'booking' | 'imported'
+  source: 'booking' | 'imported' | 'manual'
 }
 
 function rowToContact(r: any): SupplierContact {
@@ -35,7 +40,7 @@ function rowToContact(r: any): SupplierContact {
     id: r.id, customerUserId: r.customer_user_id, name: r.name, email: r.email, phone: r.phone,
     firstBookingAt: r.first_booking_at, lastBookingAt: r.last_booking_at,
     bookingCount: r.booking_count, lifetimeSpend: Number(r.lifetime_spend) || 0,
-    source: r.source === 'imported' ? 'imported' : 'booking',
+    source: r.source === 'imported' ? 'imported' : r.source === 'manual' ? 'manual' : 'booking',
   }
 }
 

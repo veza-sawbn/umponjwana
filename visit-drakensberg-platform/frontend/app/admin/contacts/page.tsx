@@ -218,9 +218,9 @@ export default function AdminContactsPage() {
                   <td className="px-5 py-4 font-sans text-sm text-gray-600">{c.supplierName}</td>
                   <td className="px-5 py-4">
                     <span className={`inline-block font-sans text-[10px] tracking-[0.08em] uppercase px-2 py-1 ${
-                      c.source === 'imported' ? 'bg-amber-50 text-amber-700' : 'bg-[#2d6a4f]/10 text-[#2d6a4f]'
+                      c.source === 'booking' ? 'bg-[#2d6a4f]/10 text-[#2d6a4f]' : 'bg-amber-50 text-amber-700'
                     }`}>
-                      {c.source === 'imported' ? 'Imported' : 'Booking'}
+                      {c.source === 'booking' ? 'Booking' : c.source === 'imported' ? 'Imported' : 'Manual'}
                     </span>
                   </td>
                   <td className="px-5 py-4 font-sans text-sm text-gray-600">{c.bookingCount}</td>

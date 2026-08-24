@@ -2,7 +2,7 @@
 import { useState, useEffect, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
-import { CalendarDays, Plus, Users, Trash2, ChevronLeft, X, Settings2, UserPlus } from 'lucide-react'
+import { CalendarDays, Plus, Users, Trash2, ChevronLeft, X, Settings2, UserPlus, Mail } from 'lucide-react'
 import { supabase } from '@/lib/auth'
 import { effectiveSupplierId } from '@/lib/effective-supplier'
 import { getSupplierEntities, type SupplierEntity } from '@/lib/supplier-entities'
@@ -140,17 +140,33 @@ function ConfigureModal({ dep, tour, trailDayCount, onClose, onSaved }: { dep: D
 /* system): the guest already has a seat, so this just records who they are  */
 /* and reserves that seat here, without running them through checkout.       */
 
-const emptyGuestForm = { name: '', email: '', phone: '', seats: '1', notes: '' }
+const emptyGuestForm = { name: '', email: '', phone: '', seats: '1', notes: '', packageId: '', sendConfirmation: true }
+
+async function sendGuestConfirmation(guestId: string): Promise<{ sent: boolean; error: string | null }> {
+  try {
+    const res = await fetch('/api/departure-guests/send-confirmation', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ guestId }),
+    })
+    const data = await res.json()
+    return { sent: !!data.sent, error: data.error ?? null }
+  } catch (e) {
+    return { sent: false, error: e instanceof Error ? e.message : 'Could not send the confirmation email.' }
+  }
+}
 
 function GuestsModal({
-  dep, onClose, onSeatsChanged,
-}: { dep: Departure; onClose: () => void; onSeatsChanged: (bookedSeats: number) => void }) {
+  dep, tour, onClose, onSeatsChanged,
+}: { dep: Departure; tour: Tour | undefined; onClose: () => void; onSeatsChanged: (bookedSeats: number) => void }) {
   const [guests, setGuests] = useState<DepartureGuest[]>([])
   const [loading, setLoading] = useState(true)
   const [form, setForm] = useState(emptyGuestForm)
   const [saving, setSaving] = useState(false)
   const [removingId, setRemovingId] = useState<string | null>(null)
+  const [sendingId, setSendingId] = useState<string | null>(null)
   const [error, setError] = useState('')
+  const [notice, setNotice] = useState('')
   // Local copy of the running seat count, so "seats left" updates live as
   // guests are added/removed without waiting on the parent table to re-render.
   const [bookedSeats, setBookedSeats] = useState(dep.bookedSeats)
@@ -160,10 +176,15 @@ function GuestsModal({
   }, [dep.id])
 
   const seatsLeft = Math.max(0, dep.maxSeats - bookedSeats)
+  // The rates this departure actually offers, resolved live against the
+  // tour's pricing tiers — same source the guest picks from at checkout —
+  // so the supplier records exactly which rate a manually-added guest paid.
+  const livePackages = dep.packages ? resolveLivePackages(dep.packages, tour) : []
 
   async function handleAdd() {
     if (!form.name.trim()) { setError('Guest name is required.'); return }
     setError('')
+    setNotice('')
     setSaving(true)
     try {
       const guest = await addManualGuest({
@@ -173,17 +194,34 @@ function GuestsModal({
         phone: form.phone,
         seats: +form.seats || 1,
         notes: form.notes,
+        packageId: form.packageId || undefined,
       })
       setGuests(g => [...g, guest])
       setForm(emptyGuestForm)
       const next = bookedSeats + guest.seats
       setBookedSeats(next)
       onSeatsChanged(next)
+
+      if (form.sendConfirmation && form.email.trim()) {
+        const result = await sendGuestConfirmation(guest.id)
+        if (result.sent) setNotice(`Confirmation email sent to ${guest.email}.`)
+        else setError(`Guest saved, but the confirmation email failed to send: ${result.error}`)
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Could not add this guest.')
     } finally {
       setSaving(false)
     }
+  }
+
+  async function handleResend(guest: DepartureGuest) {
+    setSendingId(guest.id)
+    setNotice('')
+    setError('')
+    const result = await sendGuestConfirmation(guest.id)
+    if (result.sent) setNotice(`Confirmation email sent to ${guest.email}.`)
+    else setError(`Could not send: ${result.error}`)
+    setSendingId(null)
   }
 
   async function handleRemove(guest: DepartureGuest) {
@@ -217,20 +255,32 @@ function GuestsModal({
           {!loading && guests.length === 0 && (
             <p className="font-sans text-sm text-black/30">No guests recorded yet. Add anyone who booked outside the platform below (e.g. migrating from Wix Events).</p>
           )}
-          {guests.map(g => (
-            <div key={g.id} className="flex items-center justify-between gap-3 border border-black/8 rounded-lg px-3 py-2">
-              <div className="min-w-0">
-                <p className="font-sans text-sm text-black/80 truncate">{g.name} <span className="text-black/35">· {g.seats} seat{g.seats === 1 ? '' : 's'}</span></p>
-                {(g.email || g.phone) && (
-                  <p className="font-sans text-xs text-black/40 truncate">{[g.email, g.phone].filter(Boolean).join(' · ')}</p>
-                )}
-                {g.notes && <p className="font-sans text-xs text-black/35 truncate">{g.notes}</p>}
+          {guests.map(g => {
+            const pkg = livePackages.find(p => p.id === g.packageId)
+            return (
+              <div key={g.id} className="flex items-center justify-between gap-3 border border-black/8 rounded-lg px-3 py-2">
+                <div className="min-w-0">
+                  <p className="font-sans text-sm text-black/80 truncate">
+                    {g.name} <span className="text-black/35">· {g.seats} seat{g.seats === 1 ? '' : 's'}{pkg ? ` · ${pkg.name}` : ''}</span>
+                  </p>
+                  {(g.email || g.phone) && (
+                    <p className="font-sans text-xs text-black/40 truncate">{[g.email, g.phone].filter(Boolean).join(' · ')}</p>
+                  )}
+                  {g.notes && <p className="font-sans text-xs text-black/35 truncate">{g.notes}</p>}
+                </div>
+                <div className="flex items-center gap-3 shrink-0">
+                  {g.email && (
+                    <button onClick={() => handleResend(g)} disabled={sendingId === g.id} title="Send confirmation email" className="text-black/30 hover:text-[#C9A96E] disabled:opacity-40">
+                      <Mail size={14} />
+                    </button>
+                  )}
+                  <button onClick={() => handleRemove(g)} disabled={removingId === g.id} className="text-red-400 hover:text-red-600 disabled:opacity-40">
+                    <Trash2 size={14} />
+                  </button>
+                </div>
               </div>
-              <button onClick={() => handleRemove(g)} disabled={removingId === g.id} className="text-red-400 hover:text-red-600 shrink-0 disabled:opacity-40">
-                <Trash2 size={14} />
-              </button>
-            </div>
-          ))}
+            )
+          })}
         </div>
 
         <div className="h-px bg-black/6" />
@@ -243,8 +293,27 @@ function GuestsModal({
             <input value={form.email} onChange={e => setForm(f => ({ ...f, email: e.target.value }))} placeholder="Email (optional)" className={inp} />
             <input value={form.phone} onChange={e => setForm(f => ({ ...f, phone: e.target.value }))} placeholder="Phone (optional)" className={inp} />
           </div>
+          {livePackages.length > 0 && (
+            <div>
+              <label className="font-sans text-[11px] text-black/40 block mb-1">Rate paid</label>
+              <select value={form.packageId} onChange={e => setForm(f => ({ ...f, packageId: e.target.value }))} className={inp}>
+                <option value="">No specific rate</option>
+                {livePackages.map(p => <option key={p.id} value={p.id}>{p.name} — R {p.pricePerPerson.toLocaleString()}</option>)}
+              </select>
+            </div>
+          )}
           <input value={form.notes} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))} placeholder="Notes — e.g. Wix booking reference (optional)" className={inp} />
+          <label className="flex items-center gap-2 font-sans text-xs text-black/60 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={form.sendConfirmation}
+              onChange={e => setForm(f => ({ ...f, sendConfirmation: e.target.checked }))}
+              className="accent-[#C9A96E]"
+            />
+            Send a confirmation email with their itinerary{!form.email.trim() && ' (needs an email address above)'}
+          </label>
           {error && <p className="font-sans text-xs text-red-500">{error}</p>}
+          {notice && <p className="font-sans text-xs text-[#2d6a4f]">{notice}</p>}
           <button onClick={handleAdd} disabled={saving} className="flex items-center gap-1.5 font-sans text-xs text-[#C9A96E] hover:text-[#b8965d] disabled:opacity-50">
             <Plus size={13} /> {saving ? 'Adding…' : 'Add guest'}
           </button>
@@ -509,6 +578,7 @@ function DeparturesInner() {
       {managingGuests && (
         <GuestsModal
           dep={managingGuests}
+          tour={tours.find(t => t.id === managingGuests.tourId)}
           onClose={() => setManagingGuests(null)}
           onSeatsChanged={bookedSeats => setRows(rs => rs.map(x => (x.id === managingGuests.id ? { ...x, bookedSeats, status: bookedSeats >= x.maxSeats ? 'full' : (x.status === 'full' ? 'open' : x.status) } : x)))}
         />

@@ -18,6 +18,8 @@ export type DepartureGuest = {
   phone: string | null
   seats: number
   notes: string | null
+  /** Which DeparturePackage (lib/departures.ts) this guest paid for, if the departure has more than one rate. */
+  packageId: string | null
   createdAt: string
 }
 
@@ -30,6 +32,7 @@ type GuestRow = {
   phone: string | null
   seats: number
   notes: string | null
+  package_id: string | null
   created_at: string
 }
 
@@ -43,6 +46,7 @@ function rowToGuest(row: GuestRow): DepartureGuest {
     phone: row.phone,
     seats: row.seats,
     notes: row.notes,
+    packageId: row.package_id,
     createdAt: row.created_at,
   }
 }
@@ -63,6 +67,12 @@ export async function getGuestsForDeparture(departureId: string): Promise<Depart
  * the departure through the same atomic, capacity-checked RPC the public
  * checkout flow uses (bookDepartureSeats/vd_book_seats) — so a manual entry
  * can never oversell a departure the way a plain field edit could.
+ *
+ * Also adds the guest to the supplier's contacts (vd_add_supplier_contact,
+ * 20260828 migration) whenever they have a name or email — this always
+ * happens, it isn't optional, matching how a real checkout booking already
+ * creates a contact automatically. Best-effort: a contact-save failure
+ * (e.g. neither name nor email given) never blocks saving the guest itself.
  */
 export async function addManualGuest(input: {
   departureId: string
@@ -71,6 +81,8 @@ export async function addManualGuest(input: {
   phone?: string
   seats?: number
   notes?: string
+  /** DeparturePackage id (lib/departures.ts) this guest paid for, if the departure has more than one rate. */
+  packageId?: string
 }): Promise<DepartureGuest> {
   const supplierId = await getEffectiveSupplierId()
   if (!supplierId) throw new Error('You need to be signed in to add a guest.')
@@ -92,6 +104,7 @@ export async function addManualGuest(input: {
       phone: input.phone?.trim() || null,
       seats,
       notes: input.notes?.trim() || null,
+      package_id: input.packageId || null,
     })
     .select()
     .maybeSingle()
@@ -102,6 +115,18 @@ export async function addManualGuest(input: {
     await releaseDepartureSeats(input.departureId, seats).catch(() => {})
     throw new Error(error?.message || 'Could not save this guest.')
   }
+
+  await supabase
+    .rpc('vd_add_supplier_contact', {
+      p_supplier_id: supplierId,
+      p_name: name,
+      p_email: input.email?.trim() || null,
+      p_phone: input.phone?.trim() || null,
+    })
+    .then(({ error: contactError }) => {
+      if (contactError) console.error('[departure-guests] contact save failed:', contactError)
+    })
+
   return rowToGuest(data as GuestRow)
 }
 
