@@ -12,6 +12,7 @@ import { SeoPanel } from '@/components/admin/SeoPanel'
 import { RelationshipPicker, type RelatedItem } from '@/components/admin/RelatedEntityManager'
 import { getProperties, type Property } from '@/lib/properties'
 import { getActivities, type Activity } from '@/lib/activities'
+import { getReserves, type Reserve } from '@/lib/reserves'
 
 const REGIONS = ['Northern Drakensberg', 'Central Drakensberg', 'Southern Drakensberg', 'Royal Natal National Park', 'Champagne Valley', "Giant's Castle", 'Sani Pass']
 const DIFFICULTIES = ['Easy', 'Moderate', 'Strenuous', 'Extreme'] as const
@@ -213,6 +214,7 @@ function TrailForm({ trail, onChange, onSave, onCancel, saveLabel, saving }: {
   const [availableProperties, setAvailableProperties] = useState<RelatedItem[]>([])
   const [availableActivities, setAvailableActivities] = useState<RelatedItem[]>([])
   const [availableTrails, setAvailableTrails] = useState<RelatedItem[]>([])
+  const [reserves, setReserves] = useState<Reserve[]>([])
 
   useEffect(() => {
     getProperties().then(list =>
@@ -228,6 +230,7 @@ function TrailForm({ trail, onChange, onSave, onCancel, saveLabel, saving }: {
           .map(t => ({ id: t.id, label: t.name, sublabel: t.region }))
       )
     ).catch(() => {})
+    getReserves().then(setReserves).catch(() => {})
   }, [trail.id])
 
   return (
@@ -243,6 +246,14 @@ function TrailForm({ trail, onChange, onSave, onCancel, saveLabel, saving }: {
           <select value={trail.region} onChange={e => onChange('region', e.target.value)} className={inputCls}>
             {REGIONS.map(r => <option key={r}>{r}</option>)}
           </select>
+        </div>
+        <div>
+          <label className={labelCls}>Nature Reserve</label>
+          <select value={trail.reserveId ?? ''} onChange={e => onChange('reserveId', e.target.value || undefined)} className={inputCls}>
+            <option value="">Unassigned</option>
+            {reserves.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
+          </select>
+          <p className="mt-1 font-sans text-[11px] text-gray-400">Powers the &quot;View Hikes&quot; link from this reserve's page.</p>
         </div>
         <div>
           <label className={labelCls}>Overall Difficulty</label>

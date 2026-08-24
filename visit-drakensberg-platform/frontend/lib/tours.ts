@@ -5,35 +5,78 @@ import { deleteDeparturesByTour } from './departures'
 import { getEffectiveSupplierId } from './effective-supplier'
 import type { GraphFields } from './graph-fields'
 import { slugify, uniqueSlug } from './slugify'
+import type { TrailDay } from './trails'
 import type { SupabaseClient } from '@supabase/supabase-js'
+
+// A tier-specific edit to one day of the tour's default itinerary (the
+// linked Trail's admin-authored `days` — see composeTierItinerary() below).
+// Referenced positionally (`dayIndex` into the trail's `days` array, same
+// indexing the admin trail editor itself uses) rather than by id, since
+// TrailDay has none. Any field left unset falls through to the trail's
+// value for that day.
+export type ItineraryDayOverride = {
+  dayIndex: number
+  notes?: string
+  accommodation?: string
+  transport?: string
+  meals?: string
+}
+
+// A day this tier adds on top of the trail's default plan — has no
+// counterpart on the Trail, so it carries its own full content.
+export type ExtraItineraryDay = {
+  id: string
+  label: string
+  description?: string
+  accommodation?: string
+  transport?: string
+  meals?: string
+}
 
 // One way to buy a seat on any departure of this tour — e.g. "Shuttled" vs
 // "Self-Drive" — with its own price and its own add-ons. Departures choose
 // which subset of a tour's tiers apply to their date (see DeparturePackage
 // and composePackages() in lib/experiences.ts); a tour with none defined
 // falls back to the flat `pricePerPerson` below.
+//
+// Itinerary customization: every tier starts from the tour's linked Trail's
+// admin-authored day-by-day plan (Trail.days, edited at /admin/trails) as
+// its default. A tier can narrow that down to fewer leading days
+// (itineraryDayCount), edit the details of specific default days
+// (itineraryOverrides), and/or add its own extra days before and/or after
+// the default plan (itineraryDaysBefore / itineraryDaysAfter) — e.g. a
+// "Standard" tier shows the trail's plan as-is, while a "Shuttle + Extra
+// Night" tier adds one extra day before it (a shuttle pickup) without
+// moving the hike's own start date. See composeTierItinerary().
 export type PricingTier = {
   id: string
   name: string
   pricePerPerson: number
   inclusions: string[]
+  itineraryDayCount?: number
+  itineraryOverrides?: ItineraryDayOverride[]
+  itineraryDaysBefore?: ExtraItineraryDay[]
+  itineraryDaysAfter?: ExtraItineraryDay[]
 }
 
-// One authored day of a multi-day tour's day-by-day plan, in trip order
-// (array index 0 = Day 1). Shared across every departure/package of the
-// tour — see DeparturePackage.dayCount in lib/departures.ts for how a rate
-// package on a departure narrows this down to just the days its guests get
-// (e.g. a 2-day "Standard" rate vs a 3-day "Shuttle + Extra Night" rate that
-// includes one more of these days).
-export type ItineraryDay = {
-  id: string
-  title: string
-  description: string
-  /** Where guests overnight after this day, e.g. "Sentinel Cave" or "Karma Lodge, Bergville". */
+// One day of a composed, guest-facing itinerary — the trail's default plan
+// (or a tier's extra day) resolved for one specific rate package, in order.
+// `dateOffset` is measured in days from the departure's "hiking date" (the
+// anchor — Departure.date, the calendar date the trail's Day 1 falls on):
+// 0 = the hiking date itself, negative = before it (an extra day a tier
+// inserted ahead of the hike), positive = after the trail's Day 1.
+export type ComposedItineraryDay = {
+  label: string
+  description?: string
   accommodation?: string
-  /** Transport for this day, e.g. "Shuttle pickup 06:00 from Johannesburg (Sandton)". */
   transport?: string
   meals?: string
+  distance?: string
+  elevation?: string
+  difficulty?: TrailDay['difficulty']
+  dateOffset: number
+  /** True for a tier's added day with no counterpart in the trail's own plan. */
+  isExtra?: boolean
 }
 
 export type Tour = {
@@ -58,11 +101,8 @@ export type Tour = {
   // unchanged. Only a true stored value when pricingTiers is empty.
   pricePerPerson: number
   pricingTiers?: PricingTier[]
-  // Ordered day-by-day plan for this tour. Absent/empty on tours predating
-  // this field, and on any tour the supplier hasn't authored one for yet —
-  // every reader must treat that as "no day-by-day content to show" and
-  // fall back to the flat `days` count, exactly as before this field existed.
-  itinerary?: ItineraryDay[]
+  /** @deprecated Superseded by PricingTier's itinerary fields, which build on the linked Trail's `days` instead of a separate tour-level plan. Retained so tours saved by the earlier version of this feature still parse; no longer read anywhere. */
+  itinerary?: unknown
   /** @deprecated Removed from the supplier forms; retained so stored tours still parse. */
   groupDiscount?: number
   status: 'active' | 'draft'
@@ -88,21 +128,62 @@ export function newPricingTierId(): string {
   return newEntityId('tier')
 }
 
-export function newItineraryDayId(): string {
+export function newExtraItineraryDayId(): string {
   return newEntityId('day')
 }
 
-// Given a tour's full day-by-day plan and a package's configured day count
-// (DeparturePackage.dayCount — how many of the tour's leading days that rate
-// includes), returns just the days that package's guests should see/receive.
-// `dayCount` absent, or no itinerary authored at all, means "every day" —
-// so a tour/package that never used this feature keeps behaving exactly as
-// it did before it existed.
-export function packageItinerary(itinerary: ItineraryDay[] | undefined, dayCount: number | undefined): ItineraryDay[] {
-  const days = itinerary ?? []
-  if (days.length === 0) return []
-  const count = dayCount != null ? Math.min(Math.max(1, dayCount), days.length) : days.length
-  return days.slice(0, count)
+// Composes one tier's guest-facing itinerary: starts from the trail's
+// default day-by-day plan (truncated to `itineraryDayCount` leading days,
+// or every day when unset), applies any per-day overrides, then surrounds
+// it with the tier's extra days. Returns [] when there's nothing to show at
+// all (no trail days authored, and no extra days either) — callers should
+// fall back to a flat duration display in that case, exactly as before this
+// feature existed.
+export function composeTierItinerary(
+  trailDays: TrailDay[] | undefined,
+  tier: Pick<PricingTier, 'itineraryDayCount' | 'itineraryOverrides' | 'itineraryDaysBefore' | 'itineraryDaysAfter'> | undefined,
+): ComposedItineraryDay[] {
+  const base = trailDays ?? []
+  const count = tier?.itineraryDayCount != null ? Math.min(Math.max(1, tier.itineraryDayCount), base.length) : base.length
+  const truncated = base.slice(0, count)
+  const defaultDays: ComposedItineraryDay[] = truncated.map((d, i) => {
+    const o = tier?.itineraryOverrides?.find(x => x.dayIndex === i)
+    return {
+      label: d.label,
+      description: o?.notes ?? d.notes,
+      accommodation: o?.accommodation,
+      transport: o?.transport,
+      meals: o?.meals,
+      distance: d.distance,
+      elevation: d.elevation,
+      difficulty: d.difficulty,
+      dateOffset: 0, // fixed up below, once we know how many "before" days precede it
+    }
+  })
+  const toExtra = (d: ExtraItineraryDay): ComposedItineraryDay => ({
+    label: d.label, description: d.description, accommodation: d.accommodation,
+    transport: d.transport, meals: d.meals, dateOffset: 0, isExtra: true,
+  })
+  const before = (tier?.itineraryDaysBefore ?? []).map(toExtra)
+  const after = (tier?.itineraryDaysAfter ?? []).map(toExtra)
+  const all = [...before, ...defaultDays, ...after]
+  return all.map((d, i) => ({ ...d, dateOffset: i - before.length }))
+}
+
+// Resolves the itinerary a specific rate package's guests should see: for a
+// tier-linked package (DeparturePackage.tierId), from that tier's itinerary
+// controls; for a freeform package (no tier), just a day-count truncation
+// of the trail's default plan via its own `dayCount`. Takes a minimal shape
+// rather than the real DeparturePackage type to avoid lib/tours.ts <->
+// lib/departures.ts importing each other.
+export function resolveItinerary(
+  trailDays: TrailDay[] | undefined,
+  pricingTiers: PricingTier[] | undefined,
+  pkg: { tierId?: string; dayCount?: number } | undefined,
+): ComposedItineraryDay[] {
+  const tier = pkg?.tierId ? pricingTiers?.find(t => t.id === pkg.tierId) : undefined
+  if (tier) return composeTierItinerary(trailDays, tier)
+  return composeTierItinerary(trailDays, pkg?.dayCount != null ? { itineraryDayCount: pkg.dayCount } : undefined)
 }
 
 /**

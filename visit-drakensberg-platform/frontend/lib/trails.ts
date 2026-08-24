@@ -27,6 +27,8 @@ export type Trail = {
   id: string
   name: string
   region: string
+  /** Nature reserve this trail falls within (Reserve.id, lib/reserves.ts). Empty/absent = unassigned. */
+  reserveId?: string
   difficulty: 'Easy' | 'Moderate' | 'Strenuous' | 'Extreme'
   distance: string
   duration: string

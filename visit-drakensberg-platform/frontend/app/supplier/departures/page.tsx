@@ -7,6 +7,7 @@ import { supabase } from '@/lib/auth'
 import { effectiveSupplierId } from '@/lib/effective-supplier'
 import { getSupplierEntities, type SupplierEntity } from '@/lib/supplier-entities'
 import { getMyTours, type Tour, type PricingTier } from '@/lib/tours'
+import { getTrails, type Trail } from '@/lib/trails'
 import {
   getMyDepartures, addDeparture, updateDeparture, deleteDeparture, newDeparturePackageId,
   type Departure,
@@ -36,13 +37,17 @@ function packagesFromTiers(tiers: PricingTier[]): PackageForm[] {
 }
 
 function RatesFieldset({
-  inclusions, onChangeInclusions, packages, onChangePackages, tour,
+  inclusions, onChangeInclusions, packages, onChangePackages, tour, trailDayCount,
 }: {
   inclusions: string[]; onChangeInclusions: (next: string[]) => void
   packages: PackageForm[]; onChangePackages: (next: PackageForm[]) => void
   tour?: Tour
+  // The linked trail's day count — freeform rates (no tierId) can truncate
+  // to a plain trip length here. Tier-linked rates get their itinerary
+  // (including trip length) from the tour's pricing tier instead, edited on
+  // the tour itself, so PackagesEditor hides this field for those rows.
+  trailDayCount: number
 }) {
-  const itineraryDayCount = tour?.itinerary?.length ?? 0
   return (
     <div className="space-y-5">
       <div className="space-y-1.5">
@@ -51,14 +56,13 @@ function RatesFieldset({
       </div>
       <div className="space-y-1.5">
         <label className="font-sans text-sm font-medium text-black/70">Rate Packages <span className="font-normal text-black/30">(different prices for the same departure)</span></label>
-        {itineraryDayCount > 0 && (
+        {trailDayCount > 0 && (
           <p className="font-sans text-xs text-black/40">
-            &quot;{tour!.name}&quot; has a {itineraryDayCount}-day itinerary. Set each rate&apos;s trip length below to
-            control how many of those days its guests see on their itinerary — e.g. a shorter rate can leave off
-            a trailing day that adds a shuttle and an extra night.
+            &quot;{tour!.name}&quot;&apos;s trail has a {trailDayCount}-day itinerary. A freeform rate below can set its own
+            trip length; a rate linked to a pricing tier follows that tier&apos;s itinerary instead — edit it on the tour.
           </p>
         )}
-        <PackagesEditor packages={packages} onChange={onChangePackages} itineraryDayCount={itineraryDayCount} />
+        <PackagesEditor packages={packages} onChange={onChangePackages} itineraryDayCount={trailDayCount} />
       </div>
     </div>
   )
@@ -66,7 +70,7 @@ function RatesFieldset({
 
 /* ─── Configure modal for an existing departure ─────────────────────────────── */
 
-function ConfigureModal({ dep, tour, onClose, onSaved }: { dep: Departure; tour: Tour | undefined; onClose: () => void; onSaved: (patch: Partial<Departure>) => void }) {
+function ConfigureModal({ dep, tour, trailDayCount, onClose, onSaved }: { dep: Departure; tour: Tour | undefined; trailDayCount: number; onClose: () => void; onSaved: (patch: Partial<Departure>) => void }) {
   const [inclusions, setInclusions] = useState<string[]>(dep.inclusions ?? [])
   // Load with each tier-linked row showing its tour tier's *current*
   // name/price/add-ons, not the stale snapshot stored on the departure —
@@ -118,7 +122,7 @@ function ConfigureModal({ dep, tour, onClose, onSaved }: { dep: Departure; tour:
           </div>
         )}
 
-        <RatesFieldset inclusions={inclusions} onChangeInclusions={setInclusions} packages={packages} onChangePackages={setPackages} tour={tour} />
+        <RatesFieldset inclusions={inclusions} onChangeInclusions={setInclusions} packages={packages} onChangePackages={setPackages} tour={tour} trailDayCount={trailDayCount} />
 
         <div className="flex gap-3 pt-2">
           <button onClick={save} disabled={saving} className="flex-1 bg-[#C9A96E] text-white font-sans text-sm py-2.5 rounded-lg disabled:opacity-50">
@@ -257,6 +261,7 @@ function DeparturesInner() {
   const tourFilter = searchParams.get('tour')
 
   const [tours, setTours] = useState<Tour[]>([])
+  const [trails, setTrails] = useState<Trail[]>([])
   const [guides, setGuides] = useState<Guide[]>([])
   const [rows, setRows] = useState<Departure[]>([])
   const [adding, setAdding] = useState(false)
@@ -280,6 +285,7 @@ function DeparturesInner() {
       }
     })
     getMyDepartures().then(setRows)
+    getTrails().then(setTrails)
     supabase.auth.getUser().then(async ({ data: { user } }) => {
       if (user) setGuides(await getSupplierEntities<Guide>('guides', effectiveSupplierId(user.id)))
     })
@@ -430,6 +436,7 @@ function DeparturesInner() {
             packages={form.packages}
             onChangePackages={next => setForm(f => ({ ...f, packages: next }))}
             tour={tours.find(t => t.id === form.tourId)}
+            trailDayCount={trails.find(t => t.id === tours.find(x => x.id === form.tourId)?.trailId)?.days.length ?? 0}
           />
 
           <div className="flex gap-3">
@@ -493,6 +500,7 @@ function DeparturesInner() {
         <ConfigureModal
           dep={configuring}
           tour={tours.find(t => t.id === configuring.tourId)}
+          trailDayCount={trails.find(t => t.id === tours.find(x => x.id === configuring.tourId)?.trailId)?.days.length ?? 0}
           onClose={() => setConfiguring(null)}
           onSaved={patch => setRows(rs => rs.map(x => (x.id === configuring.id ? { ...x, ...patch } : x)))}
         />

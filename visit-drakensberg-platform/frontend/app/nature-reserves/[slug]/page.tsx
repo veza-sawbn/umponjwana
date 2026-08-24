@@ -224,14 +224,12 @@ export default async function ReservePage({ params }: { params: { slug: string }
                 </div>
               )}
               <div className="flex flex-col gap-3">
-                {regionName && (
-                  <Link
-                    href={`/hikes?region=${encodeURIComponent(regionName)}`}
-                    className="font-sans text-sm px-5 py-3 bg-forest text-white hover:bg-sage transition-colors inline-flex items-center justify-center gap-2"
-                  >
-                    View Hikes <ArrowRight className="w-3.5 h-3.5" />
-                  </Link>
-                )}
+                <Link
+                  href={`/hikes?nature-reserves=${encodeURIComponent(reserve.id)}`}
+                  className="font-sans text-sm px-5 py-3 bg-forest text-white hover:bg-sage transition-colors inline-flex items-center justify-center gap-2"
+                >
+                  View Hikes <ArrowRight className="w-3.5 h-3.5" />
+                </Link>
                 {regionName && (
                   <Link
                     href={`/stays?region=${encodeURIComponent(regionName)}`}

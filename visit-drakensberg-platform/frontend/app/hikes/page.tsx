@@ -3,8 +3,10 @@ import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import Footer from '@/components/layout/Footer'
 import EditablePageHeader from '@/components/editor/EditablePageHeader'
+import { X } from 'lucide-react'
 import { getTrails, trailStartPoint, trailCategory, type Trail, type TrailCategory } from '@/lib/trails'
 import { regionsMatch } from '@/lib/regions'
+import { getReserves, type Reserve } from '@/lib/reserves'
 import TrailExperiences from '@/components/experiences/TrailExperiences'
 import { getUpcomingExperiences, type TrekkingExperience } from '@/lib/experiences'
 import RouteArtwork from '@/components/trails/RouteArtwork'
@@ -36,12 +38,23 @@ export default function HikesPage() {
   const [maxDist, setMaxDist] = useState(250)
   const [category, setCategory] = useState<'All' | TrailCategory>('All')
   const [specialityType, setSpecialityType] = useState('All')
+  // Set only via ?nature-reserves=<Reserve.id> (from a reserve's "View
+  // Hikes" button) — a separate axis from the region dropdown above, since
+  // a reserve can span, or be narrower than, a region.
+  const [reserveId, setReserveId] = useState<string | null>(null)
+  const [reserve, setReserve] = useState<Reserve | null>(null)
 
   useEffect(() => {
     getTrails().then(all => setTrails(all.filter(t => t.status === 'published')))
     getUpcomingExperiences().then(setExperiences)
-    const regionParam = new URLSearchParams(window.location.search).get('region')
+    const params = new URLSearchParams(window.location.search)
+    const regionParam = params.get('region')
     if (regionParam) setRegion(regionParam)
+    const reserveParam = params.get('nature-reserves')
+    if (reserveParam) {
+      setReserveId(reserveParam)
+      getReserves().then(all => setReserve(all.find(r => r.id === reserveParam) ?? null))
+    }
   }, [])
 
   const regionOpts = ['All', ...Array.from(new Set(trails.map(t => t.region))).sort()]
@@ -56,6 +69,7 @@ export default function HikesPage() {
     (diff === 'All' || t.difficulty === diff) &&
     (region === 'All' || regionsMatch(t.region, region)) &&
     (routeType === 'All' || (t.trail_type || '') === routeType) &&
+    (!reserveId || t.reserveId === reserveId) &&
     parseKm(t.distance) <= maxDist
   )
 
@@ -75,6 +89,19 @@ export default function HikesPage() {
       <EditablePageHeader section="hikes_page" />
 
       <div className="max-w-[1440px] mx-auto px-6 lg:px-12 py-10">
+        {reserveId && (
+          <div className="flex items-center justify-between gap-3 mb-5 bg-forest/5 border border-forest/15 px-4 py-2.5">
+            <p className="font-sans text-sm text-forest/70">
+              Filtered to trails in <span className="font-medium text-forest">{reserve?.name || 'this nature reserve'}</span>
+            </p>
+            <button
+              onClick={() => { setReserveId(null); setReserve(null) }}
+              className="inline-flex items-center gap-1 font-sans text-xs text-forest/50 hover:text-forest transition-colors"
+            >
+              <X size={12} /> Clear
+            </button>
+          </div>
+        )}
         {/* Category tabs */}
         <div className="flex flex-wrap gap-2 mb-4 border-b border-black/8">
           {CATEGORY_TABS.map((c) => (
