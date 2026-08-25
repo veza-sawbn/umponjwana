@@ -159,17 +159,7 @@ export const EDITOR_PAGES: EditorPage[] = [
         reorderable: true,
         hideable: true,
         fields: [text('stories_eyebrow', 'Eyebrow'), text('stories_heading', 'Heading')],
-        cards: {
-          contentKey: 'home_cards',
-          fieldKey: 'stories',
-          label: 'Story Cards',
-          itemLabelKey: 'title',
-          fields: [
-            text('title', 'Title'), text('tag', 'Tag'), text('date', 'Date'),
-            image('img', 'Image'), link('href', 'Destination'),
-          ],
-          blank: { title: 'New Story', tag: 'Journal', date: '', img: '', href: '/mydrakensberg', visible: true },
-        },
+        note: 'Story cards show the 3 most recent published posts — edit them under Admin → Blog & Content.',
       },
       {
         id: 'trails',
