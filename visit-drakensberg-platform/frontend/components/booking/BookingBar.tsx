@@ -5,7 +5,7 @@ import { usePathname, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { Calendar, Users, MapPin, Bed, Plus, X, ChevronUp, ChevronDown, ShoppingBag, Trash2, Bus } from 'lucide-react'
 import { AnimatePresence, motion } from 'framer-motion'
-import { useBooking } from '@/lib/booking-context'
+import { useBooking, describeAddonParty } from '@/lib/booking-context'
 import { slideUp, slideUpBar } from '@/lib/motion'
 import { useShuttleRecommendations } from '@/lib/shuttle-service'
 
@@ -132,7 +132,7 @@ export default function BookingBar() {
                             <div>
                               <p className="font-sans text-sm font-medium">{addon.title}</p>
                               <p className="font-sans text-xs text-gray-400">
-                                {addon.date && `${addon.date} · `}R {addon.price_per_person.toLocaleString()} × {addon.guests}p = R {(addon.price_per_person * addon.guests).toLocaleString()}
+                                {addon.date && `${addon.date}${addon.timeslotTime ? ` ${addon.timeslotTime}` : ''} · `}{describeAddonParty(addon)} = R {(addon.price_per_person * addon.guests).toLocaleString()}
                               </p>
                             </div>
                           </div>

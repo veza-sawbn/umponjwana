@@ -4,7 +4,7 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import Footer from '@/components/layout/Footer'
 import { Mountain, Bed, Car, Compass, ChevronRight, Trash2, Users, Calendar, ArrowLeft, Pencil } from 'lucide-react'
-import { useBooking } from '@/lib/booking-context'
+import { useBooking, describeAddonParty } from '@/lib/booking-context'
 import { getRecommendations, type Recommendation } from '@/lib/recommendations'
 import { ShuttleTripCard } from '@/components/booking/ShuttleTripCard'
 import { useState, useEffect } from 'react'
@@ -103,8 +103,8 @@ export default function TripPage() {
                         <div className="min-w-0">
                           <p className="font-sans font-medium text-sm text-black/80 truncate">{a.title}</p>
                           <p className="font-sans text-xs text-black/40 mt-0.5 flex items-center gap-3 flex-wrap">
-                            {a.date && <span className="flex items-center gap-1"><Calendar size={10} />{formatDate(a.date)}</span>}
-                            <span className="flex items-center gap-1"><Users size={10} />{a.guests} {a.guests === 1 ? 'person' : 'people'}</span>
+                            {a.date && <span className="flex items-center gap-1"><Calendar size={10} />{formatDate(a.date)}{a.timeslotTime && ` · ${a.timeslotTime}`}</span>}
+                            <span className="flex items-center gap-1"><Users size={10} />{describeAddonParty(a)}</span>
                           </p>
                         </div>
                       </div>

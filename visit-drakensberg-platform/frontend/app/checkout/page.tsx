@@ -6,9 +6,10 @@ import Link from 'next/link'
 import toast from 'react-hot-toast'
 import Footer from '@/components/layout/Footer'
 import { ArrowLeft, ShieldCheck, Lock, Calendar, Users, MapPin, Bus } from 'lucide-react'
-import { useBooking } from '@/lib/booking-context'
+import { useBooking, describeAddonParty } from '@/lib/booking-context'
 import { addBooking } from '@/lib/bookings'
 import { getDepartures, bookDepartureSeats, releaseDepartureSeats } from '@/lib/departures'
+import { bookActivityTimeslot, releaseActivityTimeslot } from '@/lib/activities'
 import { getSupplierEntities } from '@/lib/supplier-entities'
 import { supabase } from '@/lib/auth'
 import { trackEvent, AnalyticsEvent, getAnalyticsIds } from '@/lib/analytics'
@@ -106,22 +107,34 @@ export default function CheckoutPage() {
         } catch {}
       }
 
-      // Reserve departure seats FIRST — atomic and capacity-checked
-      // server-side, so a full departure aborts the booking cleanly.
+      // Reserve departure seats and activity timeslots FIRST — both atomic
+      // and capacity-checked server-side, so a full departure/timeslot
+      // aborts the booking cleanly before anything is persisted.
       const allDeps = await getDepartures()
       const departureAddons = snap.addons.filter(a => allDeps.some(d => d.id === a.id))
+      const slotAddons = snap.addons.filter(a => a.activityId && a.timeslotId && a.date)
       const reserved: { id: string; seats: number }[] = []
+      const reservedSlots: { activityId: string; date: string; timeslotId: string; seats: number }[] = []
       try {
         for (const addon of departureAddons) {
           await bookDepartureSeats(addon.id, addon.guests)
           reserved.push({ id: addon.id, seats: addon.guests })
         }
+        for (const addon of slotAddons) {
+          await bookActivityTimeslot(addon.activityId!, addon.date!, addon.timeslotId!, addon.guests)
+          reservedSlots.push({ activityId: addon.activityId!, date: addon.date!, timeslotId: addon.timeslotId!, seats: addon.guests })
+        }
       } catch (seatErr) {
-        // Roll back any seats we already took, then surface the problem.
-        await Promise.all(reserved.map(r => releaseDepartureSeats(r.id, r.seats).catch(() => {})))
-        const msg = seatErr instanceof Error && seatErr.message.includes('seats')
-          ? 'One of your tour departures no longer has enough seats. Please adjust your trip.'
-          : 'We could not reserve your tour seats. Please try again.'
+        // Roll back anything we already took, then surface the problem.
+        await Promise.all([
+          ...reserved.map(r => releaseDepartureSeats(r.id, r.seats).catch(() => {})),
+          ...reservedSlots.map(r => releaseActivityTimeslot(r.activityId, r.date, r.timeslotId, r.seats).catch(() => {})),
+        ])
+        const msg = seatErr instanceof Error && (seatErr.message.includes('seats') || seatErr.message.includes('timeslot'))
+          ? seatErr.message.includes('timeslot')
+            ? 'One of your activity timeslots no longer has enough seats. Please adjust your trip.'
+            : 'One of your tour departures no longer has enough seats. Please adjust your trip.'
+          : 'We could not reserve your booking. Please try again.'
         toast.error(msg)
         setLoading(false)
         return
@@ -313,7 +326,10 @@ export default function CheckoutPage() {
                     <p className="font-sans text-[10px] uppercase text-white/30 mb-2">Add-ons</p>
                     {booking.addons.map(a => (
                       <div key={a.id} className="flex justify-between font-sans text-xs text-white/60 mb-1.5">
-                        <span className="truncate mr-2">{a.title}</span>
+                        <span className="truncate mr-2">
+                          {a.title}
+                          {a.adults !== undefined && <span className="block text-white/35 text-[11px]">{describeAddonParty(a)}{a.timeslotTime && ` · ${a.timeslotTime}`}</span>}
+                        </span>
                         <span className="shrink-0">R {(a.price_per_person * a.guests).toLocaleString()}</span>
                       </div>
                     ))}

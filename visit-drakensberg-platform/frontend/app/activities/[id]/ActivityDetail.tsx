@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import Footer from '@/components/layout/Footer'
 import { ArrowLeft, Clock, Users, CheckCircle, Calendar, MapPin } from 'lucide-react'
@@ -9,6 +9,7 @@ import { getTourDates } from '@/lib/tour-dates'
 import { useBooking } from '@/lib/booking-context'
 import { Check, Plus } from 'lucide-react'
 import type { Activity } from '@/lib/activities'
+import { timeslotsForDate, slotRemaining } from '@/lib/activities'
 
 function mapActivityToView(a: Activity) {
   const durationParts = []
@@ -27,6 +28,9 @@ function mapActivityToView(a: Activity) {
     duration,
     group_size: a.maxGroup ? `Up to ${a.maxGroup} people` : '',
     price_per_person: a.pricePerPerson || 0,
+    // A child rate only applies once the supplier set an age cutoff.
+    childPrice: a.childMaxAge ? (a.childPrice || a.pricePerPerson || 0) : undefined,
+    childMaxAge: a.childMaxAge || undefined,
     description: a.description,
     includes: Array.isArray(a.included) ? a.included : [],
     what_to_bring: whatToWear,
@@ -48,13 +52,35 @@ function mapActivityToView(a: Activity) {
 export default function ActivityDetail({ activityData, id }: { activityData: Activity; id: string }) {
   const activity = mapActivityToView(activityData)
   const booking = useBooking()
+  const hasChildRate = activity.childPrice !== undefined
+  const hasTimeslots = !!activityData.timeslots?.length
 
   const [date, setDate] = useState(booking.checkIn || '')
+  const [timeslotId, setTimeslotId] = useState('')
+  // Legacy single group-size selector, used only when this activity has no
+  // child rate configured.
   const [groupSize, setGroupSize] = useState(booking.guests || 2)
+  const [adults, setAdults] = useState(booking.guests || 2)
+  const [children, setChildren] = useState(0)
 
-  const total = activity.price_per_person * groupSize
-  const addonId = `activity-${id}-${date}`
+  const dayTimeslots = date ? timeslotsForDate(activityData, date) : []
+  // Reset a stale timeslot selection when the date changes or the previously
+  // picked slot doesn't run on the newly picked date.
+  useEffect(() => {
+    if (timeslotId && !dayTimeslots.some(t => t.id === timeslotId)) setTimeslotId('')
+  }, [date]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  const finalAdults = hasChildRate ? adults : groupSize
+  const finalChildren = hasChildRate ? children : 0
+  const guests = finalAdults + finalChildren
+  const total = finalAdults * activity.price_per_person + finalChildren * (activity.childPrice ?? activity.price_per_person)
+  const selectedSlot = dayTimeslots.find(t => t.id === timeslotId)
+  const remaining = selectedSlot ? slotRemaining(activityData, date, selectedSlot.id) : Infinity
+  const overCapacity = selectedSlot ? guests > remaining : false
+
+  const addonId = `activity-${id}-${date}${timeslotId ? `-${timeslotId}` : ''}`
   const isAdded = booking.addons.some((a: any) => a.id === addonId)
+  const canAdd = !!date && guests > 0 && (!hasTimeslots || !!timeslotId) && !overCapacity
 
   function toggleAddon() {
     if (isAdded) {
@@ -67,11 +93,13 @@ export default function ActivityDetail({ activityData, id }: { activityData: Act
         operator: activity.supplier?.name || undefined,
         supplierId: activity.supplierId,
         date: date || undefined,
-        price_per_person: activity.price_per_person,
-        guests: groupSize,
+        price_per_person: guests > 0 ? total / guests : activity.price_per_person,
+        guests,
         location: activity.location || undefined,
         lat: activity.gpsLat || undefined,
         lng: activity.gpsLng || undefined,
+        ...(hasChildRate ? { adults: finalAdults, children: finalChildren } : {}),
+        ...(selectedSlot ? { activityId: id, timeslotId: selectedSlot.id, timeslotTime: selectedSlot.time } : {}),
       })
     }
   }
@@ -152,8 +180,11 @@ export default function ActivityDetail({ activityData, id }: { activityData: Act
           <div>
             <div className="bg-white border border-gray-200 p-6 sticky top-24">
               <div className="mb-5">
-                <p className="font-sans text-[10px] tracking-[0.12em] uppercase text-gray-400">Per person</p>
-                <p className="font-display italic text-3xl text-[#2d6a4f]">R {activity.price_per_person.toLocaleString()}</p>
+                <p className="font-sans text-[10px] tracking-[0.12em] uppercase text-gray-400">{hasChildRate ? 'Adult / Child' : 'Per person'}</p>
+                <p className="font-display italic text-3xl text-[#2d6a4f]">
+                  R {activity.price_per_person.toLocaleString()}
+                  {hasChildRate && <span className="text-base text-gray-400"> / R {activity.childPrice!.toLocaleString()} <span className="text-xs">({activity.childMaxAge} & under)</span></span>}
+                </p>
               </div>
               <div className="space-y-4 mb-5">
                 <div>
@@ -163,18 +194,68 @@ export default function ActivityDetail({ activityData, id }: { activityData: Act
                     <input type="date" value={date} onChange={e => setDate(e.target.value)} className="flex-1 font-sans text-sm focus:outline-none" />
                   </div>
                 </div>
-                <div>
-                  <label className="block font-sans text-xs uppercase text-gray-400 mb-1.5">Group Size</label>
-                  <select value={groupSize} onChange={e => setGroupSize(parseInt(e.target.value))} className="w-full border border-gray-300 px-3 py-2.5 font-sans text-sm focus:outline-none">
-                    {[1,2,3,4,5,6,7,8].map(n => <option key={n} value={n}>{n} person{n !== 1 ? 's' : ''}</option>)}
-                  </select>
-                </div>
+
+                {hasTimeslots && (
+                  <div>
+                    <label className="block font-sans text-xs uppercase text-gray-400 mb-1.5">Select Timeslot</label>
+                    {!date ? (
+                      <p className="font-sans text-xs text-gray-400">Choose a date first.</p>
+                    ) : dayTimeslots.length === 0 ? (
+                      <p className="font-sans text-xs text-amber-600">No timeslots run on this date — try another day.</p>
+                    ) : (
+                      <select value={timeslotId} onChange={e => setTimeslotId(e.target.value)} className="w-full border border-gray-300 px-3 py-2.5 font-sans text-sm focus:outline-none">
+                        <option value="">Select a time…</option>
+                        {dayTimeslots.map(t => {
+                          const left = slotRemaining(activityData, date, t.id)
+                          return <option key={t.id} value={t.id} disabled={left <= 0}>{t.time}{left <= 0 ? ' — Fully booked' : ` — ${left} seat${left === 1 ? '' : 's'} left`}</option>
+                        })}
+                      </select>
+                    )}
+                  </div>
+                )}
+
+                {hasChildRate ? (
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block font-sans text-xs uppercase text-gray-400 mb-1.5">Adults</label>
+                      <input type="number" min={0} value={adults} onChange={e => setAdults(Math.max(0, parseInt(e.target.value) || 0))} className="w-full border border-gray-300 px-3 py-2.5 font-sans text-sm focus:outline-none" />
+                    </div>
+                    <div>
+                      <label className="block font-sans text-xs uppercase text-gray-400 mb-1.5">Children</label>
+                      <input type="number" min={0} value={children} onChange={e => setChildren(Math.max(0, parseInt(e.target.value) || 0))} className="w-full border border-gray-300 px-3 py-2.5 font-sans text-sm focus:outline-none" />
+                    </div>
+                  </div>
+                ) : (
+                  <div>
+                    <label className="block font-sans text-xs uppercase text-gray-400 mb-1.5">Group Size</label>
+                    <select value={groupSize} onChange={e => setGroupSize(parseInt(e.target.value))} className="w-full border border-gray-300 px-3 py-2.5 font-sans text-sm focus:outline-none">
+                      {[1,2,3,4,5,6,7,8].map(n => <option key={n} value={n}>{n} person{n !== 1 ? 's' : ''}</option>)}
+                    </select>
+                  </div>
+                )}
               </div>
               <div className="border-t border-gray-100 pt-4 mb-5">
-                <div className="flex justify-between font-sans text-sm mb-1">
-                  <span className="text-gray-600">R {activity.price_per_person.toLocaleString()} × {groupSize}</span>
-                  <span>R {total.toLocaleString()}</span>
-                </div>
+                {hasChildRate ? (
+                  <>
+                    {finalAdults > 0 && (
+                      <div className="flex justify-between font-sans text-sm mb-1">
+                        <span className="text-gray-600">R {activity.price_per_person.toLocaleString()} × {finalAdults} adult{finalAdults === 1 ? '' : 's'}</span>
+                        <span>R {(activity.price_per_person * finalAdults).toLocaleString()}</span>
+                      </div>
+                    )}
+                    {finalChildren > 0 && (
+                      <div className="flex justify-between font-sans text-sm mb-1">
+                        <span className="text-gray-600">R {activity.childPrice!.toLocaleString()} × {finalChildren} child{finalChildren === 1 ? '' : 'ren'}</span>
+                        <span>R {(activity.childPrice! * finalChildren).toLocaleString()}</span>
+                      </div>
+                    )}
+                  </>
+                ) : (
+                  <div className="flex justify-between font-sans text-sm mb-1">
+                    <span className="text-gray-600">R {activity.price_per_person.toLocaleString()} × {groupSize}</span>
+                    <span>R {total.toLocaleString()}</span>
+                  </div>
+                )}
                 <div className="flex justify-between font-sans text-sm font-medium pt-2 border-t border-gray-100 mt-2">
                   <span>Total</span>
                   <span className="text-[#2d6a4f]">R {total.toLocaleString()}</span>
@@ -183,11 +264,17 @@ export default function ActivityDetail({ activityData, id }: { activityData: Act
               {!date && (
                 <p className="font-sans text-xs text-amber-600 mb-2">Please select a date to add this activity.</p>
               )}
+              {date && hasTimeslots && !timeslotId && dayTimeslots.length > 0 && (
+                <p className="font-sans text-xs text-amber-600 mb-2">Please select a timeslot to add this activity.</p>
+              )}
+              {overCapacity && (
+                <p className="font-sans text-xs text-red-500 mb-2">Only {remaining} seat{remaining === 1 ? '' : 's'} left in this timeslot.</p>
+              )}
               <button
                 onClick={toggleAddon}
-                disabled={!date && !isAdded}
+                disabled={!canAdd && !isAdded}
                 className={`w-full py-3.5 font-sans text-sm font-medium transition-colors flex items-center justify-center gap-2 ${
-                  !date && !isAdded
+                  !canAdd && !isAdded
                     ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
                     : isAdded
                     ? 'bg-[#2d6a4f] text-white hover:bg-red-600'

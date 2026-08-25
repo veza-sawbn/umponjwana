@@ -598,3 +598,61 @@ the SQL side did.
 `Notification['type']` (`lib/notifications.ts`) gained `'payment'` — rows
 with that type already existed (`app/api/receipts/send`, the iKhokha
 webhook), the type just didn't say so.
+
+## UPDATE 8 — Activity adult/child rates & timeslots (2026-08-25)
+
+**Branch:** `claude/activity-rates-timeslots-4y0fnb`
+Run `frontend/supabase/migrations/20260829_activity_timeslots.sql`. Purely
+additive — two new RPCs, no schema/table changes (activities are a single
+evergreen `vd_entities` row, so per-slot booked counts nest inside that same
+row's JSON value rather than a new table).
+
+- `Activity` (`lib/activities.ts`) gained `childPrice`/`childMaxAge` (a
+  child rate only applies once a supplier sets an age cutoff — activities
+  created before this existed have neither, so everyone still pays
+  `pricePerPerson`) and `timeslots: ActivityTimeslot[]` (recurring `{ time,
+  capacity, days }`, days 0=Sun..6=Sat, empty/legacy = every day). Absent
+  timeslots = legacy behaviour, visitors just pick a date.
+- Timeslot capacity is atomic and server-checked, mirroring
+  `vd_book_seats()`/`vd_release_seats()` for tour departures:
+  `vd_book_activity_slot()` / `vd_release_activity_slot()` read/lock the
+  activity row, validate capacity from `value.timeslots` server-side (never
+  a client-supplied number), and increment/decrement
+  `value.slotBookings["<date>:<timeslotId>"]`. Wrapped by
+  `bookActivityTimeslot()`/`releaseActivityTimeslot()` in `lib/activities.ts`.
+- **Supplier forms** (`/supplier/activities/new`, `/edit`) — new Child Age
+  Cutoff + Child Price fields alongside the existing adult price, and a
+  `TimeslotEditor` (`components/activities/TimeslotEditor.tsx`, shared by
+  both forms) for adding/removing recurring times with per-slot capacity and
+  day-of-week toggles.
+- **`BookingAddon`** (`lib/booking-context.tsx`) gained optional `adults`,
+  `children`, `activityId`, `timeslotId`, `timeslotTime`. `price_per_person`
+  is kept as the *blended* average (`total / guests`) so every existing
+  `price_per_person × guests` total calculation across the cart/checkout/
+  order pipeline (trip, checkout, orders, itinerary, success page) stays
+  correct with no changes to that math. New `describeAddonParty()` helper
+  renders "2 adults, 1 child" (falls back to the plain guest count for
+  every other addon) — used in `/trip`, `BookingBar`, and `/checkout`'s
+  add-on summary.
+- **`/activities/[id]`** — when the activity has a child rate, the sidebar
+  swaps the single "Group Size" selector for separate Adults/Children
+  inputs; when it has timeslots, a Timeslot select appears once a date is
+  picked (filtered to that date's weekday, showing live remaining seats,
+  best-effort — same staleness tradeoff `UpcomingDepartures` already accepts
+  for tour seats) and is required before adding to the cart.
+- **Checkout** (`app/checkout/page.tsx`) now reserves activity timeslots
+  the same way it reserves departure seats: atomic, before the booking is
+  persisted, with rollback (of both departures *and* timeslots already
+  taken) if any reservation fails. Cancellation releases those seats from
+  both sides — the visitor's own cancel (`app/account/page.tsx`) and the
+  supplier's own order cancel (`app/supplier/bookings/page.tsx`), the
+  latter via new `activityId`/`timeslotId` fields on `OrderItem`
+  (`lib/booking-orders.ts`), carried through from the addon at checkout.
+
+### Still open
+- No public listing/filter surfaced for "runs at set times" vs. "any date"
+  — `/activities` still shows a flat price; timeslot/age-rate details only
+  appear on `/activities/[id]`.
+- Remaining-seat counts shown while picking a timeslot are best-effort
+  (read once with the page load), same tradeoff already accepted for tour
+  departures — the atomic RPC at checkout is the actual source of truth.

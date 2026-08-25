@@ -6,6 +6,7 @@ import toast from 'react-hot-toast'
 import { MapPin, Calendar, Users, CheckCircle, Clock, XCircle, Download, ChevronRight } from 'lucide-react'
 import { getBookingsByUser, updateBookingStatus, type SavedBooking } from '@/lib/bookings'
 import { getDepartures, releaseDepartureSeats } from '@/lib/departures'
+import { releaseActivityTimeslot } from '@/lib/activities'
 import { supabase } from '@/lib/auth'
 
 const STATUS_STYLE: Record<string, string> = {
@@ -107,13 +108,16 @@ export default function AccountBookingsPage() {
     if (!window.confirm(`Cancel booking ${b.reference}? Free cancellation applies until 48 hours before check-in.`)) return
     try {
       await updateBookingStatus(b.id, 'cancelled', { notifySuppliers: true })
-      // Release any tour departure seats held by this booking.
+      // Release any tour departure seats and activity timeslots held by this booking.
       const deps = await getDepartures()
-      await Promise.all(
-        b.addons
+      await Promise.all([
+        ...b.addons
           .filter(a => deps.some(d => d.id === a.id))
-          .map(a => releaseDepartureSeats(a.id, a.guests).catch(() => {}))
-      )
+          .map(a => releaseDepartureSeats(a.id, a.guests).catch(() => {})),
+        ...b.addons
+          .filter(a => a.activityId && a.timeslotId && a.date)
+          .map(a => releaseActivityTimeslot(a.activityId!, a.date!, a.timeslotId!, a.guests).catch(() => {})),
+      ])
       setBookings(prev => prev.map(x => x.id === b.id ? { ...x, status: 'cancelled' } : x))
       toast.success('Booking cancelled. The suppliers have been notified.')
     } catch {

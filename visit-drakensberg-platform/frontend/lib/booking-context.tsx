@@ -10,6 +10,10 @@ export type BookingAddon = {
   operator?: string
   supplierId?: string
   date?: string
+  // Blended average per-person price (total / guests) so every existing
+  // `price_per_person * guests` total calculation across the cart/checkout/
+  // order pipeline stays correct unchanged, even for an activity addon with
+  // separate adult/child rates below.
   price_per_person: number
   guests: number
   location?: string
@@ -22,6 +26,32 @@ export type BookingAddon = {
   // missing packageId as "show every authored day", same as before this
   // field existed.
   packageId?: string
+  // Adult/child party breakdown for a `type: 'activity'` addon booked on an
+  // activity with a configured child rate (lib/activities.ts). Absent for
+  // every other addon type and for activities with no child rate — `guests`
+  // alone is the party size there, same as before these fields existed.
+  adults?: number
+  children?: number
+  // Which ActivityTimeslot (lib/activities.ts) this addon reserved, and the
+  // activity's own id (distinct from `id` above, which is a composite cart
+  // key). Present only for activities with configured timeslots — used to
+  // reserve/release capacity atomically via vd_book_activity_slot()/
+  // vd_release_activity_slot() at checkout and on cancellation.
+  activityId?: string
+  timeslotId?: string
+  timeslotTime?: string
+}
+
+/** Human-readable party size for a cart/order line — "2 adults, 1 child"
+ *  when the addon carries an adult/child breakdown, otherwise the plain
+ *  guest count ("3 people"). */
+export function describeAddonParty(a: Pick<BookingAddon, 'adults' | 'children' | 'guests'>): string {
+  if (a.adults !== undefined) {
+    const parts = [`${a.adults} adult${a.adults === 1 ? '' : 's'}`]
+    if (a.children) parts.push(`${a.children} child${a.children === 1 ? '' : 'ren'}`)
+    return parts.join(', ')
+  }
+  return `${a.guests} ${a.guests === 1 ? 'person' : 'people'}`
 }
 
 export type BookingStay = {
