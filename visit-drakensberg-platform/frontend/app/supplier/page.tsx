@@ -1,8 +1,11 @@
 'use client'
+import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { ArrowRight, AlertCircle } from 'lucide-react'
 import { useSupplier } from '@/lib/supplier-context'
 import { SUPPLIER_CONFIG } from '@/lib/supplier-config'
+import { getMyOrders, type SupplierOrder } from '@/lib/booking-orders'
+import { supabase } from '@/lib/auth'
 
 /* ── per-type stat cards ─────────────────────────────────────────── */
 const TYPE_STATS: Record<string, { label: string; value: string }[]> = {
@@ -38,12 +41,6 @@ const TYPE_STATS: Record<string, { label: string; value: string }[]> = {
   ],
 }
 
-const RECENT_BOOKINGS = [
-  { id: 'BK001', guest: 'Sarah van der Merwe', item: 'Cathedral Peak Mountain Lodge', date: '2025-07-15', total: 8214, status: 'confirmed' },
-  { id: 'BK002', guest: 'James Fourie',         item: 'Berg Valley Guesthouse',        date: '2025-06-22', total: 12320, status: 'completed' },
-  { id: 'BK003', guest: 'Priya Naidoo',         item: 'Cathedral Peak Mountain Lodge', date: '2025-07-10', total: 2940,  status: 'pending' },
-]
-
 const STATUS_STYLES: Record<string, string> = {
   confirmed:  'bg-emerald-100 text-emerald-700',
   completed:  'bg-slate-100 text-slate-600',
@@ -53,6 +50,19 @@ const STATUS_STYLES: Record<string, string> = {
 
 export default function SupplierOverview() {
   const { config, supplierType, supplierTypes, nav, isApproved, loading } = useSupplier()
+  const [recentBookings, setRecentBookings] = useState<SupplierOrder[]>([])
+  const [bookingsLoading, setBookingsLoading] = useState(true)
+
+  useEffect(() => {
+    supabase.auth.getUser().then(async ({ data: { user } }) => {
+      if (!user) { setBookingsLoading(false); return }
+      // RLS scopes this to orders that actually belong to the signed-in
+      // supplier — never another supplier's bookings.
+      const orders = await getMyOrders()
+      setRecentBookings(orders.slice(0, 5))
+      setBookingsLoading(false)
+    })
+  }, [])
 
   if (loading) {
     return (
@@ -144,31 +154,48 @@ export default function SupplierOverview() {
           <h2 className="font-sans text-sm font-semibold text-black/60 uppercase tracking-wider">Recent Bookings</h2>
           <Link href="/supplier/bookings" className="font-sans text-xs text-[#C9A96E] hover:underline">View all</Link>
         </div>
-        <div className="bg-white rounded-xl border border-black/8 overflow-hidden">
-          <table className="w-full">
-            <thead>
-              <tr className="border-b border-black/6">
-                {['ID', 'Guest', 'Item', 'Date', 'Total', 'Status'].map(h => (
-                  <th key={h} className="px-4 py-3 text-left font-sans text-xs font-semibold text-black/40 uppercase tracking-wider">{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {RECENT_BOOKINGS.map((b, i) => (
-                <tr key={b.id} className={i < RECENT_BOOKINGS.length - 1 ? 'border-b border-black/5' : ''}>
-                  <td className="px-4 py-3 font-sans text-xs text-black/40">{b.id}</td>
-                  <td className="px-4 py-3 font-sans text-sm text-black/80">{b.guest}</td>
-                  <td className="px-4 py-3 font-sans text-sm text-black/60 max-w-[180px] truncate">{b.item}</td>
-                  <td className="px-4 py-3 font-sans text-sm text-black/60">{b.date}</td>
-                  <td className="px-4 py-3 font-sans text-sm text-black/80">R {b.total.toLocaleString()}</td>
-                  <td className="px-4 py-3">
-                    <span className={`font-sans text-xs px-2 py-0.5 rounded-full capitalize ${STATUS_STYLES[b.status]}`}>{b.status}</span>
-                  </td>
+        {bookingsLoading ? (
+          <div className="bg-white rounded-xl border border-black/8 flex items-center justify-center py-12">
+            <div className="w-5 h-5 border-2 border-[#C9A96E] border-t-transparent rounded-full animate-spin" />
+          </div>
+        ) : recentBookings.length === 0 ? (
+          <div className="bg-white rounded-xl border border-black/8 p-8 text-center">
+            <p className="font-sans text-sm text-black/40">No bookings yet. They&apos;ll appear here as guests confirm them.</p>
+          </div>
+        ) : (
+          <div className="bg-white rounded-xl border border-black/8 overflow-hidden">
+            <table className="w-full">
+              <thead>
+                <tr className="border-b border-black/6">
+                  {['Reference', 'Guest', 'Item', 'Date', 'Total', 'Status'].map(h => (
+                    <th key={h} className="px-4 py-3 text-left font-sans text-xs font-semibold text-black/40 uppercase tracking-wider">{h}</th>
+                  ))}
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody>
+                {recentBookings.map((b, i) => {
+                  const firstItem = b.items[0]
+                  const itemLabel = firstItem
+                    ? `${firstItem.title}${b.items.length > 1 ? ` +${b.items.length - 1}` : ''}`
+                    : '—'
+                  const date = b.checkIn || firstItem?.date
+                  return (
+                    <tr key={b.id} className={i < recentBookings.length - 1 ? 'border-b border-black/5' : ''}>
+                      <td className="px-4 py-3 font-sans text-xs text-black/40">{b.reference}</td>
+                      <td className="px-4 py-3 font-sans text-sm text-black/80">{b.customerName}</td>
+                      <td className="px-4 py-3 font-sans text-sm text-black/60 max-w-[180px] truncate">{itemLabel}</td>
+                      <td className="px-4 py-3 font-sans text-sm text-black/60">{date ? new Date(date).toLocaleDateString('en-ZA', { day: 'numeric', month: 'short', year: 'numeric' }) : '—'}</td>
+                      <td className="px-4 py-3 font-sans text-sm text-black/80">R {b.orderTotal.toLocaleString()}</td>
+                      <td className="px-4 py-3">
+                        <span className={`font-sans text-xs px-2 py-0.5 rounded-full capitalize ${STATUS_STYLES[b.status]}`}>{b.status}</span>
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
     </div>
   )
