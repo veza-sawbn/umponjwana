@@ -3,6 +3,7 @@ import type { GraphFields } from './graph-fields'
 import { slugify, uniqueSlug } from './slugify'
 import type { Season, SeasonTopic } from './seasons'
 import type { SupabaseClient } from '@supabase/supabase-js'
+import { supabase } from './auth'
 
 // Single canonical activity-category vocabulary — imported by both the
 // supplier creation/edit forms and the public /activities filter tabs.
@@ -30,6 +31,23 @@ export const ACTIVITY_INCLUSIONS = [
   'Transport to Site', 'Photos/Video', 'Equipment',
 ]
 
+// A recurring time-of-day this activity departs, independent of any
+// specific date — e.g. "09:00" and "13:30" every day, or "07:00" on
+// weekends only. Suppliers configure these on the listing; visitors pick
+// one alongside a date at booking time (ActivityDetail.tsx). Capacity is
+// tracked per (date, timeslot) via slotBookings below, kept accurate with
+// the atomic vd_book_activity_slot()/vd_release_activity_slot() RPCs — see
+// supabase/migrations/20260829_activity_timeslots.sql — the same pattern
+// lib/departures.ts uses for tour seats.
+export type ActivityTimeslot = {
+  id: string
+  /** 24-hour "HH:mm". */
+  time: string
+  capacity: number
+  /** Days this slot runs, 0=Sun..6=Sat. Empty = every day. */
+  days: number[]
+}
+
 export type Activity = {
   id: string
   supplierId: string
@@ -50,8 +68,21 @@ export type Activity = {
   photos: string[]
   included: string[]
   safetyNotes: string
+  /** Adult (default) per-person rate. */
   pricePerPerson: number
   priceGroup: number
+  /** Per-child rate. Only applied when childMaxAge is also set — activities
+   *  created before this existed have neither, so everyone pays
+   *  pricePerPerson as before. */
+  childPrice?: number
+  /** Age in years, inclusive, at or under which the child rate applies. */
+  childMaxAge?: number
+  /** Recurring departure times for this activity. Empty/absent = no fixed
+   *  timeslots — visitors just pick a date (legacy behaviour). */
+  timeslots?: ActivityTimeslot[]
+  /** Seats already taken per (date, timeslot), keyed `${date}:${timeslotId}`.
+   *  Written only by the booking RPCs — never set this from client code. */
+  slotBookings?: Record<string, number>
   depositRequired: boolean
   depositPercent: string
   status: 'active' | 'draft'
@@ -65,6 +96,48 @@ export type Activity = {
 } & GraphFields
 
 const KIND = 'activity'
+
+export function newActivityTimeslotId(): string {
+  return newEntityId('slot')
+}
+
+/** The timeslots (if any) that run on the given day, in time order. */
+export function timeslotsForDate(activity: Pick<Activity, 'timeslots'>, dateStr: string): ActivityTimeslot[] {
+  if (!activity.timeslots?.length || !dateStr) return []
+  const day = new Date(`${dateStr}T00:00:00`).getDay()
+  return activity.timeslots
+    .filter(t => !t.days?.length || t.days.includes(day))
+    .sort((a, b) => a.time.localeCompare(b.time))
+}
+
+export function slotBookedCount(activity: Pick<Activity, 'slotBookings'>, dateStr: string, timeslotId: string): number {
+  return activity.slotBookings?.[`${dateStr}:${timeslotId}`] ?? 0
+}
+
+/** Best-effort remaining seats for display — the source of truth is the
+ *  atomic RPC checked at checkout, same as tour departures. */
+export function slotRemaining(activity: Pick<Activity, 'timeslots' | 'slotBookings'>, dateStr: string, timeslotId: string): number {
+  const slot = activity.timeslots?.find(t => t.id === timeslotId)
+  if (!slot) return 0
+  return Math.max(slot.capacity - slotBookedCount(activity, dateStr, timeslotId), 0)
+}
+
+/** Visitor-side booking: atomic, capacity-checked, executed server-side.
+ *  Throws with a readable message when the timeslot is full for that date. */
+export async function bookActivityTimeslot(activityId: string, dateStr: string, timeslotId: string, seats: number): Promise<void> {
+  const { error } = await supabase.rpc('vd_book_activity_slot', {
+    p_activity_id: activityId, p_slot_date: dateStr, p_timeslot_id: timeslotId, p_seats: seats,
+  })
+  if (error) throw new Error(error.message || 'Could not reserve this timeslot')
+}
+
+/** Free seats after a cancellation (booking owner or supplier). */
+export async function releaseActivityTimeslot(activityId: string, dateStr: string, timeslotId: string, seats: number): Promise<void> {
+  const { error } = await supabase.rpc('vd_release_activity_slot', {
+    p_activity_id: activityId, p_slot_date: dateStr, p_timeslot_id: timeslotId, p_seats: seats,
+  })
+  if (error) throw new Error(error.message || 'Could not release this timeslot')
+}
 
 export async function getActivities(client?: SupabaseClient): Promise<Activity[]> {
   return client ? listEntities<Activity>(KIND, client) : listEntities<Activity>(KIND)

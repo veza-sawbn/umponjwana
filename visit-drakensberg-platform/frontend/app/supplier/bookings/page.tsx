@@ -6,6 +6,7 @@ import { CalendarDays, Search, Phone, Mail, Users, MessageSquare, XCircle, Check
 import { getMyOrders, cancelOrderAsSupplier, type SupplierOrder } from '@/lib/booking-orders'
 import { getMyOrderLinesForBooking, setLineFulfilment, type OrderLine } from '@/lib/orders'
 import { getMyDepartures, releaseDepartureSeats } from '@/lib/departures'
+import { releaseActivityTimeslot } from '@/lib/activities'
 import { supabase } from '@/lib/auth'
 
 type Status = 'all' | 'confirmed' | 'cancelled'
@@ -43,13 +44,16 @@ export default function BookingsPage() {
     if (!window.confirm(`Cancel your service on booking ${o.reference} for ${o.customerName}? The guest will be notified; the rest of their trip is unaffected.`)) return
     try {
       await cancelOrderAsSupplier(o)
-      // Free any tour departure seats this order held.
+      // Free any tour departure seats and activity timeslots this order held.
       const deps = await getMyDepartures()
-      await Promise.all(
-        o.items
+      await Promise.all([
+        ...o.items
           .filter(i => deps.some(d => d.id === i.id))
-          .map(i => releaseDepartureSeats(i.id, i.guests).catch(() => {}))
-      )
+          .map(i => releaseDepartureSeats(i.id, i.guests).catch(() => {})),
+        ...o.items
+          .filter(i => i.activityId && i.timeslotId && i.date)
+          .map(i => releaseActivityTimeslot(i.activityId!, i.date!, i.timeslotId!, i.guests).catch(() => {})),
+      ])
       setOrders(prev => prev.map(x => x.id === o.id ? { ...x, status: 'cancelled' } : x))
       toast.success('Your service was cancelled and the guest notified.')
     } catch {

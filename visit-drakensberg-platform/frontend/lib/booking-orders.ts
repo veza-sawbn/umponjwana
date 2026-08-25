@@ -17,6 +17,12 @@ export type OrderItem = {
   guests: number
   unitPrice: number
   total: number
+  // Carried through from BookingAddon (lib/booking-context.tsx) for an
+  // activity booked on a configured timeslot — lets the supplier's own
+  // cancellation flow release the seats it holds. Absent for every other
+  // item type and for activities with no timeslots configured.
+  activityId?: string
+  timeslotId?: string
 }
 
 export type SupplierOrder = {
@@ -92,6 +98,7 @@ export async function createOrdersForBooking(booking: SavedBooking): Promise<voi
       guests: a.guests,
       unitPrice: a.price_per_person,
       total: a.price_per_person * a.guests,
+      ...(a.activityId && a.timeslotId ? { activityId: a.activityId, timeslotId: a.timeslotId } : {}),
     }
     bySupplier.set(a.supplierId, [...(bySupplier.get(a.supplierId) ?? []), item])
   }

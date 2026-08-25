@@ -4,14 +4,15 @@ import { useRouter } from 'next/navigation'
 import { ChevronLeft, ChevronRight, Plus, Trash2 } from 'lucide-react'
 import { supabase } from '@/lib/auth'
 import { effectiveSupplierId } from '@/lib/effective-supplier'
-import { addActivity, ACTIVITY_CATEGORIES, ACTIVITY_DIFFICULTIES, ACTIVITY_INCLUSIONS } from '@/lib/activities'
+import { addActivity, ACTIVITY_CATEGORIES, ACTIVITY_DIFFICULTIES, ACTIVITY_INCLUSIONS, type ActivityTimeslot } from '@/lib/activities'
 import { getRegionNames } from '@/lib/regions'
 import { SEASONS, SEASON_META, SEASON_TOPICS, SEASON_TOPIC_META, type Season, type SeasonTopic } from '@/lib/seasons'
 import { GoogleAddressField } from '@/components/maps/GoogleAddressField'
 import { supplierMediaSource } from '@/lib/supplier-media'
 import { MediaGalleryPicker } from '@/components/media/MediaPicker'
+import { TimeslotEditor } from '@/components/activities/TimeslotEditor'
 
-const STEPS = ['Activity Details', 'Logistics', 'Inclusions & Safety', 'Pricing', 'Review']
+const STEPS = ['Activity Details', 'Logistics', 'Inclusions & Safety', 'Pricing & Timeslots', 'Review']
 
 function ImageList({ images, onChange }: { images: string[]; onChange: (v: string[]) => void }) {
   return (
@@ -33,7 +34,9 @@ export default function NewActivityPage() {
     durationH: '', minAge: '', maxGroupSize: '',
     meetingPoint: '', gpsLat: '', gpsLng: '', whatToWear: '', photos: [] as string[],
     included: [] as string[], safetyNotes: '',
-    pricePerPerson: '', priceGroup: '', depositRequired: false, depositPercent: '30',
+    pricePerPerson: '', priceGroup: '', childPrice: '', childMaxAge: '',
+    depositRequired: false, depositPercent: '30',
+    timeslots: [] as ActivityTimeslot[],
     seasons: [] as Season[], topics: [] as SeasonTopic[],
   })
 
@@ -79,6 +82,9 @@ export default function NewActivityPage() {
         safetyNotes: form.safetyNotes,
         pricePerPerson: +form.pricePerPerson || 0,
         priceGroup: +form.priceGroup || 0,
+        childPrice: form.childMaxAge ? (+form.childPrice || 0) : undefined,
+        childMaxAge: form.childMaxAge ? +form.childMaxAge : undefined,
+        timeslots: form.timeslots,
         depositRequired: form.depositRequired,
         depositPercent: form.depositPercent,
         seasons: form.seasons,
@@ -192,9 +198,20 @@ export default function NewActivityPage() {
 
         {step === 3 && (
           <>
-            <F label="Price per Person (ZAR)" required><input type="number" value={form.pricePerPerson} onChange={e => set('pricePerPerson', e.target.value)} className={inp} /></F>
+            <F label="Adult Price per Person (ZAR)" required><input type="number" value={form.pricePerPerson} onChange={e => set('pricePerPerson', e.target.value)} className={inp} /></F>
             <F label="Group Rate (ZAR, optional)"><input type="number" value={form.priceGroup} onChange={e => set('priceGroup', e.target.value)} placeholder="Flat rate for full group" className={inp} /></F>
-            <div className="flex items-center gap-3">
+            <div className="grid grid-cols-2 gap-4">
+              <F label="Child Age Cutoff (optional)"><input type="number" min="0" value={form.childMaxAge} onChange={e => set('childMaxAge', e.target.value)} placeholder="e.g. 12" className={inp} /></F>
+              <F label="Child Price per Person (ZAR)"><input type="number" value={form.childPrice} onChange={e => set('childPrice', e.target.value)} disabled={!form.childMaxAge} placeholder="Leave blank to charge adult rate" className={`${inp} disabled:opacity-40`} /></F>
+            </div>
+            <p className="-mt-3 font-sans text-[11px] text-black/35">Set an age cutoff to charge a separate rate for children at booking — visitors this age or younger pay the child rate.</p>
+
+            <div className="pt-2 border-t border-black/8">
+              <p className="font-sans text-sm font-medium text-black/70 mb-2">Timeslots</p>
+              <TimeslotEditor timeslots={form.timeslots} onChange={v => set('timeslots', v)} />
+            </div>
+
+            <div className="flex items-center gap-3 pt-2 border-t border-black/8">
               <input type="checkbox" id="dep" checked={form.depositRequired} onChange={e => set('depositRequired', e.target.checked)} className="rounded" />
               <label htmlFor="dep" className="font-sans text-sm text-black/70">Require deposit at booking</label>
             </div>
@@ -212,7 +229,7 @@ export default function NewActivityPage() {
           <div className="space-y-3">
             <p className="font-sans text-sm text-black/60">Review your activity before submitting.</p>
             <div className="rounded-lg bg-black/3 p-4 space-y-2">
-              {[['Name', form.name], ['Category', form.category], ['Region', form.region], ['Difficulty', form.difficulty], ['Duration', form.durationH ? `${form.durationH}h` : ''], ['Max Group', form.maxGroupSize], ['Meeting Point', form.meetingPoint], ['Price/Person', form.pricePerPerson ? `R ${form.pricePerPerson}` : '']].map(([k, v]) => v ? (
+              {[['Name', form.name], ['Category', form.category], ['Region', form.region], ['Difficulty', form.difficulty], ['Duration', form.durationH ? `${form.durationH}h` : ''], ['Max Group', form.maxGroupSize], ['Meeting Point', form.meetingPoint], ['Adult Price', form.pricePerPerson ? `R ${form.pricePerPerson}` : ''], ['Child Price', form.childMaxAge ? `R ${form.childPrice || form.pricePerPerson} (${form.childMaxAge} & under)` : ''], ['Timeslots', form.timeslots.length ? form.timeslots.map(t => t.time).join(', ') : '']].map(([k, v]) => v ? (
                 <div key={k} className="flex gap-3 font-sans text-sm">
                   <span className="text-black/40 w-32 shrink-0">{k}</span>
                   <span className="text-black/80">{v}</span>
