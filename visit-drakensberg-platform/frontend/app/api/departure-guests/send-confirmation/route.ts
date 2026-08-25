@@ -6,18 +6,12 @@ import {
   emailShell, ctaButton, detailTable, itineraryBlock, esc, getFeaturedExperiences,
   type EmailItineraryDay,
 } from '@/lib/email-layout'
-import { getDepartures } from '@/lib/departures'
-import { getTours, resolveItinerary } from '@/lib/tours'
+import { getDepartures, type DeparturePackage } from '@/lib/departures'
+import { getTours, resolveItinerary, type Tour } from '@/lib/tours'
 import { getTrails } from '@/lib/trails'
-import { resolveLivePackages } from '@/components/tours/PackageEditor'
+import { getSiteOrigin } from '@/lib/origin'
 
 export const dynamic = 'force-dynamic'
-
-// Deliberately loose (no full RFC 5322 compliance attempted) — just enough
-// to reject an obviously-mistyped address (no @, no domain) with a clear
-// message here rather than letting it reach the mailer/SMTP layer and fail
-// in some more roundabout way further down.
-const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
 // Emails a booking confirmation + day-by-day itinerary to a guest the
 // supplier added by hand on a departure (lib/departure-guests.ts) — the
@@ -37,6 +31,31 @@ const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 // raw, unexplained engine error — it always comes back as a clean
 // {sent:false, error} the UI can show verbatim.
 
+// Deliberately NOT imported from components/tours/PackageEditor.tsx, even
+// though that file exports the identical resolveLivePackages() — it's a
+// 'use client' module, and pulling a client-boundary export into a Route
+// Handler's server bundle turns it into a non-callable client reference in
+// a production build (passes tsc, works in `next dev`, throws "X is not a
+// function" once actually built/deployed). lib/experiences.ts's private
+// resolveTierPackages() hit this exact trap already — same fix, same
+// reasoning: duplicate the ~10 lines here rather than import across that
+// boundary.
+function resolveLivePackages(packages: DeparturePackage[], tour: Tour | undefined): DeparturePackage[] {
+  if (!tour) return packages
+  return packages.map(p => {
+    if (!p.tierId) return p
+    const tier = tour.pricingTiers?.find(t => t.id === p.tierId)
+    if (!tier) return p
+    return { ...p, name: tier.name, inclusions: tier.inclusions, pricePerPerson: p.priceOverride ?? tier.pricePerPerson }
+  })
+}
+
+// Deliberately loose (no full RFC 5322 compliance attempted) — just enough
+// to reject an obviously-mistyped address (no @, no domain) with a clear
+// message here rather than letting it reach the mailer/SMTP layer and fail
+// in some more roundabout way further down.
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+
 /** Never throws — an unparsable/missing date renders as '—' instead of blowing up the whole send. */
 function fmtDate(iso: string | null | undefined): string {
   if (!iso) return '—'
@@ -51,25 +70,6 @@ function addDaysIso(iso: string | null | undefined, days: number): string | null
   if (Number.isNaN(d.getTime())) return null
   d.setDate(d.getDate() + days)
   return d.toISOString().slice(0, 10)
-}
-
-/**
- * The site origin for links/images in the email. Deliberately never uses
- * `new URL(...)` — a proxied/rewritten request can hand a Route Handler a
- * `req.url` the URL parser rejects, and that exception previously escaped
- * this route as an opaque "The string did not match the expected pattern."
- * with no indication of where it came from. Plain string handling can't
- * throw the same way.
- */
-function resolveOrigin(req: Request): string {
-  const configured = process.env.NEXT_PUBLIC_SITE_URL?.trim()
-  if (configured) return configured.replace(/\/+$/, '')
-  const host = req.headers.get('x-forwarded-host') || req.headers.get('host')
-  if (host) {
-    const proto = req.headers.get('x-forwarded-proto') || 'https'
-    return `${proto}://${host}`
-  }
-  return 'https://visitdrakensberg.com'
 }
 
 export async function POST(req: Request) {
@@ -118,7 +118,7 @@ export async function POST(req: Request) {
       meals: d.meals,
     }))
 
-    const origin = resolveOrigin(req)
+    const origin = getSiteOrigin(req)
     const tripName = tour?.name || departure.tour
     const operatorName = departure.supplierName || tour?.supplierName || 'Visit Drakensberg'
     const featured = await getFeaturedExperiences(origin)
