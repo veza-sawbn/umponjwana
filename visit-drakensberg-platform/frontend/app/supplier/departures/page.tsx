@@ -290,7 +290,7 @@ function GuestsModal({
           <div className="grid grid-cols-2 gap-3">
             <input value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} placeholder="Guest name" className={inp} />
             <input type="number" min="1" value={form.seats} onChange={e => setForm(f => ({ ...f, seats: e.target.value }))} placeholder="Seats" className={inp} />
-            <input value={form.email} onChange={e => setForm(f => ({ ...f, email: e.target.value }))} placeholder="Email (optional)" className={inp} />
+            <input type="email" value={form.email} onChange={e => setForm(f => ({ ...f, email: e.target.value }))} placeholder="Email (optional)" className={inp} />
             <input value={form.phone} onChange={e => setForm(f => ({ ...f, phone: e.target.value }))} placeholder="Phone (optional)" className={inp} />
           </div>
           {livePackages.length > 0 && (
