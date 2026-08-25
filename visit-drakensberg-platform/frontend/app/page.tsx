@@ -4,6 +4,7 @@ import Link from 'next/link'
 import toast from 'react-hot-toast'
 import { ArrowRight, ChevronDown, X } from 'lucide-react'
 import { supabase } from '@/lib/auth'
+import { publicSupabase } from '@/lib/supabase-public'
 import { motion, AnimatePresence } from 'framer-motion'
 import SearchBar from '@/components/search/SearchBar'
 import Footer from '@/components/layout/Footer'
@@ -284,9 +285,16 @@ export default function HomePage() {
       setHero(content.hero)
       setPromos(content.promotions)
     })
-    getTrails().then(all => setTrails(all.filter(t => t.status === 'published')))
-    getUpcomingExperiences().then(exps => setScheduledHikes(exps.slice(0, 3)))
-    getSupplierEntities<any>('events')
+    // Public, session-less client for all of the below: this is anonymous
+    // catalogue data every visitor sees, and it must not depend on the
+    // visitor's (possibly stale/broken) auth session — see lib/supabase-public.ts.
+    getTrails(publicSupabase)
+      .then(all => setTrails(all.filter(t => t.status === 'published')))
+      .catch(() => setTrails([]))
+    getUpcomingExperiences(publicSupabase)
+      .then(exps => setScheduledHikes(exps.slice(0, 3)))
+      .catch(() => setScheduledHikes([]))
+    getSupplierEntities<any>('events', undefined, publicSupabase)
       .then((all: PublicEvent[]) => {
         const now = new Date().toISOString()
         setUpcomingEvents(
@@ -297,7 +305,7 @@ export default function HomePage() {
         )
       })
       .catch(() => setUpcomingEvents([]))
-    getActivities()
+    getActivities(publicSupabase)
       .then(all => setFeaturedActivities(all.filter(a => a.status === 'active').slice(0, 3)))
       .catch(() => setFeaturedActivities([]))
     getPublishedPosts()
