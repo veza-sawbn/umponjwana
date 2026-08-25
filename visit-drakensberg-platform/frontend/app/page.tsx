@@ -19,6 +19,7 @@ import { getUpcomingExperiences, type TrekkingExperience } from '@/lib/experienc
 import { getSupplierEntities } from '@/lib/supplier-entities'
 import { getActivities, type Activity } from '@/lib/activities'
 import { trackEvent, AnalyticsEvent } from '@/lib/analytics'
+import { getPublishedPosts, type BlogPost } from '@/lib/blog-posts'
 
 /* ─── Data ─────────────────────────────────────────────────────────────────── */
 
@@ -244,12 +245,12 @@ export default function HomePage() {
   const [featuredActivities, setFeaturedActivities] = useState<Activity[]>([])
   const [newsletterEmail, setNewsletterEmail] = useState('')
   const [subscribing, setSubscribing] = useState(false)
+  const [stories, setStories] = useState<BlogPost[]>([])
 
   const trailImageById = useMemo(() => new Map(trails.map(t => [t.id, t.image])), [trails])
 
   const categories = useVisibleCards(cards.categories ?? [], inEditor)
   const regions = useVisibleCards(cards.regions ?? [], inEditor)
-  const stories = useVisibleCards(cards.stories ?? [], inEditor)
 
   async function subscribeNewsletter(e: React.FormEvent) {
     e.preventDefault()
@@ -299,6 +300,9 @@ export default function HomePage() {
     getActivities()
       .then(all => setFeaturedActivities(all.filter(a => a.status === 'active').slice(0, 3)))
       .catch(() => setFeaturedActivities([]))
+    getPublishedPosts()
+      .then(posts => setStories(posts.slice(0, 3)))
+      .catch(() => setStories([]))
   }, [])
 
   /* ── Reorderable sections ── */
@@ -430,27 +434,35 @@ export default function HomePage() {
           </Link>
         </div>
 
-        <motion.div
-          className="grid md:grid-cols-3 gap-8"
-          variants={staggerContainer(0.08)}
-          initial="hidden"
-          whileInView="show"
-          viewport={{ once: true, margin: '-80px' }}
-        >
-          {stories.map((s, index) => (
-            <motion.div key={s.id} variants={staggerChild} whileHover={{ y: -3 }} transition={{ duration: 0.2, ease: [0, 0, 0.2, 1] }} className={cardDimClass(s, inEditor)}>
-              <EditableCard contentKey="home_cards" fieldKey="stories" index={index} label={String(s.title ?? 'Story Card')}>
-                <Link href={String(s.href || '/mydrakensberg')} className="group block">
-                  <div className="relative overflow-hidden aspect-[3/2] mb-4">
-                    <img loading="lazy" decoding="async" src={String(s.img)} alt={String(s.title)} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" style={{ willChange: 'transform' }} />
+        {stories.length === 0 ? (
+          <p className="font-sans text-sm text-forest/40 py-6">
+            No stories published yet — publish one under Admin → Blog & Content.
+          </p>
+        ) : (
+          <motion.div
+            className="grid md:grid-cols-3 gap-8"
+            variants={staggerContainer(0.08)}
+            initial="hidden"
+            whileInView="show"
+            viewport={{ once: true, margin: '-80px' }}
+          >
+            {stories.map(s => (
+              <motion.div key={s.id} variants={staggerChild} whileHover={{ y: -3 }} transition={{ duration: 0.2, ease: [0, 0, 0.2, 1] }}>
+                <Link href={`/mydrakensberg/${s.slug}`} className="group block">
+                  <div className="relative overflow-hidden aspect-[3/2] mb-4 bg-forest/5">
+                    {s.featured_image && (
+                      <img loading="lazy" decoding="async" src={s.featured_image} alt={s.title} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" style={{ willChange: 'transform' }} />
+                    )}
                   </div>
-                  <p className="font-sans text-[10px] tracking-[0.15em] uppercase text-gold mb-2">{s.tag} · {s.date}</p>
+                  <p className="font-sans text-[10px] tracking-[0.15em] uppercase text-gold mb-2">
+                    {s.category}{s.published_at ? ` · ${new Date(s.published_at).toLocaleDateString('en-ZA', { month: 'long', year: 'numeric' })}` : ''}
+                  </p>
                   <h3 className="font-display text-xl text-forest leading-snug group-hover:text-sage transition-colors">{s.title}</h3>
                 </Link>
-              </EditableCard>
-            </motion.div>
-          ))}
-        </motion.div>
+              </motion.div>
+            ))}
+          </motion.div>
+        )}
       </div>
     </EditableSection>
   )

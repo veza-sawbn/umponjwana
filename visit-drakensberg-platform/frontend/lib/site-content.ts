@@ -81,23 +81,9 @@ export const SITE_CONTENT_DEFAULTS = {
         img: 'https://images.unsplash.com/photo-1503614472-8c93d56e92ce?w=900&q=80', href: '/regions#southern', visible: true,
       },
     ] as HomeCard[],
-    stories: [
-      {
-        id: 'story-vulture', tag: 'Wildlife', title: "Africa's rarest raptor: the bearded vulture of the Berg",
-        img: 'https://images.unsplash.com/photo-1508739773434-c26b3d09e071?w=800&q=80',
-        href: '/mydrakensberg/bearded-vulture-lammergeier', date: 'March 2025', visible: true,
-      },
-      {
-        id: 'story-rock-art', tag: 'Heritage', title: "The ancient language of the San: rock art at Giant's Castle",
-        img: 'https://images.unsplash.com/photo-1529946179074-1f3cf40c0a0e?w=800&q=80',
-        href: '/mydrakensberg/san-bushmen-rock-art-giants-castle', date: 'January 2025', visible: true,
-      },
-      {
-        id: 'story-chain-ladder', tag: 'Adventure', title: 'Climbing the Chain Ladder: what nobody tells you',
-        img: 'https://images.unsplash.com/photo-1551632811-561732d1e306?w=800&q=80',
-        href: '/mydrakensberg/tugela-falls-chain-ladder-guide', date: 'November 2024', visible: true,
-      },
-    ] as HomeCard[],
+    // Note: story cards are NOT configured here — the homepage Stories
+    // section renders the 3 most recent published posts live from
+    // `blog_posts` (see lib/blog-posts.ts). Manage them at Admin → Blog & Content.
   },
   // Section layout for the homepage: render order, hidden sections, and
   // per-section style overrides (keyed by section id, shared by all pages).
