@@ -8,6 +8,7 @@ import { addActivity, ACTIVITY_CATEGORIES, ACTIVITY_DIFFICULTIES, ACTIVITY_INCLU
 import { getRegionNames } from '@/lib/regions'
 import { SEASONS, SEASON_META, SEASON_TOPICS, SEASON_TOPIC_META, type Season, type SeasonTopic } from '@/lib/seasons'
 import { GoogleAddressField } from '@/components/maps/GoogleAddressField'
+import { formatMoney } from '@/lib/allocation'
 import { supplierMediaSource } from '@/lib/supplier-media'
 import { MediaGalleryPicker } from '@/components/media/MediaPicker'
 import { TimeslotEditor } from '@/components/activities/TimeslotEditor'
@@ -229,7 +230,7 @@ export default function NewActivityPage() {
           <div className="space-y-3">
             <p className="font-sans text-sm text-black/60">Review your activity before submitting.</p>
             <div className="rounded-lg bg-black/3 p-4 space-y-2">
-              {[['Name', form.name], ['Category', form.category], ['Region', form.region], ['Difficulty', form.difficulty], ['Duration', form.durationH ? `${form.durationH}h` : ''], ['Max Group', form.maxGroupSize], ['Meeting Point', form.meetingPoint], ['Adult Price', form.pricePerPerson ? `R ${form.pricePerPerson}` : ''], ['Child Price', form.childMaxAge ? `R ${form.childPrice || form.pricePerPerson} (${form.childMaxAge} & under)` : ''], ['Timeslots', form.timeslots.length ? form.timeslots.map(t => t.time).join(', ') : '']].map(([k, v]) => v ? (
+              {[['Name', form.name], ['Category', form.category], ['Region', form.region], ['Difficulty', form.difficulty], ['Duration', form.durationH ? `${form.durationH}h` : ''], ['Max Group', form.maxGroupSize], ['Meeting Point', form.meetingPoint], ['Adult Price', form.pricePerPerson ? formatMoney(Number(form.pricePerPerson)) : ''], ['Child Price', form.childMaxAge ? `${formatMoney(Number(form.childPrice || form.pricePerPerson))} (${form.childMaxAge} & under)` : ''], ['Timeslots', form.timeslots.length ? form.timeslots.map(t => t.time).join(', ') : '']].map(([k, v]) => v ? (
                 <div key={k} className="flex gap-3 font-sans text-sm">
                   <span className="text-black/40 w-32 shrink-0">{k}</span>
                   <span className="text-black/80">{v}</span>

@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation'
 import { useState, useMemo, useEffect } from 'react'
 import { ChevronLeft, Copy, MapPin, Plus, Trash2 } from 'lucide-react'
 import { GoogleAddressField, useAutoDrivingDistance } from '@/components/maps/GoogleAddressField'
+import { formatMoney } from '@/lib/allocation'
 
 function F({ label, required, children }: { label: string; required?: boolean; children: React.ReactNode }) {
   return (
@@ -40,7 +41,7 @@ function generateRef() {
 }
 
 function fmt(n: number) {
-  return `R ${n.toLocaleString('en-ZA', { minimumFractionDigits: 0 })}`
+  return formatMoney(n)
 }
 
 function isVehicleRateKey(value: string): value is VehicleRateKey {

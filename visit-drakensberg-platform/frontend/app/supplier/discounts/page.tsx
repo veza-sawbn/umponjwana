@@ -9,6 +9,7 @@ import { getActivitiesBySupplier } from '@/lib/activities'
 import {
   getSupplierEntities, addSupplierEntity, deleteSupplierEntity, type SupplierEntity,
 } from '@/lib/supplier-entities'
+import { formatMoney } from '@/lib/allocation'
 
 type Discount = SupplierEntity & {
   code: string
@@ -142,7 +143,7 @@ export default function DiscountsPage() {
             {rows.map((r, i) => (
               <tr key={r.id} className={i < rows.length - 1 ? 'border-b border-black/5' : ''}>
                 <td className="px-4 py-3 font-mono text-sm font-semibold text-black/80">{r.code}</td>
-                <td className="px-4 py-3 font-sans text-sm text-black/80">{r.type === 'percent' ? `${r.value}%` : `R ${r.value}`} off</td>
+                <td className="px-4 py-3 font-sans text-sm text-black/80">{r.type === 'percent' ? `${r.value}%` : formatMoney(r.value)} off</td>
                 <td className="px-4 py-3 font-sans text-sm text-black/60 max-w-[160px] truncate">{r.listing || 'All listings'}</td>
                 <td className="px-4 py-3 font-sans text-sm text-black/60">{r.validUntil || '—'}</td>
                 <td className="px-4 py-3 font-sans text-sm text-black/60">{r.uses}</td>
