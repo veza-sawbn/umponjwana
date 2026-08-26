@@ -14,11 +14,7 @@ import Link from 'next/link'
 import { Wallet, RefreshCw, AlertCircle, ChevronRight } from 'lucide-react'
 import { useOperations } from '@/lib/operations-context'
 import { getAllOrderLines, type OrderLine } from '@/lib/orders'
-
-function money(n: number, currency = 'ZAR') {
-  return new Intl.NumberFormat('en-ZA', { style: 'currency', currency, maximumFractionDigits: 0 })
-    .format(n ?? 0)
-}
+import { formatMoney as money } from '@/lib/allocation'
 
 type Row = {
   supplierId: string

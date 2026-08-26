@@ -5,6 +5,7 @@ import { getRoomsByProperty, type Room } from '@/lib/rooms'
 import { publicSupabase } from '@/lib/supabase-public'
 import StayDetail from './StayDetail'
 import TrackView from '@/components/analytics/TrackView'
+import { formatMoney } from '@/lib/allocation'
 
 // Server shell — same pattern as the other converted detail routes. Property
 // has no seoTitle/seoDescription populated yet, so title/description are
@@ -33,7 +34,7 @@ async function resolveStay(id: string): Promise<{ property: Property; rooms: Roo
 function buildDescription(property: Property, minPrice: number): string | undefined {
   if (property.seoDescription) return property.seoDescription
   if (!property.description) return undefined
-  const priceNote = minPrice > 0 ? `From R${minPrice}/night. ` : ''
+  const priceNote = minPrice > 0 ? `From ${formatMoney(minPrice)}/night. ` : ''
   const prefix = `${property.type} in ${property.region || 'the Drakensberg'}. ${priceNote}`
   const remaining = 155 - prefix.length
   const body = property.description.length > remaining
@@ -89,7 +90,7 @@ export default async function StayPage({ params }: { params: { id: string } }) {
       longitude: property.gpsLng,
     } : undefined,
     amenityFeature: property.amenities?.map(a => ({ '@type': 'LocationFeatureSpecification', name: a, value: true })),
-    priceRange: minPrice > 0 ? `R${minPrice}+` : undefined,
+    priceRange: minPrice > 0 ? `${formatMoney(minPrice)}+` : undefined,
   }
 
   const breadcrumbJsonLd = {

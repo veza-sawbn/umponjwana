@@ -10,6 +10,7 @@ import { getMyOperatorProfile } from '@/lib/operators'
 import { GoogleAddressField } from '@/components/maps/GoogleAddressField'
 import { PackagesEditor, emptyTier, formToTiers, cheapest, type PackageForm } from '@/components/tours/PackageEditor'
 import TierItineraryEditor from '@/components/tours/TierItineraryEditor'
+import { formatMoney } from '@/lib/allocation'
 
 const DIFFICULTIES = ['Easy', 'Moderate', 'Challenging', 'Extreme']
 const CANCELLATIONS = ['48h', '72h', '7 days', '14 days']
@@ -169,7 +170,7 @@ export default function NewTourPage() {
               <span>{selectedTrail.elevation}</span>
               <span>{selectedTrail.duration}</span>
               {selectedTrail.permit_required && (
-                <span className="text-[#C9A96E]">Permit required · R{selectedTrail.permit_cost} pp</span>
+                <span className="text-[#C9A96E]">Permit required · {formatMoney(selectedTrail.permit_cost)} pp</span>
               )}
             </div>
           )}

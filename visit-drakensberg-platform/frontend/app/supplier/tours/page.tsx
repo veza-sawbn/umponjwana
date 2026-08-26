@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { Map, Plus, Clock, Users, Mountain, Trash2 } from 'lucide-react'
 import { getMyTours, deleteTour, type Tour } from '@/lib/tours'
+import { formatMoney } from '@/lib/allocation'
 
 const DIFF_STYLE: Record<string, string> = {
   Easy: 'bg-emerald-100 text-emerald-700',
@@ -61,7 +62,7 @@ export default function ToursPage() {
                   <span className={`font-sans text-[10px] px-1.5 py-0.5 rounded capitalize ${DIFF_STYLE[t.difficulty] ?? 'bg-slate-100 text-slate-500'}`}>{t.difficulty}</span>
                   <span className="font-sans text-xs text-black/40 flex items-center gap-1"><Clock size={11} /> {t.days} day{t.days > 1 ? 's' : ''}</span>
                   <span className="font-sans text-xs text-black/40 flex items-center gap-1"><Users size={11} /> max {t.maxGroup}</span>
-                  {t.pricePerPerson > 0 && <span className="font-sans text-xs text-black/40">R{t.pricePerPerson.toLocaleString()} pp</span>}
+                  {t.pricePerPerson > 0 && <span className="font-sans text-xs text-black/40">{formatMoney(t.pricePerPerson)} pp</span>}
                 </div>
               </div>
               <div className="flex items-center gap-3 shrink-0">

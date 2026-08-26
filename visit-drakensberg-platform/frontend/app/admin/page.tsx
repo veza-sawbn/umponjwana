@@ -10,6 +10,7 @@ import {
 import type { SavedBooking } from '@/lib/bookings'
 import { ADMIN_QUICK_ACTIONS } from '@/lib/admin-nav'
 import { getListingApplications, APPLICANT_TYPES, type ListingApplication } from '@/lib/listing-applications'
+import { formatMoney } from '@/lib/allocation'
 
 const typeLabel = (id: string) => APPLICANT_TYPES.find(t => t.id === id)?.label ?? id
 
@@ -54,7 +55,7 @@ export default function AdminOverviewPage() {
   const cards = [
     { label: 'Listings', value: stats?.totalListings ?? '—', sub: 'Properties, activities & tours', icon: ListChecks, color: 'text-[#2d6a4f]', bg: 'bg-[#2d6a4f]/8' },
     { label: 'Total Bookings', value: stats?.totalBookings ?? '—', sub: `${stats?.cancelledBookings ?? 0} cancelled`, icon: TrendingUp, color: 'text-[#C9A96E]', bg: 'bg-[#C9A96E]/10' },
-    { label: 'Booked Revenue', value: `R ${(stats?.totalRevenue ?? 0).toLocaleString()}`, sub: 'Confirmed bookings', icon: DollarSign, color: 'text-[#2d6a4f]', bg: 'bg-[#2d6a4f]/8' },
+    { label: 'Booked Revenue', value: `${formatMoney(stats?.totalRevenue ?? 0)}`, sub: 'Confirmed bookings', icon: DollarSign, color: 'text-[#2d6a4f]', bg: 'bg-[#2d6a4f]/8' },
     { label: 'Suppliers', value: stats?.totalSuppliers ?? '—', sub: `${stats?.pendingSuppliers ?? 0} pending approval`, icon: Building2, color: 'text-[#C9A96E]', bg: 'bg-[#C9A96E]/10' },
     { label: 'Registered Users', value: stats?.totalUsers ?? '—', sub: 'All platform accounts', icon: Users, color: 'text-[#2d6a4f]', bg: 'bg-[#2d6a4f]/8' },
     { label: 'Pending Approvals', value: pendingSuppliers.length, sub: 'Suppliers awaiting review', icon: AlertTriangle, color: 'text-[#C9A96E]', bg: 'bg-[#C9A96E]/10' },
@@ -91,7 +92,7 @@ export default function AdminOverviewPage() {
         {pendingSuppliers.length === 0 && <div className="px-6 py-10 text-center"><CheckCircle size={24} className="text-[#2d6a4f] mx-auto mb-2"/><p className="font-sans text-sm text-gray-400">All applications reviewed</p></div>}
       </div></div>
       <div className="bg-white border border-gray-200"><div className="flex items-center justify-between px-6 py-4 border-b border-gray-100"><div><h2 className="font-display italic text-xl text-[#000000]">Recent Bookings</h2><p className="font-sans text-xs text-gray-400">Latest platform activity</p></div><Link href="/admin/bookings" className="font-sans text-xs text-[#2d6a4f] hover:underline">View all →</Link></div><div className="divide-y divide-gray-100">
-        {bookings.map(b => { const Icon=STATUS_ICON[b.status] || Clock; return <div key={b.id} className="px-6 py-4 flex items-center gap-4"><div className="flex-1 min-w-0"><div className="flex items-center gap-2 mb-0.5"><p className="font-sans text-xs text-gray-400 font-mono">{b.reference}</p><span className={`inline-flex items-center gap-1 px-2 py-0.5 font-sans text-[10px] uppercase tracking-wide ${STATUS_STYLE[b.status] || STATUS_STYLE.pending}`}><Icon size={9}/> {b.status}</span></div><p className="font-sans text-sm font-medium truncate">{b.customerName || 'Guest booking'}</p><p className="font-sans text-xs text-gray-400 truncate">{b.stay?.title || (b.addons[0]?.title ?? 'Trip booking')}</p></div><div className="text-right shrink-0"><p className="font-display italic text-lg text-[#2d6a4f]">R {(b.total ?? 0).toLocaleString()}</p><p className="font-sans text-xs text-gray-400">{new Date(b.createdAt).toLocaleDateString()}</p></div></div>})}
+        {bookings.map(b => { const Icon=STATUS_ICON[b.status] || Clock; return <div key={b.id} className="px-6 py-4 flex items-center gap-4"><div className="flex-1 min-w-0"><div className="flex items-center gap-2 mb-0.5"><p className="font-sans text-xs text-gray-400 font-mono">{b.reference}</p><span className={`inline-flex items-center gap-1 px-2 py-0.5 font-sans text-[10px] uppercase tracking-wide ${STATUS_STYLE[b.status] || STATUS_STYLE.pending}`}><Icon size={9}/> {b.status}</span></div><p className="font-sans text-sm font-medium truncate">{b.customerName || 'Guest booking'}</p><p className="font-sans text-xs text-gray-400 truncate">{b.stay?.title || (b.addons[0]?.title ?? 'Trip booking')}</p></div><div className="text-right shrink-0"><p className="font-display italic text-lg text-[#2d6a4f]">{formatMoney(b.total ?? 0)}</p><p className="font-sans text-xs text-gray-400">{new Date(b.createdAt).toLocaleDateString()}</p></div></div>})}
         {bookings.length === 0 && <div className="px-6 py-10 text-center"><Clock size={24} className="text-gray-300 mx-auto mb-2"/><p className="font-sans text-sm text-gray-400">No bookings yet</p></div>}
       </div></div>
     </div>

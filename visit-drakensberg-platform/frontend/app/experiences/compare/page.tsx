@@ -7,6 +7,7 @@ import Footer from '@/components/layout/Footer'
 import { ArrowLeft, Star, Check, X, GitCompareArrows, Award } from 'lucide-react'
 import { getExperiencesByTrail, type TrekkingExperience } from '@/lib/experiences'
 import { getTrails, type Trail } from '@/lib/trails'
+import { formatMoney } from '@/lib/allocation'
 
 // Side-by-side comparison of departures. Comparison is only available between
 // experiences that reference the same Trail ID — the trail comes from the
@@ -54,7 +55,7 @@ function CompareContent() {
     { label: 'Lead Guide', render: e => e.leadGuide || '—' },
     { label: 'Departure', render: e => formatDate(e.departureDate) },
     { label: 'Return', render: e => formatDate(e.returnDate) },
-    { label: 'Price (pp)', render: e => <span className="font-display italic text-lg text-[#2d6a4f]">R {e.pricePerPerson.toLocaleString()}</span> },
+    { label: 'Price (pp)', render: e => <span className="font-display italic text-lg text-[#2d6a4f]">{formatMoney(e.pricePerPerson)}</span> },
     { label: 'Duration', render: e => `${e.durationDays} day${e.durationDays !== 1 ? 's' : ''}` },
     { label: 'Difficulty', render: e => e.difficulty },
     { label: 'Group Size', render: e => `Max ${e.maxGroup}` },

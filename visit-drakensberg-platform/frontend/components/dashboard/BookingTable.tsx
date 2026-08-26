@@ -1,3 +1,5 @@
+import { formatMoney } from '@/lib/allocation'
+
 type BookingStatus = 'confirmed' | 'pending' | 'cancelled' | 'completed';
 
 interface Booking {
@@ -58,7 +60,7 @@ export default function BookingTable({ bookings }: BookingTableProps) {
               <td className="px-4 py-3 text-gray-600 whitespace-nowrap">{b.checkOut}</td>
               <td className="px-4 py-3 text-gray-600">{b.guests}</td>
               <td className="px-4 py-3 font-medium text-gray-800">
-                R{b.total.toLocaleString()}
+                {formatMoney(b.total)}
               </td>
               <td className="px-4 py-3">
                 <span

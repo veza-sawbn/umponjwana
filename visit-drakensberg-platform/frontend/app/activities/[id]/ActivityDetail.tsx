@@ -10,6 +10,7 @@ import { useBooking } from '@/lib/booking-context'
 import { Check, Plus } from 'lucide-react'
 import type { Activity } from '@/lib/activities'
 import { timeslotsForDate, slotRemaining } from '@/lib/activities'
+import { formatMoney } from '@/lib/allocation'
 
 function mapActivityToView(a: Activity) {
   const durationParts = []
@@ -182,8 +183,8 @@ export default function ActivityDetail({ activityData, id }: { activityData: Act
               <div className="mb-5">
                 <p className="font-sans text-[10px] tracking-[0.12em] uppercase text-gray-400">{hasChildRate ? 'Adult / Child' : 'Per person'}</p>
                 <p className="font-display italic text-3xl text-[#2d6a4f]">
-                  R {activity.price_per_person.toLocaleString()}
-                  {hasChildRate && <span className="text-base text-gray-400"> / R {activity.childPrice!.toLocaleString()} <span className="text-xs">({activity.childMaxAge} & under)</span></span>}
+                  {formatMoney(activity.price_per_person)}
+                  {hasChildRate && <span className="text-base text-gray-400"> / {formatMoney(activity.childPrice!)} <span className="text-xs">({activity.childMaxAge} & under)</span></span>}
                 </p>
               </div>
               <div className="space-y-4 mb-5">
@@ -239,26 +240,26 @@ export default function ActivityDetail({ activityData, id }: { activityData: Act
                   <>
                     {finalAdults > 0 && (
                       <div className="flex justify-between font-sans text-sm mb-1">
-                        <span className="text-gray-600">R {activity.price_per_person.toLocaleString()} × {finalAdults} adult{finalAdults === 1 ? '' : 's'}</span>
-                        <span>R {(activity.price_per_person * finalAdults).toLocaleString()}</span>
+                        <span className="text-gray-600">{formatMoney(activity.price_per_person)} × {finalAdults} adult{finalAdults === 1 ? '' : 's'}</span>
+                        <span>{formatMoney(activity.price_per_person * finalAdults)}</span>
                       </div>
                     )}
                     {finalChildren > 0 && (
                       <div className="flex justify-between font-sans text-sm mb-1">
-                        <span className="text-gray-600">R {activity.childPrice!.toLocaleString()} × {finalChildren} child{finalChildren === 1 ? '' : 'ren'}</span>
-                        <span>R {(activity.childPrice! * finalChildren).toLocaleString()}</span>
+                        <span className="text-gray-600">{formatMoney(activity.childPrice!)} × {finalChildren} child{finalChildren === 1 ? '' : 'ren'}</span>
+                        <span>{formatMoney(activity.childPrice! * finalChildren)}</span>
                       </div>
                     )}
                   </>
                 ) : (
                   <div className="flex justify-between font-sans text-sm mb-1">
-                    <span className="text-gray-600">R {activity.price_per_person.toLocaleString()} × {groupSize}</span>
-                    <span>R {total.toLocaleString()}</span>
+                    <span className="text-gray-600">{formatMoney(activity.price_per_person)} × {groupSize}</span>
+                    <span>{formatMoney(total)}</span>
                   </div>
                 )}
                 <div className="flex justify-between font-sans text-sm font-medium pt-2 border-t border-gray-100 mt-2">
                   <span>Total</span>
-                  <span className="text-[#2d6a4f]">R {total.toLocaleString()}</span>
+                  <span className="text-[#2d6a4f]">{formatMoney(total)}</span>
                 </div>
               </div>
               {!date && (

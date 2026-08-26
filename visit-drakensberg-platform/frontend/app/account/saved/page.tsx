@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { Heart, MapPin, Star, X } from 'lucide-react'
+import { formatMoney } from '@/lib/allocation'
 
 type SavedListing = {
   id: string
@@ -69,7 +70,7 @@ export default function SavedListingsPage() {
                     <span className="font-sans text-xs text-gray-600">{item.rating}</span>
                   </div>
                   {item.price && (
-                    <p className="font-display italic text-[#2d6a4f]">R {item.price.toLocaleString()}<span className="font-sans text-xs text-gray-400">/night</span></p>
+                    <p className="font-display italic text-[#2d6a4f]">{formatMoney(item.price)}<span className="font-sans text-xs text-gray-400">/night</span></p>
                   )}
                 </div>
                 <Link href={item.href} className="block mt-3 text-center border border-[#2d6a4f] text-[#2d6a4f] py-2 font-sans text-xs hover:bg-[#2d6a4f] hover:text-white transition-colors">

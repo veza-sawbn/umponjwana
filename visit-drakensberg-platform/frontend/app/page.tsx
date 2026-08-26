@@ -21,6 +21,7 @@ import { getSupplierEntities } from '@/lib/supplier-entities'
 import { getActivities, type Activity } from '@/lib/activities'
 import { trackEvent, AnalyticsEvent } from '@/lib/analytics'
 import { getPublishedPosts, type BlogPost } from '@/lib/blog-posts'
+import { formatMoney } from '@/lib/allocation'
 
 /* ─── Data ─────────────────────────────────────────────────────────────────── */
 
@@ -545,7 +546,7 @@ export default function HomePage() {
     id: a.id,
     href: `/activities/${a.id}`,
     title: a.name,
-    meta: `${a.category}${a.pricePerPerson ? ' · R' + a.pricePerPerson.toLocaleString() : ''}`,
+    meta: `${a.category}${a.pricePerPerson ? ' · ' + formatMoney(a.pricePerPerson) : ''}`,
     badgeLabel: a.category || 'Experience',
     badgeColor: '#C9A96E',
     img: a.photos?.[0],

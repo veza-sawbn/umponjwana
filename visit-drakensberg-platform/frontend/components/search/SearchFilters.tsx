@@ -3,6 +3,7 @@ import { useState } from 'react'
 import { useRouter, useSearchParams, usePathname } from 'next/navigation'
 import { Button } from '@/components/ui/Button'
 import { ChevronDown, ChevronUp } from 'lucide-react'
+import { formatMoney } from '@/lib/allocation'
 
 const AMENITIES = ['WiFi', 'Pool', 'Braai', 'Parking', 'Kitchen', 'Air conditioning', 'Pet friendly', 'Mountain views', 'River access', 'Hiking trails']
 
@@ -53,8 +54,8 @@ export default function SearchFilters() {
       <Section title="Price range (ZAR)">
         <div className="space-y-3">
           <div className="flex items-center justify-between text-sm text-gray-600">
-            <span>R{minPrice.toLocaleString()}</span>
-            <span>R{maxPrice.toLocaleString()}</span>
+            <span>{formatMoney(minPrice)}</span>
+            <span>{formatMoney(maxPrice)}</span>
           </div>
           <input type="range" min={0} max={10000} step={100} value={minPrice} onChange={e => setMinPrice(Number(e.target.value))} className="w-full accent-primary-500" />
           <input type="range" min={0} max={10000} step={100} value={maxPrice} onChange={e => setMaxPrice(Number(e.target.value))} className="w-full accent-primary-500" />

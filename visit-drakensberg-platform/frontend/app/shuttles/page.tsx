@@ -10,6 +10,7 @@ import { GoogleAddressField, useAutoDrivingDistance, type GooglePlaceSelection }
 import { buildShuttleOption, estimateTransferPrice, suggestedVehicleType, SHUTTLE_TYPES, type ShuttleSupplierChoice, type ShuttleType } from '@/lib/shuttle-service'
 import { SUPPLIER_CATEGORIES } from '@/lib/transport'
 import { TransportSupplierPicker } from '@/components/booking/TransportSupplierPicker'
+import { formatMoney } from '@/lib/allocation'
 
 const EMPTY_PLACE: GooglePlaceSelection = { address: '' }
 
@@ -165,7 +166,7 @@ function ShuttlesPageContent() {
                     <p className="font-display text-lg text-forest">{result.distanceKm} km · {fmtMinutes(result.durationMinutes)} drive</p>
                     <p className="font-sans text-xs text-forest/40">{suggestedVehicleType(passengers)} · {passengers} passenger{passengers !== 1 ? 's' : ''} · {shuttleType}</p>
                   </div>
-                  {price !== null && <p className="font-display text-xl text-forest">R{price.toLocaleString()}</p>}
+                  {price !== null && <p className="font-display text-xl text-forest">{formatMoney(price)}</p>}
                 </div>
               )}
             </div>
@@ -222,7 +223,7 @@ function ShuttlesPageContent() {
           </div>
           <div className="border-t border-white/10 mt-6 pt-6 flex items-end justify-between">
             <span className="font-sans text-xs text-white/40">{supplierChoice ? `${supplierChoice.companyName} fare` : 'Estimated fare'}</span>
-            <span className="font-display text-3xl text-gold">{price !== null ? `R${price.toLocaleString()}` : '—'}</span>
+            <span className="font-display text-3xl text-gold">{price !== null ? `${formatMoney(price)}` : '—'}</span>
           </div>
 
           {added ? (

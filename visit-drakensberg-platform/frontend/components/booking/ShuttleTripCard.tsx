@@ -7,6 +7,7 @@ import type { MeetAndGreetDetails } from '@/lib/transport'
 import type { ShuttleSupplierChoice } from '@/lib/shuttle-service'
 import { TransportSupplierPicker } from './TransportSupplierPicker'
 import { MeetAndGreetForm } from './MeetAndGreetForm'
+import { formatMoney } from '@/lib/allocation'
 
 // A single shuttle line in the trip cart, expanded into its configuration
 // hub: choose (or change) the transport partner + vehicle, and capture the
@@ -69,7 +70,7 @@ export function ShuttleTripCard({ shuttle }: { shuttle: ShuttleOption }) {
           </div>
         </div>
         <div className="flex items-center gap-4 shrink-0">
-          <p className="font-sans text-sm font-semibold text-black/80">R {shuttle.price.toLocaleString()}</p>
+          <p className="font-sans text-sm font-semibold text-black/80">{formatMoney(shuttle.price)}</p>
           <button onClick={() => booking.removeShuttle(shuttle.id)} className="text-red-400 hover:text-red-600 transition-colors" title="Remove">
             <Trash2 size={14} />
           </button>

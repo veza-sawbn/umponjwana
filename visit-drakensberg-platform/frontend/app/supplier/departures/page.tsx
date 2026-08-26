@@ -8,6 +8,7 @@ import { effectiveSupplierId } from '@/lib/effective-supplier'
 import { getSupplierEntities, type SupplierEntity } from '@/lib/supplier-entities'
 import { getMyTours, type Tour, type PricingTier } from '@/lib/tours'
 import { getTrails, type Trail } from '@/lib/trails'
+import { formatMoney } from '@/lib/allocation'
 import {
   getMyDepartures, addDeparture, updateDeparture, deleteDeparture, newDeparturePackageId,
   type Departure,
@@ -298,7 +299,7 @@ function GuestsModal({
               <label className="font-sans text-[11px] text-black/40 block mb-1">Rate paid</label>
               <select value={form.packageId} onChange={e => setForm(f => ({ ...f, packageId: e.target.value }))} className={inp}>
                 <option value="">No specific rate</option>
-                {livePackages.map(p => <option key={p.id} value={p.id}>{p.name} — R {p.pricePerPerson.toLocaleString()}</option>)}
+                {livePackages.map(p => <option key={p.id} value={p.id}>{p.name} — {formatMoney(p.pricePerPerson)}</option>)}
               </select>
             </div>
           )}
@@ -426,10 +427,10 @@ function DeparturesInner() {
 
   function rateSummary(r: Departure) {
     const packages = r.packages && r.packages.length > 0 ? resolveLivePackages(r.packages, tours.find(t => t.id === r.tourId)) : null
-    if (!packages) return `R ${r.pricePerPerson.toLocaleString()}`
-    if (packages.length === 1) return `R ${packages[0].pricePerPerson.toLocaleString()} · ${packages[0].name}`
+    if (!packages) return `${formatMoney(r.pricePerPerson)}`
+    if (packages.length === 1) return `${formatMoney(packages[0].pricePerPerson)} · ${packages[0].name}`
     const prices = packages.map(p => p.pricePerPerson)
-    return `R ${Math.min(...prices).toLocaleString()}–${Math.max(...prices).toLocaleString()} · ${packages.length} rates`
+    return `${formatMoney(Math.min(...prices))}–${Math.max(...prices).toLocaleString()} · ${packages.length} rates`
   }
 
   return (

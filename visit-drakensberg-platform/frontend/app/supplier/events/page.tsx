@@ -33,6 +33,7 @@ interface SupplierEvent extends Pick<VdEvent, 'region' | 'gpsLat' | 'gpsLng'> {
 
 import { supabase } from '@/lib/auth'
 import { effectiveSupplierId } from '@/lib/effective-supplier'
+import { formatMoney } from '@/lib/allocation'
 import {
   getSupplierEntities, addSupplierEntity, updateSupplierEntity, deleteSupplierEntity,
 } from '@/lib/supplier-entities'
@@ -289,7 +290,7 @@ export default function EventsManagePage() {
                     </div>
                   </div>
                   <div className="text-right">
-                    <p className="font-display italic text-2xl text-[#2d6a4f]">R {event.ticket_price}</p>
+                    <p className="font-display italic text-2xl text-[#2d6a4f]">{formatMoney(event.ticket_price)}</p>
                     <p className="font-sans text-xs text-gray-400 mb-3">per ticket</p>
                     <div className="flex items-center gap-1.5 justify-end text-xs font-sans text-gray-500">
                       <Ticket size={12} />

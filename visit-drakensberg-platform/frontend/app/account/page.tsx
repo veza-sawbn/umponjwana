@@ -8,6 +8,7 @@ import { getBookingsByUser, updateBookingStatus, type SavedBooking } from '@/lib
 import { getDepartures, releaseDepartureSeats } from '@/lib/departures'
 import { releaseActivityTimeslot } from '@/lib/activities'
 import { supabase } from '@/lib/auth'
+import { formatMoney } from '@/lib/allocation'
 
 const STATUS_STYLE: Record<string, string> = {
   confirmed: 'bg-[#2d6a4f]/10 text-[#2d6a4f]',
@@ -62,7 +63,7 @@ function BookingCard({ b, onCancel }: { b: SavedBooking; onCancel?: (b: SavedBoo
           )}
         </div>
         <div className="flex items-center justify-between mt-4 pt-3 border-t border-gray-100">
-          <p className="font-display italic text-2xl text-[#2d6a4f]">R {b.total.toLocaleString()}</p>
+          <p className="font-display italic text-2xl text-[#2d6a4f]">{formatMoney(b.total)}</p>
           <div className="flex gap-2">
             {onCancel && status === 'confirmed' && (
               <button

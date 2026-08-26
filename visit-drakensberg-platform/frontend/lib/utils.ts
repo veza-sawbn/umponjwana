@@ -1,19 +1,15 @@
 import { clsx, type ClassValue } from 'clsx'
 import { twMerge } from 'tailwind-merge'
 import { format, differenceInCalendarDays } from 'date-fns'
+import { formatMoney } from './allocation'
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
 }
 
-export function formatCurrency(amount: number, currency = 'ZAR') {
-  return new Intl.NumberFormat('en-ZA', {
-    style: 'currency',
-    currency,
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
-  }).format(amount)
-}
+// Re-exported so existing `formatCurrency` call sites keep working — both
+// names resolve to the one platform money formatter in lib/allocation.ts.
+export { formatMoney, formatMoney as formatCurrency }
 
 export function formatDate(date: Date | string, fmt = 'dd MMM yyyy') {
   return format(new Date(date), fmt)

@@ -10,6 +10,7 @@ import {
 } from 'lucide-react'
 import { getExperiencesByTrail, resolvePackageItinerary, type TrekkingExperience } from '@/lib/experiences'
 import { useBooking } from '@/lib/booking-context'
+import { formatMoney } from '@/lib/allocation'
 
 const DIFF_COLOR: Record<string, string> = {
   Easy: '#4A7251', Moderate: '#C9A96E', Challenging: '#c0392b', Extreme: '#8e44ad', Strenuous: '#c0392b',
@@ -245,7 +246,7 @@ export default function ExperienceDetail({ exp }: { exp: TrekkingExperience }) {
                           <p className="font-display italic text-lg">{s.title}</p>
                           <p className="font-sans text-xs text-gray-500">{s.operator} · {formatDate(s.departureDate)} · {s.durationDays} day{s.durationDays !== 1 ? 's' : ''}</p>
                         </div>
-                        <p className="font-display italic text-lg text-[#2d6a4f] shrink-0">R {s.pricePerPerson.toLocaleString()}</p>
+                        <p className="font-display italic text-lg text-[#2d6a4f] shrink-0">{formatMoney(s.pricePerPerson)}</p>
                       </div>
                     </Link>
                   ))}
@@ -258,7 +259,7 @@ export default function ExperienceDetail({ exp }: { exp: TrekkingExperience }) {
           <div className="space-y-6">
             <div className="bg-white border border-gray-200 p-6">
               <div className="flex items-baseline justify-between mb-1">
-                <p className="font-display italic text-3xl text-[#2d6a4f]">R {(selectedPackage?.pricePerPerson ?? exp.pricePerPerson).toLocaleString()}</p>
+                <p className="font-display italic text-3xl text-[#2d6a4f]">{formatMoney(selectedPackage?.pricePerPerson ?? exp.pricePerPerson)}</p>
                 <p className="font-sans text-xs text-gray-400">per person</p>
               </div>
               <p className={`font-sans text-xs mb-5 ${full ? 'text-gray-400' : exp.spacesAvailable <= 2 ? 'text-red-600' : 'text-[#2d6a4f]'}`}>
@@ -281,7 +282,7 @@ export default function ExperienceDetail({ exp }: { exp: TrekkingExperience }) {
                         }`}
                       >
                         <span className="font-sans text-sm text-gray-700">{pkg.name}</span>
-                        <span className="font-display italic text-sm text-[#2d6a4f] shrink-0">R {pkg.pricePerPerson.toLocaleString()}</span>
+                        <span className="font-display italic text-sm text-[#2d6a4f] shrink-0">{formatMoney(pkg.pricePerPerson)}</span>
                       </button>
                     ))}
                   </div>
@@ -330,7 +331,7 @@ export default function ExperienceDetail({ exp }: { exp: TrekkingExperience }) {
                   </button>
                   {clampedGuests > 1 && (
                     <p className="font-sans text-xs text-gray-400 text-center mt-2">
-                      Total: R {((selectedPackage?.pricePerPerson ?? exp.pricePerPerson) * clampedGuests).toLocaleString()}
+                      Total: {formatMoney((selectedPackage?.pricePerPerson ?? exp.pricePerPerson) * clampedGuests)}
                     </p>
                   )}
                 </>

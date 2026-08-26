@@ -8,6 +8,7 @@ import { getPropertiesBySupplier, type Property } from '@/lib/properties'
 import { addRoom } from '@/lib/rooms'
 import { supplierMediaSource } from '@/lib/supplier-media'
 import { MediaGalleryPicker } from '@/components/media/MediaPicker'
+import { formatMoney } from '@/lib/allocation'
 
 const BED_CONFIGS = ['Single', 'Twin', 'Double', 'Queen', 'King', '2×Queen', '2×King', 'Bunk Beds']
 const ROOM_FEATURES = ['Air Con', 'Heater', 'TV', 'Mini-fridge', 'Safe', 'Balcony', 'Mountain View', 'Private Entrance', 'Wheelchair Accessible', 'Fireplace', 'Kitchenette', 'Bathtub']
@@ -287,9 +288,9 @@ export default function NewRoomPage() {
                 ['Units', form.units],
                 ['Room Size', form.sizeSqm ? `${form.sizeSqm} m²` : ''],
                 ['En-suite', form.enSuite ? 'Yes' : 'No'],
-                ['Base Price', form.basePrice ? `R${form.basePrice}/night` : ''],
+                ['Base Price', form.basePrice ? `${formatMoney(Number(form.basePrice))}/night` : ''],
                 ['Min Nights', form.minNights],
-                ['Cleaning Fee', form.cleaningFee ? `R${form.cleaningFee}` : 'None'],
+                ['Cleaning Fee', form.cleaningFee ? `${formatMoney(Number(form.cleaningFee))}` : 'None'],
               ] as [string, string][]).map(([k, v]) => v ? (
                 <div key={k} className="flex gap-3 font-sans text-sm">
                   <span className="text-black/40 w-36 shrink-0">{k}</span>

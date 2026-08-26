@@ -1,5 +1,6 @@
 import { supabase } from './auth'
 import { notify } from './notifications'
+import { formatMoney } from './allocation'
 
 // Custom-date private trip requests (vd_trip_requests — see
 // supabase/migrations/20260707_marketplace.sql). A visitor requests a private
@@ -191,7 +192,7 @@ export async function issueQuote(request: TripRequest, quote: TripQuote): Promis
     'Operational approval — quote issued')
   await notify(request.userId, 'approval',
     `Quote ready — ${request.reference}`,
-    `${request.operatorName || 'The operator'} approved your ${request.trailName} trip and sent a quote of R ${quote.total.toLocaleString()}.`,
+    `${request.operatorName || 'The operator'} approved your ${request.trailName} trip and sent a quote of ${formatMoney(quote.total)}.`,
     '/account/requests')
   return updated
 }

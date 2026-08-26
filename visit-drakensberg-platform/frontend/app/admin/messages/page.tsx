@@ -20,6 +20,7 @@ import { getMessageTemplates, applyTemplate, type MessageTemplate } from '@/lib/
 import { buildCustomerProfile, type CustomerProfile } from '@/lib/crm'
 import { assist, type AssistResult } from '@/lib/hub-assistant'
 import { getOrders, type MasterOrder } from '@/lib/orders'
+import { formatMoney } from '@/lib/allocation'
 
 /* ── Channel icon resolution ──────────────────────────────────────────────── */
 const CHANNEL_ICONS: Record<string, any> = {
@@ -43,7 +44,7 @@ function fmtTime(iso: string) {
   return today ? d.toLocaleTimeString('en-ZA', { hour: '2-digit', minute: '2-digit' })
     : d.toLocaleDateString('en-ZA', { day: 'numeric', month: 'short' })
 }
-const money = (n: number) => `R${Math.round(n).toLocaleString()}`
+
 const isEnquiry = (c: Conversation) => c.bookingId?.startsWith('enq-')
 const lastMsg = (c: Conversation) => c.messages[c.messages.length - 1]
 const awaitingReply = (c: Conversation) => { const m = lastMsg(c); return !!m && m.from === 'visitor' }
@@ -220,9 +221,9 @@ export default function AdminMessagesHub() {
       CustomerName: selected?.customerName || '',
       ConsultantName: me?.name || '',
       Destination: profile?.regionsVisited[0] || 'the Drakensberg',
-      OutstandingBalance: profile ? money(profile.outstandingBalance) : '',
+      OutstandingBalance: profile ? formatMoney(profile.outstandingBalance) : '',
       BookingReference: selected?.bookingRef || '',
-      TotalValue: profile ? money(profile.lifetimeSpend) : '',
+      TotalValue: profile ? formatMoney(profile.lifetimeSpend) : '',
     }
     setBody(b => (b ? b + '\n\n' : '') + applyTemplate(t.body, vars))
     setTplOpen(false)
@@ -316,7 +317,7 @@ export default function AdminMessagesHub() {
             { label: 'Leads', value: stats.leads },
             { label: 'Awaiting Reply', value: stats.awaiting },
             { label: 'Win Rate', value: `${stats.conversion}%` },
-            { label: 'Revenue Collected', value: money(stats.revenue) },
+            { label: 'Revenue Collected', value: formatMoney(stats.revenue) },
           ].map(s => (
             <div key={s.label} className="bg-white/5 px-3 py-2">
               <p className="font-sans text-[9px] tracking-[0.1em] uppercase text-white/30">{s.label}</p>
@@ -391,7 +392,7 @@ export default function AdminMessagesHub() {
                     <ChannelBadge id={c.hub.channel} small />
                     <span className="inline-flex items-center gap-1 font-sans text-[9px] px-1.5 py-0.5" style={{ color: st.color, background: st.color + '22' }}>{st.label}</span>
                     {awaitingReply(c) && <span className="font-sans text-[9px] text-[#C9A96E]">• reply due</span>}
-                    {out > 0 && <span className="font-sans text-[9px] text-amber-400">{money(out)} due</span>}
+                    {out > 0 && <span className="font-sans text-[9px] text-amber-400">{formatMoney(out)} due</span>}
                     {c.hub.assignedName && <span className="font-sans text-[9px] text-white/30">{c.hub.assignedName.split(' ')[0]}</span>}
                   </div>
                 </button>
@@ -576,9 +577,9 @@ function CustomerTab({ conv, profile, loading }: { conv: Conversation; profile: 
       {loading ? <div className="py-6 flex justify-center"><Loader2 className="w-4 h-4 text-gray-300 animate-spin" /></div> : profile && (
         <>
           <div className="grid grid-cols-3 gap-2 my-4">
-            <div className="bg-[#F7F5F2] px-2 py-2"><p className="font-sans text-[9px] uppercase text-gray-400">Lifetime</p><p className="font-sans text-sm font-medium text-gray-800">{money(profile.lifetimeSpend)}</p></div>
-            <div className="bg-[#F7F5F2] px-2 py-2"><p className="font-sans text-[9px] uppercase text-gray-400">Paid</p><p className="font-sans text-sm font-medium text-gray-800">{money(profile.totalPaid)}</p></div>
-            <div className="bg-[#F7F5F2] px-2 py-2"><p className="font-sans text-[9px] uppercase text-gray-400">Owing</p><p className={`font-sans text-sm font-medium ${profile.outstandingBalance > 0 ? 'text-amber-600' : 'text-gray-800'}`}>{money(profile.outstandingBalance)}</p></div>
+            <div className="bg-[#F7F5F2] px-2 py-2"><p className="font-sans text-[9px] uppercase text-gray-400">Lifetime</p><p className="font-sans text-sm font-medium text-gray-800">{formatMoney(profile.lifetimeSpend)}</p></div>
+            <div className="bg-[#F7F5F2] px-2 py-2"><p className="font-sans text-[9px] uppercase text-gray-400">Paid</p><p className="font-sans text-sm font-medium text-gray-800">{formatMoney(profile.totalPaid)}</p></div>
+            <div className="bg-[#F7F5F2] px-2 py-2"><p className="font-sans text-[9px] uppercase text-gray-400">Owing</p><p className={`font-sans text-sm font-medium ${profile.outstandingBalance > 0 ? 'text-amber-600' : 'text-gray-800'}`}>{formatMoney(profile.outstandingBalance)}</p></div>
           </div>
           <p className="font-sans text-[9px] tracking-[0.1em] uppercase text-gray-400 mb-2">Trip History</p>
           {profile.trips.length === 0 && <p className="font-sans text-xs text-gray-400">No bookings yet — this is a fresh lead.</p>}
@@ -591,8 +592,8 @@ function CustomerTab({ conv, profile, loading }: { conv: Conversation; profile: 
                 </div>
                 <p className="font-sans text-[10px] text-gray-400">{t.bookingRef}{t.travelStart ? ` · ${t.travelStart}` : ''}</p>
                 <div className="flex items-center gap-3 mt-1 font-sans text-[10px]">
-                  <span className="text-gray-500">{money(t.total)}</span>
-                  {t.outstanding > 0 && <span className="text-amber-600">{money(t.outstanding)} due</span>}
+                  <span className="text-gray-500">{formatMoney(t.total)}</span>
+                  {t.outstanding > 0 && <span className="text-amber-600">{formatMoney(t.outstanding)} due</span>}
                 </div>
               </div>
             ))}
@@ -730,7 +731,7 @@ function ActionsTab({ conv, profile, onAction, onStage }: {
       {profile && profile.outstandingBalance > 0 && (
         <div className="bg-amber-50 border border-amber-200 px-3 py-2 mb-4">
           <p className="font-sans text-[10px] text-amber-700">Outstanding balance</p>
-          <p className="font-sans text-lg text-amber-800">{money(profile.outstandingBalance)}</p>
+          <p className="font-sans text-lg text-amber-800">{formatMoney(profile.outstandingBalance)}</p>
         </div>
       )}
       <p className="font-sans text-[9px] tracking-[0.1em] uppercase text-gray-400 mb-2">One-click stage moves</p>

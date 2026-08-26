@@ -1,6 +1,7 @@
 import type { Conversation } from './conversations'
 import type { CustomerProfile } from './crm'
 import { applyTemplate, type MessageTemplate } from './message-templates'
+import { formatMoney } from '@/lib/allocation'
 
 /* ────────────────────────────────────────────────────────────────────────────
  * Communications Hub — assistant.
@@ -94,14 +95,14 @@ export function assist(conv: Conversation, profile: CustomerProfile | null, cons
       CustomerName: conv.customerName || name,
       ConsultantName: consultantName,
       Destination: profile?.regionsVisited[0] || 'the Drakensberg',
-      OutstandingBalance: profile ? `R${Math.round(profile.outstandingBalance).toLocaleString()}` : '',
+      OutstandingBalance: profile ? `${formatMoney(Math.round(profile.outstandingBalance))}` : '',
       BookingReference: conv.bookingRef || '',
     })
   }
 
   const msgCount = conv.messages.length
   const spendNote = profile && profile.lifetimeSpend > 0
-    ? ` This is a returning customer (${profile.tripCount} trip${profile.tripCount === 1 ? '' : 's'}, R${Math.round(profile.lifetimeSpend).toLocaleString()} lifetime).`
+    ? ` This is a returning customer (${profile.tripCount} trip${profile.tripCount === 1 ? '' : 's'}, ${formatMoney(Math.round(profile.lifetimeSpend))} lifetime).`
     : profile?.isLead ? ' This is a new lead with no prior bookings.' : ''
   const summary = `${custMsgs.length} customer message${custMsgs.length === 1 ? '' : 's'} across ${msgCount} total. Detected intent: ${intent}.${urgent ? ' Flagged URGENT.' : ''}${spendNote}${requirements.length ? ' Requirements: ' + requirements.join('; ') + '.' : ''}`
 

@@ -8,6 +8,7 @@ import { getMyOrderLinesForBooking, setLineFulfilment, type OrderLine } from '@/
 import { getMyDepartures, releaseDepartureSeats } from '@/lib/departures'
 import { releaseActivityTimeslot } from '@/lib/activities'
 import { supabase } from '@/lib/auth'
+import { formatMoney } from '@/lib/allocation'
 
 type Status = 'all' | 'confirmed' | 'cancelled'
 
@@ -176,7 +177,7 @@ export default function BookingsPage() {
                   </div>
                   <div className="min-w-[80px]">
                     <p className="font-sans text-[10px] uppercase tracking-wider text-black/30 mb-0.5">Your total</p>
-                    <p className="font-sans text-sm text-black/80 font-medium">R {o.orderTotal.toLocaleString()}</p>
+                    <p className="font-sans text-sm text-black/80 font-medium">{formatMoney(o.orderTotal)}</p>
                   </div>
                   <div>
                     <span className={`font-sans text-xs px-2.5 py-1 capitalize ${STATUS_CHIP[o.status] || 'bg-gray-100 text-gray-500'}`}>{o.status}</span>
@@ -217,7 +218,7 @@ export default function BookingsPage() {
                                 ? ` (${o.nights ?? 0}n · ${fmt(o.checkIn)} → ${fmt(o.checkOut)})`
                                 : i.date ? ` — ${fmt(i.date)}` : ''} × {i.guests}
                             </span>
-                            <span className="font-medium text-black/70">R {i.total.toLocaleString()}</span>
+                            <span className="font-medium text-black/70">{formatMoney(i.total)}</span>
                           </div>
                         ))}
                       </div>
@@ -280,7 +281,7 @@ export default function BookingsPage() {
                             <XCircle size={12} /> Cancel this service
                           </button>
                         )}
-                        <p className="font-display italic text-lg text-[#2d6a4f]">Your total: R {o.orderTotal.toLocaleString()}</p>
+                        <p className="font-display italic text-lg text-[#2d6a4f]">Your total: {formatMoney(o.orderTotal)}</p>
                       </div>
                     </div>
                   </div>

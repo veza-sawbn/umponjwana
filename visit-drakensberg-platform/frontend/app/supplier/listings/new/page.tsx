@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { GoogleAddressField } from '@/components/maps/GoogleAddressField';
+import { formatMoney } from '@/lib/allocation'
 
 const STEPS = [
   { id: 1, label: 'Basic Info' },
@@ -278,10 +279,10 @@ export default function NewListingPage() {
                 <div className="bg-green-50 border border-green-200 rounded-lg p-4 text-sm text-gray-700">
                   <p className="font-medium text-[#2D6A4F] mb-1">Earnings Estimate</p>
                   <p>
-                    At R{Number(form.price).toLocaleString()} {form.priceUnit}, with 70% occupancy over 30 days,
+                    At {formatMoney(Number(form.price))} {form.priceUnit}, with 70% occupancy over 30 days,
                     you could earn approximately{' '}
                     <span className="font-bold">
-                      R{Math.round(Number(form.price) * 21).toLocaleString()}
+                      {formatMoney(Math.round(Number(form.price) * 21))}
                     </span>{' '}
                     per month.
                   </p>

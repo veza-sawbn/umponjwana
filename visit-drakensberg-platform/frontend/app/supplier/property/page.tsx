@@ -5,6 +5,7 @@ import Link from 'next/link'
 import Navbar from '@/components/layout/Navbar'
 import Footer from '@/components/layout/Footer'
 import { ArrowLeft, ToggleLeft, ToggleRight, Plus, ChevronDown, ChevronRight } from 'lucide-react'
+import { formatMoney } from '@/lib/allocation'
 
 const PROPERTIES = [
   { id: 'p1', name: 'Cathedral Peak Mountain Lodge', location: 'Cathedral Peak, Northern Berg', rooms_count: 4 },
@@ -205,7 +206,7 @@ export default function PropertyDashboardPage() {
                         <p className="font-sans text-xs text-gray-400">{room.max_guests} guests max · {room.bookings_this_month} bookings this month</p>
                       </div>
                       <div className="text-right ml-6">
-                        <p className="font-display italic text-2xl text-[#2d6a4f]">R {room.price_per_night.toLocaleString()}</p>
+                        <p className="font-display italic text-2xl text-[#2d6a4f]">{formatMoney(room.price_per_night)}</p>
                         <p className="font-sans text-xs text-gray-400">/night</p>
                       </div>
                     </div>
@@ -261,7 +262,7 @@ export default function PropertyDashboardPage() {
                         <td className="px-4 py-3 font-sans text-sm font-medium">{b.guest}</td>
                         <td className="px-4 py-3 font-sans text-xs text-gray-500">{new Date(b.check_in).toLocaleDateString('en-ZA', { day: 'numeric', month: 'short' })}</td>
                         <td className="px-4 py-3 font-sans text-xs text-gray-500">{new Date(b.check_out).toLocaleDateString('en-ZA', { day: 'numeric', month: 'short' })}</td>
-                        <td className="px-4 py-3 font-display italic text-lg text-[#2d6a4f]">R {b.total.toLocaleString()}</td>
+                        <td className="px-4 py-3 font-display italic text-lg text-[#2d6a4f]">{formatMoney(b.total)}</td>
                         <td className="px-4 py-3">
                           <span className={`font-sans text-xs px-2.5 py-1 ${STATUS_COLOR[b.status]}`}>{b.status.charAt(0).toUpperCase() + b.status.slice(1)}</span>
                         </td>
@@ -284,8 +285,8 @@ export default function PropertyDashboardPage() {
               <div className="space-y-6">
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                   {[
-                    { label: 'Revenue this month', value: `R ${revenue.toLocaleString()}` },
-                    { label: 'Avg nightly rate', value: `R ${Math.round(propRooms.reduce((s, r) => s + r.price_per_night, 0) / Math.max(propRooms.length, 1)).toLocaleString()}` },
+                    { label: 'Revenue this month', value: `${formatMoney(revenue)}` },
+                    { label: 'Avg nightly rate', value: `${formatMoney(Math.round(propRooms.reduce((s, r) => s + r.price_per_night, 0) / Math.max(propRooms.length, 1)))}` },
                     { label: 'Occupancy', value: `${occupancy}%` },
                     { label: 'Total bookings', value: propBookings.length.toString() },
                   ].map(stat => (
@@ -306,7 +307,7 @@ export default function PropertyDashboardPage() {
                         <div key={room.id}>
                           <div className="flex justify-between font-sans text-sm mb-1.5">
                             <span className="text-gray-700">{room.name}</span>
-                            <span className="text-[#2d6a4f] font-medium">R {roomRevenue.toLocaleString()}</span>
+                            <span className="text-[#2d6a4f] font-medium">{formatMoney(roomRevenue)}</span>
                           </div>
                           <div className="bg-gray-100 h-2">
                             <div className="bg-[#2d6a4f] h-2 transition-all duration-500" style={{ width: `${pct}%` }} />

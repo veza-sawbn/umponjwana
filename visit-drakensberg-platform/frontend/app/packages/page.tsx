@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { ArrowRight } from 'lucide-react'
 import Footer from '@/components/layout/Footer'
 import { getPublishedPackages, PACKAGE_CATEGORIES, PACKAGE_CATEGORY_LABELS, type PackageCategory } from '@/lib/packages'
+import { formatMoney } from '@/lib/allocation'
 
 // Filter tabs mirror the vocabulary curated in the Package Builder
 // (/admin/packages) — see lib/packages.ts PACKAGE_CATEGORIES.
@@ -101,7 +102,7 @@ export default function PackagesPage() {
                 )}
                 {p.originalPrice && (
                   <span className="absolute top-4 right-4 font-sans text-xs bg-forest text-white px-2.5 py-1">
-                    Save R{(p.originalPrice - p.price).toLocaleString()}
+                    Save {formatMoney(p.originalPrice - p.price)}
                   </span>
                 )}
               </div>
@@ -114,9 +115,9 @@ export default function PackagesPage() {
                   </div>
                   <div className="text-right shrink-0">
                     {p.originalPrice && (
-                      <p className="font-sans text-xs text-forest/30 line-through">R{p.originalPrice.toLocaleString()}</p>
+                      <p className="font-sans text-xs text-forest/30 line-through">{formatMoney(p.originalPrice)}</p>
                     )}
-                    <p className="font-display text-2xl text-forest">R{p.price.toLocaleString()}</p>
+                    <p className="font-display text-2xl text-forest">{formatMoney(p.price)}</p>
                     <p className="font-sans text-xs text-forest/40">per person</p>
                   </div>
                 </div>

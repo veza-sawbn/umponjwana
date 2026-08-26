@@ -11,6 +11,7 @@ import { supabase } from '@/lib/auth'
 import { getRegionNames } from '@/lib/regions'
 import { PROPERTY_REGIONS, PROPERTY_TYPES, PROPERTY_AMENITIES } from '@/lib/properties'
 import { ACTIVITY_CATEGORIES, ACTIVITY_DIFFICULTIES, ACTIVITY_INCLUSIONS } from '@/lib/activities'
+import { formatMoney } from '@/lib/allocation'
 import {
   submitListingApplication, uploadApplicationPhoto, emptyActivity, tierById,
   emptyStay, emptyTour, emptyShuttle, emptyExperience,
@@ -966,7 +967,7 @@ export default function ListWithUsPage() {
               {activitiesShown && (
                 <SummaryRow k="Activities" v={form.activities.filter(a => a.name.trim()).map(a => {
                   const bits = [a.category, a.difficulty, a.durationHours && `${a.durationHours}h`,
-                    a.pricePerPerson && `R${a.pricePerPerson} pp`].filter(Boolean)
+                    a.pricePerPerson && `${formatMoney(Number(a.pricePerPerson))} pp`].filter(Boolean)
                   return `${a.name} — ${bits.join(', ')}`
                 }).join(' · ')} />
               )}

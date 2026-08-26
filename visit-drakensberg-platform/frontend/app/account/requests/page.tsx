@@ -10,6 +10,7 @@ import {
   FileText, UserCircle, Building2,
 } from 'lucide-react'
 import { supabase } from '@/lib/auth'
+import { formatMoney } from '@/lib/allocation'
 import {
   getTripRequests, acceptQuote, confirmTripPayment, cancelTripRequest,
   TRIP_STATUS_LABELS, type TripRequest, type TripRequestStatus,
@@ -129,8 +130,8 @@ export default function MyRequestsPage() {
                 </div>
                 {r.quote && !dead && (
                   <div className="text-right shrink-0">
-                    <p className="font-display italic text-2xl text-[#2d6a4f]">R {r.quote.total.toLocaleString()}</p>
-                    <p className="font-sans text-[10px] text-gray-400">R {r.quote.pricePerPerson.toLocaleString()} pp · quote valid until {formatDate(r.quote.validUntil)}</p>
+                    <p className="font-display italic text-2xl text-[#2d6a4f]">{formatMoney(r.quote.total)}</p>
+                    <p className="font-sans text-[10px] text-gray-400">{formatMoney(r.quote.pricePerPerson)} pp · quote valid until {formatDate(r.quote.validUntil)}</p>
                   </div>
                 )}
               </div>
@@ -194,12 +195,12 @@ export default function MyRequestsPage() {
                     onClick={() => setPayingId(r.id)}
                     className="bg-[#2d6a4f] text-white px-5 py-2.5 font-sans text-sm hover:bg-[#235a3f] transition-colors"
                   >
-                    <CreditCard size={13} className="inline mr-1.5 -mt-0.5" />Pay R {r.quote?.total.toLocaleString() ?? ''}
+                    <CreditCard size={13} className="inline mr-1.5 -mt-0.5" />Pay {formatMoney(r.quote?.total ?? 0)}
                   </button>
                 )}
                 {payingId === r.id && r.status === 'awaiting_payment' && (
                   <div className="flex items-center gap-2 flex-wrap">
-                    <span className="font-sans text-xs text-gray-500">Confirm payment of R {r.quote?.total.toLocaleString()}?</span>
+                    <span className="font-sans text-xs text-gray-500">Confirm payment of {formatMoney(r.quote?.total ?? 0)}?</span>
                     <button
                       onClick={() => handlePay(r)}
                       disabled={busy === r.id}

@@ -10,6 +10,7 @@ import { supabase } from '@/lib/auth'
 import { effectiveSupplierId } from '@/lib/effective-supplier'
 import { getSupplierEntities } from '@/lib/supplier-entities'
 import type { GuideProfile } from '@/lib/operators'
+import { formatMoney } from '@/lib/allocation'
 import {
   getTripRequests, approveGuideAvailability, issueQuote, rejectTripRequest,
   isGuideAvailable, TRIP_STATUS_LABELS, type TripRequest, type TripRequestStatus,
@@ -169,7 +170,7 @@ export default function SupplierRequestsPage() {
           </div>
           {r.quote && (
             <div className="text-right shrink-0">
-              <p className="font-sans font-semibold text-[#C9A96E]">R {r.quote.total.toLocaleString()}</p>
+              <p className="font-sans font-semibold text-[#C9A96E]">{formatMoney(r.quote.total)}</p>
               <p className="font-sans text-[10px] text-black/30">quoted · valid until {r.quote.validUntil}</p>
             </div>
           )}
@@ -258,7 +259,7 @@ export default function SupplierRequestsPage() {
                   </div>
                 </details>
                 {Number(quote.pricePerPerson) > 0 && (
-                  <p className="font-sans text-xs text-black/50">Total for {r.groupSize} guest{r.groupSize !== 1 ? 's' : ''}: <span className="font-semibold text-[#C9A96E]">R {(Number(quote.pricePerPerson) * r.groupSize).toLocaleString()}</span></p>
+                  <p className="font-sans text-xs text-black/50">Total for {r.groupSize} guest{r.groupSize !== 1 ? 's' : ''}: <span className="font-semibold text-[#C9A96E]">{formatMoney(Number(quote.pricePerPerson) * r.groupSize)}</span></p>
                 )}
                 <div className="flex gap-2">
                   <button onClick={() => handleQuote(r)} disabled={busy === r.id}

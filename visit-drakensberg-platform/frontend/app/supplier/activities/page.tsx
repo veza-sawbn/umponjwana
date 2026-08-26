@@ -5,6 +5,7 @@ import { Zap, Plus, Clock, Users, Trash2 } from 'lucide-react'
 import { supabase } from '@/lib/auth'
 import { effectiveSupplierId } from '@/lib/effective-supplier'
 import { getActivitiesBySupplier, deleteActivity, type Activity } from '@/lib/activities'
+import { formatMoney } from '@/lib/allocation'
 
 export default function ActivitiesPage() {
   const [activities, setActivities] = useState<Activity[]>([])
@@ -62,7 +63,7 @@ export default function ActivitiesPage() {
                     <span className="font-sans text-xs text-black/40 flex items-center gap-1"><Clock size={11} /> {a.durationH}h{a.durationM > 0 ? ` ${a.durationM}m` : ''}</span>
                   )}
                   <span className="font-sans text-xs text-black/40 flex items-center gap-1"><Users size={11} /> max {a.maxGroup}</span>
-                  {a.pricePerPerson > 0 && <span className="font-sans text-xs text-black/40">R{a.pricePerPerson.toLocaleString()} pp</span>}
+                  {a.pricePerPerson > 0 && <span className="font-sans text-xs text-black/40">{formatMoney(a.pricePerPerson)} pp</span>}
                 </div>
               </div>
               <div className="flex items-center gap-3 shrink-0">

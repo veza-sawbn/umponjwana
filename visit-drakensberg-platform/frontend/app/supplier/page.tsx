@@ -6,6 +6,7 @@ import { useSupplier } from '@/lib/supplier-context'
 import { SUPPLIER_CONFIG } from '@/lib/supplier-config'
 import { getMyOrders, type SupplierOrder } from '@/lib/booking-orders'
 import { supabase } from '@/lib/auth'
+import { formatMoney } from '@/lib/allocation'
 
 /* ── per-type stat cards ─────────────────────────────────────────── */
 const TYPE_STATS: Record<string, { label: string; value: string }[]> = {
@@ -185,7 +186,7 @@ export default function SupplierOverview() {
                       <td className="px-4 py-3 font-sans text-sm text-black/80">{b.customerName}</td>
                       <td className="px-4 py-3 font-sans text-sm text-black/60 max-w-[180px] truncate">{itemLabel}</td>
                       <td className="px-4 py-3 font-sans text-sm text-black/60">{date ? new Date(date).toLocaleDateString('en-ZA', { day: 'numeric', month: 'short', year: 'numeric' }) : '—'}</td>
-                      <td className="px-4 py-3 font-sans text-sm text-black/80">R {b.orderTotal.toLocaleString()}</td>
+                      <td className="px-4 py-3 font-sans text-sm text-black/80">{formatMoney(b.orderTotal)}</td>
                       <td className="px-4 py-3">
                         <span className={`font-sans text-xs px-2 py-0.5 rounded-full capitalize ${STATUS_STYLES[b.status]}`}>{b.status}</span>
                       </td>

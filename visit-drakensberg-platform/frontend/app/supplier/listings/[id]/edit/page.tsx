@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { useParams } from 'next/navigation'
 import Link from 'next/link'
 import Navbar from '@/components/layout/Navbar'
+import { formatMoney } from '@/lib/allocation'
 import {
   ArrowLeft, Plus, Trash2, Save, ToggleLeft, ToggleRight,
   User, Eye, EyeOff, CheckCircle, AlertCircle, Image,
@@ -451,7 +452,7 @@ export default function EditListingPage() {
                       <div key={s.label} className="bg-[#F7F5F2] p-4">
                         <p className="font-sans text-[10px] tracking-[0.1em] uppercase text-gray-400 mb-1">{s.label}</p>
                         <p className="font-display italic text-2xl text-[#2d6a4f]">
-                          R {Math.round(parseFloat(price || '0') * s.nights).toLocaleString()}
+                          {formatMoney(Math.round(parseFloat(price || '0') * s.nights))}
                         </p>
                         <p className="font-sans text-xs text-gray-400 mt-0.5">/month estimate</p>
                       </div>
@@ -588,7 +589,7 @@ export default function EditListingPage() {
                           </div>
                           <div className="flex items-center gap-4 ml-4 shrink-0">
                             <div className="text-right">
-                              <p className="font-display italic text-xl text-[#2d6a4f]">R {room.price_per_night.toLocaleString()}</p>
+                              <p className="font-display italic text-xl text-[#2d6a4f]">{formatMoney(room.price_per_night)}</p>
                               <p className="font-sans text-xs text-gray-400">/night</p>
                             </div>
                             <button

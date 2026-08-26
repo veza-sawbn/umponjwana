@@ -10,6 +10,7 @@ import { getDepartures, type Departure } from '@/lib/departures'
 import type { Tour } from '@/lib/tours'
 import type { NearbyStayResult } from '@/lib/modules'
 import NearbyStaysModule from '@/components/modules/NearbyStaysModule'
+import { formatMoney } from '@/lib/allocation'
 
 const DIFF_COLOR: Record<string, string> = { Easy: '#4A7251', Moderate: '#C9A96E', Strenuous: '#c0392b', Extreme: '#7f1d1d' }
 
@@ -146,7 +147,7 @@ export default function TourDetail({ tour, nearbyStays }: { tour: Tour; nearbySt
                           <p className="font-display italic text-lg">{formatDate(d.date)}</p>
                           <p className="font-sans text-xs text-gray-500">{d.guide ? `Guide: ${d.guide} · ` : ''}{d.maxSeats - d.bookedSeats} of {d.maxSeats} spaces left</p>
                         </div>
-                        <p className="font-display italic text-lg text-[#2d6a4f] shrink-0">R {d.pricePerPerson.toLocaleString()}</p>
+                        <p className="font-display italic text-lg text-[#2d6a4f] shrink-0">{formatMoney(d.pricePerPerson)}</p>
                       </div>
                     </Link>
                   ))}
@@ -166,7 +167,7 @@ export default function TourDetail({ tour, nearbyStays }: { tour: Tour; nearbySt
             <div className="bg-white border border-gray-200 p-6 sticky top-24">
               <div className="mb-5">
                 <p className="font-sans text-[10px] tracking-[0.12em] uppercase text-gray-400">From</p>
-                <p className="font-display italic text-3xl text-[#2d6a4f]">R {tour.pricePerPerson.toLocaleString()}<span className="font-sans text-sm text-gray-400"> pp</span></p>
+                <p className="font-display italic text-3xl text-[#2d6a4f]">{formatMoney(tour.pricePerPerson)}<span className="font-sans text-sm text-gray-400"> pp</span></p>
                 {!!tour.groupDiscount && tour.groupDiscount > 0 && (
                   <p className="font-sans text-xs text-gray-400 mt-1">{tour.groupDiscount}% off for groups</p>
                 )}
