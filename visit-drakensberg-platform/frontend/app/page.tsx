@@ -6,6 +6,8 @@ import { ArrowRight, ChevronDown, X } from 'lucide-react'
 import { supabase } from '@/lib/auth'
 import { publicSupabase } from '@/lib/supabase-public'
 import { motion, AnimatePresence } from 'framer-motion'
+import { Swiper, SwiperSlide } from 'swiper/react'
+import 'swiper/css'
 import SearchBar from '@/components/search/SearchBar'
 import Footer from '@/components/layout/Footer'
 import { getAllSiteContent, SITE_CONTENT_DEFAULTS, type HomeCard } from '@/lib/site-content'
@@ -72,6 +74,46 @@ function useVisibleCards(cards: HomeCard[], inEditor: boolean) {
 
 function cardDimClass(card: HomeCard, inEditor: boolean) {
   return inEditor && card.visible === false ? 'opacity-35' : ''
+}
+
+/**
+ * Mobile-only presentation of the Regions section — a swipeable Swiper
+ * carousel, matching the card markup of the desktop grid it replaces below
+ * the `sm` breakpoint. Looping needs enough cards to feel like a loop
+ * rather than glitch, so it falls back to a plain (still swipeable) row.
+ */
+function RegionsCarousel({ regions, inEditor }: { regions: HomeCard[]; inEditor: boolean }) {
+  const canLoop = regions.length > 2
+
+  return (
+    <Swiper
+      loop={canLoop}
+      slidesPerView={1.15}
+      spaceBetween={12}
+      grabCursor
+      className="!pb-1 !overflow-visible"
+    >
+      {regions.map((r, index) => (
+        <SwiperSlide key={r.id} className={`h-auto self-stretch ${cardDimClass(r, inEditor)}`}>
+          <EditableCard contentKey="home_cards" fieldKey="regions" index={index} label={String(r.name ?? 'Region Card')}>
+            <Link href={String(r.href || '/regions')} className="group block">
+              <div className="relative overflow-hidden aspect-[4/3] mb-4">
+                <img loading="lazy" decoding="async"
+                  src={String(r.img)}
+                  alt={String(r.name)}
+                  className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                  style={{ willChange: 'transform' }}
+                />
+              </div>
+              <p className="font-sans text-[10px] tracking-[0.15em] uppercase text-gold mb-1">{r.subtitle}</p>
+              <h3 className="font-display text-2xl text-forest mb-2">{r.name}</h3>
+              <p className="font-sans text-sm text-forest/55 leading-relaxed">{r.desc}</p>
+            </Link>
+          </EditableCard>
+        </SwiperSlide>
+      ))}
+    </Swiper>
+  )
 }
 
 /* ─── Hero ───────────────────────────────────────────────────────────────────── */
@@ -395,8 +437,9 @@ export default function HomePage() {
           </Link>
         </div>
 
+        {/* Tablet/desktop: static grid */}
         <motion.div
-          className="grid md:grid-cols-3 gap-6"
+          className="hidden sm:grid sm:grid-cols-3 gap-6"
           variants={staggerContainer(0.08)}
           initial="hidden"
           whileInView="show"
@@ -422,6 +465,11 @@ export default function HomePage() {
             </motion.div>
           ))}
         </motion.div>
+
+        {/* Mobile: swipeable carousel */}
+        <div className="sm:hidden">
+          <RegionsCarousel regions={regions} inEditor={inEditor} />
+        </div>
       </div>
     </EditableSection>
   )
