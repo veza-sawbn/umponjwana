@@ -13,6 +13,7 @@ import { bookActivityTimeslot, releaseActivityTimeslot } from '@/lib/activities'
 import { getSupplierEntities } from '@/lib/supplier-entities'
 import { supabase } from '@/lib/auth'
 import { trackEvent, AnalyticsEvent, getAnalyticsIds } from '@/lib/analytics'
+import { formatMoney } from '@/lib/allocation'
 
 function formatDate(iso: string) {
   if (!iso) return ''
@@ -312,8 +313,8 @@ export default function CheckoutPage() {
                     </div>
                     <div className="space-y-2 mb-4 pb-4 border-b border-white/10">
                       <div className="flex justify-between font-sans text-sm text-white/60">
-                        <span>R {booking.stay.price_per_night.toLocaleString()} × {nights} night{nights !== 1 ? 's' : ''}</span>
-                        <span>R {stayTotal.toLocaleString()}</span>
+                        <span>{formatMoney(booking.stay.price_per_night)} × {nights} night{nights !== 1 ? 's' : ''}</span>
+                        <span>{formatMoney(stayTotal)}</span>
                       </div>
                     </div>
                   </>
@@ -330,7 +331,7 @@ export default function CheckoutPage() {
                           {a.title}
                           {a.adults !== undefined && <span className="block text-white/35 text-[11px]">{describeAddonParty(a)}{a.timeslotTime && ` · ${a.timeslotTime}`}</span>}
                         </span>
-                        <span className="shrink-0">R {(a.price_per_person * a.guests).toLocaleString()}</span>
+                        <span className="shrink-0">{formatMoney(a.price_per_person * a.guests)}</span>
                       </div>
                     ))}
                   </div>
@@ -344,7 +345,7 @@ export default function CheckoutPage() {
                     {booking.shuttles.map(shuttle => (
                       <div key={shuttle.id} className="flex justify-between font-sans text-xs text-white/60 mb-1.5">
                         <span className="flex items-center gap-1 truncate mr-2"><Bus size={10} />{shuttle.label}</span>
-                        <span className="shrink-0">R {shuttle.price.toLocaleString()}</span>
+                        <span className="shrink-0">{formatMoney(shuttle.price)}</span>
                       </div>
                     ))}
                   </div>
@@ -353,17 +354,17 @@ export default function CheckoutPage() {
                 <div className="space-y-2 mb-5 pb-5 border-b border-white/10">
                   <div className="flex justify-between font-sans text-sm text-white/60">
                     <span>Service fee</span>
-                    <span>R {serviceFee.toLocaleString()}</span>
+                    <span>{formatMoney(serviceFee)}</span>
                   </div>
                   <div className="flex justify-between font-sans text-sm text-white/60">
                     <span>VAT (15%)</span>
-                    <span>R {tax.toLocaleString()}</span>
+                    <span>{formatMoney(tax)}</span>
                   </div>
                 </div>
 
                 <div className="flex justify-between items-baseline mb-6">
                   <span className="font-sans text-sm text-white">Total</span>
-                  <span className="font-display italic text-3xl text-[#C9A96E]">R {total.toLocaleString()}</span>
+                  <span className="font-display italic text-3xl text-[#C9A96E]">{formatMoney(total)}</span>
                 </div>
 
                 <div className="flex items-center gap-2 text-white/40 mb-4">
@@ -372,7 +373,7 @@ export default function CheckoutPage() {
                 </div>
 
                 <button type="submit" disabled={!agreed || loading} className={`w-full py-4 font-sans text-sm font-medium transition-colors ${agreed && !loading ? 'bg-[#C9A96E] text-[#000000] hover:bg-[#b8945a]' : 'bg-white/10 text-white/30 cursor-not-allowed'}`}>
-                  {loading ? 'Redirecting to payment…' : `Continue to Payment — R ${total.toLocaleString()}`}
+                  {loading ? 'Redirecting to payment…' : `Continue to Payment — ${formatMoney(total)}`}
                 </button>
                 <div className="flex items-center justify-center gap-2 mt-4 text-white/30">
                   <ShieldCheck size={12} />

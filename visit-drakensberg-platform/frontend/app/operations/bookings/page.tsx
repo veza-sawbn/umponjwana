@@ -14,6 +14,7 @@ import Link from 'next/link'
 import { CalendarDays, Search, RefreshCw, AlertCircle } from 'lucide-react'
 import { useOperations } from '@/lib/operations-context'
 import { getAllOrderLines, type OrderLine } from '@/lib/orders'
+import { formatMoney as money } from '@/lib/allocation'
 
 const FULFILMENT_CHIP: Record<string, string> = {
   pending: 'bg-amber-50 text-amber-700',
@@ -26,11 +27,6 @@ const FULFILMENT_CHIP: Record<string, string> = {
 function fmt(d: string | null) {
   if (!d) return '—'
   return new Date(d).toLocaleDateString('en-ZA', { day: 'numeric', month: 'short', year: 'numeric' })
-}
-
-function money(n: number, currency = 'ZAR') {
-  return new Intl.NumberFormat('en-ZA', { style: 'currency', currency, maximumFractionDigits: 0 })
-    .format(n ?? 0)
 }
 
 export default function ConsolidatedBookingsPage() {

@@ -12,6 +12,7 @@ import { supabase } from '@/lib/auth'
 import { COMPONENT_TYPE_LABELS, PACKAGE_CATEGORY_LABELS, type MarketplacePackage } from '@/lib/packages'
 import { bookPackage } from '@/lib/package-bookings'
 import { getTrails, type Trail } from '@/lib/trails'
+import { formatMoney } from '@/lib/allocation'
 
 /**
  * Client island rendered inside the server shell (page.tsx), which already
@@ -207,9 +208,9 @@ export default function PackageDetail({ pkg, id }: { pkg: MarketplacePackage; id
               <div className="flex items-baseline justify-between mb-5">
                 <div>
                   {pkg.originalPrice && pkg.originalPrice > pkg.pricePerPerson && (
-                    <p className="font-sans text-xs text-gray-400 line-through">R {pkg.originalPrice.toLocaleString()}</p>
+                    <p className="font-sans text-xs text-gray-400 line-through">{formatMoney(pkg.originalPrice)}</p>
                   )}
-                  <p className="font-display italic text-3xl text-[#2d6a4f]">R {pkg.pricePerPerson.toLocaleString()}</p>
+                  <p className="font-display italic text-3xl text-[#2d6a4f]">{formatMoney(pkg.pricePerPerson)}</p>
                 </div>
                 <p className="font-sans text-xs text-gray-400">per person</p>
               </div>
@@ -251,7 +252,7 @@ export default function PackageDetail({ pkg, id }: { pkg: MarketplacePackage; id
 
                 <div className="border-t border-gray-100 pt-4 flex items-center justify-between">
                   <span className="font-sans text-sm text-gray-500"><Users size={12} className="inline mr-1 -mt-0.5" />{form.guests} guest{form.guests !== 1 ? 's' : ''}</span>
-                  <span className="font-display italic text-xl text-[#2d6a4f]">R {(pkg.pricePerPerson * form.guests).toLocaleString()}</span>
+                  <span className="font-display italic text-xl text-[#2d6a4f]">{formatMoney(pkg.pricePerPerson * form.guests)}</span>
                 </div>
 
                 {error && <p className="font-sans text-sm text-red-500">{error}</p>}

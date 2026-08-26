@@ -1,6 +1,7 @@
 import { newEntityId } from './entities'
 import { notify } from './notifications'
 import type { SavedBooking } from './bookings'
+import { formatMoney } from '@/lib/allocation'
 import {
   areaForPoint, classifyTrip, companyAvgResponseMinutes, companyRating, companyReliability,
   driverAvailable, eligibleCategories, getFleet, getTransportCompanies, haversineKm,
@@ -175,7 +176,7 @@ export function scoreCompany(
 
   const rate = company.ratePerKm || medianRatePerKm
   const priceFactor = medianRatePerKm > 0 ? clamp01(1 - (rate - medianRatePerKm) / medianRatePerKm) : 0.5
-  score += add('Price competitiveness', priceFactor * 5, 5, `R${rate}/km vs R${medianRatePerKm}/km median`)
+  score += add('Price competitiveness', priceFactor * 5, 5, `${formatMoney(rate)}/km vs ${formatMoney(medianRatePerKm)}/km median`)
 
   // ── Follow-on bonus: already travelling into the pickup area on that date?
   //    Prioritise this company over one starting cold from a distant city. ──
@@ -322,13 +323,13 @@ export async function createTransportRequest(params: {
   if (params.preselected) {
     await notify(params.preselected.supplierId, 'booking',
       'You were booked for a transfer',
-      `${params.customerName ?? 'A guest'} chose ${params.preselected.companyName}${params.preselected.vehicleName ? ` (${params.preselected.vehicleName})` : ''} for ${params.pickup.address} → ${params.dropoff.address} on ${params.date} · ${params.passengers} pax · R${params.quotedPrice.toLocaleString()}. Accept the job to reserve the vehicle.`,
+      `${params.customerName ?? 'A guest'} chose ${params.preselected.companyName}${params.preselected.vehicleName ? ` (${params.preselected.vehicleName})` : ''} for ${params.pickup.address} → ${params.dropoff.address} on ${params.date} · ${params.passengers} pax · ${formatMoney(params.quotedPrice)}. Accept the job to reserve the vehicle.`,
       '/supplier/jobs')
   } else {
     await Promise.all(notified.map(o =>
       notify(o.supplierId, 'booking',
         'New transfer opportunity',
-        `${params.pickup.address} → ${params.dropoff.address} on ${params.date} · ${params.passengers} pax · R${params.quotedPrice.toLocaleString()}. You ranked #${o.rank} of ${offers.length} for this trip.`,
+        `${params.pickup.address} → ${params.dropoff.address} on ${params.date} · ${params.passengers} pax · ${formatMoney(params.quotedPrice)}. You ranked #${o.rank} of ${offers.length} for this trip.`,
         '/supplier/jobs')
     ))
   }

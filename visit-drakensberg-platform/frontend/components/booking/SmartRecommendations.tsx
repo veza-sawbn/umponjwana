@@ -11,6 +11,7 @@ import { getTrails, trailStartPoint, type Trail } from '@/lib/trails'
 import { getActivities, type Activity } from '@/lib/activities'
 import { getUpcomingExperiences, type TrekkingExperience } from '@/lib/experiences'
 import { regionsMatch } from '@/lib/regions'
+import { formatMoney } from '@/lib/allocation'
 
 interface SmartRecommendation {
   title: string
@@ -191,7 +192,7 @@ export default function SmartRecommendations({ region, excludeListingId, originL
                   )}
                 </div>
                 <div className="shrink-0 text-right">
-                  <p className="font-display italic text-sm text-[#2d6a4f]">R{shuttle.price.toLocaleString()}</p>
+                  <p className="font-display italic text-sm text-[#2d6a4f]">{formatMoney(shuttle.price)}</p>
                   <p className="font-sans text-[9px] text-gray-400 inline-flex items-center gap-1 justify-end"><Plus size={9} /> Add</p>
                 </div>
               </button>
@@ -240,7 +241,7 @@ export default function SmartRecommendations({ region, excludeListingId, originL
                 </div>
                 {item.price ? (
                   <div className="shrink-0 text-right">
-                    <p className="font-display italic text-sm text-[#2d6a4f]">R{item.price.toLocaleString()}</p>
+                    <p className="font-display italic text-sm text-[#2d6a4f]">{formatMoney(item.price)}</p>
                     <p className="font-sans text-[9px] text-gray-400">pp</p>
                   </div>
                 ) : null}

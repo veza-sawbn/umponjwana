@@ -24,6 +24,7 @@ interface TourPackage {
 
 import { supabase } from '@/lib/auth'
 import { effectiveSupplierId } from '@/lib/effective-supplier'
+import { formatMoney } from '@/lib/allocation'
 import {
   getSupplierEntities, addSupplierEntity, updateSupplierEntity, deleteSupplierEntity,
 } from '@/lib/supplier-entities'
@@ -253,7 +254,7 @@ export default function PackagesPage() {
                     <p className="font-sans text-gray-600 text-sm">{pkg.description}</p>
                   </div>
                   <div className="text-right ml-6">
-                    <p className="font-display italic text-2xl text-[#2d6a4f]">R {pkg.price.toLocaleString()}</p>
+                    <p className="font-display italic text-2xl text-[#2d6a4f]">{formatMoney(pkg.price)}</p>
                     <p className="font-sans text-xs text-gray-400">per person</p>
                   </div>
                 </div>

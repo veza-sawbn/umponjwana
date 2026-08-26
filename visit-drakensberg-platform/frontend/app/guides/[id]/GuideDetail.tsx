@@ -9,6 +9,7 @@ import {
 } from 'lucide-react'
 import { getOperatorForGuide, type GuideProfile, type OperatorProfile } from '@/lib/operators'
 import { getUpcomingExperiences, type TrekkingExperience } from '@/lib/experiences'
+import { formatMoney } from '@/lib/allocation'
 
 const csv = (s?: string) => (s ?? '').split(',').map(x => x.trim()).filter(Boolean)
 
@@ -157,7 +158,7 @@ export default function GuideDetail({ guide }: { guide: GuideProfile }) {
                           <p className="font-sans text-xs text-gray-500">{formatDate(e.departureDate)} · {e.durationDays} day{e.durationDays !== 1 ? 's' : ''} · {e.operator}</p>
                         </div>
                         <div className="text-right shrink-0">
-                          <p className="font-display italic text-lg text-[#2d6a4f]">R {e.pricePerPerson.toLocaleString()}</p>
+                          <p className="font-display italic text-lg text-[#2d6a4f]">{formatMoney(e.pricePerPerson)}</p>
                           <p className="font-sans text-[10px] text-gray-400">{e.spacesAvailable === 0 ? 'Fully booked' : `${e.spacesAvailable} spaces left`}</p>
                         </div>
                       </div>

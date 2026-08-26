@@ -9,6 +9,7 @@ import {
 } from '@/lib/transport'
 import { rankSuppliers, type ScoredCandidate } from '@/lib/transport-dispatch'
 import type { ShuttleSupplierChoice } from '@/lib/shuttle-service'
+import { formatMoney } from '@/lib/allocation'
 
 // The supplier step of the booking journey: once the route is known, the
 // customer picks which registered transport company — and which of its
@@ -115,7 +116,7 @@ export function TransportSupplierPicker({
                   <span>{vehicles.length} vehicle{vehicles.length !== 1 ? 's' : ''} available</span>
                 </p>
               </div>
-              <p className="font-display text-xl text-forest shrink-0">R{price.toLocaleString()}</p>
+              <p className="font-display text-xl text-forest shrink-0">{formatMoney(price)}</p>
             </button>
 
             {expanded && (

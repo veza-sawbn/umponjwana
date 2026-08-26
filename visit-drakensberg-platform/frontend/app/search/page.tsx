@@ -15,6 +15,7 @@ import { getTrails, trailStartPoint, type Trail } from '@/lib/trails'
 import { getSupplierEntities } from '@/lib/supplier-entities'
 import { StayDistance } from '@/lib/stay-distance'
 import { trackEvent, AnalyticsEvent } from '@/lib/analytics'
+import { formatMoney } from '@/lib/allocation'
 
 type LiveStay = {
   id: string
@@ -419,10 +420,10 @@ function SearchResults() {
                           {stay.price > 0 ? (
                             <>
                               <span className="font-sans text-xs text-gray-400">
-                                {numNights ? `R ${(stay.price * numNights).toLocaleString()} total` : 'From'}
+                                {numNights ? `${formatMoney(stay.price * numNights)} total` : 'From'}
                               </span>
                               <p className="font-display italic text-xl text-[#2d6a4f]">
-                                R {stay.price.toLocaleString()}<span className="font-sans text-xs text-gray-400">/night</span>
+                                {formatMoney(stay.price)}<span className="font-sans text-xs text-gray-400">/night</span>
                               </p>
                             </>
                           ) : (
@@ -511,7 +512,7 @@ function SearchResults() {
                     <h3 className="font-display italic text-lg mt-1 mb-2">{a.title}</h3>
                     <StayDistance lat={a.gpsLat} lng={a.gpsLng} className="mb-2" />
                     {a.price > 0 ? (
-                      <p className="font-display italic text-xl text-[#2d6a4f]">R {a.price.toLocaleString()} <span className="font-sans text-xs text-gray-400">pp</span></p>
+                      <p className="font-display italic text-xl text-[#2d6a4f]">{formatMoney(a.price)} <span className="font-sans text-xs text-gray-400">pp</span></p>
                     ) : (
                       <p className="font-sans text-xs text-gray-400">Contact for pricing</p>
                     )}
@@ -536,7 +537,7 @@ function SearchResults() {
                     <p className="font-sans text-[10px] tracking-[0.12em] uppercase text-[#C9A96E] mb-1">{fmt(ev.starts_at)}</p>
                     <h3 className="font-display italic text-base mb-1 group-hover:text-[#2d6a4f] transition-colors">{ev.title}</h3>
                     {ev.location && <p className="font-sans text-xs text-gray-400 mb-2">{ev.location}</p>}
-                    <p className="font-display italic text-lg text-[#2d6a4f]">R {ev.ticket_price.toLocaleString()}</p>
+                    <p className="font-display italic text-lg text-[#2d6a4f]">{formatMoney(ev.ticket_price)}</p>
                   </div>
                 </Link>
               ))}

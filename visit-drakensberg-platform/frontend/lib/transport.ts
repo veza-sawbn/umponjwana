@@ -3,6 +3,7 @@ import { supabase } from './auth'
 import { listEntities, getEntity, insertEntity, updateEntity, newEntityId, listEntitiesByOwner } from './entities'
 import { getSupplierEntities, updateSupplierEntity, type SupplierEntity } from './supplier-entities'
 import { notify } from './notifications'
+import { formatMoney } from './allocation'
 
 // ============================================================================
 // Transport Supplier Marketplace — core domain.
@@ -566,7 +567,7 @@ export async function declineTransportRequest(
   if (next) {
     await notify(next.supplierId, 'booking',
       'New transfer opportunity',
-      `${request.pickup.address} → ${request.dropoff.address} on ${request.date} · ${request.passengers} pax · R${request.quotedPrice.toLocaleString()}. You ranked #${next.rank} for this trip.`,
+      `${request.pickup.address} → ${request.dropoff.address} on ${request.date} · ${request.passengers} pax · ${formatMoney(request.quotedPrice)}. You ranked #${next.rank} for this trip.`,
       '/supplier/jobs')
   }
   return updated

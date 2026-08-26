@@ -5,6 +5,7 @@ import Footer from '@/components/layout/Footer'
 import { CalendarDays, MapPin, Ticket, Star, Filter, Check, Loader2 } from 'lucide-react'
 import { useBooking } from '@/lib/booking-context'
 import { getSupplierEntities } from '@/lib/supplier-entities'
+import { formatMoney } from '@/lib/allocation'
 
 interface PublicEvent {
   id: string
@@ -155,7 +156,7 @@ export default function EventsPage() {
                     <div className="flex items-center justify-between pt-4 border-t border-gray-100">
                       <div>
                         <p className="font-sans text-[10px] tracking-[0.12em] uppercase text-gray-400">From</p>
-                        <p className="font-display italic text-2xl text-[#2d6a4f]">R {event.ticket_price.toLocaleString()}</p>
+                        <p className="font-display italic text-2xl text-[#2d6a4f]">{formatMoney(event.ticket_price)}</p>
                       </div>
                       <button
                         onClick={() => toggleAddon(event)}

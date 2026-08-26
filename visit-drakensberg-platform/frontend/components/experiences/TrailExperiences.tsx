@@ -9,6 +9,7 @@ import {
 } from 'lucide-react'
 import type { TrekkingExperience } from '@/lib/experiences'
 import { StayDistance } from '@/lib/stay-distance'
+import { formatMoney } from '@/lib/allocation'
 
 // "Upcoming Trekking Experiences" — the marketplace extension of a hiking
 // trail page. The trail remains the primary content; these are the commercial
@@ -142,7 +143,7 @@ export default function TrailExperiences({
                   <div className="text-right">
                     <p className="font-display italic text-xl text-[#2d6a4f]">
                       {e.packages.length > 1 && <span className="font-sans text-xs text-gray-400 mr-1">from</span>}
-                      R {e.pricePerPerson.toLocaleString()}
+                      {formatMoney(e.pricePerPerson)}
                     </p>
                     <p className="font-sans text-[10px] text-gray-400">
                       per person{e.packages.length > 1 ? ` · ${e.packages.length} rate options` : ''}

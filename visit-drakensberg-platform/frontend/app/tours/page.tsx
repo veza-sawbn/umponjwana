@@ -6,6 +6,7 @@ import EditablePageHeader from '@/components/editor/EditablePageHeader'
 import { Mountain, Users, Star } from 'lucide-react'
 import { getTours, type Tour } from '@/lib/tours'
 import { regionsMatch } from '@/lib/regions'
+import { formatMoney } from '@/lib/allocation'
 
 // Tours are the evergreen, bookable product layer — created once by a
 // supplier and reused across scheduled departures (see lib/departures.ts).
@@ -107,7 +108,7 @@ export default function ToursPage() {
                     ) : null}
                   </div>
                   <span>
-                    <span className="font-display text-lg text-forest">R{t.pricePerPerson.toLocaleString()}</span>
+                    <span className="font-display text-lg text-forest">{formatMoney(t.pricePerPerson)}</span>
                     <span className="font-sans text-xs text-forest/40"> pp</span>
                   </span>
                 </div>

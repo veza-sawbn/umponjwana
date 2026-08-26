@@ -1,4 +1,5 @@
 import { supabase } from './auth'
+import { formatMoney } from './allocation'
 
 /* ────────────────────────────────────────────────────────────────────────────
  * Admin CRM reads (§7 "Customer Management System", §18 "Customer 360 View").
@@ -274,7 +275,7 @@ export async function getCustomerTimeline(userId: string, eventLimit = 200): Pro
     entries.push({
       at: o.created_at, kind: 'order',
       label: `Order ${o.order_number} — ${o.trip_name || 'Trip'}`,
-      detail: `${o.booking_status}${o.trip_status && o.trip_status !== 'planned' ? ` · ${o.trip_status}` : ''} · R ${Number(o.total_value).toLocaleString()}`,
+      detail: `${o.booking_status}${o.trip_status && o.trip_status !== 'planned' ? ` · ${o.trip_status}` : ''} · ${formatMoney(Number(o.total_value))}`,
     })
   }
   for (const c of consents ?? []) {

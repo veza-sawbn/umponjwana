@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { X, ChevronLeft, ChevronRight, Users, BedDouble, Sparkles, Moon, Check } from 'lucide-react'
+import { formatMoney } from '@/lib/allocation'
 
 export type RoomDetail = {
   id: string
@@ -124,12 +125,12 @@ export default function RoomDetailModal({
                   <span className="flex items-center gap-1.5"><Moon size={13} /> Min {room.minNights} nights</span>
                 )}
                 {typeof room.cleaningFee === 'number' && room.cleaningFee > 0 && (
-                  <span className="flex items-center gap-1.5"><Sparkles size={13} /> R{room.cleaningFee.toLocaleString()} cleaning fee</span>
+                  <span className="flex items-center gap-1.5"><Sparkles size={13} /> {formatMoney(room.cleaningFee)} cleaning fee</span>
                 )}
               </div>
             </div>
             <div className="text-right shrink-0">
-              <p className="font-display italic text-3xl text-[#2d6a4f]">R {room.price_per_night.toLocaleString()}</p>
+              <p className="font-display italic text-3xl text-[#2d6a4f]">{formatMoney(room.price_per_night)}</p>
               <p className="font-sans text-xs text-gray-400">per night</p>
             </div>
           </div>

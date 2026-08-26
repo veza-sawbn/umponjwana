@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import { Bus, ArrowRight, Clock } from 'lucide-react'
 import { routeDurationLabel, routePrice, routeSlug, type Route } from '@/lib/transport-routes'
+import { formatMoney } from '@/lib/allocation'
 
 /**
  * Reusable "shuttle routes touching this region" module — pure server
@@ -39,7 +40,7 @@ export default function ShuttleRoutesModule({
               </p>
             </div>
             <p className="font-display italic text-lg text-[#2d6a4f] shrink-0">
-              R {routePrice(r).toLocaleString()}
+              {formatMoney(routePrice(r))}
             </p>
           </Link>
         ))}

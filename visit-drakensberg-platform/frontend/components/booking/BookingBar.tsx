@@ -8,6 +8,7 @@ import { AnimatePresence, motion } from 'framer-motion'
 import { useBooking, describeAddonParty } from '@/lib/booking-context'
 import { slideUp, slideUpBar } from '@/lib/motion'
 import { useShuttleRecommendations } from '@/lib/shuttle-service'
+import { formatMoney } from '@/lib/allocation'
 
 function fmt(iso: string) {
   if (!iso) return ''
@@ -97,7 +98,7 @@ export default function BookingBar() {
                           <div>
                             <p className="font-sans text-sm font-medium">{booking.stay.title}</p>
                             <p className="font-sans text-xs text-gray-400">
-                              R {booking.stay.price_per_night.toLocaleString()}/night × {booking.nights} = R {(booking.stay.price_per_night * booking.nights).toLocaleString()}
+                              {formatMoney(booking.stay.price_per_night)}/night × {booking.nights} = {formatMoney(booking.stay.price_per_night * booking.nights)}
                             </p>
                           </div>
                         </div>
@@ -132,7 +133,7 @@ export default function BookingBar() {
                             <div>
                               <p className="font-sans text-sm font-medium">{addon.title}</p>
                               <p className="font-sans text-xs text-gray-400">
-                                {addon.date && `${addon.date}${addon.timeslotTime ? ` ${addon.timeslotTime}` : ''} · `}{describeAddonParty(addon)} = R {(addon.price_per_person * addon.guests).toLocaleString()}
+                                {addon.date && `${addon.date}${addon.timeslotTime ? ` ${addon.timeslotTime}` : ''} · `}{describeAddonParty(addon)} = {formatMoney(addon.price_per_person * addon.guests)}
                               </p>
                             </div>
                           </div>
@@ -170,7 +171,7 @@ export default function BookingBar() {
                               </div>
                             </div>
                             <div className="text-right">
-                              <p className="font-display italic text-sm text-[#2d6a4f]">R {shuttle.price.toLocaleString()}</p>
+                              <p className="font-display italic text-sm text-[#2d6a4f]">{formatMoney(shuttle.price)}</p>
                               <p className="font-sans text-[10px] text-gray-400">Add transfer</p>
                             </div>
                           </button>
@@ -194,7 +195,7 @@ export default function BookingBar() {
                             <div>
                               <p className="font-sans text-sm font-medium">{shuttle.label}</p>
                               <p className="font-sans text-xs text-gray-400">
-                                R {shuttle.price.toLocaleString()}
+                                {formatMoney(shuttle.price)}
                                 {shuttle.companyName && ` · ${shuttle.companyName}`}
                               </p>
                             </div>
@@ -259,7 +260,7 @@ export default function BookingBar() {
               <>
                 <div className="text-white/30 text-xs">|</div>
                 <div className="font-display italic text-lg text-[#C9A96E]">
-                  R {booking.totalPrice.toLocaleString()}
+                  {formatMoney(booking.totalPrice)}
                 </div>
               </>
             )}

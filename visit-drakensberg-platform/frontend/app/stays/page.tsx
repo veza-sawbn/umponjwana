@@ -7,6 +7,7 @@ import EditablePageHeader from '@/components/editor/EditablePageHeader'
 import { getProperties, type Property } from '@/lib/properties'
 import { getRoomsByProperty } from '@/lib/rooms'
 import { regionsMatch } from '@/lib/regions'
+import { formatMoney } from '@/lib/allocation'
 
 type StayCard = {
   id: string
@@ -115,7 +116,7 @@ export default function StaysPage() {
             <div>
               <p className="font-sans text-xs tracking-[0.15em] uppercase text-forest/40 mb-3">Max price / night</p>
               <div className="flex items-center justify-between font-sans text-sm text-forest mb-2">
-                <span>R0</span><span className="font-medium">R{maxPrice.toLocaleString()}</span>
+                <span>{formatMoney(0)}</span><span className="font-medium">{formatMoney(maxPrice)}</span>
               </div>
               <input type="range" min={0} max={5000} step={100} value={maxPrice}
                 onChange={(e) => setMaxPrice(Number(e.target.value))}
@@ -189,13 +190,13 @@ export default function StaysPage() {
                     {stay.price > 0 ? (
                       discountedPrice ? (
                         <div>
-                          <span className="font-sans text-xs text-forest/35 line-through mr-1">R{stay.price.toLocaleString()}</span>
-                          <span className="font-display text-lg text-forest">R{discountedPrice.toLocaleString()}</span>
+                          <span className="font-sans text-xs text-forest/35 line-through mr-1">{formatMoney(stay.price)}</span>
+                          <span className="font-display text-lg text-forest">{formatMoney(discountedPrice)}</span>
                           <span className="font-sans text-xs text-forest/40"> /night</span>
                         </div>
                       ) : (
                         <span>
-                          <span className="font-display text-lg text-forest">R{stay.price.toLocaleString()}</span>
+                          <span className="font-display text-lg text-forest">{formatMoney(stay.price)}</span>
                           <span className="font-sans text-xs text-forest/40"> /night</span>
                         </span>
                       )

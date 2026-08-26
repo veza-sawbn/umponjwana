@@ -5,6 +5,7 @@ import { Search, DollarSign, CheckCircle, Clock, XCircle, RefreshCw } from 'luci
 import { getAdminBookings, setAdminBookingStatus } from '@/lib/admin-supabase'
 import type { SavedBooking } from '@/lib/bookings'
 import { useQuickParam } from '@/lib/admin-quick-param'
+import { formatMoney } from '@/lib/allocation'
 
 const BOOKING_STATUS_STYLE: Record<string, string> = {
   confirmed: 'bg-[#2d6a4f]/10 text-[#2d6a4f]',
@@ -96,7 +97,7 @@ export default function AdminBookingsPage() {
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4 mb-6 lg:mb-8">
         {[
-          { label: 'Total Revenue', value: `R ${totalRevenue.toLocaleString()}`, icon: DollarSign, color: 'text-[#2d6a4f]', bg: 'bg-[#2d6a4f]/8' },
+          { label: 'Total Revenue', value: `${formatMoney(totalRevenue)}`, icon: DollarSign, color: 'text-[#2d6a4f]', bg: 'bg-[#2d6a4f]/8' },
           { label: 'Confirmed', value: confirmed, icon: CheckCircle, color: 'text-[#2d6a4f]', bg: 'bg-[#2d6a4f]/8' },
           { label: 'Pending', value: pending, icon: Clock, color: 'text-[#C9A96E]', bg: 'bg-[#C9A96E]/10' },
           { label: 'Cancelled', value: cancelled, icon: XCircle, color: 'text-red-400', bg: 'bg-red-50' },
@@ -127,7 +128,7 @@ export default function AdminBookingsPage() {
             </div>
             <div className="flex items-end justify-between gap-3 mt-3">
               <p className="font-sans text-xs text-gray-500">{fmt(b.checkIn)}{b.checkIn !== b.checkOut ? ` — ${fmt(b.checkOut)}` : ''} · {b.guests} {b.guests === 1 ? 'guest' : 'guests'}</p>
-              <p className="font-display italic text-xl text-[#2d6a4f]">R {b.total.toLocaleString()}</p>
+              <p className="font-display italic text-xl text-[#2d6a4f]">{formatMoney(b.total)}</p>
             </div>
             <div className="flex gap-2 mt-3">
               {b.status !== 'confirmed' && <button onClick={() => updateStatus(b.id, 'confirmed')} className="flex-1 border border-gray-200 py-2.5 font-sans text-sm text-[#2d6a4f]">Confirm</button>}
@@ -143,7 +144,7 @@ export default function AdminBookingsPage() {
         <table className="w-full min-w-[980px]">
           <thead><tr className="border-b border-gray-100">{['Booking Ref', 'Visitor', 'Listing', 'Dates', 'Guests', 'Total', 'Payment', 'Status', 'Actions'].map(h => <th key={h} className="text-left px-5 py-3 font-sans text-[10px] tracking-[0.12em] uppercase text-gray-400">{h}</th>)}</tr></thead>
           <tbody className="divide-y divide-gray-100">
-            {filtered.map(b => <tr key={b.id} className="hover:bg-[#F7F5F2] transition-colors"><td className="px-5 py-4 font-mono text-xs text-gray-400">{b.reference}</td><td className="px-5 py-4"><p className="font-sans text-sm font-medium">{b.customerName}</p><p className="font-sans text-xs text-gray-400">{b.customerEmail}</p></td><td className="px-5 py-4"><p className="font-sans text-sm text-gray-700">{listingName(b)}</p><p className="font-sans text-xs text-gray-400">{supplierName(b)} · {bookingType(b)}</p></td><td className="px-5 py-4 font-sans text-xs text-gray-500">{fmt(b.checkIn)}{b.checkIn !== b.checkOut ? ` — ${fmt(b.checkOut)}` : ''}</td><td className="px-5 py-4 font-sans text-sm text-gray-600">{b.guests}</td><td className="px-5 py-4 font-display italic text-[#2d6a4f]">R {b.total.toLocaleString()}</td><td className="px-5 py-4"><span className={`font-sans text-xs capitalize ${PAYMENT_STYLE.paid}`}>paid</span></td><td className="px-5 py-4"><span className={`font-sans text-[10px] tracking-[0.1em] uppercase px-2.5 py-1 ${BOOKING_STATUS_STYLE[b.status] ?? BOOKING_STATUS_STYLE.pending}`}>{b.status}</span></td><td className="px-5 py-4"><div className="flex gap-2">{b.status !== 'confirmed' && <button onClick={() => updateStatus(b.id, 'confirmed')} className="font-sans text-xs text-[#2d6a4f] hover:underline">Confirm</button>}{b.status !== 'cancelled' && <button onClick={() => updateStatus(b.id, 'cancelled')} className="font-sans text-xs text-red-400 hover:underline">Cancel</button>}</div></td></tr>)}
+            {filtered.map(b => <tr key={b.id} className="hover:bg-[#F7F5F2] transition-colors"><td className="px-5 py-4 font-mono text-xs text-gray-400">{b.reference}</td><td className="px-5 py-4"><p className="font-sans text-sm font-medium">{b.customerName}</p><p className="font-sans text-xs text-gray-400">{b.customerEmail}</p></td><td className="px-5 py-4"><p className="font-sans text-sm text-gray-700">{listingName(b)}</p><p className="font-sans text-xs text-gray-400">{supplierName(b)} · {bookingType(b)}</p></td><td className="px-5 py-4 font-sans text-xs text-gray-500">{fmt(b.checkIn)}{b.checkIn !== b.checkOut ? ` — ${fmt(b.checkOut)}` : ''}</td><td className="px-5 py-4 font-sans text-sm text-gray-600">{b.guests}</td><td className="px-5 py-4 font-display italic text-[#2d6a4f]">{formatMoney(b.total)}</td><td className="px-5 py-4"><span className={`font-sans text-xs capitalize ${PAYMENT_STYLE.paid}`}>paid</span></td><td className="px-5 py-4"><span className={`font-sans text-[10px] tracking-[0.1em] uppercase px-2.5 py-1 ${BOOKING_STATUS_STYLE[b.status] ?? BOOKING_STATUS_STYLE.pending}`}>{b.status}</span></td><td className="px-5 py-4"><div className="flex gap-2">{b.status !== 'confirmed' && <button onClick={() => updateStatus(b.id, 'confirmed')} className="font-sans text-xs text-[#2d6a4f] hover:underline">Confirm</button>}{b.status !== 'cancelled' && <button onClick={() => updateStatus(b.id, 'cancelled')} className="font-sans text-xs text-red-400 hover:underline">Cancel</button>}</div></td></tr>)}
             {!loading && filtered.length === 0 && <tr><td colSpan={9} className="px-5 py-12 text-center font-sans text-sm text-gray-400">No bookings found.</td></tr>}
             {loading && <tr><td colSpan={9} className="px-5 py-12 text-center font-sans text-sm text-gray-400">Loading bookings…</td></tr>}
           </tbody>

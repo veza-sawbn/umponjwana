@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { formatMoney } from '@/lib/allocation';
 
 interface PaymentFormProps {
   onSuccess?: (data: { cardholderName: string; last4: string }) => void;
@@ -160,7 +161,7 @@ export default function PaymentForm({
         ) : (
           <>
             🔒 {submitLabel}
-            {amount ? ` — R${amount.toLocaleString()}` : ''}
+            {amount ? ` — ${formatMoney(amount)}` : ''}
           </>
         )}
       </button>

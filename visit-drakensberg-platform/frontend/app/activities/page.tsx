@@ -6,6 +6,7 @@ import EditablePageHeader from '@/components/editor/EditablePageHeader'
 import { getActivities, ACTIVITY_CATEGORIES, type Activity } from '@/lib/activities'
 import { StayDistance } from '@/lib/stay-distance'
 import { regionsMatch } from '@/lib/regions'
+import { formatMoney } from '@/lib/allocation'
 
 // Derived from the canonical activity-category vocabulary (lib/activities.ts)
 // so every category a supplier can tag is reachable via a public filter tab —
@@ -100,7 +101,7 @@ export default function ActivitiesPage() {
                     <div className="flex items-center justify-between">
                       <span className="font-sans text-xs text-forest/40">{a.difficulty}</span>
                       <span className="font-display text-base text-forest">
-                        R{a.pricePerPerson.toLocaleString()}<span className="font-sans text-xs text-forest/40"> /p</span>
+                        {formatMoney(a.pricePerPerson)}<span className="font-sans text-xs text-forest/40"> /p</span>
                       </span>
                     </div>
                   </Link>

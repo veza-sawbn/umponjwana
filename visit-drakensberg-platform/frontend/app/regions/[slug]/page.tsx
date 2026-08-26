@@ -16,6 +16,7 @@ import { StayDistance } from '@/lib/stay-distance'
 import ShuttleRoutesModule from '@/components/modules/ShuttleRoutesModule'
 import SeasonMosaic from '@/components/modules/SeasonMosaic'
 import TrackView from '@/components/analytics/TrackView'
+import { formatMoney } from '@/lib/allocation'
 
 // Pure server component — same shape as app/nature-reserves/[slug]/page.tsx.
 // Previously this was a server shell (this file) handing off to
@@ -150,7 +151,7 @@ function StayCard({ prop, minPrice }: { prop: Property; minPrice: number | null 
         <div className="flex items-center justify-between mt-auto pt-2 border-t border-gray-100">
           {minPrice ? (
             <p className="font-display italic text-[#2d6a4f]">
-              R {minPrice.toLocaleString()} <span className="font-sans text-xs text-gray-400">/night</span>
+              {formatMoney(minPrice)} <span className="font-sans text-xs text-gray-400">/night</span>
             </p>
           ) : (
             <p className="font-sans text-xs text-gray-400">Contact for rates</p>
@@ -224,7 +225,7 @@ function ActivityCard({ activity }: { activity: Activity }) {
         <div className="flex items-center justify-between mt-2">
           {activity.pricePerPerson ? (
             <p className="font-display italic text-[#2d6a4f] text-sm">
-              R {activity.pricePerPerson.toLocaleString()} <span className="font-sans text-[10px] text-gray-400">pp</span>
+              {formatMoney(activity.pricePerPerson)} <span className="font-sans text-[10px] text-gray-400">pp</span>
             </p>
           ) : (
             <p className="font-sans text-[10px] text-gray-400">Contact for rates</p>

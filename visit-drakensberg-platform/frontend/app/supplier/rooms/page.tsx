@@ -6,6 +6,7 @@ import { BedDouble, Plus, Users, Pencil } from 'lucide-react'
 import { supabase } from '@/lib/auth'
 import { effectiveSupplierId } from '@/lib/effective-supplier'
 import { getRoomsBySupplier, type Room } from '@/lib/rooms'
+import { formatMoney } from '@/lib/allocation'
 
 function RoomsInner() {
   const searchParams = useSearchParams()
@@ -71,7 +72,7 @@ function RoomsInner() {
                   <td className="px-4 py-3 font-sans text-sm text-black/60">
                     <span className="flex items-center gap-1"><Users size={12} /> {r.maxOccupancy}</span>
                   </td>
-                  <td className="px-4 py-3 font-sans text-sm text-black/80">R {r.basePrice.toLocaleString()}</td>
+                  <td className="px-4 py-3 font-sans text-sm text-black/80">{formatMoney(r.basePrice)}</td>
                   <td className="px-4 py-3 font-sans text-sm text-black/60">{r.units}</td>
                   <td className="px-4 py-3">
                     <span className={`font-sans text-xs px-2 py-0.5 rounded-full ${r.status === 'active' ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500'}`}>

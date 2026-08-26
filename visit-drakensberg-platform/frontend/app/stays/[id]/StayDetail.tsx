@@ -11,6 +11,7 @@ import { useBooking } from '@/lib/booking-context'
 import { Check } from 'lucide-react'
 import type { Property } from '@/lib/properties'
 import { getRoomUnitsLeft, type Room } from '@/lib/rooms'
+import { formatMoney } from '@/lib/allocation'
 
 const AMENITY_ICONS: Record<string, React.ComponentType<any>> = {
   'Wi-Fi': Wifi, 'Swimming Pool': Waves, 'Braai Facilities': Flame, 'Restaurant': Utensils,
@@ -296,7 +297,7 @@ export default function StayDetail({ property, rooms: roomsData, id }: { propert
                             <div className="flex flex-wrap gap-x-4 gap-y-1 mb-3 font-sans text-xs text-gray-400">
                               {room.units > 0 && <span>{room.units} unit{room.units !== 1 ? 's' : ''}</span>}
                               {room.minNights > 1 && <span>Min {room.minNights} nights</span>}
-                              {room.cleaningFee > 0 && <span>R{room.cleaningFee} cleaning fee</span>}
+                              {room.cleaningFee > 0 && <span>{formatMoney(room.cleaningFee)} cleaning fee</span>}
                             </div>
                           )}
                           {room.amenities?.length > 0 && (
@@ -308,7 +309,7 @@ export default function StayDetail({ property, rooms: roomsData, id }: { propert
                           )}
                         </div>
                         <div className="text-right shrink-0 pl-4">
-                          <p className="font-display italic text-2xl text-[#2d6a4f]">R {room.price_per_night.toLocaleString()}</p>
+                          <p className="font-display italic text-2xl text-[#2d6a4f]">{formatMoney(room.price_per_night)}</p>
                           <p className="font-sans text-xs text-gray-400">/night</p>
                           <button
                             onClick={e => { e.stopPropagation(); setDetailRoom(room) }}
@@ -394,7 +395,7 @@ export default function StayDetail({ property, rooms: roomsData, id }: { propert
               <div className="mb-5">
                 <p className="font-sans text-[10px] tracking-[0.12em] uppercase text-gray-400">From</p>
                 <p className="font-display italic text-3xl text-[#2d6a4f]">
-                  {stay.price_from > 0 ? `R ${stay.price_from.toLocaleString()}` : 'Contact for rates'}
+                  {stay.price_from > 0 ? `${formatMoney(stay.price_from)}` : 'Contact for rates'}
                   {stay.price_from > 0 && <span className="font-sans text-sm text-gray-400">/night</span>}
                 </p>
               </div>
@@ -426,7 +427,7 @@ export default function StayDetail({ property, rooms: roomsData, id }: { propert
                       <label className="block font-sans text-[10px] tracking-[0.1em] uppercase text-gray-400 mb-1.5">Room</label>
                       <select value={selectedRoom?.id || ''} onChange={e => setSelectedRoom(stay.rooms.find((r: any) => r.id === e.target.value) || null)} className="w-full border border-gray-300 px-3 py-2.5 font-sans text-sm focus:outline-none bg-white">
                         <option value="">Select a room…</option>
-                        {stay.rooms.map((r: any) => <option key={r.id} value={r.id}>{r.name} — R {r.price_per_night.toLocaleString()}/night</option>)}
+                        {stay.rooms.map((r: any) => <option key={r.id} value={r.id}>{r.name} — {formatMoney(r.price_per_night)}/night</option>)}
                       </select>
                     </div>
                     {!showRooms && (
@@ -444,12 +445,12 @@ export default function StayDetail({ property, rooms: roomsData, id }: { propert
               {total && (
                 <div className="border-t border-gray-100 pt-4 mb-5">
                   <div className="flex justify-between font-sans text-sm mb-1 text-gray-600">
-                    <span>R {selectedRoom.price_per_night.toLocaleString()} × {nights} night{nights !== 1 ? 's' : ''}</span>
-                    <span>R {total.toLocaleString()}</span>
+                    <span>{formatMoney(selectedRoom.price_per_night)} × {nights} night{nights !== 1 ? 's' : ''}</span>
+                    <span>{formatMoney(total)}</span>
                   </div>
                   <div className="flex justify-between font-sans text-sm font-medium pt-3 mt-2 border-t border-gray-100">
                     <span>Total</span>
-                    <span className="text-[#2d6a4f]">R {total.toLocaleString()}</span>
+                    <span className="text-[#2d6a4f]">{formatMoney(total)}</span>
                   </div>
                 </div>
               )}

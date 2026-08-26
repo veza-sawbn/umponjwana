@@ -25,6 +25,7 @@ import {
   getOrderLines, setLineFulfilment, assignLineStaff, clearLineStaff, type OrderLine,
 } from '@/lib/orders'
 import { getSupplierEntities, type SupplierEntity } from '@/lib/supplier-entities'
+import { formatMoney as money } from '@/lib/allocation'
 
 const FULFILMENT_CHIP: Record<string, string> = {
   pending: 'bg-gray-100 text-gray-600',
@@ -43,11 +44,6 @@ type RosterRow = SupplierEntity & { name?: string; fullName?: string; email?: st
 function fmt(d: string | null) {
   if (!d) return '—'
   return new Date(d).toLocaleDateString('en-ZA', { day: 'numeric', month: 'short', year: 'numeric' })
-}
-
-function money(n: number, currency = 'ZAR') {
-  return new Intl.NumberFormat('en-ZA', { style: 'currency', currency, maximumFractionDigits: 0 })
-    .format(n ?? 0)
 }
 
 export default function BookingItineraryPage() {

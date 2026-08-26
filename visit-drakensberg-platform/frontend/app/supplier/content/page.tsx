@@ -5,6 +5,7 @@ import Link from 'next/link'
 import Navbar from '@/components/layout/Navbar'
 import Footer from '@/components/layout/Footer'
 import { LayoutDashboard, List, BedDouble, User, Package, CalendarDays, Image, Eye, Pencil, Archive, ToggleLeft, ToggleRight, ExternalLink } from 'lucide-react'
+import { formatMoney } from '@/lib/allocation'
 
 type Section = 'overview' | 'listings' | 'rooms' | 'guides' | 'packages' | 'events' | 'media'
 
@@ -184,7 +185,7 @@ export default function ContentManagerPage() {
                       <tr key={r.id} className="hover:bg-[#F7F5F2] transition-colors">
                         <td className="px-4 py-3 font-sans text-xs text-gray-500">{r.property}</td>
                         <td className="px-4 py-3 font-sans text-sm font-medium">{r.name}</td>
-                        <td className="px-4 py-3 font-display italic text-lg text-[#2d6a4f]">R {r.price.toLocaleString()}</td>
+                        <td className="px-4 py-3 font-display italic text-lg text-[#2d6a4f]">{formatMoney(r.price)}</td>
                         <td className="px-4 py-3"><span className={`font-sans text-xs px-2.5 py-1 ${STATUS_CHIP[r.status]}`}>{r.status}</span></td>
                         <td className="px-4 py-3">
                           <button onClick={() => toggleRoomStatus(r.id)}>
@@ -294,7 +295,7 @@ export default function ContentManagerPage() {
                         <td className="px-4 py-3 font-sans text-xs text-gray-500">{e.type}</td>
                         <td className="px-4 py-3 font-sans text-xs text-gray-500">{e.date}</td>
                         <td className="px-4 py-3 font-sans text-sm">{e.sold}/{e.total}</td>
-                        <td className="px-4 py-3 font-display italic text-lg text-[#2d6a4f]">R {e.revenue.toLocaleString()}</td>
+                        <td className="px-4 py-3 font-display italic text-lg text-[#2d6a4f]">{formatMoney(e.revenue)}</td>
                         <td className="px-4 py-3">
                           <Link href="/supplier/events" className="text-[#2d6a4f] hover:underline font-sans text-xs">Edit →</Link>
                         </td>

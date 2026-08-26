@@ -9,6 +9,7 @@ import {
 } from 'lucide-react'
 import { getGuidesByOperator, type OperatorProfile, type GuideProfile } from '@/lib/operators'
 import { getUpcomingExperiences, type TrekkingExperience } from '@/lib/experiences'
+import { formatMoney } from '@/lib/allocation'
 
 function formatDate(iso: string) {
   return new Date(iso).toLocaleDateString('en-ZA', { day: 'numeric', month: 'short', year: 'numeric' })
@@ -124,7 +125,7 @@ export default function OperatorDetail({ operator }: { operator: OperatorProfile
                           </p>
                         </div>
                         <div className="text-right shrink-0">
-                          <p className="font-display italic text-lg text-[#2d6a4f]">R {e.pricePerPerson.toLocaleString()}</p>
+                          <p className="font-display italic text-lg text-[#2d6a4f]">{formatMoney(e.pricePerPerson)}</p>
                           <p className="font-sans text-[10px] text-gray-400">{e.spacesAvailable === 0 ? 'Fully booked' : `${e.spacesAvailable} spaces left`}</p>
                         </div>
                       </div>

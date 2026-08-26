@@ -7,6 +7,7 @@ import { supabase } from '@/lib/auth'
 import { useBooking } from '@/lib/booking-context'
 import { getBookingsByUser, type SavedBooking } from '@/lib/bookings'
 import { getRecommendations, type Recommendation } from '@/lib/recommendations'
+import { formatMoney } from '@/lib/allocation'
 
 const KIND_LABEL: Record<Recommendation['kind'], string> = {
   activity: 'Activity',
@@ -122,7 +123,7 @@ export default function RecommendationsPage() {
                   <div className="flex items-center gap-2 mb-1">
                     <span className="font-sans text-[9px] tracking-[0.12em] uppercase text-[#C9A96E]">{KIND_LABEL[item.kind]}</span>
                     {item.price != null && (
-                      <span className="font-sans text-xs text-gray-400">R {item.price.toLocaleString()} pp</span>
+                      <span className="font-sans text-xs text-gray-400">{formatMoney(item.price)} pp</span>
                     )}
                   </div>
                   <p className="font-display italic text-lg leading-tight truncate">{item.title}</p>

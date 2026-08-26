@@ -7,6 +7,7 @@ import { Calendar, Users, Tag, UserCircle, Package, Sparkles, Check, Plus, Minus
 import { motion } from 'framer-motion'
 import { useBooking } from '@/lib/booking-context'
 import { staggerContainer, staggerChild } from '@/lib/motion'
+import { formatMoney } from '@/lib/allocation'
 
 export type TourDate = {
   id: string
@@ -190,7 +191,7 @@ export default function UpcomingDepartures({
                 {/* Right: price + guest picker + CTA */}
                 <div className="flex flex-col items-end gap-3 shrink-0">
                   <div className="text-right">
-                    <p className="font-display italic text-xl text-[#2d6a4f]">R {d.price_per_person.toLocaleString()}</p>
+                    <p className="font-display italic text-xl text-[#2d6a4f]">{formatMoney(d.price_per_person)}</p>
                     <p className="font-sans text-[10px] text-gray-400">per person</p>
                   </div>
 
@@ -255,7 +256,7 @@ export default function UpcomingDepartures({
 
                   {!spots.full && !isAdded && guests > 1 && (
                     <p className="font-sans text-[10px] text-gray-400">
-                      Total: R {(d.price_per_person * guests).toLocaleString()}
+                      Total: {formatMoney(d.price_per_person * guests)}
                     </p>
                   )}
                 </div>

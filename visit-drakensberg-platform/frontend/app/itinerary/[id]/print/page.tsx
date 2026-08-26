@@ -9,6 +9,7 @@ import { getDepartures, type Departure } from '@/lib/departures'
 import { getTrails, type Trail } from '@/lib/trails'
 import { resolveLivePackages } from '@/components/tours/PackageEditor'
 import Logo from '@/components/Logo'
+import { formatMoney } from '@/lib/allocation'
 
 // Printable trip itinerary — a proper travel document, not a screen dump:
 // trip summary, guest details, accommodation, a chronological day-by-day
@@ -29,10 +30,6 @@ function fmtShort(iso?: string) {
   if (!iso) return ''
   return new Date(iso).toLocaleDateString('en-ZA', { weekday: 'short', day: 'numeric', month: 'short' })
 }
-function money(n: number) {
-  return `R ${n.toLocaleString('en-ZA')}`
-}
-
 const EMERGENCY = [
   ['Police', '10111'],
   ['Ambulance / Fire', '10177'],
@@ -274,10 +271,10 @@ export default function PrintableItineraryPage() {
               </div>
               <table className="shrink-0 font-sans text-sm">
                 <tbody>
-                  <tr><td className="pr-8 py-0.5 text-gray-500">Subtotal</td><td className="text-right">{money(booking.subtotal)}</td></tr>
-                  <tr><td className="pr-8 py-0.5 text-gray-500">Service fee</td><td className="text-right">{money(booking.serviceFee)}</td></tr>
-                  <tr><td className="pr-8 py-0.5 text-gray-500">VAT</td><td className="text-right">{money(booking.vat)}</td></tr>
-                  <tr className="border-t border-gray-300"><td className="pr-8 pt-1 font-medium text-[#000000]">Total</td><td className="text-right pt-1 font-display italic text-xl text-[#2d6a4f]">{money(booking.total)}</td></tr>
+                  <tr><td className="pr-8 py-0.5 text-gray-500">Subtotal</td><td className="text-right">{formatMoney(booking.subtotal)}</td></tr>
+                  <tr><td className="pr-8 py-0.5 text-gray-500">Service fee</td><td className="text-right">{formatMoney(booking.serviceFee)}</td></tr>
+                  <tr><td className="pr-8 py-0.5 text-gray-500">VAT</td><td className="text-right">{formatMoney(booking.vat)}</td></tr>
+                  <tr className="border-t border-gray-300"><td className="pr-8 pt-1 font-medium text-[#000000]">Total</td><td className="text-right pt-1 font-display italic text-xl text-[#2d6a4f]">{formatMoney(booking.total)}</td></tr>
                 </tbody>
               </table>
             </div>

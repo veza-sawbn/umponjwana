@@ -1,4 +1,5 @@
 import type { SeasonalItem } from './modules'
+import { formatMoney } from './allocation'
 
 const FALLBACK = 'https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=800&q=80'
 
@@ -29,7 +30,7 @@ export function toSeasonCard(entry: SeasonalItem): SeasonCard {
       eyebrow: `${t.distance} · ${t.difficulty}`,
       title: t.name,
       description: t.description,
-      price: t.permit_required ? (t.permit_cost > 0 ? `R ${t.permit_cost.toLocaleString()}` : 'Free') : 'Free',
+      price: t.permit_required ? (t.permit_cost > 0 ? formatMoney(t.permit_cost) : 'Free') : 'Free',
       priceNote: t.permit_required ? 'permit req.' : '',
     }
   }
@@ -42,7 +43,7 @@ export function toSeasonCard(entry: SeasonalItem): SeasonCard {
     eyebrow: a.category,
     title: a.name,
     description: a.description,
-    price: a.pricePerPerson ? `R ${a.pricePerPerson.toLocaleString()}` : 'Contact for rates',
+    price: a.pricePerPerson ? formatMoney(a.pricePerPerson) : 'Contact for rates',
     priceNote: a.pricePerPerson ? 'pp' : '',
   }
 }

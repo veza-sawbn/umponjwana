@@ -6,6 +6,7 @@ import Footer from '@/components/layout/Footer'
 import { getRoutes, routeDurationLabel, routePrice, routeSlug, type Route } from '@/lib/transport-routes'
 import { getMyTransportCompany } from '@/lib/transport'
 import { publicSupabase } from '@/lib/supabase-public'
+import { formatMoney } from '@/lib/allocation'
 
 // New route — closes SEO audit G17: named shuttle routes were real supplier
 // data (app/supplier/routes/*) with no public detail page, so search never
@@ -136,7 +137,7 @@ export default async function TransportRoutePage({ params }: { params: { slug: s
               <div className="bg-white p-6 border border-forest/10">
                 <p className="font-sans text-[10px] tracking-[0.15em] uppercase text-forest/40 mb-1">From</p>
                 <p className="font-display italic text-3xl text-forest">
-                  R {price.toLocaleString()}<span className="font-sans text-sm text-forest/40 not-italic"> pp</span>
+                  {formatMoney(price)}<span className="font-sans text-sm text-forest/40 not-italic"> pp</span>
                 </p>
                 <Link
                   href="/shuttles"

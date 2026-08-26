@@ -6,6 +6,7 @@ import EditablePageHeader from '@/components/editor/EditablePageHeader'
 import { ArrowRight, Bus, Clock, MapPin } from 'lucide-react'
 import { getPublishedRoutes, routeDurationLabel, routePrice, routeSlug, type Route } from '@/lib/transport-routes'
 import { getTransportCompanies, type TransportCompany } from '@/lib/transport'
+import { formatMoney } from '@/lib/allocation'
 
 // Named shuttle routes are real supplier-authored data (see
 // lib/transport-routes.ts) that previously had nowhere public to render —
@@ -59,7 +60,7 @@ export default function TransportPage() {
                   </p>
                 )}
                 <p className="mt-4 font-display italic text-xl text-forest group-hover:text-sage transition-colors">
-                  R {routePrice(r).toLocaleString()}<span className="font-sans text-xs text-forest/40 not-italic"> pp</span>
+                  {formatMoney(routePrice(r))}<span className="font-sans text-xs text-forest/40 not-italic"> pp</span>
                 </p>
               </Link>
             ))}

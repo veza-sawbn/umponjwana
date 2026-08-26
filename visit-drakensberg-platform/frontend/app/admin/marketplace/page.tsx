@@ -14,6 +14,7 @@ import { getTripRequests, TRIP_STATUS_LABELS, type TripRequest } from '@/lib/cus
 import { getSupplierEntities } from '@/lib/supplier-entities'
 import type { OperatorProfile, GuideProfile } from '@/lib/operators'
 import { getTrails, type Trail } from '@/lib/trails'
+import { formatMoney } from '@/lib/allocation'
 
 // Marketplace operations dashboard — a live view over the marketplace data
 // the admin manages: tour operators, guides, experiences (tours), scheduled
@@ -99,10 +100,10 @@ export default function AdminMarketplacePage() {
       {/* Analytics strip */}
       <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 mb-8">
         {[
-          { label: 'Departure Revenue', value: `R ${analytics.seatRevenue.toLocaleString()}`, icon: TrendingUp },
-          { label: 'Custom Trip Revenue', value: `R ${analytics.requestRevenue.toLocaleString()}`, icon: CalendarPlus },
-          { label: 'Package Margin', value: `R ${analytics.pkgMargin.toLocaleString()}`, icon: Package },
-          { label: 'Supplier Commission', value: `R ${Math.round(analytics.pkgCommission).toLocaleString()}`, icon: Percent },
+          { label: 'Departure Revenue', value: `${formatMoney(analytics.seatRevenue)}`, icon: TrendingUp },
+          { label: 'Custom Trip Revenue', value: `${formatMoney(analytics.requestRevenue)}`, icon: CalendarPlus },
+          { label: 'Package Margin', value: `${formatMoney(analytics.pkgMargin)}`, icon: Package },
+          { label: 'Supplier Commission', value: `${formatMoney(Math.round(analytics.pkgCommission))}`, icon: Percent },
           { label: 'Open Requests', value: `${analytics.openRequests}`, icon: Star },
         ].map(s => {
           const Icon = s.icon
@@ -174,7 +175,7 @@ export default function AdminMarketplacePage() {
                   <div>
                     <p className="font-sans text-sm font-medium">{t.name}</p>
                     <p className="font-sans text-xs text-gray-400">
-                      <Mountain size={10} className="inline -mt-0.5 mr-1" />{t.trailName || trailName(t.trailId)} · {t.supplierName} · {t.days} day{t.days !== 1 ? 's' : ''} · R{t.pricePerPerson.toLocaleString()} pp
+                      <Mountain size={10} className="inline -mt-0.5 mr-1" />{t.trailName || trailName(t.trailId)} · {t.supplierName} · {t.days} day{t.days !== 1 ? 's' : ''} · {formatMoney(t.pricePerPerson)} pp
                     </p>
                   </div>
                   <Chip className={t.status === 'active' ? 'bg-emerald-50 text-emerald-700' : 'bg-gray-100 text-gray-500'}>{t.status}</Chip>
@@ -189,7 +190,7 @@ export default function AdminMarketplacePage() {
                 <Row key={d.id}>
                   <div>
                     <p className="font-sans text-sm font-medium">{d.tour} — {d.date}</p>
-                    <p className="font-sans text-xs text-gray-400">{d.supplierName} · guide: {d.guide || 'TBC'} · {d.bookedSeats}/{d.maxSeats} seats · R{d.pricePerPerson.toLocaleString()} pp</p>
+                    <p className="font-sans text-xs text-gray-400">{d.supplierName} · guide: {d.guide || 'TBC'} · {d.bookedSeats}/{d.maxSeats} seats · {formatMoney(d.pricePerPerson)} pp</p>
                   </div>
                   <Chip className={d.status === 'full' ? 'bg-red-50 text-red-600' : 'bg-emerald-50 text-emerald-700'}>{d.status}</Chip>
                 </Row>
@@ -205,7 +206,7 @@ export default function AdminMarketplacePage() {
                     <p className="font-sans text-sm font-medium">{r.reference} — {r.trailName}</p>
                     <p className="font-sans text-xs text-gray-400">
                       {r.customerName} · {r.startDate} → {r.endDate} · {r.groupSize} guests · {r.operatorName || 'unassigned operator'}
-                      {r.quote ? ` · quoted R${r.quote.total.toLocaleString()}` : ''}
+                      {r.quote ? ` · quoted ${formatMoney(r.quote.total)}` : ''}
                     </p>
                   </div>
                   <Chip className={
@@ -225,7 +226,7 @@ export default function AdminMarketplacePage() {
                   <div>
                     <p className="font-sans text-sm font-medium">{c.supplierName || 'Internal'} — {c.title || 'Untitled service'}</p>
                     <p className="font-sans text-xs text-gray-400">
-                      Package: {p.title} ({PACKAGE_STATUS_LABELS[p.packageStatus]}) · cost R{c.costPrice.toLocaleString()} · sell R{c.sellingPrice.toLocaleString()}
+                      Package: {p.title} ({PACKAGE_STATUS_LABELS[p.packageStatus]}) · cost {formatMoney(c.costPrice)} · sell {formatMoney(c.sellingPrice)}
                       {c.bookingRules ? ` · ${c.bookingRules}` : ''}{c.cancellationRules ? ` · ${c.cancellationRules}` : ''}
                     </p>
                   </div>

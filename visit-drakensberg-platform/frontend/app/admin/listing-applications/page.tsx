@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import toast from 'react-hot-toast'
+import { formatMoney } from '@/lib/allocation'
 import {
   Search, ShieldCheck, XCircle, ChevronDown, ChevronUp, RefreshCw,
   Mail, Phone, Building2, MapPin, Image as ImageIcon, ExternalLink,
@@ -44,7 +45,7 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 
 function ActivityCard({ a }: { a: ApplicationActivity }) {
   const bits = [a.category, a.difficulty, a.durationHours && `${a.durationHours}h`, a.maxGroup && `up to ${a.maxGroup}`,
-    a.minAge && `${a.minAge}+`, a.pricePerPerson && `R${a.pricePerPerson} pp`].filter(Boolean)
+    a.minAge && `${a.minAge}+`, a.pricePerPerson && `${formatMoney(Number(a.pricePerPerson))} pp`].filter(Boolean)
   return (
     <div className="border border-gray-100 px-3 py-2.5">
       <p className="font-sans text-sm font-medium text-gray-800">{a.name}</p>

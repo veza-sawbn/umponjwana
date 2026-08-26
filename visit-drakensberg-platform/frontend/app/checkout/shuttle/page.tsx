@@ -9,6 +9,7 @@ import { buildShuttleOption, estimateTransferPrice, suggestedVehicleType, SHUTTL
 import { TransportSupplierPicker } from '@/components/booking/TransportSupplierPicker'
 import { MeetAndGreetForm } from '@/components/booking/MeetAndGreetForm'
 import type { MeetAndGreetDetails } from '@/lib/transport'
+import { formatMoney } from '@/lib/allocation'
 
 // Transfers are quoted live from the Google Distance Matrix against the
 // guest's real pickup point and their actual stay — no fixed provider list.
@@ -228,7 +229,7 @@ export default function ShuttlePage() {
                             <span className="flex items-center gap-1"><Bus size={11} />{supplierChoice ? supplierChoice.vehicleName : suggestedVehicleType(passengers)} · {passengers} passenger{passengers !== 1 ? 's' : ''}</span>
                           </div>
                           <div className="text-right shrink-0">
-                            <p className="font-display italic text-2xl text-[#2d6a4f]">R {shuttlePrice.toLocaleString()}</p>
+                            <p className="font-display italic text-2xl text-[#2d6a4f]">{formatMoney(shuttlePrice)}</p>
                             <p className="font-sans text-[10px] text-gray-400">per vehicle{supplierChoice ? ` · ${supplierChoice.companyName}` : ''}</p>
                           </div>
                         </div>
@@ -305,7 +306,7 @@ export default function ShuttlePage() {
                   <p className="font-display italic text-lg">{stay.title}</p>
                   <p className="font-sans text-xs text-white/40 mt-0.5">{stay.region}</p>
                   <p className="font-sans text-xs text-white/40 mt-1">
-                    R {stay.price_per_night.toLocaleString()} × {nights} night{nights !== 1 ? 's' : ''} = R {stayTotal.toLocaleString()}
+                    {formatMoney(stay.price_per_night)} × {nights} night{nights !== 1 ? 's' : ''} = {formatMoney(stayTotal)}
                   </p>
                 </div>
               )}
@@ -316,7 +317,7 @@ export default function ShuttlePage() {
                   {booking.addons.map(a => (
                     <div key={a.id} className="flex justify-between font-sans text-xs text-white/60 mb-1.5">
                       <span className="truncate mr-2">{a.title}</span>
-                      <span className="shrink-0">R {(a.price_per_person * a.guests).toLocaleString()}</span>
+                      <span className="shrink-0">{formatMoney(a.price_per_person * a.guests)}</span>
                     </div>
                   ))}
                 </div>
@@ -327,7 +328,7 @@ export default function ShuttlePage() {
                   <p className="font-sans text-[10px] uppercase text-white/30 mb-1">Shuttle</p>
                   <div className="flex justify-between font-sans text-xs text-white/60">
                     <span className="truncate mr-2">{pickup.address || 'Transfer'} → {stay?.title || 'accommodation'}</span>
-                    <span>R {shuttlePrice.toLocaleString()}</span>
+                    <span>{formatMoney(shuttlePrice)}</span>
                   </div>
                   {supplierChoice && (
                     <p className="font-sans text-[11px] text-white/40 mt-1">{supplierChoice.companyName} · {supplierChoice.vehicleName}</p>
@@ -337,7 +338,7 @@ export default function ShuttlePage() {
 
               <div className="flex justify-between items-baseline">
                 <span className="font-sans text-sm text-white/60">Estimated total</span>
-                <span className="font-display italic text-3xl text-[#C9A96E]">R {grandTotal.toLocaleString()}</span>
+                <span className="font-display italic text-3xl text-[#C9A96E]">{formatMoney(grandTotal)}</span>
               </div>
               <p className="font-sans text-[10px] text-white/30 mt-1">Final total confirmed at checkout</p>
             </div>

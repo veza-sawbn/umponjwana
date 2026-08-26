@@ -1,3 +1,5 @@
+import { formatMoney } from '@/lib/allocation'
+
 interface Listing {
   id: string;
   title: string;
@@ -70,7 +72,7 @@ export default function ListingMap({ listings }: ListingMapProps) {
                   <div className="relative">
                     <div className="bg-[#2D6A4F] text-white text-xs font-semibold px-2.5 py-1 rounded-full shadow-md whitespace-nowrap flex items-center gap-1 hover:bg-[#245a42] transition-colors">
                       📍
-                      {listing.price ? `R${listing.price.toLocaleString()}` : listing.title.split(' ')[0]}
+                      {listing.price ? `${formatMoney(listing.price)}` : listing.title.split(' ')[0]}
                     </div>
                     {/* Tooltip */}
                     <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 hidden group-hover:block z-10">

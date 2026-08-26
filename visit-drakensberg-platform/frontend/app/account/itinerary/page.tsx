@@ -22,6 +22,7 @@ import {
 } from '@/lib/messages'
 import SupplierMessageBlock from '@/components/messaging/SupplierMessageBlock'
 import { resolveLivePackages } from '@/components/tours/PackageEditor'
+import { formatMoney } from '@/lib/allocation'
 
 /* ── helpers ────────────────────────────────────────────── */
 function fmtLong(iso: string) {
@@ -463,7 +464,7 @@ function ExperienceSection({
             <div>
               <p className="font-sans text-sm font-medium text-amber-800">Permit required</p>
               <p className="font-sans text-xs text-amber-700 mt-0.5">
-                R{trail.permit_cost} per person. Your guide will arrange the permit. Bring proof of identity.
+                {formatMoney(trail.permit_cost)} per person. Your guide will arrange the permit. Bring proof of identity.
               </p>
             </div>
           </div>
@@ -740,7 +741,7 @@ function ItineraryInner() {
                       <p className="font-sans text-sm text-gray-500 leading-relaxed">{shuttle.description}</p>
                       <p className="font-sans text-xs text-gray-400 mt-3">Your shuttle operator will confirm pickup time and exact location 24 hours before departure.</p>
                     </div>
-                    <p className="font-display italic text-2xl text-[#2d6a4f] shrink-0">R {shuttle.price.toLocaleString()}</p>
+                    <p className="font-display italic text-2xl text-[#2d6a4f] shrink-0">{formatMoney(shuttle.price)}</p>
                   </div>
                   <div className="mt-4 pt-4 border-t border-gray-100">
                     <SupplierMessageBlock
@@ -765,28 +766,28 @@ function ItineraryInner() {
               {booking.addons.map(a => (
                 <div key={a.id} className="flex justify-between font-sans text-sm text-gray-700">
                   <span>{a.title} × {a.guests}</span>
-                  <span>R {(a.price_per_person * a.guests).toLocaleString()}</span>
+                  <span>{formatMoney(a.price_per_person * a.guests)}</span>
                 </div>
               ))}
               {booking.stay && (
                 <div className="flex justify-between font-sans text-sm text-gray-700">
                   <span>{booking.stay.title} ({booking.nights}n)</span>
-                  <span>R {(booking.stay.price_per_night * booking.nights).toLocaleString()}</span>
+                  <span>{formatMoney(booking.stay.price_per_night * booking.nights)}</span>
                 </div>
               )}
               {booking.shuttles.map(shuttle => (
                 <div key={shuttle.id} className="flex justify-between font-sans text-sm text-gray-700">
                   <span>{shuttle.label}</span>
-                  <span>R {shuttle.price.toLocaleString()}</span>
+                  <span>{formatMoney(shuttle.price)}</span>
                 </div>
               ))}
             </div>
             <div className="border-t border-gray-100 pt-3 space-y-1.5">
-              <div className="flex justify-between font-sans text-sm text-gray-500"><span>Subtotal</span><span>R {booking.subtotal.toLocaleString()}</span></div>
-              <div className="flex justify-between font-sans text-sm text-gray-500"><span>Service fee (12%)</span><span>R {booking.serviceFee.toLocaleString()}</span></div>
-              <div className="flex justify-between font-sans text-sm text-gray-500"><span>VAT (15%)</span><span>R {booking.vat.toLocaleString()}</span></div>
+              <div className="flex justify-between font-sans text-sm text-gray-500"><span>Subtotal</span><span>{formatMoney(booking.subtotal)}</span></div>
+              <div className="flex justify-between font-sans text-sm text-gray-500"><span>Service fee (12%)</span><span>{formatMoney(booking.serviceFee)}</span></div>
+              <div className="flex justify-between font-sans text-sm text-gray-500"><span>VAT (15%)</span><span>{formatMoney(booking.vat)}</span></div>
               <div className="flex justify-between font-display italic text-xl text-[#2d6a4f] pt-2 border-t border-gray-100">
-                <span>Total paid</span><span>R {booking.total.toLocaleString()}</span>
+                <span>Total paid</span><span>{formatMoney(booking.total)}</span>
               </div>
             </div>
             <div className="bg-[#2d6a4f]/5 border border-[#2d6a4f]/15 p-3 flex items-start gap-2">

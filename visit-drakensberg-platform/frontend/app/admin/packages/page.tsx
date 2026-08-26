@@ -18,6 +18,7 @@ import { getAdminSuppliers, adminMediaSource, type AdminSupplier } from '@/lib/a
 import { getTrails, type Trail } from '@/lib/trails'
 import { MediaPicker, MediaGalleryPicker } from '@/components/media/MediaPicker'
 import { SeoPanel } from '@/components/admin/SeoPanel'
+import { formatMoney } from '@/lib/allocation'
 
 // Admin Package Builder: packages are curated by Visit Drakensberg from
 // services supplied by multiple businesses. Each component keeps its own
@@ -79,8 +80,8 @@ function ComponentEditor({
         </button>
         <div className="flex items-center gap-3 shrink-0">
           <span className="font-sans text-xs text-gray-500">
-            R{component.costPrice.toLocaleString()} → R{component.sellingPrice.toLocaleString()}
-            <span className={componentMargin(component) >= 0 ? 'text-emerald-600' : 'text-red-500'}> ({componentMargin(component) >= 0 ? '+' : ''}R{componentMargin(component).toLocaleString()})</span>
+            {formatMoney(component.costPrice)} → {formatMoney(component.sellingPrice)}
+            <span className={componentMargin(component) >= 0 ? 'text-emerald-600' : 'text-red-500'}> ({componentMargin(component) >= 0 ? '+' : ''}{formatMoney(componentMargin(component))})</span>
           </span>
           <button onClick={onRemove} className="text-gray-300 hover:text-red-400 transition-colors"><Trash2 size={14} /></button>
         </div>
@@ -414,9 +415,9 @@ export default function AdminPackagesPage() {
 
             {draft.components.length > 0 && (
               <div className="flex items-center justify-end gap-6 border-t border-gray-100 pt-4 font-sans text-sm">
-                <span className="text-gray-400">Cost: <span className="text-gray-700">R {totals.cost.toLocaleString()}</span></span>
-                <span className="text-gray-400">Sell: <span className="text-gray-700">R {totals.sell.toLocaleString()}</span></span>
-                <span className="text-gray-400">Margin: <span className={totals.margin >= 0 ? 'text-emerald-600' : 'text-red-500'}>R {totals.margin.toLocaleString()}</span></span>
+                <span className="text-gray-400">Cost: <span className="text-gray-700">{formatMoney(totals.cost)}</span></span>
+                <span className="text-gray-400">Sell: <span className="text-gray-700">{formatMoney(totals.sell)}</span></span>
+                <span className="text-gray-400">Margin: <span className={totals.margin >= 0 ? 'text-emerald-600' : 'text-red-500'}>{formatMoney(totals.margin)}</span></span>
               </div>
             )}
           </div>
@@ -514,8 +515,8 @@ export default function AdminPackagesPage() {
                     )}
                   </div>
                   <div className="text-right shrink-0">
-                    <p className="font-display italic text-xl text-[#2d6a4f]">R {p.pricePerPerson.toLocaleString()} <span className="font-sans text-[10px] text-gray-400">pp</span></p>
-                    <p className="font-sans text-[10px] text-gray-400">cost R{t.cost.toLocaleString()} · margin <span className={t.margin >= 0 ? 'text-emerald-600' : 'text-red-500'}>R{t.margin.toLocaleString()}</span></p>
+                    <p className="font-display italic text-xl text-[#2d6a4f]">{formatMoney(p.pricePerPerson)} <span className="font-sans text-[10px] text-gray-400">pp</span></p>
+                    <p className="font-sans text-[10px] text-gray-400">cost {formatMoney(t.cost)} · margin <span className={t.margin >= 0 ? 'text-emerald-600' : 'text-red-500'}>{formatMoney(t.margin)}</span></p>
                   </div>
                 </div>
 

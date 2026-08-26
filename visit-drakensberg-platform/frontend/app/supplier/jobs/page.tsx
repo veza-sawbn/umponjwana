@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { ArrowRight, Bus, Calendar, Check, Clock, MapPin, Phone, Plane, Play, Route, Truck, Users, X } from 'lucide-react'
 import { supabase } from '@/lib/auth'
 import { effectiveSupplierId } from '@/lib/effective-supplier'
+import { formatMoney } from '@/lib/allocation'
 import {
   acceptTransportRequest, assignDriverToRequest, completeTrip, declineTransportRequest,
   driverAvailable, getFleet, getMyTransportCompany, getTransportRequests, startTrip,
@@ -252,7 +253,7 @@ function JobCard({ request, children }: { request: TransportRequest; children?: 
           </div>
         </div>
         <div className="flex items-center gap-3 shrink-0">
-          <span className="font-display italic text-lg text-black/85">R {request.quotedPrice.toLocaleString()}</span>
+          <span className="font-display italic text-lg text-black/85">{formatMoney(request.quotedPrice)}</span>
           <span className={`font-sans text-xs px-2 py-0.5 rounded-full ${STATUS_STYLE[request.status] ?? 'bg-slate-100 text-slate-500'}`}>
             {STATUS_LABEL[request.status] ?? request.status}
           </span>

@@ -14,6 +14,7 @@ import {
 import { rankSuppliers, OFFER_SHORTLIST_SIZE, type ScoredCandidate } from '@/lib/transport-dispatch'
 import { areaName, runTransportOptimisation, type TransportInsights } from '@/lib/transport-optimizer'
 import { notify } from '@/lib/notifications'
+import { formatMoney } from '@/lib/allocation'
 
 // Dispatch console: every transport request with its suitability ranking,
 // manual/auto assignment, marketplace fleet overview, and the background
@@ -103,7 +104,7 @@ export default function AdminTransportPage() {
       await acceptTransportRequest(request, top.company, top.bestVehicle)
       await notify(top.company.supplierId, 'booking',
         'Transfer assigned to you',
-        `Visit Drakensberg assigned you ${request.pickup.address} → ${request.dropoff.address} on ${request.date} (${request.passengers} pax, R${request.quotedPrice.toLocaleString()}). Assign a driver to get rolling.`,
+        `Visit Drakensberg assigned you ${request.pickup.address} → ${request.dropoff.address} on ${request.date} (${request.passengers} pax, ${formatMoney(request.quotedPrice)}). Assign a driver to get rolling.`,
         '/supplier/jobs')
       await load()
     } finally {
@@ -138,7 +139,7 @@ export default function AdminTransportPage() {
       }).eq('id', request.id)
       await Promise.all(notified.map(o =>
         notify(o.supplierId, 'booking', 'New transfer opportunity',
-          `${request.pickup.address} → ${request.dropoff.address} on ${request.date} · ${request.passengers} pax · R${request.quotedPrice.toLocaleString()}.`,
+          `${request.pickup.address} → ${request.dropoff.address} on ${request.date} · ${request.passengers} pax · ${formatMoney(request.quotedPrice)}.`,
           '/supplier/jobs')))
       await load()
     } finally {
@@ -303,7 +304,7 @@ function RequestGroup({ title, requests, emptyText, busy, expanded, ranking, onT
                   </div>
                 </div>
                 <div className="flex items-center gap-3 shrink-0">
-                  <span className="font-display italic text-lg text-black/85">R {request.quotedPrice.toLocaleString()}</span>
+                  <span className="font-display italic text-lg text-black/85">{formatMoney(request.quotedPrice)}</span>
                   <span className={`font-sans text-xs px-2 py-0.5 rounded-full capitalize ${STATUS_STYLE[request.status] ?? 'bg-slate-100 text-slate-500'}`}>{request.status.replace('_', ' ')}</span>
                 </div>
               </div>
@@ -399,7 +400,7 @@ function CompanyCard({ company }: { company: TransportCompany }) {
         <span>{fleet ? `${fleet.drivers} drivers` : ''}</span>
         <span>{company.stats?.completedTrips ?? 0} trips completed</span>
         <span>{(company.openJobs ?? []).length} open jobs</span>
-        <span>R{company.ratePerKm}/km</span>
+        <span>{formatMoney(company.ratePerKm)}/km</span>
       </div>
     </div>
   )

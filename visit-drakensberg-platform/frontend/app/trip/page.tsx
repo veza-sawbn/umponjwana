@@ -8,6 +8,7 @@ import { useBooking, describeAddonParty } from '@/lib/booking-context'
 import { getRecommendations, type Recommendation } from '@/lib/recommendations'
 import { ShuttleTripCard } from '@/components/booking/ShuttleTripCard'
 import { useState, useEffect } from 'react'
+import { formatMoney } from '@/lib/allocation'
 
 function formatDate(iso: string) {
   return new Date(iso).toLocaleDateString('en-ZA', { weekday: 'short', day: 'numeric', month: 'short' })
@@ -110,7 +111,7 @@ export default function TripPage() {
                       </div>
                       <div className="flex items-center gap-4 shrink-0">
                         <p className="font-sans text-sm font-semibold text-black/80">
-                          R {(a.price_per_person * a.guests).toLocaleString()}
+                          {formatMoney(a.price_per_person * a.guests)}
                         </p>
                         <button
                           onClick={() => booking.removeAddon(a.id)}
@@ -138,7 +139,7 @@ export default function TripPage() {
                       </div>
                       <div className="flex items-center gap-4 shrink-0">
                         <p className="font-sans text-sm font-semibold text-black/80">
-                          R {(booking.stay.price_per_night * booking.nights).toLocaleString()}
+                          {formatMoney(booking.stay.price_per_night * booking.nights)}
                         </p>
                         <button onClick={() => booking.setStay(null)} className="text-red-400 hover:text-red-600 transition-colors">
                           <Trash2 size={14} />
@@ -278,7 +279,7 @@ export default function TripPage() {
                       <p className="font-sans font-medium text-sm text-black/80 mb-1">{s.title}</p>
                       <p className="font-sans text-xs text-black/40 leading-relaxed">{s.reason}</p>
                       {s.price != null && (
-                        <p className="font-sans text-xs font-semibold text-[#2d6a4f] mt-2">R {s.price.toLocaleString()} pp</p>
+                        <p className="font-sans text-xs font-semibold text-[#2d6a4f] mt-2">{formatMoney(s.price)} pp</p>
                       )}
                     </Link>
                   ))}
@@ -299,13 +300,13 @@ export default function TripPage() {
                   {booking.addons.map(a => (
                     <div key={a.id} className="flex justify-between gap-2 font-sans text-sm">
                       <span className="text-black/50 truncate">{a.title.split('·')[0].trim()}</span>
-                      <span className="text-black/80 shrink-0 font-medium">R {(a.price_per_person * a.guests).toLocaleString()}</span>
+                      <span className="text-black/80 shrink-0 font-medium">{formatMoney(a.price_per_person * a.guests)}</span>
                     </div>
                   ))}
                   {booking.stay && (
                     <div className="flex justify-between gap-2 font-sans text-sm">
                       <span className="text-black/50 truncate">{booking.stay.title}</span>
-                      <span className="text-black/80 shrink-0 font-medium">R {(booking.stay.price_per_night * booking.nights).toLocaleString()}</span>
+                      <span className="text-black/80 shrink-0 font-medium">{formatMoney(booking.stay.price_per_night * booking.nights)}</span>
                     </div>
                   )}
                   {booking.shuttles.map(shuttle => (
@@ -313,7 +314,7 @@ export default function TripPage() {
                       <span className="text-black/50 truncate">
                         Shuttle{shuttle.companyName ? ` · ${shuttle.companyName}` : ''}
                       </span>
-                      <span className="text-black/80 shrink-0 font-medium">R {shuttle.price.toLocaleString()}</span>
+                      <span className="text-black/80 shrink-0 font-medium">{formatMoney(shuttle.price)}</span>
                     </div>
                   ))}
                 </div>
@@ -322,7 +323,7 @@ export default function TripPage() {
               {subtotal > 0 && (
                 <div className="border-t border-black/8 pt-4 flex justify-between font-sans text-sm font-semibold">
                   <span>Subtotal</span>
-                  <span>R {subtotal.toLocaleString()}</span>
+                  <span>{formatMoney(subtotal)}</span>
                 </div>
               )}
 

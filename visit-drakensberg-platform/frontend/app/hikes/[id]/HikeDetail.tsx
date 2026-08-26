@@ -16,6 +16,7 @@ import TrailPlanner from '@/components/trails/TrailPlanner'
 import RouteArtwork from '@/components/trails/RouteArtwork'
 import type { Property } from '@/lib/properties'
 import type { Activity } from '@/lib/activities'
+import { formatMoney } from '@/lib/allocation'
 
 const DIFF_COLOR: Record<string, string> = { Easy: '#4A7251', Moderate: '#C9A96E', Hard: '#c0392b', Strenuous: '#c0392b', Extreme: '#7f1d1d' }
 const DIFF_BG: Record<string, string> = { Easy: '#4A725122', Moderate: '#C9A96E22', Hard: '#c0392b22', Strenuous: '#c0392b22', Extreme: '#7f1d1d22' }
@@ -403,7 +404,7 @@ export default function HikeDetail({
                   <span className="px-2.5 py-1 text-xs" style={{ color: DIFF_COLOR[diff], background: DIFF_BG[diff] }}>{diff}</span>
                 </div>
                 {trail.permit_required && (
-                  <div className="flex justify-between"><span className="text-gray-400">Permit</span><span>R{trail.permit_cost} pp</span></div>
+                  <div className="flex justify-between"><span className="text-gray-400">Permit</span><span>{formatMoney(trail.permit_cost)} pp</span></div>
                 )}
               </div>
             </div>
