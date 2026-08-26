@@ -153,17 +153,38 @@ export async function getActivityById(id: string, client?: SupabaseClient): Prom
   return client ? getEntity<Activity>(KIND, id, client) : getEntity<Activity>(KIND, id)
 }
 
+// The public activity page (app/activities/[id]/page.tsx) is ISR-cached for
+// 5 minutes, so without this a supplier's price/timeslot/child-rate edit
+// wouldn't reach visitors until that cache window happened to expire. Best-
+// effort and non-blocking — a failed revalidate (e.g. offline) still leaves
+// the save itself intact, just stale until the cache naturally expires.
+function revalidateActivityPage(id: string, slug?: string): void {
+  if (typeof fetch !== 'function') return
+  fetch('/api/revalidate/activity', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ id, slug }),
+  }).catch(() => {})
+}
+
 export async function addActivity(a: Omit<Activity, 'id' | 'createdAt'>): Promise<Activity> {
   // Slug population (see lib/slugify.ts) — auto-generated from the
   // activity name unless already supplied, unique against every other
   // activity's canonical URL segment (slug || id).
   const slug = a.slug || uniqueSlug(slugify(a.name), (await getActivities()).map(e => e.slug || e.id))
   const activity: Activity = { ...a, slug, id: newEntityId('act'), createdAt: new Date().toISOString() }
-  return insertEntity(KIND, activity)
+  const saved = await insertEntity(KIND, activity)
+  revalidateActivityPage(saved.id, saved.slug)
+  return saved
 }
 
 export async function updateActivity(id: string, patch: Partial<Activity>): Promise<void> {
   await updateEntity(KIND, id, patch)
+  // patch usually won't carry `slug` (the edit form never touches it), so
+  // read it back rather than assuming the id-only path is enough — visitor
+  // links built from `slug || id` (regions, hikes) need that path busted too.
+  const current = await getActivityById(id)
+  revalidateActivityPage(id, current?.slug)
 }
 
 export async function deleteActivity(id: string): Promise<void> {
