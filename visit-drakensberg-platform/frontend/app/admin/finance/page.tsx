@@ -139,6 +139,7 @@ export default function AdminFinancePage() {
         {/* Trial balance */}
         <div className="bg-white border border-gray-200 p-6">
           <h2 className="font-display italic text-xl mb-4">Ledger Account Balances</h2>
+          <div className="overflow-x-auto">
           <table className="w-full">
             <thead><tr className="border-b border-gray-100">
               {['Code', 'Account', 'Type', 'Balance'].map(h => <th key={h} className="text-left py-2 font-sans text-[10px] tracking-[0.1em] uppercase text-gray-400">{h}</th>)}
@@ -155,6 +156,7 @@ export default function AdminFinancePage() {
               {balances.length === 0 && <tr><td colSpan={4} className="py-6 text-center font-sans text-sm text-gray-400">Ledger requires the finance role.</td></tr>}
             </tbody>
           </table>
+          </div>
         </div>
       </div>
 
@@ -162,6 +164,7 @@ export default function AdminFinancePage() {
         {/* Supplier performance */}
         <div className="bg-white border border-gray-200 p-6">
           <h2 className="font-display italic text-xl mb-4">Supplier Performance</h2>
+          <div className="overflow-x-auto">
           <table className="w-full">
             <thead><tr className="border-b border-gray-100">
               {['Supplier', 'Services', 'Gross', 'Commission', 'Net Payable'].map(h => <th key={h} className="text-left py-2 font-sans text-[10px] tracking-[0.1em] uppercase text-gray-400">{h}</th>)}
@@ -179,6 +182,7 @@ export default function AdminFinancePage() {
               {supplierPerf.length === 0 && <tr><td colSpan={5} className="py-6 text-center font-sans text-sm text-gray-400">No supplier lines yet.</td></tr>}
             </tbody>
           </table>
+          </div>
         </div>
 
         <div className="space-y-6">

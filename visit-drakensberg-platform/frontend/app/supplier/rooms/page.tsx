@@ -53,6 +53,7 @@ function RoomsInner() {
         </div>
       ) : (
         <div className="bg-white rounded-xl border border-black/8 overflow-hidden">
+          <div className="overflow-x-auto">
           <table className="w-full">
             <thead>
               <tr className="border-b border-black/6">
@@ -86,6 +87,7 @@ function RoomsInner() {
               ))}
             </tbody>
           </table>
+          </div>
         </div>
       )}
     </div>

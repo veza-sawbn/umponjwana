@@ -396,6 +396,7 @@ export default function AdminBlogPage() {
             <Loader2 size={16} className="animate-spin" /> Loading posts…
           </div>
         ) : (
+          <div className="overflow-x-auto">
           <table className="w-full">
             <thead>
               <tr className="border-b border-gray-100">
@@ -456,6 +457,7 @@ export default function AdminBlogPage() {
               ))}
             </tbody>
           </table>
+          </div>
         )}
       </div>
     </div>

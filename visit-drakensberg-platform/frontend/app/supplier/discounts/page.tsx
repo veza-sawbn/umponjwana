@@ -133,6 +133,7 @@ export default function DiscountsPage() {
       )}
 
       <div className="bg-white rounded-xl border border-black/8 overflow-hidden">
+        <div className="overflow-x-auto">
         <table className="w-full">
           <thead><tr className="border-b border-black/6">{['Code', 'Discount', 'Listing', 'Valid Until', 'Uses', ''].map((h, i) => <th key={i} className="px-4 py-3 text-left font-sans text-xs font-semibold text-black/40 uppercase tracking-wider">{h}</th>)}</tr></thead>
           <tbody>
@@ -150,6 +151,7 @@ export default function DiscountsPage() {
             ))}
           </tbody>
         </table>
+        </div>
       </div>
     </div>
   )

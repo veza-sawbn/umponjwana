@@ -164,6 +164,7 @@ export default function SupplierOverview() {
           </div>
         ) : (
           <div className="bg-white rounded-xl border border-black/8 overflow-hidden">
+            <div className="overflow-x-auto">
             <table className="w-full">
               <thead>
                 <tr className="border-b border-black/6">
@@ -194,6 +195,7 @@ export default function SupplierOverview() {
                 })}
               </tbody>
             </table>
+            </div>
           </div>
         )}
       </div>

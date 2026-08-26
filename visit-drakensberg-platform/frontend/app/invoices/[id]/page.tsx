@@ -416,7 +416,8 @@ function PrintableInvoiceInner() {
           </div>
 
           {/* Lines */}
-          <table className="w-full my-8">
+          <div className="overflow-x-auto">
+          <table className="w-full my-8 min-w-[480px]">
             <thead>
               <tr className="border-b-2 border-gray-800">
                 <th className="text-left py-2.5 font-sans text-[10px] tracking-[0.14em] uppercase text-gray-500">Service</th>
@@ -442,6 +443,7 @@ function PrintableInvoiceInner() {
               ))}
             </tbody>
           </table>
+          </div>
 
           {/* Totals */}
           <div className="flex justify-end">
