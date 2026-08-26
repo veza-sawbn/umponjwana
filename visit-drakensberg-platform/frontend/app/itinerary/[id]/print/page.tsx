@@ -264,7 +264,7 @@ export default function PrintableItineraryPage() {
             )}
 
             {/* Payment summary */}
-            <div className="py-6 border-b border-gray-200 flex items-start justify-between gap-8">
+            <div className="py-6 border-b border-gray-200 flex flex-col sm:flex-row items-start justify-between gap-4 sm:gap-8">
               <div>
                 <p className="font-sans text-[10px] tracking-[0.16em] uppercase text-[#C9A96E] mb-2">Payment Summary</p>
                 <p className="font-sans text-xs text-gray-500 leading-relaxed">

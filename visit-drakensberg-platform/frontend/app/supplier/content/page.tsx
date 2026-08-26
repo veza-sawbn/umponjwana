@@ -129,6 +129,7 @@ export default function ContentManagerPage() {
                 <Link href="/supplier/listings/new" className="bg-[#2d6a4f] text-white px-5 py-2.5 font-sans text-sm hover:bg-[#235a3f] transition-colors">+ New Listing</Link>
               </div>
               <div className="bg-white border border-gray-200 overflow-hidden">
+                <div className="overflow-x-auto">
                 <table className="w-full">
                   <thead>
                     <tr className="border-b border-gray-100 bg-[#F7F5F2]">
@@ -157,6 +158,7 @@ export default function ContentManagerPage() {
                     ))}
                   </tbody>
                 </table>
+                </div>
               </div>
             </div>
           )}
@@ -168,6 +170,7 @@ export default function ContentManagerPage() {
                 <Link href="/supplier/property" className="border border-[#2d6a4f] text-[#2d6a4f] px-5 py-2.5 font-sans text-sm hover:bg-[#2d6a4f] hover:text-white transition-colors">Property Manager →</Link>
               </div>
               <div className="bg-white border border-gray-200 overflow-hidden">
+                <div className="overflow-x-auto">
                 <table className="w-full">
                   <thead>
                     <tr className="border-b border-gray-100 bg-[#F7F5F2]">
@@ -192,6 +195,7 @@ export default function ContentManagerPage() {
                     ))}
                   </tbody>
                 </table>
+                </div>
               </div>
             </div>
           )}
@@ -203,6 +207,7 @@ export default function ContentManagerPage() {
                 <Link href="/supplier/guides" className="bg-[#2d6a4f] text-white px-5 py-2.5 font-sans text-sm hover:bg-[#235a3f] transition-colors">+ Register Guide</Link>
               </div>
               <div className="bg-white border border-gray-200 overflow-hidden">
+                <div className="overflow-x-auto">
                 <table className="w-full">
                   <thead>
                     <tr className="border-b border-gray-100 bg-[#F7F5F2]">
@@ -225,6 +230,7 @@ export default function ContentManagerPage() {
                     ))}
                   </tbody>
                 </table>
+                </div>
               </div>
             </div>
           )}
@@ -236,6 +242,7 @@ export default function ContentManagerPage() {
                 <Link href="/supplier/packages" className="bg-[#2d6a4f] text-white px-5 py-2.5 font-sans text-sm hover:bg-[#235a3f] transition-colors">Manage Packages →</Link>
               </div>
               <div className="bg-white border border-gray-200 overflow-hidden">
+                <div className="overflow-x-auto">
                 <table className="w-full">
                   <thead>
                     <tr className="border-b border-gray-100 bg-[#F7F5F2]">
@@ -259,6 +266,7 @@ export default function ContentManagerPage() {
                     ))}
                   </tbody>
                 </table>
+                </div>
               </div>
             </div>
           )}
@@ -270,6 +278,7 @@ export default function ContentManagerPage() {
                 <Link href="/supplier/events" className="bg-[#2d6a4f] text-white px-5 py-2.5 font-sans text-sm hover:bg-[#235a3f] transition-colors">Manage Events →</Link>
               </div>
               <div className="bg-white border border-gray-200 overflow-hidden">
+                <div className="overflow-x-auto">
                 <table className="w-full">
                   <thead>
                     <tr className="border-b border-gray-100 bg-[#F7F5F2]">
@@ -293,6 +302,7 @@ export default function ContentManagerPage() {
                     ))}
                   </tbody>
                 </table>
+                </div>
               </div>
             </div>
           )}

@@ -119,6 +119,7 @@ export default function LoyaltyPage() {
       <div>
         <h2 className="font-display italic text-2xl text-[#000000] mb-5">Points History</h2>
         <div className="bg-white border border-gray-200 overflow-hidden">
+          <div className="overflow-x-auto">
           <table className="w-full">
             <thead>
               <tr className="border-b border-gray-100">
@@ -138,6 +139,7 @@ export default function LoyaltyPage() {
               ))}
             </tbody>
           </table>
+          </div>
         </div>
       </div>
     </div>

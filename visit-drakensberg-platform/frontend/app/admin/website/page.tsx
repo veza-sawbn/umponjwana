@@ -328,6 +328,7 @@ export default function AdminWebsitePage() {
                 <p className="font-sans text-sm text-gray-500 mb-6">Edit nav item order and visibility, and set the background photo shown in the super menu for each section.</p>
 
                 <div className="border border-gray-200 overflow-hidden">
+                  <div className="overflow-x-auto">
                   <table className="w-full">
                     <thead>
                       <tr className="border-b border-gray-100 bg-[#F7F5F2]">
@@ -370,6 +371,7 @@ export default function AdminWebsitePage() {
                       ))}
                     </tbody>
                   </table>
+                  </div>
                 </div>
 
                 <div className="flex gap-3 items-end">

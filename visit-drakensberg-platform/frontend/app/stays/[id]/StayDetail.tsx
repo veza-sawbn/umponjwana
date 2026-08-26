@@ -134,8 +134,18 @@ export default function StayDetail({ property, rooms: roomsData, id }: { propert
         </div>
       </section>
 
-      {/* Photo gallery */}
-      <div className="grid grid-cols-4 grid-rows-2 h-[52vh] min-h-[340px] gap-px">
+      {/* Photo gallery — a single full-width hero on mobile (the 4-up collage
+          reads as a strip of thumbnails on a narrow screen), the full collage
+          from sm up. */}
+      <div className="relative h-[42vh] min-h-[240px] sm:hidden overflow-hidden">
+        <img src={stay.images[0]} alt={stay.title} className="w-full h-full object-cover" />
+        {stay.images.length > 1 && (
+          <span className="absolute bottom-3 right-3 font-sans text-[11px] tracking-wide bg-black/60 text-white px-2.5 py-1 rounded-full">
+            1 / {stay.images.length}
+          </span>
+        )}
+      </div>
+      <div className="hidden sm:grid grid-cols-4 grid-rows-2 h-[52vh] min-h-[340px] gap-px">
         <div className="col-span-2 row-span-2 overflow-hidden">
           <img src={stay.images[0]} alt={stay.title} className="w-full h-full object-cover" />
         </div>

@@ -136,7 +136,8 @@ export default function QuotePage() {
             </div>
           </div>
 
-          <table className="w-full my-8">
+          <div className="overflow-x-auto">
+          <table className="w-full my-8 min-w-[480px]">
             <thead>
               <tr className="border-b-2 border-gray-800">
                 <th className="text-left py-2.5 font-sans text-[10px] tracking-[0.14em] uppercase text-gray-500">Service</th>
@@ -159,6 +160,7 @@ export default function QuotePage() {
               ))}
             </tbody>
           </table>
+          </div>
 
           <div className="flex justify-end">
             <div className="w-72 space-y-2 font-sans text-sm">

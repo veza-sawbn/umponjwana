@@ -181,6 +181,7 @@ export default function StaffPage() {
           </div>
 
           <div className="bg-white rounded-xl border border-black/8 overflow-hidden">
+            <div className="overflow-x-auto">
             <table className="w-full">
               <thead>
                 <tr className="border-b border-black/6">
@@ -225,6 +226,7 @@ export default function StaffPage() {
                 ))}
               </tbody>
             </table>
+            </div>
           </div>
 
           <div className="bg-white rounded-xl border border-black/8 p-5 space-y-3">

@@ -246,6 +246,7 @@ export default function PropertyDashboardPage() {
             {/* Bookings */}
             {tab === 'bookings' && (
               <div className="bg-white border border-gray-200 overflow-hidden">
+                <div className="overflow-x-auto">
                 <table className="w-full">
                   <thead>
                     <tr className="border-b border-gray-100">
@@ -269,6 +270,7 @@ export default function PropertyDashboardPage() {
                     ))}
                   </tbody>
                 </table>
+                </div>
               </div>
             )}
 
