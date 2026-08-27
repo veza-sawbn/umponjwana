@@ -116,6 +116,8 @@ export async function POST(req: Request) {
       accommodation: d.accommodation,
       transport: d.transport,
       meals: d.meals,
+      distance: d.distance,
+      elevation: d.elevation,
     }))
 
     const origin = getSiteOrigin(req)
