@@ -212,12 +212,30 @@ export type EmailItineraryDay = {
   accommodation?: string
   transport?: string
   meals?: string
+  distance?: string
+  elevation?: string
+}
+
+/**
+ * Splits freeform itinerary notes into paragraphs on blank/single line
+ * breaks, mirroring the web itinerary accordion (app/experiences/[id]) so a
+ * day's write-up reads as distinct, well-spaced paragraphs rather than one
+ * dense block — email clients ignore <details>/JS toggles too inconsistently
+ * to rely on for the accordion interaction itself, so this block stays fully
+ * expanded and leans on the same title composition and paragraph spacing to
+ * carry readability instead.
+ */
+function emailParagraphs(text: string): string {
+  return text.split(/\n+/).map(p => p.trim()).filter(Boolean)
+    .map(p => `<p style="margin:0 0 8px;font-family:${SANS};font-size:12px;color:${BODY_TEXT};line-height:1.6;">${esc(p)}</p>`)
+    .join('')
 }
 
 /** Day-by-day itinerary cards — used by the departure-guest confirmation email (app/api/departure-guests/send-confirmation). */
 export function itineraryBlock(days: EmailItineraryDay[]): string {
   if (days.length === 0) return ''
   const rows = days.map(d => {
+    const meta = [d.distance, d.elevation].filter(Boolean).join(' &middot; ')
     const facts = [
       d.accommodation ? `Overnight: ${d.accommodation}` : '',
       d.transport ? `Transport: ${d.transport}` : '',
@@ -228,11 +246,14 @@ export function itineraryBlock(days: EmailItineraryDay[]): string {
       <td style="padding:0 0 12px;">
         <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="border:1px solid ${BORDER};">
           <tr>
-            <td style="padding:12px 14px;">
+            <td style="padding:14px;">
               <p style="margin:0 0 3px;font-family:${SANS};font-size:10px;letter-spacing:1px;text-transform:uppercase;color:${GOLD};">Day ${d.dayNumber} &middot; ${esc(d.dateLabel)}</p>
-              ${d.label ? `<p style="margin:0 0 5px;font-family:${SERIF};font-size:14px;font-style:italic;color:${INK};">${esc(d.label)}</p>` : ''}
-              ${d.description ? `<p style="margin:0 0 6px;font-family:${SANS};font-size:12px;color:${BODY_TEXT};line-height:1.5;">${esc(d.description)}</p>` : ''}
-              ${facts.map(f => `<p style="margin:2px 0 0;font-family:${SANS};font-size:11px;color:${MUTED};">${esc(f)}</p>`).join('')}
+              ${d.label ? `<p style="margin:0 0 4px;font-family:${SERIF};font-size:14px;font-style:italic;color:${INK};">${esc(d.label)}</p>` : ''}
+              ${meta ? `<p style="margin:0 0 10px;font-family:${SANS};font-size:11px;color:${MUTED};">${meta}</p>` : ''}
+              ${d.description ? emailParagraphs(d.description) : ''}
+              ${facts.length > 0 ? `<div style="margin-top:8px;padding-top:8px;border-top:1px solid ${BORDER};">
+                ${facts.map(f => `<p style="margin:2px 0 0;font-family:${SANS};font-size:11px;color:${MUTED};">${esc(f)}</p>`).join('')}
+              </div>` : ''}
             </td>
           </tr>
         </table>
