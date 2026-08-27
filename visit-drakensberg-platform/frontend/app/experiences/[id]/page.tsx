@@ -20,7 +20,18 @@ const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://visitdrakensberg.c
 // (see docs/destination-graph/PHASE_D.md), an experience is one dated
 // departure: seats booked, sold-out state and the noindex-when-past logic
 // below are all time-sensitive in a way a cached page would misreport.
-// Stays fully dynamic (the Next.js default), rendered fresh per request.
+//
+// That intent needs an explicit `dynamic = 'force-dynamic'` to actually
+// hold, though — omitting `revalidate` is NOT enough on its own. This route
+// takes no dynamic segment input beyond `params.id` and its only data comes
+// from plain `fetch`-backed Supabase calls, so without this export Next 14
+// treats it as static and caches the underlying departures/tours fetch
+// indefinitely: every request for any id keeps reusing whichever departure
+// list was fetched first, so a departure created after that point 404s
+// until the next deploy or on-demand revalidation quietly fixes it. Was
+// missing here for a while — caught when a freshly-created multi-package
+// departure kept 404ing on a live deploy.
+export const dynamic = 'force-dynamic'
 
 async function resolveExperience(id: string): Promise<TrekkingExperience | null> {
   return getExperienceById(id, publicSupabase)
