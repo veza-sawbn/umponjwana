@@ -118,7 +118,7 @@ export default function AdminRegionsPage() {
             </div>
             <div><label className={labelCls}>Hero Image</label><MediaPicker value={data.heroImage} onChange={url => update('heroImage', url)} source={adminMediaSource} /></div>
             <div><label className={labelCls}>Hero Video</label><MediaPicker value={data.heroVideo} onChange={url => update('heroVideo', url)} source={adminMediaSource} accept="video" /></div>
-            <div><label className={labelCls}>Overview</label><textarea value={data.overview} onChange={e => update('overview', e.target.value)} rows={5} className={`${inputCls} resize-none`}/></div>
+            <div><label className={labelCls}>Overview</label><textarea value={data.overview} onChange={e => update('overview', e.target.value)} rows={5} className={`${inputCls} resize-none`} placeholder="Blank lines between paragraphs are preserved on the public page."/></div>
 
             <div>
               <div className="flex items-center justify-between mb-2"><label className={labelCls}>Highlights</label><button onClick={() => update('highlights', [...data.highlights, ''])} className="flex items-center gap-1 font-sans text-xs text-[#2d6a4f]"><Plus size={12}/> Add</button></div>

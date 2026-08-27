@@ -244,8 +244,11 @@ export default async function RegionPage({ params }: { params: { slug: string } 
   const { stays, trails, activities, shuttleRoutes, gatewayTown } = await loadRegionContent(region)
   // Preserve the paragraph breaks an admin already typed into the plain
   // gettingThere textarea — collapsing them into one <p> was the original
-  // complaint (see docs/destination-graph/PHASE_H.md).
+  // complaint (see docs/destination-graph/PHASE_H.md). Overview gets the
+  // same treatment for the same reason: it's a 5-row textarea an admin can
+  // (and does) type blank lines into, but was rendered as one run-on <p>.
   const gettingThereParagraphs = region.gettingThere.split(/\n\s*\n/).map(p => p.trim()).filter(Boolean)
+  const overviewParagraphs = (region.overview || region.seoDescription || '').split(/\n\s*\n/).map(p => p.trim()).filter(Boolean)
   const shuttleHref = gatewayTown ? `/shuttles?to=${encodeURIComponent(gatewayTown)}` : '/shuttles'
   const hasGettingThereContent =
     gettingThereParagraphs.length > 0 || region.gettingThereSections.length > 0 || region.gettingThereRoutes.length > 0 || shuttleRoutes.length > 0
@@ -311,9 +314,13 @@ export default async function RegionPage({ params }: { params: { slug: string } 
         <div className="max-w-[1440px] mx-auto px-6 lg:px-12">
           <div className="grid lg:grid-cols-[2fr_1fr] gap-12 items-start">
             <div>
-              <p className="font-sans text-base text-forest/70 leading-relaxed mb-8">
-                {region.overview || region.seoDescription}
-              </p>
+              {overviewParagraphs.length > 0 && (
+                <div className="space-y-4 mb-8">
+                  {overviewParagraphs.map((p, i) => (
+                    <p key={i} className="font-sans text-base text-forest/70 leading-relaxed">{p}</p>
+                  ))}
+                </div>
+              )}
               {region.highlights.length > 0 && (
                 <div className="mb-8">
                   <p className="font-sans text-[10px] tracking-[0.2em] uppercase text-[#C9A96E] mb-3">Highlights</p>
