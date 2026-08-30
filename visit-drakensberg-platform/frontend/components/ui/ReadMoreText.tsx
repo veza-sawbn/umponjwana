@@ -10,6 +10,18 @@ const PREVIEW_PARAGRAPHS = 2
 const MAX_CHARS_BEFORE_SPLIT = 320
 const SENTENCES_PER_SYNTHETIC_PARAGRAPH = 3
 
+// Splits on sentence-ending punctuation, but a paragraph that trails off
+// without one (no closing '.', '!' or '?') would otherwise have that final
+// clause silently dropped — regex.match() only returns what it matched, not
+// the untouched remainder — so any leftover text is appended as its own
+// sentence rather than lost.
+function splitSentences(text: string): string[] {
+  const sentences: string[] = text.match(/[^.!?]+[.!?]+(\s+|$)/g) ?? []
+  const remainder = text.slice(sentences.join('').length).trim()
+  if (remainder) sentences.push(remainder)
+  return sentences.length ? sentences : [text]
+}
+
 function splitIntoParagraphs(text: string): string[] {
   const paragraphs = text.split(/\n+/).map(p => p.trim()).filter(Boolean)
   if (paragraphs.length === 0) return []
@@ -20,7 +32,7 @@ function splitIntoParagraphs(text: string): string[] {
 
   return paragraphs.flatMap(p => {
     if (p.length <= MAX_CHARS_BEFORE_SPLIT) return [p]
-    const sentences = p.match(/[^.!?]+[.!?]+(\s+|$)/g) ?? [p]
+    const sentences = splitSentences(p)
     const chunks: string[] = []
     for (let i = 0; i < sentences.length; i += SENTENCES_PER_SYNTHETIC_PARAGRAPH) {
       chunks.push(sentences.slice(i, i + SENTENCES_PER_SYNTHETIC_PARAGRAPH).join('').trim())

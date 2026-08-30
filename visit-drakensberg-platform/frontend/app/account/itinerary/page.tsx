@@ -22,7 +22,7 @@ import {
 } from '@/lib/messages'
 import SupplierMessageBlock from '@/components/messaging/SupplierMessageBlock'
 import { resolveLivePackages } from '@/components/tours/PackageEditor'
-import { formatMoney } from '@/lib/allocation'
+import { formatMoney, formatRate } from '@/lib/allocation'
 
 /* ── helpers ────────────────────────────────────────────── */
 function fmtLong(iso: string) {
@@ -784,8 +784,8 @@ function ItineraryInner() {
             </div>
             <div className="border-t border-gray-100 pt-3 space-y-1.5">
               <div className="flex justify-between font-sans text-sm text-gray-500"><span>Subtotal</span><span>{formatMoney(booking.subtotal)}</span></div>
-              <div className="flex justify-between font-sans text-sm text-gray-500"><span>Service fee (12%)</span><span>{formatMoney(booking.serviceFee)}</span></div>
-              <div className="flex justify-between font-sans text-sm text-gray-500"><span>VAT (15%)</span><span>{formatMoney(booking.vat)}</span></div>
+              <div className="flex justify-between font-sans text-sm text-gray-500"><span>Service fee{booking.serviceFeeRate !== undefined ? ` (${formatRate(booking.serviceFeeRate)})` : ''}</span><span>{formatMoney(booking.serviceFee)}</span></div>
+              <div className="flex justify-between font-sans text-sm text-gray-500"><span>VAT{booking.vatRate !== undefined ? ` (${formatRate(booking.vatRate)})` : ''}</span><span>{formatMoney(booking.vat)}</span></div>
               <div className="flex justify-between font-display italic text-xl text-[#2d6a4f] pt-2 border-t border-gray-100">
                 <span>Total paid</span><span>{formatMoney(booking.total)}</span>
               </div>

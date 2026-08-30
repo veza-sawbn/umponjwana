@@ -76,7 +76,14 @@ export default function RouteProfileChart({ trail }: { trail: Trail }) {
     const el = trackRef.current
     if (!el) return
     const rect = el.getBoundingClientRect()
-    const ratio = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width))
+    // The SVG stretches its VIEW_W-wide viewBox uniformly across rect.width
+    // (preserveAspectRatio="none"), so a pointer position first needs to be
+    // expressed in that same viewBox space before the chart's left/right
+    // padding can be subtracted out — the plotted line only runs from
+    // PAD_LEFT to VIEW_W - PAD_RIGHT, not edge to edge.
+    const xInViewBox = ((clientX - rect.left) / rect.width) * VIEW_W
+    const plotWidth = VIEW_W - PAD_LEFT - PAD_RIGHT
+    const ratio = Math.max(0, Math.min(1, (xInViewBox - PAD_LEFT) / plotWidth))
     setScrubKm(ratio * totalKm)
   }
 
