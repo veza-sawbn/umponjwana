@@ -12,6 +12,7 @@ import { Check } from 'lucide-react'
 import type { Property } from '@/lib/properties'
 import { getRoomUnitsLeft, type Room } from '@/lib/rooms'
 import { formatMoney } from '@/lib/allocation'
+import ReadMoreText from '@/components/ui/ReadMoreText'
 
 const AMENITY_ICONS: Record<string, React.ComponentType<any>> = {
   'Wi-Fi': Wifi, 'Swimming Pool': Waves, 'Braai Facilities': Flame, 'Restaurant': Utensils,
@@ -186,7 +187,7 @@ export default function StayDetail({ property, rooms: roomsData, id }: { propert
             {/* About */}
             <div>
               <h2 className="font-display italic text-2xl text-[#000000] mb-4">About this Stay</h2>
-              <p className="font-sans text-gray-700 leading-relaxed">{stay.description}</p>
+              <ReadMoreText text={stay.description} />
               {stay.checkIn && (
                 <div className="mt-4 flex gap-6 font-sans text-sm text-gray-500">
                   <span>Check-in: <strong>{stay.checkIn}</strong></span>

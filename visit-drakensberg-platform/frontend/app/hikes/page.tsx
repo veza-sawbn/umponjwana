@@ -9,7 +9,7 @@ import { regionsMatch } from '@/lib/regions'
 import { getReserves, type Reserve } from '@/lib/reserves'
 import TrailExperiences from '@/components/experiences/TrailExperiences'
 import { getUpcomingExperiences, type TrekkingExperience } from '@/lib/experiences'
-import RouteArtwork from '@/components/trails/RouteArtwork'
+import ExploreCard from '@/components/trails/ExploreCard'
 import { StayDistance } from '@/lib/stay-distance'
 import { ROUTE_TYPES } from '@/lib/gpx'
 
@@ -220,33 +220,24 @@ export default function HikesPage() {
               {filtered.map((t) => {
                 const start = trailStartPoint(t)
                 return (
-                <Link key={t.id} href={`/hikes/${t.id}`} className="group block">
-                  <div className="relative overflow-hidden aspect-[4/3] mb-4">
-                    <img loading="lazy" decoding="async" src={t.image} alt={t.name}
-                      className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" />
-                    <div className="absolute inset-0 bg-black/25" />
-                    {t.analytics?.routeArtworkSvg && (
-                      <div className="pointer-events-none absolute bottom-3 right-3 h-12 w-20">
-                        <RouteArtwork trail={t} tone="white" className="h-full w-full" />
-                      </div>
-                    )}
-                    <span
-                      className="absolute bottom-3 left-3 font-sans text-[10px] px-2.5 py-1 uppercase tracking-wide"
-                      style={{ background: DIFF_COLOR[t.difficulty] + 'dd', color: '#fff' }}
-                    >
-                      {t.difficulty}
-                    </span>
-                    {trailCategory(t) === 'speciality_walk' && t.speciality_type && (
-                      <span className="absolute bottom-3 right-3 font-sans text-[10px] px-2.5 py-1 uppercase tracking-wide bg-gold/90 text-forest">
-                        {t.speciality_type}
-                      </span>
-                    )}
-                  </div>
-                  <p className="font-sans text-[10px] tracking-[0.15em] uppercase text-gold mb-1">{t.region}</p>
-                  <h3 className="font-display text-xl text-forest leading-snug mb-2 group-hover:text-sage transition-colors">{t.name}</h3>
-                  <p className="font-sans text-xs text-forest/40">{t.distance} · {t.elevation} · {t.duration}</p>
-                  <StayDistance lat={start?.lat} lng={start?.lng} className="mt-1" />
-                </Link>
+                <ExploreCard
+                  key={t.id}
+                  href={`/hikes/${t.id}`}
+                  image={t.image}
+                  imageAlt={t.name}
+                  eyebrow={t.region}
+                  title={t.name}
+                  difficultyLabel={t.difficulty}
+                  difficultyColor={DIFF_COLOR[t.difficulty]}
+                  bottomRightBadge={trailCategory(t) === 'speciality_walk' ? t.speciality_type : undefined}
+                  routeArtworkTrail={t}
+                  meta={
+                    <>
+                      <p className="font-sans text-xs text-forest/40">{t.distance} · {t.elevation} · {t.duration}</p>
+                      <StayDistance lat={start?.lat} lng={start?.lng} className="mt-1" />
+                    </>
+                  }
+                />
                 )
               })}
             </div>

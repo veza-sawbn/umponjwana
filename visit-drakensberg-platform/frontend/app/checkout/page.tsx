@@ -14,6 +14,7 @@ import { getSupplierEntities } from '@/lib/supplier-entities'
 import { supabase } from '@/lib/auth'
 import { trackEvent, AnalyticsEvent, getAnalyticsIds } from '@/lib/analytics'
 import { formatMoney } from '@/lib/allocation'
+import { getFinanceSettings } from '@/lib/invoices'
 
 function formatDate(iso: string) {
   if (!iso) return ''
@@ -30,6 +31,19 @@ export default function CheckoutPage() {
   const [email, setEmail] = useState('')
   const [phone, setPhone] = useState('')
   const [specialRequests, setSpecialRequests] = useState('')
+  // Service fee / VAT rates come from the admin-editable website settings
+  // module (vd_finance_settings) — never hardcoded here, so a rate change
+  // there is reflected at checkout without a code change. The defaults
+  // below only cover the brief window before the real settings load.
+  const [serviceFeeRate, setServiceFeeRate] = useState(0.12)
+  const [vatRate, setVatRate] = useState(0.15)
+
+  useEffect(() => {
+    getFinanceSettings().then(s => {
+      setServiceFeeRate(s.serviceFeeRate)
+      setVatRate(s.vatRate)
+    })
+  }, [])
 
   const isEmpty = !booking.stay && booking.addons.length === 0 && booking.shuttles.length === 0
 
@@ -64,8 +78,8 @@ export default function CheckoutPage() {
   const addonTotal = booking.addons.reduce((s, a) => s + a.price_per_person * a.guests, 0)
   const shuttleTotal = booking.shuttles.reduce((sum, s) => sum + s.price, 0)
   const subtotal = stayTotal + addonTotal + shuttleTotal
-  const serviceFee = Math.round(subtotal * 0.12)
-  const tax = Math.round((subtotal + serviceFee) * 0.15)
+  const serviceFee = Math.round(subtotal * serviceFeeRate)
+  const tax = Math.round((subtotal + serviceFee) * vatRate)
   const total = subtotal + serviceFee + tax
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -353,11 +367,11 @@ export default function CheckoutPage() {
 
                 <div className="space-y-2 mb-5 pb-5 border-b border-white/10">
                   <div className="flex justify-between font-sans text-sm text-white/60">
-                    <span>Service fee</span>
+                    <span>Service fee ({(serviceFeeRate * 100).toFixed(serviceFeeRate * 100 % 1 === 0 ? 0 : 1)}%)</span>
                     <span>{formatMoney(serviceFee)}</span>
                   </div>
                   <div className="flex justify-between font-sans text-sm text-white/60">
-                    <span>VAT (15%)</span>
+                    <span>VAT ({(vatRate * 100).toFixed(vatRate * 100 % 1 === 0 ? 0 : 1)}%)</span>
                     <span>{formatMoney(tax)}</span>
                   </div>
                 </div>

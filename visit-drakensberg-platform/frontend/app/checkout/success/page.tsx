@@ -287,8 +287,8 @@ function SuccessInner() {
               <p className="font-sans text-xs text-white/40 mb-5">Total · incl. service fee &amp; VAT</p>
               <div className="space-y-1.5 font-sans text-xs text-white/40 mb-5">
                 <div className="flex justify-between"><span>Subtotal</span><span>{formatMoney(booking.subtotal)}</span></div>
-                <div className="flex justify-between"><span>Service fee (12%)</span><span>{formatMoney(booking.serviceFee)}</span></div>
-                <div className="flex justify-between"><span>VAT (15%)</span><span>{formatMoney(booking.vat)}</span></div>
+                <div className="flex justify-between"><span>Service fee{booking.subtotal ? ` (${Math.round((booking.serviceFee / booking.subtotal) * 100)}%)` : ''}</span><span>{formatMoney(booking.serviceFee)}</span></div>
+                <div className="flex justify-between"><span>VAT{(booking.subtotal + booking.serviceFee) ? ` (${Math.round((booking.vat / (booking.subtotal + booking.serviceFee)) * 100)}%)` : ''}</span><span>{formatMoney(booking.vat)}</span></div>
               </div>
               <div className="flex items-center gap-2 text-white/40 text-xs">
                 <Mail size={12} />

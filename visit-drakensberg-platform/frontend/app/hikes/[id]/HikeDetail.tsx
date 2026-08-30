@@ -14,9 +14,11 @@ import type { TourDate } from '@/components/tours/UpcomingDepartures'
 import { CalendarPlus } from 'lucide-react'
 import TrailPlanner from '@/components/trails/TrailPlanner'
 import RouteArtwork from '@/components/trails/RouteArtwork'
+import RouteProfileChart from '@/components/trails/RouteProfileChart'
 import type { Property } from '@/lib/properties'
 import type { Activity } from '@/lib/activities'
 import { formatMoney } from '@/lib/allocation'
+import ReadMoreText from '@/components/ui/ReadMoreText'
 
 const DIFF_COLOR: Record<string, string> = { Easy: '#4A7251', Moderate: '#C9A96E', Hard: '#c0392b', Strenuous: '#c0392b', Extreme: '#7f1d1d' }
 const DIFF_BG: Record<string, string> = { Easy: '#4A725122', Moderate: '#C9A96E22', Hard: '#c0392b22', Strenuous: '#c0392b22', Extreme: '#7f1d1d22' }
@@ -165,7 +167,7 @@ export default function HikeDetail({
             {/* Description */}
             <div>
               <h2 className="font-display italic text-2xl text-[#000000] mb-4">About this Trail</h2>
-              <p className="font-sans text-gray-700 leading-relaxed">{trail.description}</p>
+              <ReadMoreText text={trail.description} />
             </div>
 
             {/* Trail highlights */}
@@ -231,29 +233,15 @@ export default function HikeDetail({
               </div>
             )}
 
-            {/* Elevation Profile (single-day only) */}
-            {!trail.is_multi_day && (
+            {/* Elevation / Route Profile (single-day only — multi-day trails get
+                the Daily Breakdown above instead) — driven by the trail's own
+                GPX analysis, not a decorative placeholder. */}
+            {!trail.is_multi_day && trail.analytics?.points.length ? (
               <div>
-                <h2 className="font-display italic text-2xl text-[#000000] mb-4">Elevation Profile</h2>
-                <div className="bg-white border border-gray-200 p-4">
-                  <svg viewBox="0 0 400 120" className="w-full h-32" preserveAspectRatio="none">
-                    <defs>
-                      <linearGradient id="elevGrad" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="0%" stopColor="#2d6a4f" stopOpacity="0.3" />
-                        <stop offset="100%" stopColor="#2d6a4f" stopOpacity="0.05" />
-                      </linearGradient>
-                    </defs>
-                    <polyline fill="url(#elevGrad)" stroke="#2d6a4f" strokeWidth="2"
-                      points="0,110 40,100 80,80 120,60 160,35 200,20 240,15 280,25 320,50 360,80 400,110 400,120 0,120" />
-                  </svg>
-                  <div className="flex justify-between font-sans text-xs text-gray-400 mt-1">
-                    <span>Start · {trail.trailhead}</span>
-                    <span>Summit</span>
-                    <span>Return</span>
-                  </div>
-                </div>
+                <h2 className="font-display italic text-2xl text-[#000000] mb-4">Route Profile</h2>
+                <RouteProfileChart trail={trail} />
               </div>
-            )}
+            ) : null}
 
             {/* Gallery */}
             {(trail.gallery.length > 0 || trail.image) && (

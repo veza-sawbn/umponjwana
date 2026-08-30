@@ -11,6 +11,7 @@ import { Check, Plus } from 'lucide-react'
 import type { Activity } from '@/lib/activities'
 import { timeslotsForDate, slotRemaining } from '@/lib/activities'
 import { formatMoney } from '@/lib/allocation'
+import ReadMoreText from '@/components/ui/ReadMoreText'
 
 function mapActivityToView(a: Activity) {
   const durationParts = []
@@ -128,7 +129,7 @@ export default function ActivityDetail({ activityData, id }: { activityData: Act
           <div className="lg:col-span-2 space-y-12">
             <div>
               <h2 className="font-display italic text-2xl text-[#000000] mb-4">About this Experience</h2>
-              <p className="font-sans text-gray-700 leading-relaxed">{activity.description}</p>
+              <ReadMoreText text={activity.description} />
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8">

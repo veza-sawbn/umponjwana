@@ -12,6 +12,7 @@ import {
 import { getExperiencesByTrail, resolvePackageItinerary, type TrekkingExperience } from '@/lib/experiences'
 import { useBooking } from '@/lib/booking-context'
 import { formatMoney } from '@/lib/allocation'
+import ReadMoreText from '@/components/ui/ReadMoreText'
 
 const DIFF_COLOR: Record<string, string> = {
   Easy: '#4A7251', Moderate: '#C9A96E', Challenging: '#c0392b', Extreme: '#8e44ad', Strenuous: '#c0392b',
@@ -172,7 +173,7 @@ export default function ExperienceDetail({ exp }: { exp: TrekkingExperience }) {
             {/* About */}
             <div>
               <h2 className="font-display italic text-2xl text-[#000000] mb-4">About this Experience</h2>
-              <p className="font-sans text-gray-700 leading-relaxed">{exp.description}</p>
+              <ReadMoreText text={exp.description} />
             </div>
 
             {/* Included services */}
