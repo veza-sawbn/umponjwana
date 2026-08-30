@@ -27,6 +27,16 @@ export type SavedBooking = {
   serviceFee: number
   vat: number
   total: number
+  /**
+   * The service-fee / VAT rates actually applied to this booking's amounts
+   * above, straight from vd_finance_settings at checkout time — not
+   * hardcoded, and not re-derived later from the rounded money amounts
+   * (which distorts a configured fractional rate, e.g. 12.5%). Optional:
+   * bookings saved before this existed don't carry it; callers that display
+   * a rate should fall back to omitting the percentage rather than
+   * guessing. */
+  serviceFeeRate?: number
+  vatRate?: number
   status: 'pending' | 'confirmed' | 'cancelled'
   createdAt: string
   /** The visitor session that created this booking (§21), carried through

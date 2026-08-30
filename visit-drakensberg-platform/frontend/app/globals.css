@@ -63,6 +63,16 @@ body {
   background: #b8935a;
 }
 
+/* Hides the scrollbar on an element that still scrolls (drag/swipe/JS) —
+   used by horizontal card carousels where a visible scrollbar looks noisy. */
+.scrollbar-none {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.scrollbar-none::-webkit-scrollbar {
+  display: none;
+}
+
 /* Selection */
 ::selection {
   background-color: #C9A96E;

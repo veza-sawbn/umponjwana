@@ -11,6 +11,7 @@ import type { Tour } from '@/lib/tours'
 import type { NearbyStayResult } from '@/lib/modules'
 import NearbyStaysModule from '@/components/modules/NearbyStaysModule'
 import { formatMoney } from '@/lib/allocation'
+import ReadMoreText from '@/components/ui/ReadMoreText'
 
 const DIFF_COLOR: Record<string, string> = { Easy: '#4A7251', Moderate: '#C9A96E', Strenuous: '#c0392b', Extreme: '#7f1d1d' }
 
@@ -98,7 +99,7 @@ export default function TourDetail({ tour, nearbyStays }: { tour: Tour; nearbySt
           <div className="lg:col-span-2 space-y-12">
             <div>
               <h2 className="font-display italic text-2xl text-[#000000] mb-4">About this Tour</h2>
-              <p className="font-sans text-gray-700 leading-relaxed">{tour.description}</p>
+              <ReadMoreText text={tour.description} />
             </div>
 
             {tour.included?.length > 0 && (

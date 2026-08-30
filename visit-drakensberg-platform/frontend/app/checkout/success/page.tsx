@@ -7,7 +7,7 @@ import toast from 'react-hot-toast'
 import Footer from '@/components/layout/Footer'
 import { CheckCircle, Download, Calendar, MapPin, Users, ArrowRight, Mail, Mountain, Bus, Printer, CreditCard, Loader2 } from 'lucide-react'
 import { getBookingById, type SavedBooking } from '@/lib/bookings'
-import { formatMoney } from '@/lib/allocation'
+import { formatMoney, formatRate } from '@/lib/allocation'
 
 function fmt(iso: string) {
   if (!iso) return '—'
@@ -287,8 +287,8 @@ function SuccessInner() {
               <p className="font-sans text-xs text-white/40 mb-5">Total · incl. service fee &amp; VAT</p>
               <div className="space-y-1.5 font-sans text-xs text-white/40 mb-5">
                 <div className="flex justify-between"><span>Subtotal</span><span>{formatMoney(booking.subtotal)}</span></div>
-                <div className="flex justify-between"><span>Service fee (12%)</span><span>{formatMoney(booking.serviceFee)}</span></div>
-                <div className="flex justify-between"><span>VAT (15%)</span><span>{formatMoney(booking.vat)}</span></div>
+                <div className="flex justify-between"><span>Service fee{booking.serviceFeeRate !== undefined ? ` (${formatRate(booking.serviceFeeRate)})` : ''}</span><span>{formatMoney(booking.serviceFee)}</span></div>
+                <div className="flex justify-between"><span>VAT{booking.vatRate !== undefined ? ` (${formatRate(booking.vatRate)})` : ''}</span><span>{formatMoney(booking.vat)}</span></div>
               </div>
               <div className="flex items-center gap-2 text-white/40 text-xs">
                 <Mail size={12} />

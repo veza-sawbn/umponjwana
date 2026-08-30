@@ -3,10 +3,14 @@ import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import Footer from '@/components/layout/Footer'
 import EditablePageHeader from '@/components/editor/EditablePageHeader'
-import { Mountain, Users, Star } from 'lucide-react'
+import { Users, Star } from 'lucide-react'
 import { getTours, type Tour } from '@/lib/tours'
+import { getTrails, type Trail } from '@/lib/trails'
+import { getOperators, type OperatorProfile } from '@/lib/operators'
 import { regionsMatch } from '@/lib/regions'
 import { formatMoney } from '@/lib/allocation'
+import ExploreCard from '@/components/trails/ExploreCard'
+import SupplierCarousel from '@/components/tours/SupplierCarousel'
 
 // Tours are the evergreen, bookable product layer — created once by a
 // supplier and reused across scheduled departures (see lib/departures.ts).
@@ -21,6 +25,8 @@ const DIFF_OPTS = ['All', 'Easy', 'Moderate', 'Strenuous', 'Extreme']
 
 export default function ToursPage() {
   const [tours, setTours] = useState<Tour[]>([])
+  const [trails, setTrails] = useState<Trail[]>([])
+  const [operators, setOperators] = useState<OperatorProfile[]>([])
   const [loading, setLoading] = useState(true)
   const [difficulty, setDifficulty] = useState('All')
   const [region, setRegion] = useState('All')
@@ -29,7 +35,20 @@ export default function ToursPage() {
     getTours()
       .then(all => setTours(all.filter(t => t.status === 'active')))
       .finally(() => setLoading(false))
+    // Each tour is built on a Trail (lib/trails.ts) — fetched here so its
+    // card can show the trail's real photo and route artwork, the same
+    // image and design /hikes' trail cards show for that trail.
+    getTrails().then(all => setTrails(all)).catch(() => setTrails([]))
+    getOperators().then(all => setOperators(all)).catch(() => setOperators([]))
   }, [])
+
+  const trailById = new Map(trails.map(t => [t.id, t]))
+
+  // Only operators actually running one of the tours listed here — the
+  // "Explore by Supplier" strip is a glimpse of who guests would be
+  // booking with, not the whole cross-platform directory.
+  const tourSupplierIds = new Set(tours.map(t => t.supplierId))
+  const tourSuppliers = operators.filter(o => tourSupplierIds.has(o.supplierId))
 
   const regionOpts = ['All', ...Array.from(new Set(tours.map(t => t.trailName).filter(Boolean)))]
 
@@ -80,40 +99,53 @@ export default function ToursPage() {
           </div>
         ) : (
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-10">
-            {filtered.map(t => (
-              <Link key={t.id} href={`/tours/${t.id}`} className="group block">
-                <div className="relative overflow-hidden aspect-[4/3] mb-4 bg-[#2d6a4f]/10 flex items-center justify-center">
-                  <Mountain className="w-10 h-10 text-forest/20" />
-                  {t.featured && (
-                    <span className="absolute top-3 left-3 font-sans text-[10px] tracking-[0.15em] uppercase bg-gold text-forest px-2.5 py-1">
-                      Featured
-                    </span>
-                  )}
-                  <span
-                    className="absolute bottom-3 left-3 font-sans text-[10px] px-2.5 py-1 uppercase tracking-wide text-white"
-                    style={{ background: (DIFF_COLOR[t.difficulty] || '#2d6a4f') + 'dd' }}
-                  >
-                    {t.difficulty}
-                  </span>
-                </div>
-                <p className="font-sans text-[10px] tracking-[0.15em] uppercase text-gold mb-1">
-                  {t.trailName || 'Drakensberg'}{t.days ? ` · ${t.days} day${t.days !== 1 ? 's' : ''}` : ''}
-                </p>
-                <h3 className="font-display text-xl text-forest leading-snug mb-2 group-hover:text-sage transition-colors">{t.name}</h3>
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3 font-sans text-xs text-forest/40">
-                    {t.maxGroup ? <span className="flex items-center gap-1"><Users size={11} /> up to {t.maxGroup}</span> : null}
-                    {t.rating ? (
-                      <span className="flex items-center gap-1"><Star size={11} className="text-gold fill-gold" /> {t.rating}</span>
-                    ) : null}
-                  </div>
-                  <span>
-                    <span className="font-display text-lg text-forest">{formatMoney(t.pricePerPerson)}</span>
-                    <span className="font-sans text-xs text-forest/40"> pp</span>
-                  </span>
-                </div>
-              </Link>
-            ))}
+            {filtered.map(t => {
+              const trail = trailById.get(t.trailId)
+              return (
+                <ExploreCard
+                  key={t.id}
+                  href={`/tours/${t.id}`}
+                  image={trail?.image}
+                  imageAlt={t.name}
+                  eyebrow={`${t.trailName || 'Drakensberg'}${t.days ? ` · ${t.days} day${t.days !== 1 ? 's' : ''}` : ''}`}
+                  title={t.name}
+                  difficultyLabel={t.difficulty}
+                  difficultyColor={DIFF_COLOR[t.difficulty] || '#2d6a4f'}
+                  topLeftBadge={t.featured ? 'Featured' : undefined}
+                  routeArtworkTrail={trail}
+                  meta={
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3 font-sans text-xs text-forest/40">
+                        {t.maxGroup ? <span className="flex items-center gap-1"><Users size={11} /> up to {t.maxGroup}</span> : null}
+                        {t.rating ? (
+                          <span className="flex items-center gap-1"><Star size={11} className="text-gold fill-gold" /> {t.rating}</span>
+                        ) : null}
+                      </div>
+                      <span>
+                        <span className="font-display text-lg text-forest">{formatMoney(t.pricePerPerson)}</span>
+                        <span className="font-sans text-xs text-forest/40"> pp</span>
+                      </span>
+                    </div>
+                  }
+                />
+              )
+            })}
+          </div>
+        )}
+
+        {/* Explore by supplier — a glimpse of each operator's profile,
+            auto-sliding on the mobile shell; opens their full profile. */}
+        {tourSuppliers.length > 0 && (
+          <div className="mt-16">
+            <div className="h-px bg-black/8 mb-10" />
+            <div className="mb-8">
+              <p className="font-sans text-xs tracking-[0.2em] uppercase text-gold mb-2">Meet the Operators</p>
+              <h2 className="font-display text-3xl text-forest leading-none mb-2">Explore by Supplier</h2>
+              <p className="font-sans text-sm text-forest/50">
+                Every guided tour above is run by one of these verified Drakensberg operators — open a profile to see their full team, certifications and track record.
+              </p>
+            </div>
+            <SupplierCarousel operators={tourSuppliers} />
           </div>
         )}
       </div>

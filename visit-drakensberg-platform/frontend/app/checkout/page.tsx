@@ -13,7 +13,8 @@ import { bookActivityTimeslot, releaseActivityTimeslot } from '@/lib/activities'
 import { getSupplierEntities } from '@/lib/supplier-entities'
 import { supabase } from '@/lib/auth'
 import { trackEvent, AnalyticsEvent, getAnalyticsIds } from '@/lib/analytics'
-import { formatMoney } from '@/lib/allocation'
+import { formatMoney, formatRate } from '@/lib/allocation'
+import { getFinanceSettings } from '@/lib/invoices'
 
 function formatDate(iso: string) {
   if (!iso) return ''
@@ -30,6 +31,24 @@ export default function CheckoutPage() {
   const [email, setEmail] = useState('')
   const [phone, setPhone] = useState('')
   const [specialRequests, setSpecialRequests] = useState('')
+  // Service fee / VAT rates come from the admin-editable website settings
+  // module (vd_finance_settings) — never hardcoded here, so a rate change
+  // there is reflected at checkout without a code change. The defaults
+  // below only cover the brief window before the real settings load.
+  const [serviceFeeRate, setServiceFeeRate] = useState(0.12)
+  const [vatRate, setVatRate] = useState(0.15)
+  // Submission is blocked until the real rates are in: vd_create_order
+  // independently recalculates the invoice from the database settings, so
+  // submitting on the (possibly wrong) 12%/15% defaults could charge a
+  // total that doesn't match what this page just showed the guest.
+  const [settingsLoaded, setSettingsLoaded] = useState(false)
+
+  useEffect(() => {
+    getFinanceSettings().then(s => {
+      setServiceFeeRate(s.serviceFeeRate)
+      setVatRate(s.vatRate)
+    }).finally(() => setSettingsLoaded(true))
+  }, [])
 
   const isEmpty = !booking.stay && booking.addons.length === 0 && booking.shuttles.length === 0
 
@@ -64,13 +83,13 @@ export default function CheckoutPage() {
   const addonTotal = booking.addons.reduce((s, a) => s + a.price_per_person * a.guests, 0)
   const shuttleTotal = booking.shuttles.reduce((sum, s) => sum + s.price, 0)
   const subtotal = stayTotal + addonTotal + shuttleTotal
-  const serviceFee = Math.round(subtotal * 0.12)
-  const tax = Math.round((subtotal + serviceFee) * 0.15)
+  const serviceFee = Math.round(subtotal * serviceFeeRate)
+  const tax = Math.round((subtotal + serviceFee) * vatRate)
   const total = subtotal + serviceFee + tax
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!agreed || isEmpty) return
+    if (!agreed || isEmpty || !settingsLoaded) return
     setLoading(true)
     try {
       const { data: { user } } = await supabase.auth.getUser()
@@ -159,6 +178,8 @@ export default function CheckoutPage() {
         subtotal,
         serviceFee,
         vat: tax,
+        serviceFeeRate,
+        vatRate,
         total,
         status: 'pending',
         analyticsAnonId,
@@ -353,11 +374,11 @@ export default function CheckoutPage() {
 
                 <div className="space-y-2 mb-5 pb-5 border-b border-white/10">
                   <div className="flex justify-between font-sans text-sm text-white/60">
-                    <span>Service fee</span>
+                    <span>Service fee ({formatRate(serviceFeeRate)})</span>
                     <span>{formatMoney(serviceFee)}</span>
                   </div>
                   <div className="flex justify-between font-sans text-sm text-white/60">
-                    <span>VAT (15%)</span>
+                    <span>VAT ({formatRate(vatRate)})</span>
                     <span>{formatMoney(tax)}</span>
                   </div>
                 </div>
@@ -372,8 +393,8 @@ export default function CheckoutPage() {
                   <span className="font-sans text-xs">{booking.guests} guest{booking.guests !== 1 ? 's' : ''}{nights > 0 ? ` · ${nights} night${nights !== 1 ? 's' : ''}` : ''}</span>
                 </div>
 
-                <button type="submit" disabled={!agreed || loading} className={`w-full py-4 font-sans text-sm font-medium transition-colors ${agreed && !loading ? 'bg-[#C9A96E] text-[#000000] hover:bg-[#b8945a]' : 'bg-white/10 text-white/30 cursor-not-allowed'}`}>
-                  {loading ? 'Redirecting to payment…' : `Continue to Payment — ${formatMoney(total)}`}
+                <button type="submit" disabled={!agreed || loading || !settingsLoaded} className={`w-full py-4 font-sans text-sm font-medium transition-colors ${agreed && !loading && settingsLoaded ? 'bg-[#C9A96E] text-[#000000] hover:bg-[#b8945a]' : 'bg-white/10 text-white/30 cursor-not-allowed'}`}>
+                  {loading ? 'Redirecting to payment…' : !settingsLoaded ? 'Loading rates…' : `Continue to Payment — ${formatMoney(total)}`}
                 </button>
                 <div className="flex items-center justify-center gap-2 mt-4 text-white/30">
                   <ShieldCheck size={12} />
