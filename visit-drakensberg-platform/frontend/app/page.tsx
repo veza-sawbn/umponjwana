@@ -96,7 +96,7 @@ function RegionsCarousel({ regions, inEditor }: { regions: HomeCard[]; inEditor:
       slidesPerView={1.15}
       spaceBetween={12}
       grabCursor
-      className="!pb-1 !overflow-visible"
+      className="!pb-1"
     >
       {regions.map((r, index) => (
         <SwiperSlide key={r.id} className={`h-auto self-stretch ${cardDimClass(r, inEditor)}`}>
