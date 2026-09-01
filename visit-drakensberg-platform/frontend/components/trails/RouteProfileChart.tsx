@@ -77,13 +77,15 @@ export default function RouteProfileChart({ trail }: { trail: Trail }) {
     return { linePath: line, areaPath: area }
   }, [points, totalKm, xForKm, yForEle])
 
+  const rawWaypoints = trail.waypoints ?? analysis?.waypoints ?? []
+
   // Waypoints projected onto the drawn curve — snapped to the nearest track
   // point (by lat/lon) so a marker always sits exactly on the plotted line
   // rather than at the waypoint's own (possibly slightly off) recorded
   // elevation. Numbered in distance order, same convention as a trail-guide
   // profile diagram keyed to numbered points on a map.
   const waypointMarks: WaypointMark[] = useMemo(() => {
-    const wps = trail.waypoints ?? analysis?.waypoints ?? []
+    const wps = rawWaypoints
     if (!points.length || !wps.length) return []
     return wps
       .map(w => {
@@ -184,7 +186,7 @@ export default function RouteProfileChart({ trail }: { trail: Trail }) {
       </div>
 
       {view === 'route' ? (
-        <MapboxRouteMap points={points} />
+        <MapboxRouteMap points={points} waypoints={rawWaypoints} />
       ) : (
         <>
           <div className="flex gap-2">
