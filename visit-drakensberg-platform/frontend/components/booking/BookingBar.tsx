@@ -40,7 +40,7 @@ export default function BookingBar() {
 
   return (
     <motion.div
-      className="fixed bottom-0 inset-x-0 z-40 shadow-2xl"
+      className="print:hidden fixed bottom-0 inset-x-0 z-40 shadow-2xl"
       initial={{ y: '100%' }}
       animate={{ y: visible ? 0 : '100%' }}
       transition={{ type: 'spring', stiffness: 380, damping: 32 }}
