@@ -26,7 +26,6 @@ const COLUMNS = [
       { label: 'Northern Drakensberg', href: '/regions#northern' },
       { label: 'Central Drakensberg', href: '/regions#central' },
       { label: 'Southern Drakensberg', href: '/regions#southern' },
-      { label: 'Royal Natal', href: '/regions#royal-natal' },
     ],
   },
   {
@@ -42,7 +41,6 @@ const COLUMNS = [
   {
     heading: 'Company',
     links: [
-      { label: 'About', href: '/about' },
       { label: 'List With Us', href: '/list-with-us' },
       { label: 'Privacy Policy', href: '/privacy' },
       { label: 'Terms of Use', href: '/terms' },

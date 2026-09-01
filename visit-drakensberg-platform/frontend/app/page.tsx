@@ -225,6 +225,28 @@ function HeroSection({ hero }: { hero: typeof SITE_CONTENT_DEFAULTS.hero }) {
   )
 }
 
+/* ─── Regions ────────────────────────────────────────────────────────────────── */
+
+// Shared by the mobile carousel and the desktop grid so both render the
+// exact same card — only the surrounding layout differs.
+function RegionCardBody({ region: r }: { region: HomeCard }) {
+  return (
+    <Link href={String(r.href || '/regions')} className="group block">
+      <div className="relative overflow-hidden aspect-[4/3] mb-4">
+        <img loading="lazy" decoding="async"
+          src={String(r.img)}
+          alt={String(r.name)}
+          className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+          style={{ willChange: 'transform' }}
+        />
+      </div>
+      <p className="font-sans text-[10px] tracking-[0.15em] uppercase text-gold mb-1">{r.subtitle}</p>
+      <h3 className="font-display text-2xl text-forest mb-2">{r.name}</h3>
+      <p className="font-sans text-sm text-forest/55 leading-relaxed">{r.desc}</p>
+    </Link>
+  )
+}
+
 /* ─── Events & Experiences columns ──────────────────────────────────────────── */
 
 function MiniListItem({ item }: { item: MiniListItemData }) {
@@ -430,8 +452,20 @@ export default function HomePage() {
           </Link>
         </div>
 
+        {/* Mobile shell: swipeable carousel, one region peeking the next */}
+        <div className="flex md:hidden gap-4 overflow-x-auto snap-x snap-mandatory scrollbar-none -mx-6 px-6 pb-1">
+          {regions.map((r, index) => (
+            <div key={r.id} className={`w-[78%] shrink-0 snap-start ${cardDimClass(r, inEditor)}`}>
+              <EditableCard contentKey="home_cards" fieldKey="regions" index={index} label={String(r.name ?? 'Region Card')}>
+                <RegionCardBody region={r} />
+              </EditableCard>
+            </div>
+          ))}
+        </div>
+
+        {/* Desktop: static grid */}
         <motion.div
-          className="grid md:grid-cols-3 gap-6"
+          className="hidden md:grid grid-cols-3 gap-6"
           variants={staggerContainer(0.08)}
           initial="hidden"
           whileInView="show"
@@ -440,19 +474,7 @@ export default function HomePage() {
           {regions.map((r, index) => (
             <motion.div key={r.id} variants={staggerChild} className={cardDimClass(r, inEditor)}>
               <EditableCard contentKey="home_cards" fieldKey="regions" index={index} label={String(r.name ?? 'Region Card')}>
-                <Link href={String(r.href || '/regions')} className="group block">
-                  <div className="relative overflow-hidden aspect-[4/3] mb-4">
-                    <img loading="lazy" decoding="async"
-                      src={String(r.img)}
-                      alt={String(r.name)}
-                      className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
-                      style={{ willChange: 'transform' }}
-                    />
-                  </div>
-                  <p className="font-sans text-[10px] tracking-[0.15em] uppercase text-gold mb-1">{r.subtitle}</p>
-                  <h3 className="font-display text-2xl text-forest mb-2">{r.name}</h3>
-                  <p className="font-sans text-sm text-forest/55 leading-relaxed">{r.desc}</p>
-                </Link>
+                <RegionCardBody region={r} />
               </EditableCard>
             </motion.div>
           ))}
