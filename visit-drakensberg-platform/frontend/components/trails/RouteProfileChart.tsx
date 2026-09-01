@@ -3,6 +3,7 @@ import { useCallback, useMemo, useRef, useState } from 'react'
 import { Home } from 'lucide-react'
 import type { Trail } from '@/lib/trails'
 import type { GpxPoint, TrailWaypoint } from '@/lib/gpx'
+import MapboxRouteMap from './MapboxRouteMap'
 
 // Clean, GPX-driven height profile: elevation over distance, x-axis in km,
 // y-axis in metres with gridlines, and named waypoints marked along the
@@ -11,11 +12,12 @@ import type { GpxPoint, TrailWaypoint } from '@/lib/gpx'
 // off the trail's own GPX waypoints), plus a draggable circular marker that
 // reads off elevation at any point along the route. Deliberately a single
 // trail-green fill throughout — no colour-coding by slope/gradient.
-// "Map View" swaps the same marker onto the actual route traced over a
-// real Mapbox outdoors/terrain tile (still driven by the same distance
-// scrubber), so both views answer "where am I / how high am I" the same
-// way. Renders for any trail with GPX track data — day hike, multi-day, or
-// speciality walk alike.
+// "Map View" is a real, pannable/zoomable Mapbox map (MapboxRouteMap) with
+// the route drawn on it and the same scrub marker on it — click the map to
+// move the marker, or drag the Elevation Profile to move it there. Falls
+// back to a schematic top-down trace if no Mapbox token is configured or
+// the map fails to load. Renders for any trail with GPX track data — day
+// hike, multi-day, or speciality walk alike.
 
 const VIEW_W = 640
 const VIEW_H = 260
@@ -26,18 +28,13 @@ const PAD_BOTTOM = 28
 const MIN_LABEL_GAP_PX = 42 // viewBox units — skip a label if it would crowd the previous one
 
 // Map view is a fixed-aspect box (rather than the elevation chart's
-// stretch-to-fill box) so the underlying satellite/terrain image is never
-// distorted.
+// stretch-to-fill box) so both the real map and the schematic fallback keep
+// a consistent, undistorted shape.
 const MAP_W = 640
 const MAP_H = 400
-// Generous margin around the fitted bounds — protects short/tight trails
-// (where the fit-bounds zoom is high) from the line's own stroke width, the
-// scrub marker's radius, or a switchback's chord momentarily poking past a
-// bounding box drawn with zero breathing room.
-const MAP_PAD = 40
+const MAP_PAD = 40 // fallback-trace margin only — the real map fits its own bounds
 
 const MAPBOX_TOKEN = process.env.NEXT_PUBLIC_MAPBOX_TOKEN
-const MAPBOX_STYLE = 'mapbox/outdoors-v12' // built for exactly this — trails, contours, terrain shading
 
 type WaypointMark = { id: string; name: string; category: TrailWaypoint['category']; distanceKm: number; ele: number }
 
@@ -61,85 +58,6 @@ function niceStep(range: number, count: number): number {
   return nice * mag
 }
 
-// ── Web Mercator projection — the same EPSG:3857 projection every slippy-
-// map provider (Mapbox, Google, OSM) renders its tiles in, so a route drawn
-// with these formulas lines up with the fetched map tile underneath
-// regardless of which provider it came from. 256px tiles, standard
-// world-coordinate conversion.
-const TILE_SIZE = 256
-function mercatorWorld(lat: number, lng: number) {
-  const siny = Math.min(Math.max(Math.sin(lat * Math.PI / 180), -0.9999), 0.9999)
-  return {
-    x: TILE_SIZE / 2 + lng * (TILE_SIZE / 360),
-    y: TILE_SIZE / 2 + 0.5 * Math.log((1 + siny) / (1 - siny)) * -(TILE_SIZE / (2 * Math.PI)),
-  }
-}
-function latRad(lat: number) {
-  const sin = Math.sin(lat * Math.PI / 180)
-  const rad = Math.log((1 + sin) / (1 - sin)) / 2
-  return Math.max(Math.min(rad, Math.PI), -Math.PI) / 2
-}
-/** Integer zoom that fits a lat/lon bounding box inside w×h (minus padding) — same "fit bounds" math Google Maps itself uses. */
-function zoomForBounds(minLat: number, maxLat: number, minLon: number, maxLon: number, w: number, h: number, pad: number): number {
-  const ZOOM_MAX = 18
-  const latFraction = (latRad(maxLat) - latRad(minLat)) / Math.PI
-  let lonDiff = maxLon - minLon
-  if (lonDiff < 0) lonDiff += 360
-  const lonFraction = lonDiff / 360
-  const zoomFor = (px: number, fraction: number) => (fraction > 0 ? Math.floor(Math.log2(px / TILE_SIZE / fraction)) : ZOOM_MAX)
-  const latZoom = zoomFor(h - pad * 2, latFraction)
-  const lonZoom = zoomFor(w - pad * 2, lonFraction)
-  return Math.max(1, Math.min(latZoom, lonZoom, ZOOM_MAX))
-}
-
-// ── Server-drawn route line — the GPX track is encoded and handed to
-// Mapbox as a path overlay so *Mapbox itself* renders the line, in its own
-// projection, directly against its own basemap. That guarantees pixel-exact
-// alignment with the terrain — reconstructing Mapbox's rendering client-side
-// (as the line used to be drawn) only ever approximates it. Only the single
-// draggable scrub marker still uses the client-side projection (mapXY
-// below), since re-fetching a static image on every pointer-move isn't
-// viable — so the marker is snapped to the nearest vertex of this exact
-// same decimated point set (see decimatedPoints below) rather than the
-// full-resolution track, guaranteeing it always lands on a point Mapbox
-// actually rendered instead of one a dropped-for-decimation stretch of
-// line only approximates.
-const MAX_PATH_POINTS = 800 // well under Mapbox's URL length limit even doubled (casing + line)
-
-function decimate<T>(arr: T[], maxPoints: number): T[] {
-  if (arr.length <= maxPoints) return arr
-  const stride = Math.ceil(arr.length / maxPoints)
-  const out: T[] = []
-  for (let i = 0; i < arr.length; i += stride) out.push(arr[i])
-  if (out[out.length - 1] !== arr[arr.length - 1]) out.push(arr[arr.length - 1])
-  return out
-}
-
-/** Standard Google/Mapbox polyline encoding (precision 1e5). */
-function encodePolyline(coords: [number, number][]): string {
-  let output = ''
-  let prevLat = 0, prevLng = 0
-  const encodeNumber = (num: number) => {
-    let n = num, out = ''
-    while (n >= 0x20) {
-      out += String.fromCharCode((0x20 | (n & 0x1f)) + 63)
-      n >>= 5
-    }
-    return out + String.fromCharCode(n + 63)
-  }
-  for (const [lat, lng] of coords) {
-    const lat5 = Math.round(lat * 1e5)
-    const lng5 = Math.round(lng * 1e5)
-    for (const delta of [lat5 - prevLat, lng5 - prevLng]) {
-      const sgn = delta < 0 ? ~(delta << 1) : delta << 1
-      output += encodeNumber(sgn)
-    }
-    prevLat = lat5
-    prevLng = lng5
-  }
-  return output
-}
-
 function fmtKm(km: number) { return `${km.toFixed(km < 10 ? 1 : 0)} km` }
 function fmtM(m: number) { return `${Math.round(m)} m` }
 
@@ -149,7 +67,7 @@ export default function RouteProfileChart({ trail }: { trail: Trail }) {
   const [view, setView] = useState<'elevation' | 'route'>('elevation')
   const [dragging, setDragging] = useState(false)
   const [scrubKm, setScrubKm] = useState(0)
-  const [mapImgFailed, setMapImgFailed] = useState(false)
+  const [mapFailed, setMapFailed] = useState(false)
   const trackRef = useRef<HTMLDivElement>(null)
 
   const totalKm = analysis?.statistics.totalDistanceKm || points[points.length - 1]?.distanceKm || 0
@@ -172,48 +90,10 @@ export default function RouteProfileChart({ trail }: { trail: Trail }) {
     return { linePath: line, areaPath: area }
   }, [points, totalKm, xForKm, yForEle])
 
-  // Real map geometry: centre + integer zoom that fits the whole track,
-  // used both for the Static Maps image URL and for projecting every point
-  // onto that same image.
-  const mapGeo = useMemo(() => {
-    if (points.length === 0) return null
-    const lats = points.map(p => p.lat), lons = points.map(p => p.lon)
-    const minLat = Math.min(...lats), maxLat = Math.max(...lats)
-    const minLon = Math.min(...lons), maxLon = Math.max(...lons)
-    const center = { lat: (minLat + maxLat) / 2, lng: (minLon + maxLon) / 2 }
-    const zoom = zoomForBounds(minLat, maxLat, minLon, maxLon, MAP_W, MAP_H, MAP_PAD)
-    return { center, zoom }
-  }, [points])
+  const useRealMap = view === 'route' && !!MAPBOX_TOKEN && !mapFailed
 
-  const mapXY = useCallback((lat: number, lng: number) => {
-    if (!mapGeo) return { x: MAP_W / 2, y: MAP_H / 2 }
-    const scale = 2 ** mapGeo.zoom
-    const centerWorld = mercatorWorld(mapGeo.center.lat, mapGeo.center.lng)
-    const world = mercatorWorld(lat, lng)
-    return { x: (world.x - centerWorld.x) * scale + MAP_W / 2, y: (world.y - centerWorld.y) * scale + MAP_H / 2 }
-  }, [mapGeo])
-
-  // The exact same decimated point set feeds both the server-drawn overlay
-  // below and the marker snapping further down — so the marker can only
-  // ever land on a vertex Mapbox actually rendered, never on a
-  // full-resolution point a dropped-for-decimation stretch only approximates.
-  const decimatedPoints = useMemo(() => decimate(points, MAX_PATH_POINTS), [points])
-
-  // White casing + green line, drawn server-side by Mapbox against its own
-  // basemap — see the comment above encodePolyline for why.
-  const pathOverlay = useMemo(() => {
-    if (decimatedPoints.length < 2) return ''
-    const encoded = encodeURIComponent(encodePolyline(decimatedPoints.map(p => [p.lat, p.lon])))
-    return `path-5+ffffff-0.85(${encoded}),path-3+2d6a4f-1(${encoded})`
-  }, [decimatedPoints])
-
-  const staticMapUrl = mapGeo && MAPBOX_TOKEN && pathOverlay
-    ? `https://api.mapbox.com/styles/v1/${MAPBOX_STYLE}/static/${pathOverlay}/${mapGeo.center.lng},${mapGeo.center.lat},${mapGeo.zoom}/${MAP_W}x${MAP_H}@2x?access_token=${encodeURIComponent(MAPBOX_TOKEN)}`
-    : null
-  const useRealMap = view === 'route' && !!staticMapUrl && !mapImgFailed
-
-  // Bounding-box fallback trace (no API key, or the image failed to load) —
-  // a schematic top-down line, not a real map, same as before this feature.
+  // Bounding-box fallback trace (no Mapbox token, or the map failed to
+  // load) — a schematic top-down line, not a real map.
   const routeFallback = useMemo(() => {
     if (points.length === 0) return { path: '', xy: (_p: GpxPoint) => ({ x: 0, y: 0 }) }
     const lats = points.map(p => p.lat), lons = points.map(p => p.lon)
@@ -271,14 +151,9 @@ export default function RouteProfileChart({ trail }: { trail: Trail }) {
   if (points.length === 0 || totalKm === 0) return null
 
   const current = nearestPoint(points, scrubKm)
-  // On the real map, snap to the nearest point Mapbox actually drew (the
-  // decimated set), not the full-resolution track — otherwise the marker
-  // can land on a stretch of line decimation dropped, appearing to sit off
-  // the rendered path.
-  const mapCurrent = decimatedPoints.length ? nearestPoint(decimatedPoints, scrubKm) : current
   const markerPos = view === 'elevation'
     ? { x: xForKm(current.distanceKm), y: yForEle(current.ele) }
-    : useRealMap ? mapXY(mapCurrent.lat, mapCurrent.lon) : routeFallback.xy(current)
+    : routeFallback.xy(current) // only used by the SVG fallback — the real map positions its own marker
 
   function scrubFromClientX(clientX: number) {
     const el = trackRef.current
@@ -295,10 +170,11 @@ export default function RouteProfileChart({ trail }: { trail: Trail }) {
     setScrubKm(ratio * totalKm)
   }
 
-  // Only the elevation view is drag-scrubbable — a real map's horizontal
-  // pixels don't correspond linearly to distance along a winding trail, so
-  // the map view instead just displays wherever the scrubber was last left
-  // (see the caption below).
+  // Only the elevation view is drag-scrubbable this way — on the real map,
+  // dragging pans the map (mapbox-gl's own gesture handling), and a single
+  // click there jumps the scrubber instead (see MapboxRouteMap's onScrub).
+  // On the schematic fallback (no real map), horizontal drag position still
+  // doesn't correspond to distance along a winding trail, so it's inert too.
   function onPointerDown(e: React.PointerEvent) {
     if (view !== 'elevation') return
     e.currentTarget.setPointerCapture(e.pointerId)
@@ -373,82 +249,74 @@ export default function RouteProfileChart({ trail }: { trail: Trail }) {
               : 'relative flex-1 min-w-0 select-none aspect-[8/5] overflow-hidden rounded-sm bg-[#e9e5dc]'
           }
         >
-          {/* Real Mapbox outdoors/terrain tile behind the route trace. Falls
-              back silently (onError) to the schematic bounding-box trace if
-              the token is missing, unset for this project, or the request
-              fails — the interactive scrubber still works either way. */}
-          {view === 'route' && staticMapUrl && !mapImgFailed && (
-            <img
-              src={staticMapUrl}
-              alt=""
-              draggable={false}
-              className="absolute inset-0 w-full h-full object-cover"
-              onError={() => setMapImgFailed(true)}
+          {view === 'route' && useRealMap && (
+            <MapboxRouteMap
+              points={points}
+              current={current}
+              onScrub={setScrubKm}
+              onFailed={() => setMapFailed(true)}
             />
           )}
 
-          <svg
-            viewBox={view === 'elevation' ? `0 0 ${VIEW_W} ${VIEW_H}` : `0 0 ${MAP_W} ${MAP_H}`}
-            className="absolute inset-0 w-full h-full"
-            preserveAspectRatio={view === 'elevation' ? 'none' : 'xMidYMid meet'}
-          >
-            <defs>
-              <linearGradient id="rp-elev-grad" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor="#2d6a4f" stopOpacity="0.28" />
-                <stop offset="100%" stopColor="#2d6a4f" stopOpacity="0.03" />
-              </linearGradient>
-              {/* Faint diagonal hatch over the fill — texture only, one colour,
-                  no slope/gradient colour-coding. */}
-              <pattern id="rp-hatch" width="7" height="7" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
-                <line x1="0" y1="0" x2="0" y2="7" stroke="#2d6a4f" strokeWidth="1" opacity="0.16" />
-              </pattern>
-            </defs>
+          {(view === 'elevation' || (view === 'route' && !useRealMap)) && (
+            <svg
+              viewBox={view === 'elevation' ? `0 0 ${VIEW_W} ${VIEW_H}` : `0 0 ${MAP_W} ${MAP_H}`}
+              className="absolute inset-0 w-full h-full"
+              preserveAspectRatio={view === 'elevation' ? 'none' : 'xMidYMid meet'}
+            >
+              <defs>
+                <linearGradient id="rp-elev-grad" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor="#2d6a4f" stopOpacity="0.28" />
+                  <stop offset="100%" stopColor="#2d6a4f" stopOpacity="0.03" />
+                </linearGradient>
+                {/* Faint diagonal hatch over the fill — texture only, one colour,
+                    no slope/gradient colour-coding. */}
+                <pattern id="rp-hatch" width="7" height="7" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+                  <line x1="0" y1="0" x2="0" y2="7" stroke="#2d6a4f" strokeWidth="1" opacity="0.16" />
+                </pattern>
+              </defs>
 
-            {view === 'elevation' ? (
-              <>
-                {/* Gridlines */}
-                {ticks.map((km, i) => (
-                  <line key={`ex-${i}`} x1={xForKm(km)} x2={xForKm(km)} y1={PAD_TOP} y2={VIEW_H - PAD_BOTTOM}
-                    stroke="#00000010" strokeWidth="1" />
-                ))}
-                {eTicks.map((e, i) => (
-                  <line key={`ey-${i}`} x1={PAD_LEFT} x2={VIEW_W - PAD_RIGHT} y1={yForEle(e)} y2={yForEle(e)}
-                    stroke="#00000010" strokeWidth="1" />
-                ))}
+              {view === 'elevation' ? (
+                <>
+                  {/* Gridlines */}
+                  {ticks.map((km, i) => (
+                    <line key={`ex-${i}`} x1={xForKm(km)} x2={xForKm(km)} y1={PAD_TOP} y2={VIEW_H - PAD_BOTTOM}
+                      stroke="#00000010" strokeWidth="1" />
+                  ))}
+                  {eTicks.map((e, i) => (
+                    <line key={`ey-${i}`} x1={PAD_LEFT} x2={VIEW_W - PAD_RIGHT} y1={yForEle(e)} y2={yForEle(e)}
+                      stroke="#00000010" strokeWidth="1" />
+                  ))}
 
-                <path d={areaPath} fill="url(#rp-elev-grad)" />
-                <path d={areaPath} fill="url(#rp-hatch)" />
-                <path d={linePath} fill="none" stroke="#2d6a4f" strokeWidth="2.5" strokeLinejoin="round" strokeLinecap="round" />
+                  <path d={areaPath} fill="url(#rp-elev-grad)" />
+                  <path d={areaPath} fill="url(#rp-hatch)" />
+                  <path d={linePath} fill="none" stroke="#2d6a4f" strokeWidth="2.5" strokeLinejoin="round" strokeLinecap="round" />
 
-                {/* Waypoint leader ticks — the labels/markers themselves are
-                    HTML-overlaid below, so their text is never stretched. */}
-                {waypointMarks.map(m => {
-                  const x = xForKm(m.distanceKm)
-                  const y = yForEle(m.ele)
-                  return (
-                    <line key={m.id} x1={x} x2={x} y1={PAD_TOP - 4} y2={y}
-                      stroke={m.category === 'Peak' || m.category === 'Summit' ? '#C9A96E' : '#00000030'}
-                      strokeWidth="1" strokeDasharray="2 2" />
-                  )
-                })}
+                  {/* Waypoint leader ticks — the labels/markers themselves are
+                      HTML-overlaid below, so their text is never stretched. */}
+                  {waypointMarks.map(m => {
+                    const x = xForKm(m.distanceKm)
+                    const y = yForEle(m.ele)
+                    return (
+                      <line key={m.id} x1={x} x2={x} y1={PAD_TOP - 4} y2={y}
+                        stroke={m.category === 'Peak' || m.category === 'Summit' ? '#C9A96E' : '#00000030'}
+                        strokeWidth="1" strokeDasharray="2 2" />
+                    )
+                  })}
 
-                {/* Scrub guide + marker */}
-                <line x1={markerPos.x} x2={markerPos.x} y1={PAD_TOP} y2={VIEW_H - PAD_BOTTOM}
-                  stroke="#C9A96E" strokeWidth="1.5" strokeDasharray="3 3" />
-                <circle cx={markerPos.x} cy={markerPos.y} r={dragging ? 8 : 6.5} fill="#C9A96E" stroke="#fff" strokeWidth="2" />
-              </>
-            ) : useRealMap ? (
-              // The route line itself is already baked into the fetched
-              // image (drawn by Mapbox, not here) — only the scrub marker
-              // is a client-side overlay.
-              <circle cx={markerPos.x} cy={markerPos.y} r={dragging ? 8 : 6.5} fill="#C9A96E" stroke="#fff" strokeWidth="2" />
-            ) : (
-              <>
-                <path d={routeFallback.path} fill="none" stroke="#2d6a4f" strokeWidth="3" strokeLinejoin="round" strokeLinecap="round" />
-                <circle cx={markerPos.x} cy={markerPos.y} r={dragging ? 8 : 6.5} fill="#C9A96E" stroke="#fff" strokeWidth="2" />
-              </>
-            )}
-          </svg>
+                  {/* Scrub guide + marker */}
+                  <line x1={markerPos.x} x2={markerPos.x} y1={PAD_TOP} y2={VIEW_H - PAD_BOTTOM}
+                    stroke="#C9A96E" strokeWidth="1.5" strokeDasharray="3 3" />
+                  <circle cx={markerPos.x} cy={markerPos.y} r={dragging ? 8 : 6.5} fill="#C9A96E" stroke="#fff" strokeWidth="2" />
+                </>
+              ) : (
+                <>
+                  <path d={routeFallback.path} fill="none" stroke="#2d6a4f" strokeWidth="3" strokeLinejoin="round" strokeLinecap="round" />
+                  <circle cx={markerPos.x} cy={markerPos.y} r={dragging ? 8 : 6.5} fill="#C9A96E" stroke="#fff" strokeWidth="2" />
+                </>
+              )}
+            </svg>
+          )}
 
           {/* Waypoint markers + angled name labels (HTML overlay — immune to
               the SVG's non-uniform stretch, so rotated text stays crisp). */}
@@ -495,19 +363,6 @@ export default function RouteProfileChart({ trail }: { trail: Trail }) {
               })}
             </div>
           )}
-
-          {/* Attribution required by Mapbox's terms of use (in addition to
-              the wordmark already baked into the returned image itself). */}
-          {useRealMap && (
-            <a
-              href="https://www.mapbox.com/about/maps/"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="absolute bottom-0.5 right-1 font-sans text-[8px] text-white/80 drop-shadow hover:text-white"
-            >
-              © Mapbox © OpenStreetMap
-            </a>
-          )}
         </div>
       </div>
 
@@ -522,7 +377,7 @@ export default function RouteProfileChart({ trail }: { trail: Trail }) {
         {view === 'elevation'
           ? 'Drag the marker — or tap anywhere on the chart — to read elevation at any distance along the trail. Numbered points mark waypoints along the route.'
           : useRealMap
-            ? 'The route traced over the actual terrain — switch to Elevation Profile to scrub the height along it.'
+            ? 'Pan and zoom the map, or click anywhere on the route to jump the marker there — switch to Elevation Profile to read the height at that point.'
             : 'A schematic trace of the route — switch to Elevation Profile to scrub the height along it.'}
       </p>
     </div>
