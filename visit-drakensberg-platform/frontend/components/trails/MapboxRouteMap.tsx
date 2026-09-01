@@ -17,6 +17,17 @@ import type { GpxPoint } from '@/lib/gpx'
 
 const MAPBOX_TOKEN = process.env.NEXT_PUBLIC_MAPBOX_TOKEN
 
+// TEMPORARY — live debugging a "canvas exists, correctly sized, no errors,
+// but nothing paints" report that's been hard to pin down from screenshots
+// alone. Shows the exact stage the map init reached, on-screen, in text —
+// remove once resolved.
+type DebugPhase =
+  | 'importing mapbox-gl'
+  | 'constructing map'
+  | `waiting on 'load' (canvas ${string})`
+  | `ready — canvas ${string}, webgl: ${string}`
+  | `error: ${string}`
+
 export default function MapboxRouteMap({
   points,
   current,
@@ -33,6 +44,7 @@ export default function MapboxRouteMap({
   const markerRef = useRef<import('mapbox-gl').Marker | null>(null)
   const resizeObserverRef = useRef<ResizeObserver | null>(null)
   const [ready, setReady] = useState(false)
+  const [debugPhase, setDebugPhase] = useState<DebugPhase>('importing mapbox-gl')
 
   // Mount the map once per `points` identity (i.e. once per trail — the
   // parent remounts this whole chart on trail change via key={trail.id}).
@@ -47,6 +59,8 @@ export default function MapboxRouteMap({
     import('mapbox-gl').then(({ default: mapboxgl }) => {
       if (cancelled || !containerRef.current) return
       mapboxgl.accessToken = MAPBOX_TOKEN
+      setDebugPhase('constructing map')
+      console.debug('[MapboxRouteMap] mapbox-gl loaded, container rect at construction:', containerRef.current.getBoundingClientRect())
 
       const lats = points.map(p => p.lat), lons = points.map(p => p.lon)
       const bounds: [[number, number], [number, number]] = [
@@ -73,7 +87,9 @@ export default function MapboxRouteMap({
       // surfaces here as a 401/403 from api.mapbox.com with a specific
       // Mapbox error message, not as a generic failure.
       map.on('error', (e) => {
-        console.error('[MapboxRouteMap]', e.error ?? e)
+        const msg = String((e.error as Error | undefined)?.message ?? e.error ?? 'unknown')
+        console.error('[MapboxRouteMap] map error event:', e.error ?? e)
+        setDebugPhase(`error: ${msg}`)
         if (!cancelled) onFailed?.()
       })
 
@@ -86,10 +102,16 @@ export default function MapboxRouteMap({
       resizeObserver.observe(containerRef.current)
       resizeObserverRef.current = resizeObserver
 
+      const canvasSize = () => `${map.getCanvas().width}x${map.getCanvas().height}`
+      setDebugPhase(`waiting on 'load' (canvas ${canvasSize()})`)
+      console.debug('[MapboxRouteMap] map constructed, waiting for load event. Canvas:', canvasSize())
+
       map.on('load', () => {
         if (cancelled) return
+        console.debug('[MapboxRouteMap] load event fired. Canvas before resize/fitBounds:', canvasSize())
         map.resize()
         map.fitBounds(bounds, { padding: 48, animate: false })
+        console.debug('[MapboxRouteMap] Canvas after resize/fitBounds:', canvasSize())
 
         map.addSource('route', {
           type: 'geojson',
@@ -125,10 +147,16 @@ export default function MapboxRouteMap({
           map.on('mouseleave', 'route-line', () => { map.getCanvas().style.cursor = '' })
         }
 
+        const canvas = map.getCanvas()
+        const gl = (canvas.getContext('webgl2') ?? canvas.getContext('webgl')) as WebGLRenderingContext | WebGL2RenderingContext | null
+        const webglStatus = gl ? (gl.isContextLost() ? 'lost' : 'ok') : 'missing'
+        console.debug('[MapboxRouteMap] ready. Final canvas:', canvasSize(), 'WebGL context:', webglStatus)
+        setDebugPhase(`ready — canvas ${canvasSize()}, webgl: ${webglStatus}`)
         setReady(true)
       })
     }).catch((err) => {
       console.error('[MapboxRouteMap] failed to load mapbox-gl or initialise the map', err)
+      setDebugPhase(`error: ${String(err)}`)
       if (!cancelled) onFailed?.()
     })
 
@@ -158,6 +186,10 @@ export default function MapboxRouteMap({
           Loading map…
         </div>
       )}
+      {/* TEMPORARY debug readout — remove once the blank-map report is resolved. */}
+      <div className="absolute top-1 left-1 z-50 rounded bg-black/80 px-1.5 py-0.5 font-mono text-[9px] leading-tight text-lime-300 pointer-events-none">
+        {debugPhase}
+      </div>
     </>
   )
 }
