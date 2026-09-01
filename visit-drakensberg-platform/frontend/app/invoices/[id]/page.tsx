@@ -247,13 +247,27 @@ function PrintableInvoiceInner() {
 
   return (
     <div className="min-h-screen bg-[#F7F5F2] pt-28 pb-16 px-4">
-      {/* Print isolation: only the invoice document is printed. */}
+      {/* Print isolation: only the invoice document is printed.
+          @page margin is 0 on purpose — that margin is exactly where the
+          browser draws its own header/footer (page title, URL, date, page
+          number), so leaving it in place always printed the address bar
+          onto the invoice. The 14mm of breathing room it used to provide
+          is added back below as padding on #invoice-doc itself, which the
+          browser has no header/footer to put there. */}
       <style>{`
         @media print {
           body * { visibility: hidden !important; }
           #invoice-doc, #invoice-doc * { visibility: visible !important; }
-          #invoice-doc { position: absolute !important; left: 0; top: 0; width: 100%; margin: 0; box-shadow: none !important; border: none !important; }
-          @page { margin: 14mm; }
+          #invoice-doc {
+            position: absolute !important;
+            left: 0; top: 0; width: 100%; margin: 0;
+            padding: 14mm !important;
+            box-shadow: none !important; border: none !important;
+            -webkit-print-color-adjust: exact; print-color-adjust: exact;
+          }
+          #invoice-doc table, #invoice-doc tr { break-inside: avoid; }
+          #invoice-doc thead { display: table-header-group; }
+          @page { size: auto; margin: 0; }
         }
       `}</style>
 
@@ -372,7 +386,7 @@ function PrintableInvoiceInner() {
 
         <div id="invoice-doc" className="bg-white border border-gray-200 p-10">
           {/* Header */}
-          <div className="flex items-start justify-between pb-8 border-b border-gray-200">
+          <div className="flex items-start justify-between pb-8 print:pb-5 border-b border-gray-200">
             <div>
               <Logo className="h-6 w-auto text-[#2d6a4f]" />
               <p className="font-sans text-xs text-gray-400 mt-3 leading-relaxed">
@@ -384,7 +398,7 @@ function PrintableInvoiceInner() {
                 {business.vat_number && <><br />VAT {business.vat_number}</>}
               </p>
             </div>
-            <div className="text-right">
+            <div className="text-right shrink-0 pl-6">
               <p className="font-sans text-[10px] tracking-[0.2em] uppercase text-[#C9A96E] mb-1">
                 {invoice.status === 'void' ? 'Void Invoice' : 'Tax Invoice'}
               </p>
@@ -400,7 +414,7 @@ function PrintableInvoiceInner() {
           </div>
 
           {/* Bill to / trip */}
-          <div className="grid grid-cols-2 gap-8 py-8 border-b border-gray-200">
+          <div className="grid grid-cols-2 gap-8 py-8 print:py-5 border-b border-gray-200">
             <div>
               <p className="font-sans text-[10px] tracking-[0.14em] uppercase text-gray-400 mb-2">Billed To</p>
               <p className="font-sans text-sm font-medium text-gray-800">{order?.customer_name || '—'}</p>
@@ -417,28 +431,28 @@ function PrintableInvoiceInner() {
 
           {/* Lines */}
           <div className="overflow-x-auto">
-          <table className="w-full my-8 min-w-[480px]">
+          <table className="w-full my-8 print:my-5 min-w-[480px]">
             <thead>
               <tr className="border-b-2 border-gray-800">
-                <th className="text-left py-2.5 font-sans text-[10px] tracking-[0.14em] uppercase text-gray-500">Service</th>
-                <th className="text-right py-2.5 font-sans text-[10px] tracking-[0.14em] uppercase text-gray-500">Qty</th>
-                <th className="text-right py-2.5 font-sans text-[10px] tracking-[0.14em] uppercase text-gray-500">Unit Price</th>
-                <th className="text-right py-2.5 font-sans text-[10px] tracking-[0.14em] uppercase text-gray-500">Amount</th>
+                <th className="text-left py-2.5 print:py-1.5 font-sans text-[10px] tracking-[0.14em] uppercase text-gray-500">Service</th>
+                <th className="text-right py-2.5 print:py-1.5 font-sans text-[10px] tracking-[0.14em] uppercase text-gray-500">Qty</th>
+                <th className="text-right py-2.5 print:py-1.5 font-sans text-[10px] tracking-[0.14em] uppercase text-gray-500">Unit Price</th>
+                <th className="text-right py-2.5 print:py-1.5 font-sans text-[10px] tracking-[0.14em] uppercase text-gray-500">Amount</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
               {invoice.lines.map((l, i) => (
                 <tr key={i}>
-                  <td className="py-3 pr-4">
+                  <td className="py-3 print:py-1.5 pr-4">
                     <p className="font-sans text-sm text-gray-800">{l.title}</p>
                     {l.description && (
                       <p className="font-sans text-[12px] text-gray-600 mt-0.5 whitespace-pre-wrap">{l.description}</p>
                     )}
                     <p className="font-sans text-[11px] text-gray-400 capitalize mt-0.5">{l.category}</p>
                   </td>
-                  <td className="py-3 text-right font-sans text-sm text-gray-600">{Number(l.quantity)} {l.unitLabel}{Number(l.quantity) !== 1 ? 's' : ''}</td>
-                  <td className="py-3 text-right font-sans text-sm text-gray-600">{formatMoney(Number(l.unitPrice), invoice.currency)}</td>
-                  <td className="py-3 text-right font-sans text-sm text-gray-800">{formatMoney(Number(l.total), invoice.currency)}</td>
+                  <td className="py-3 print:py-1.5 text-right font-sans text-sm text-gray-600 whitespace-nowrap">{Number(l.quantity)} {l.unitLabel}{Number(l.quantity) !== 1 ? 's' : ''}</td>
+                  <td className="py-3 print:py-1.5 text-right font-sans text-sm text-gray-600 whitespace-nowrap">{formatMoney(Number(l.unitPrice), invoice.currency)}</td>
+                  <td className="py-3 print:py-1.5 text-right font-sans text-sm text-gray-800 whitespace-nowrap">{formatMoney(Number(l.total), invoice.currency)}</td>
                 </tr>
               ))}
             </tbody>
@@ -446,8 +460,8 @@ function PrintableInvoiceInner() {
           </div>
 
           {/* Totals */}
-          <div className="flex justify-end">
-            <div className="w-72 space-y-2 font-sans text-sm">
+          <div className="flex justify-end print:break-inside-avoid">
+            <div className="w-72 space-y-2 print:space-y-1 font-sans text-sm">
               <div className="flex justify-between text-gray-600"><span>Subtotal</span><span>{formatMoney(Number(invoice.subtotal), invoice.currency)}</span></div>
               {Number(invoice.discount) > 0 && (
                 <div className="flex justify-between text-gray-600"><span>Discount</span><span>−{formatMoney(Number(invoice.discount), invoice.currency)}</span></div>
@@ -464,10 +478,10 @@ function PrintableInvoiceInner() {
 
           {/* Receipts */}
           {receipts.length > 0 && (
-            <div className="mt-10 pt-6 border-t border-gray-200">
+            <div className="mt-10 print:mt-6 pt-6 print:pt-4 border-t border-gray-200 print:break-inside-avoid">
               <p className="font-sans text-[10px] tracking-[0.14em] uppercase text-gray-400 mb-2">Payments Received</p>
               {receipts.map(r => (
-                <div key={r.id} className="flex justify-between font-sans text-xs text-gray-500 py-1">
+                <div key={r.id} className="flex justify-between font-sans text-xs text-gray-500 py-1 print:py-0.5">
                   <span>{r.receipt_number} · {fmt(r.created_at)} · {r.method}</span>
                   <span>{Number(r.amount) < 0 ? `−${formatMoney(Math.abs(Number(r.amount)), r.currency)} (refund)` : formatMoney(Number(r.amount), r.currency)}</span>
                 </div>
@@ -476,7 +490,7 @@ function PrintableInvoiceInner() {
           )}
 
           {Number(invoice.balance) > 0 && business.bank_account_number && (
-            <div className="mt-10 pt-6 border-t border-gray-200">
+            <div className="mt-10 print:mt-6 pt-6 print:pt-4 border-t border-gray-200 print:break-inside-avoid">
               <p className="font-sans text-[10px] tracking-[0.14em] uppercase text-gray-400 mb-2">Pay by EFT</p>
               <div className="grid grid-cols-2 gap-x-8 gap-y-1 font-sans text-xs text-gray-600 max-w-md">
                 {business.bank_name && <><span className="text-gray-400">Bank</span><span>{business.bank_name}</span></>}
@@ -489,10 +503,10 @@ function PrintableInvoiceInner() {
           )}
 
           {business.invoice_footer_note && (
-            <p className="mt-6 font-sans text-[11px] text-gray-400 leading-relaxed whitespace-pre-line">{business.invoice_footer_note}</p>
+            <p className="mt-6 print:mt-4 font-sans text-[11px] text-gray-400 leading-relaxed whitespace-pre-line">{business.invoice_footer_note}</p>
           )}
 
-          <p className="mt-10 pt-6 border-t border-gray-200 font-sans text-[11px] text-gray-400 leading-relaxed">
+          <p className="mt-10 print:mt-6 pt-6 print:pt-4 border-t border-gray-200 font-sans text-[11px] text-gray-400 leading-relaxed">
             This invoice covers all services in your trip, arranged through {business.business_name}.
             Payments reconcile against order {order?.order_number}. Thank you for exploring the Drakensberg with us.
           </p>
