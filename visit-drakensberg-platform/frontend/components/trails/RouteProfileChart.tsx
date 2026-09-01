@@ -12,7 +12,7 @@ import type { GpxPoint, TrailWaypoint } from '@/lib/gpx'
 // reads off elevation at any point along the route. Deliberately a single
 // trail-green fill throughout — no colour-coding by slope/gradient.
 // "Map View" swaps the same marker onto the actual route traced over a
-// real Google Maps terrain tile (still driven by the same distance
+// real Mapbox outdoors/terrain tile (still driven by the same distance
 // scrubber), so both views answer "where am I / how high am I" the same
 // way. Renders for any trail with GPX track data — day hike, multi-day, or
 // speciality walk alike.
@@ -32,7 +32,8 @@ const MAP_W = 640
 const MAP_H = 400
 const MAP_PAD = 24
 
-const GOOGLE_MAPS_API_KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY
+const MAPBOX_TOKEN = process.env.NEXT_PUBLIC_MAPBOX_TOKEN
+const MAPBOX_STYLE = 'mapbox/outdoors-v12' // built for exactly this — trails, contours, terrain shading
 
 type WaypointMark = { id: string; name: string; category: TrailWaypoint['category']; distanceKm: number; ele: number }
 
@@ -56,10 +57,11 @@ function niceStep(range: number, count: number): number {
   return nice * mag
 }
 
-// ── Web Mercator projection — matches how Google renders both its Static
-// Maps image and its dynamic map, so a route drawn with these formulas
-// lines up with the fetched map tile underneath. Formulas follow Google's
-// own documented world-coordinate conversion.
+// ── Web Mercator projection — the same EPSG:3857 projection every slippy-
+// map provider (Mapbox, Google, OSM) renders its tiles in, so a route drawn
+// with these formulas lines up with the fetched map tile underneath
+// regardless of which provider it came from. 256px tiles, standard
+// world-coordinate conversion.
 const TILE_SIZE = 256
 function mercatorWorld(lat: number, lng: number) {
   const siny = Math.min(Math.max(Math.sin(lat * Math.PI / 180), -0.9999), 0.9999)
@@ -139,8 +141,8 @@ export default function RouteProfileChart({ trail }: { trail: Trail }) {
     return { x: (world.x - centerWorld.x) * scale + MAP_W / 2, y: (world.y - centerWorld.y) * scale + MAP_H / 2 }
   }, [mapGeo])
 
-  const staticMapUrl = mapGeo && GOOGLE_MAPS_API_KEY
-    ? `https://maps.googleapis.com/maps/api/staticmap?center=${mapGeo.center.lat},${mapGeo.center.lng}&zoom=${mapGeo.zoom}&size=${MAP_W}x${MAP_H}&scale=2&maptype=terrain&key=${encodeURIComponent(GOOGLE_MAPS_API_KEY)}`
+  const staticMapUrl = mapGeo && MAPBOX_TOKEN
+    ? `https://api.mapbox.com/styles/v1/${MAPBOX_STYLE}/static/${mapGeo.center.lng},${mapGeo.center.lat},${mapGeo.zoom}/${MAP_W}x${MAP_H}@2x?access_token=${encodeURIComponent(MAPBOX_TOKEN)}`
     : null
   const useRealMap = view === 'route' && !!staticMapUrl && !mapImgFailed
 
@@ -305,9 +307,9 @@ export default function RouteProfileChart({ trail }: { trail: Trail }) {
               : 'relative flex-1 min-w-0 select-none aspect-[8/5] overflow-hidden rounded-sm bg-[#e9e5dc]'
           }
         >
-          {/* Real Google Maps terrain tile behind the route trace. Falls
+          {/* Real Mapbox outdoors/terrain tile behind the route trace. Falls
               back silently (onError) to the schematic bounding-box trace if
-              the key is missing, unset for this project, or the request
+              the token is missing, unset for this project, or the request
               fails — the interactive scrubber still works either way. */}
           {view === 'route' && staticMapUrl && !mapImgFailed && (
             <img
@@ -432,9 +434,17 @@ export default function RouteProfileChart({ trail }: { trail: Trail }) {
             </div>
           )}
 
-          {/* Attribution required by Google's Static Maps terms of use. */}
+          {/* Attribution required by Mapbox's terms of use (in addition to
+              the wordmark already baked into the returned image itself). */}
           {useRealMap && (
-            <span className="absolute bottom-0.5 right-1 font-sans text-[8px] text-white/80 drop-shadow">© Google</span>
+            <a
+              href="https://www.mapbox.com/about/maps/"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="absolute bottom-0.5 right-1 font-sans text-[8px] text-white/80 drop-shadow hover:text-white"
+            >
+              © Mapbox © OpenStreetMap
+            </a>
           )}
         </div>
       </div>
