@@ -246,8 +246,15 @@ function PrintableInvoiceInner() {
   const shareUrl = invoice.share_revoked_at ? '' : invoiceShareUrl(invoice)
 
   return (
-    <div className="min-h-screen bg-[#F7F5F2] pt-28 pb-16 px-4">
-      {/* Print isolation: only the invoice document is printed.
+    <div className="min-h-screen print:min-h-0 bg-[#F7F5F2] print:bg-white pt-28 print:pt-0 pb-16 print:pb-0 px-4 print:px-0">
+      {/* Print isolation: every other block on this page already carries
+          print:hidden, so #invoice-doc is the only thing left in the print
+          flow — no need for the old visibility:hidden + position:absolute
+          overlay trick, which is what produced the duplicated/overlapping
+          content and the stray blank page: an invisible-but-still-
+          min-h-screen-tall ancestor still consumes page height even though
+          nothing on it is drawn, and Chrome can repaint an absolutely
+          positioned box on every generated page.
           @page margin is 0 on purpose — that margin is exactly where the
           browser draws its own header/footer (page title, URL, date, page
           number), so leaving it in place always printed the address bar
@@ -256,22 +263,18 @@ function PrintableInvoiceInner() {
           browser has no header/footer to put there. */}
       <style>{`
         @media print {
-          body * { visibility: hidden !important; }
-          #invoice-doc, #invoice-doc * { visibility: visible !important; }
           #invoice-doc {
-            position: absolute !important;
-            left: 0; top: 0; width: 100%; margin: 0;
             padding: 14mm !important;
             box-shadow: none !important; border: none !important;
             -webkit-print-color-adjust: exact; print-color-adjust: exact;
           }
-          #invoice-doc table, #invoice-doc tr { break-inside: avoid; }
+          #invoice-doc tr { break-inside: avoid; }
           #invoice-doc thead { display: table-header-group; }
           @page { size: auto; margin: 0; }
         }
       `}</style>
 
-      <div className="max-w-[820px] mx-auto">
+      <div className="max-w-[820px] print:max-w-none mx-auto print:mx-0">
         {paymentResult === 'success' && (
           <div className="mb-4 print:hidden bg-[#2d6a4f]/10 border border-[#2d6a4f]/30 text-[#2d6a4f] font-sans text-sm px-4 py-3 flex items-center gap-2">
             {invoice.status !== 'paid' && <Loader2 size={14} className="animate-spin shrink-0" />}
