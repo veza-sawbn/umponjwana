@@ -1,7 +1,6 @@
 'use client'
 
 import { Suspense, useState } from 'react'
-import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { ArrowRight, Bus, Calendar, Check, MapPin, Users } from 'lucide-react'
 import Footer from '@/components/layout/Footer'
@@ -60,6 +59,12 @@ function ShuttlesPageContent() {
   const [added, setAdded] = useState(false)
   const [supplierChoice, setSupplierChoice] = useState<ShuttleSupplierChoice | null>(null)
   const [eligibleCount, setEligibleCount] = useState<number | null>(null)
+  // Cheapest fare among this route's listed transport partners — shown in
+  // the "Live route estimate" below instead of the generic distance-based
+  // formula, so the upfront number reflects real market pricing rather than
+  // a synthetic guess. Null until the partner list has loaded (or none cover
+  // the route), in which case the formula estimate is still the fallback.
+  const [lowestSupplierPrice, setLowestSupplierPrice] = useState<number | null>(null)
 
   // Live driving distance & duration straight from the Google Distance
   // Matrix — the only source of route data on this page.
@@ -70,7 +75,9 @@ function ShuttlesPageContent() {
 
   const price = supplierChoice
     ? supplierChoice.price
-    : result ? estimateTransferPrice(result.distanceKm, passengers, shuttleType) : null
+    : lowestSupplierPrice !== null
+      ? lowestSupplierPrice
+      : result ? estimateTransferPrice(result.distanceKm, passengers, shuttleType) : null
   // A transport partner + vehicle must be chosen before booking; only when no
   // registered partner covers the route does the platform estimate stand in.
   const ready = Boolean(result && date && pickup.address && destination.address && (supplierChoice || eligibleCount === 0))
@@ -100,9 +107,6 @@ function ShuttlesPageContent() {
             Pick up anywhere, drop off anywhere. Your transfer is quoted from live driving distance and
             operated by the best-matched company in our transport partner marketplace.
           </p>
-          <Link href="/transport" className="inline-flex items-center gap-1.5 mt-4 font-sans text-sm text-gold hover:text-white transition-colors">
-            Browse fixed-price routes <ArrowRight size={14} />
-          </Link>
         </div>
       </section>
 
@@ -188,6 +192,7 @@ function ShuttlesPageContent() {
                     selected={supplierChoice}
                     onSelect={setSupplierChoice}
                     onCandidates={setEligibleCount}
+                    onLowestPrice={setLowestSupplierPrice}
                   />
                 )}
             </div>

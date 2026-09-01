@@ -76,7 +76,7 @@ const PRIMARY_ENRICHMENT: Record<string, Pick<NavItem, 'image' | 'imageAlt' | 's
   Transport: {
     image:    'https://images.unsplash.com/photo-1501854140801-50d01698950b?w=1200&q=80',
     imageAlt: 'Road into the Drakensberg',
-    sublabel: 'Shuttles, transfers and fixed-price shuttle routes',
+    sublabel: 'Door-to-door shuttles and transfers',
   },
 }
 
