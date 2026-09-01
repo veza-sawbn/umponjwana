@@ -46,6 +46,13 @@ export type SavedBooking = {
    *  bookings saved before this existed simply don't get attributed. */
   analyticsAnonId?: string
   analyticsSessionId?: string | null
+  /** Set when this booking was created from an accepted custom-trip quote
+   *  (see lib/custom-trips.ts acceptQuote()) rather than at checkout. Carried
+   *  through the same way as the analytics ids above, so the iKhokha
+   *  webhook — no browser session there either — can flip the originating
+   *  vd_trip_requests row to 'confirmed' alongside this booking once payment
+   *  actually clears. */
+  tripRequestId?: string
 }
 
 type Row = {

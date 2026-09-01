@@ -1,12 +1,21 @@
 import { supabase } from './auth'
 import { notify } from './notifications'
 import { formatMoney } from './allocation'
+import { addBooking, updateBookingStatus } from './bookings'
 
 // Custom-date private trip requests (vd_trip_requests — see
 // supabase/migrations/20260707_marketplace.sql). A visitor requests a private
 // departure on a hiking trail; the tour operator first confirms the guide's
 // availability, then gives operational approval and issues a quote; the
 // visitor accepts the quote and pays. Never an instant booking.
+//
+// Accepting a quote stands up a real vd_bookings row (+ Master Order +
+// Invoice) via the same pipeline checkout uses — held 'pending' until iKhokha
+// actually confirms a payment. That booking is what /account shows under
+// "upcoming trips" and what the customer pays via the real payment gateway;
+// this file never marks a request paid itself (see the iKhokha webhook,
+// which is the only place vd_bookings — and, through it, this request — is
+// ever flipped to 'confirmed').
 
 export type TripRequestStatus =
   | 'draft'
@@ -68,6 +77,11 @@ export type TripRequest = {
   guideApprovedAt?: string
   operatorApprovedAt?: string
   quote?: TripQuote
+  /** The real vd_bookings row this request is paid against, created when the
+   *  quote is accepted (see acceptQuote()). Absent for a request still short
+   *  of that step, or one accepted before this booking pipeline existed. */
+  bookingId?: string
+  invoiceId?: string
   timeline: TripTimelineEntry[]
   status: TripRequestStatus
   createdAt: string
@@ -207,9 +221,65 @@ export async function rejectTripRequest(request: TripRequest, reason: string): P
   return updated
 }
 
-/** Customer accepts the quote → payment step; operator is told right away. */
+/**
+ * Customer accepts the quote → payment step. This is the moment a real
+ * financial object comes into existence: a vd_bookings row (held 'pending'),
+ * fanned out into per-supplier orders, and a Master Order + Invoice — the
+ * exact pipeline checkout uses (see lib/bookings.ts addBooking()). There is
+ * no inventory to reserve here (a guide's own availability was already
+ * confirmed in the earlier approval step), so this never fails on a "sold
+ * out" race the way a room or seat booking can.
+ *
+ * The trip request itself only stores the resulting bookingId/invoiceId —
+ * paying, and confirming payment, both happen against that booking from here
+ * on (see handlePay() in app/account/requests/page.tsx and the iKhokha
+ * webhook, which is the only place this ever reaches 'confirmed').
+ */
 export async function acceptQuote(request: TripRequest): Promise<TripRequest> {
-  const updated = await saveTransition(request, 'awaiting_payment', {}, 'Quote accepted by customer')
+  if (!request.quote) throw new Error('This request has no quote to accept yet.')
+
+  const { booking, invoiceId } = await addBooking({
+    userId: request.userId,
+    customerName: request.customerName,
+    customerEmail: request.customerEmail,
+    customerPhone: request.customerPhone,
+    specialRequests: request.specialRequests,
+    region: request.region,
+    checkIn: request.startDate,
+    checkOut: request.endDate,
+    nights: 0,
+    guests: request.groupSize,
+    stay: null,
+    addons: [{
+      // Deliberately not request.trailId: that id belongs to a Trail entity,
+      // not a bookable Departure, and vd_create_order re-prices a 'hike'/
+      // 'tour' line from a matching Departure's own listed price when the
+      // productId happens to resolve to one. This quote's negotiated total
+      // must never be overwritten by the trail's default listed price.
+      id: `trip-request-${request.id}`,
+      type: 'hike',
+      title: `Private trip — ${request.trailName}`,
+      operator: request.operatorName,
+      supplierId: request.operatorId ?? undefined,
+      date: request.startDate,
+      price_per_person: request.quote.pricePerPerson,
+      guests: request.groupSize,
+    }],
+    shuttles: [],
+    subtotal: request.quote.total,
+    serviceFee: 0,
+    vat: 0,
+    total: request.quote.total,
+    status: 'pending',
+    // Carried through to the iKhokha webhook (no browser session there) so
+    // it can flip this request to 'confirmed' alongside the booking once
+    // payment actually clears.
+    tripRequestId: request.id,
+  })
+
+  const updated = await saveTransition(request, 'awaiting_payment',
+    { bookingId: booking.id, invoiceId: invoiceId ?? undefined },
+    'Quote accepted by customer')
   if (request.operatorId) {
     await notify(request.operatorId, 'approval',
       `Quote accepted — ${request.reference}`,
@@ -219,21 +289,16 @@ export async function acceptQuote(request: TripRequest): Promise<TripRequest> {
   return updated
 }
 
-/** Customer pays → booking confirmed; operator is notified. */
-export async function confirmTripPayment(request: TripRequest): Promise<TripRequest> {
-  const updated = await saveTransition(request, 'confirmed', {}, 'Payment received — booking confirmed')
-  if (request.operatorId) {
-    await notify(request.operatorId, 'booking',
-      `Custom trip confirmed — ${request.reference}`,
-      `${request.customerName} paid for the private ${request.trailName} trip (${request.startDate} → ${request.endDate}).`,
-      '/supplier/requests')
-  }
-  return updated
-}
-
 /** Customer withdraws the request. */
 export async function cancelTripRequest(request: TripRequest): Promise<TripRequest> {
   const updated = await saveTransition(request, 'cancelled', {}, 'Cancelled by customer')
+  // A quote already accepted stood up a real booking/order — cancel that
+  // financial side too (reverses the ledger, releases the Master Order).
+  // Suppliers aren't double-notified: this function tells the operator
+  // itself, right below.
+  if (request.bookingId) {
+    await updateBookingStatus(request.bookingId, 'cancelled', { notifySuppliers: false }).catch(() => {})
+  }
   if (request.operatorId) {
     await notify(request.operatorId, 'cancellation',
       `Request cancelled — ${request.reference}`,
