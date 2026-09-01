@@ -69,7 +69,13 @@ export default function MapboxRouteMap({
       })
       mapRef.current = map
       map.addControl(new mapboxgl.NavigationControl({ showCompass: false }), 'top-right')
-      map.on('error', () => { if (!cancelled) onFailed?.() })
+      // Logged rather than swallowed — a bad/misscoped/URL-restricted token
+      // surfaces here as a 401/403 from api.mapbox.com with a specific
+      // Mapbox error message, not as a generic failure.
+      map.on('error', (e) => {
+        console.error('[MapboxRouteMap]', e.error ?? e)
+        if (!cancelled) onFailed?.()
+      })
 
       // Belt-and-suspenders against any later layout shift (web fonts
       // reflowing the page, orientation change, the tab becoming visible
@@ -121,7 +127,10 @@ export default function MapboxRouteMap({
 
         setReady(true)
       })
-    }).catch(() => { if (!cancelled) onFailed?.() })
+    }).catch((err) => {
+      console.error('[MapboxRouteMap] failed to load mapbox-gl or initialise the map', err)
+      if (!cancelled) onFailed?.()
+    })
 
     return () => {
       cancelled = true
