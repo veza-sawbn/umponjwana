@@ -31,6 +31,7 @@ export default function MapboxRouteMap({
   const containerRef = useRef<HTMLDivElement>(null)
   const mapRef = useRef<import('mapbox-gl').Map | null>(null)
   const markerRef = useRef<import('mapbox-gl').Marker | null>(null)
+  const resizeObserverRef = useRef<ResizeObserver | null>(null)
   const [ready, setReady] = useState(false)
 
   // Mount the map once per `points` identity (i.e. once per trail — the
@@ -48,18 +49,42 @@ export default function MapboxRouteMap({
       mapboxgl.accessToken = MAPBOX_TOKEN
 
       const lats = points.map(p => p.lat), lons = points.map(p => p.lon)
+      const bounds: [[number, number], [number, number]] = [
+        [Math.min(...lons), Math.min(...lats)],
+        [Math.max(...lons), Math.max(...lats)],
+      ]
+      // Deliberately NOT passing `bounds` to the constructor: mapbox-gl
+      // computes the fitted camera synchronously against the container's
+      // size at that exact instant, and immediately after mount that can
+      // still be 0×0 (layout not yet settled) — silently producing an
+      // invalid camera and a permanently blank canvas, even though the
+      // style itself loads fine. Constructing with a plain default camera
+      // and calling resize() + fitBounds() only once the map has actually
+      // loaded (and the container is guaranteed painted) avoids that.
       const map = new mapboxgl.Map({
         container: containerRef.current,
         style: 'mapbox://styles/mapbox/outdoors-v12',
-        bounds: [[Math.min(...lons), Math.min(...lats)], [Math.max(...lons), Math.max(...lats)]],
-        fitBoundsOptions: { padding: 48 },
+        center: [(bounds[0][0] + bounds[1][0]) / 2, (bounds[0][1] + bounds[1][1]) / 2],
+        zoom: 10,
       })
       mapRef.current = map
       map.addControl(new mapboxgl.NavigationControl({ showCompass: false }), 'top-right')
       map.on('error', () => { if (!cancelled) onFailed?.() })
 
+      // Belt-and-suspenders against any later layout shift (web fonts
+      // reflowing the page, orientation change, the tab becoming visible
+      // after being laid out while hidden) — mapbox-gl never re-measures
+      // its container on its own, so without this a resize can leave the
+      // canvas stale or blank until the user manually pans/zooms it.
+      const resizeObserver = new ResizeObserver(() => map.resize())
+      resizeObserver.observe(containerRef.current)
+      resizeObserverRef.current = resizeObserver
+
       map.on('load', () => {
         if (cancelled) return
+        map.resize()
+        map.fitBounds(bounds, { padding: 48, animate: false })
+
         map.addSource('route', {
           type: 'geojson',
           data: { type: 'Feature', properties: {}, geometry: { type: 'LineString', coordinates: points.map(p => [p.lon, p.lat]) } },
@@ -100,6 +125,7 @@ export default function MapboxRouteMap({
 
     return () => {
       cancelled = true
+      resizeObserverRef.current?.disconnect()
       markerRef.current?.remove()
       mapRef.current?.remove()
       mapRef.current = null
