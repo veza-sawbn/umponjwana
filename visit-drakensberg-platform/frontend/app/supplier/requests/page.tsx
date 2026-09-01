@@ -65,11 +65,12 @@ export default function SupplierRequestsPage() {
   useEffect(() => {
     supabase.auth.getUser().then(async ({ data: { user } }) => {
       if (!user) { setLoading(false); return }
+      const ownerId = effectiveSupplierId(user.id)
       const [reqs, myGuides] = await Promise.all([
         getTripRequests(),
-        getSupplierEntities<GuideProfile>('guides', effectiveSupplierId(user.id)),
+        getSupplierEntities<GuideProfile>('guides', ownerId),
       ])
-      setRequests(reqs.filter(r => r.operatorId === user.id))
+      setRequests(reqs.filter(r => r.operatorId === ownerId))
       setGuides(myGuides)
       setLoading(false)
     })
