@@ -12,11 +12,8 @@ import MapboxRouteMap from './MapboxRouteMap'
 // off the trail's own GPX waypoints), plus a draggable circular marker that
 // reads off elevation at any point along the route. Deliberately a single
 // trail-green fill throughout — no colour-coding by slope/gradient.
-// "Map View" is a real, pannable/zoomable Mapbox map (MapboxRouteMap) with
-// the route drawn on it and the same scrub marker on it — click the map to
-// move the marker, or drag the Elevation Profile to move it there. Falls
-// back to a schematic top-down trace if no Mapbox token is configured or
-// the map fails to load. Renders for any trail with GPX track data — day
+// "Map View" is a plain, pannable/zoomable Mapbox map (MapboxRouteMap) with
+// the route drawn on it. Renders for any trail with GPX track data — day
 // hike, multi-day, or speciality walk alike.
 
 const VIEW_W = 640
@@ -26,15 +23,6 @@ const PAD_RIGHT = 10
 const PAD_TOP = 96 // label lane for angled waypoint names
 const PAD_BOTTOM = 28
 const MIN_LABEL_GAP_PX = 42 // viewBox units — skip a label if it would crowd the previous one
-
-// Map view is a fixed-aspect box (rather than the elevation chart's
-// stretch-to-fill box) so both the real map and the schematic fallback keep
-// a consistent, undistorted shape.
-const MAP_W = 640
-const MAP_H = 400
-const MAP_PAD = 40 // fallback-trace margin only — the real map fits its own bounds
-
-const MAPBOX_TOKEN = process.env.NEXT_PUBLIC_MAPBOX_TOKEN
 
 type WaypointMark = { id: string; name: string; category: TrailWaypoint['category']; distanceKm: number; ele: number }
 
@@ -67,7 +55,6 @@ export default function RouteProfileChart({ trail }: { trail: Trail }) {
   const [view, setView] = useState<'elevation' | 'route'>('elevation')
   const [dragging, setDragging] = useState(false)
   const [scrubKm, setScrubKm] = useState(0)
-  const [mapFailed, setMapFailed] = useState(false)
   const trackRef = useRef<HTMLDivElement>(null)
 
   const totalKm = analysis?.statistics.totalDistanceKm || points[points.length - 1]?.distanceKm || 0
@@ -89,21 +76,6 @@ export default function RouteProfileChart({ trail }: { trail: Trail }) {
     const area = `${line} L ${xForKm(totalKm).toFixed(1)} ${VIEW_H - PAD_BOTTOM} L ${xForKm(0).toFixed(1)} ${VIEW_H - PAD_BOTTOM} Z`
     return { linePath: line, areaPath: area }
   }, [points, totalKm, xForKm, yForEle])
-
-  const useRealMap = view === 'route' && !!MAPBOX_TOKEN && !mapFailed
-
-  // Bounding-box fallback trace (no Mapbox token, or the map failed to
-  // load) — a schematic top-down line, not a real map.
-  const routeFallback = useMemo(() => {
-    if (points.length === 0) return { path: '', xy: (_p: GpxPoint) => ({ x: 0, y: 0 }) }
-    const lats = points.map(p => p.lat), lons = points.map(p => p.lon)
-    const minLat = Math.min(...lats), maxLat = Math.max(...lats)
-    const minLon = Math.min(...lons), maxLon = Math.max(...lons)
-    const rx = (lon: number) => MAP_PAD + ((lon - minLon) / (maxLon - minLon || 1)) * (MAP_W - MAP_PAD * 2)
-    const ry = (lat: number) => MAP_H - MAP_PAD - ((lat - minLat) / (maxLat - minLat || 1)) * (MAP_H - MAP_PAD * 2)
-    const path = points.map((p, i) => `${i ? 'L' : 'M'} ${rx(p.lon).toFixed(1)} ${ry(p.lat).toFixed(1)}`).join(' ')
-    return { path, xy: (p: GpxPoint) => ({ x: rx(p.lon), y: ry(p.lat) }) }
-  }, [points])
 
   // Waypoints projected onto the drawn curve — snapped to the nearest track
   // point (by lat/lon) so a marker always sits exactly on the plotted line
@@ -151,9 +123,7 @@ export default function RouteProfileChart({ trail }: { trail: Trail }) {
   if (points.length === 0 || totalKm === 0) return null
 
   const current = nearestPoint(points, scrubKm)
-  const markerPos = view === 'elevation'
-    ? { x: xForKm(current.distanceKm), y: yForEle(current.ele) }
-    : routeFallback.xy(current) // only used by the SVG fallback — the real map positions its own marker
+  const markerPos = { x: xForKm(current.distanceKm), y: yForEle(current.ele) }
 
   function scrubFromClientX(clientX: number) {
     const el = trackRef.current
@@ -170,23 +140,16 @@ export default function RouteProfileChart({ trail }: { trail: Trail }) {
     setScrubKm(ratio * totalKm)
   }
 
-  // Only the elevation view is drag-scrubbable this way — on the real map,
-  // dragging pans the map (mapbox-gl's own gesture handling), and a single
-  // click there jumps the scrubber instead (see MapboxRouteMap's onScrub).
-  // On the schematic fallback (no real map), horizontal drag position still
-  // doesn't correspond to distance along a winding trail, so it's inert too.
   function onPointerDown(e: React.PointerEvent) {
-    if (view !== 'elevation') return
     e.currentTarget.setPointerCapture(e.pointerId)
     setDragging(true)
     scrubFromClientX(e.clientX)
   }
   function onPointerMove(e: React.PointerEvent) {
-    if (!dragging || view !== 'elevation') return
+    if (!dragging) return
     scrubFromClientX(e.clientX)
   }
   function onPointerUp(e: React.PointerEvent) {
-    if (view !== 'elevation') return
     setDragging(false)
     try { e.currentTarget.releasePointerCapture(e.pointerId) } catch {}
   }
@@ -212,193 +175,148 @@ export default function RouteProfileChart({ trail }: { trail: Trail }) {
             </button>
           ))}
         </div>
-        <div className="text-right">
-          <p className="font-display italic text-lg text-[#2d6a4f] leading-none">{fmtM(current.ele)}</p>
-          <p className="font-sans text-[10px] text-gray-400">at {fmtKm(current.distanceKm)}</p>
-        </div>
-      </div>
-
-      <div className="flex gap-2">
-        {/* Y-axis altitude labels — plain HTML so figures never get skewed by
-            the SVG's non-uniform (preserveAspectRatio="none") stretch. Only
-            meaningful for the elevation view — the map has no linear axis. */}
         {view === 'elevation' && (
-          <div className="relative w-9 shrink-0 h-56 sm:h-72">
-            <span className="absolute top-0 left-0 font-sans text-[8px] tracking-[0.1em] uppercase text-gray-300">Alt. m</span>
-            {eTicks.map((e, i) => (
-              <span
-                key={i}
-                className="absolute right-0 -translate-y-1/2 font-sans text-[9px] text-gray-400 whitespace-nowrap"
-                style={{ top: `${(yForEle(e) / VIEW_H) * 100}%` }}
-              >
-                {Math.round(e).toLocaleString()}
-              </span>
-            ))}
+          <div className="text-right">
+            <p className="font-display italic text-lg text-[#2d6a4f] leading-none">{fmtM(current.ele)}</p>
+            <p className="font-sans text-[10px] text-gray-400">at {fmtKm(current.distanceKm)}</p>
           </div>
         )}
-
-        {/* Draggable chart / map */}
-        <div
-          ref={trackRef}
-          onPointerDown={onPointerDown}
-          onPointerMove={onPointerMove}
-          onPointerUp={onPointerUp}
-          className={
-            view === 'elevation'
-              ? 'relative flex-1 min-w-0 touch-none cursor-ew-resize select-none h-56 sm:h-72'
-              // Explicit height, not `aspect-ratio` — this was the actual
-              // bug behind the map staying blank. `position:absolute;
-              // inset:0` (what MapboxRouteMap's container, and everything
-              // mapbox-gl builds inside it, uses to fill this box) only
-              // resolves against a *definite* parent height. A height
-              // purely derived from `aspect-ratio` on a flex item doesn't
-              // count as definite here — the absolutely-positioned map
-              // container measurably collapsed to zero height (confirmed
-              // via getBoundingClientRect) while the <canvas> inside it
-              // kept its own JS-set pixel size, just clipped to nothing
-              // visible. A real length value like h-56/h-72 sidesteps the
-              // ambiguity entirely — same reason the Elevation Profile
-              // view (which already used explicit heights) never hit this.
-              // No aspect-ratio-matching need either now that Map View is
-              // an interactive map, not a fixed-aspect static image — it
-              // resizes itself to whatever box it's given.
-              : 'relative flex-1 min-w-0 select-none h-56 sm:h-72 overflow-hidden rounded-sm bg-[#e9e5dc]'
-          }
-        >
-          {view === 'route' && useRealMap && (
-            <MapboxRouteMap
-              points={points}
-              current={current}
-              onScrub={setScrubKm}
-              onFailed={() => setMapFailed(true)}
-            />
-          )}
-
-          {(view === 'elevation' || (view === 'route' && !useRealMap)) && (
-            <svg
-              viewBox={view === 'elevation' ? `0 0 ${VIEW_W} ${VIEW_H}` : `0 0 ${MAP_W} ${MAP_H}`}
-              className="absolute inset-0 w-full h-full"
-              // The fallback box is now a fixed height (see the className
-              // comment above), not an aspect-matched box, so "meet" would
-              // letterbox it — stretch to fill instead, same tradeoff the
-              // elevation view already makes.
-              preserveAspectRatio="none"
-            >
-              <defs>
-                <linearGradient id="rp-elev-grad" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="#2d6a4f" stopOpacity="0.28" />
-                  <stop offset="100%" stopColor="#2d6a4f" stopOpacity="0.03" />
-                </linearGradient>
-                {/* Faint diagonal hatch over the fill — texture only, one colour,
-                    no slope/gradient colour-coding. */}
-                <pattern id="rp-hatch" width="7" height="7" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
-                  <line x1="0" y1="0" x2="0" y2="7" stroke="#2d6a4f" strokeWidth="1" opacity="0.16" />
-                </pattern>
-              </defs>
-
-              {view === 'elevation' ? (
-                <>
-                  {/* Gridlines */}
-                  {ticks.map((km, i) => (
-                    <line key={`ex-${i}`} x1={xForKm(km)} x2={xForKm(km)} y1={PAD_TOP} y2={VIEW_H - PAD_BOTTOM}
-                      stroke="#00000010" strokeWidth="1" />
-                  ))}
-                  {eTicks.map((e, i) => (
-                    <line key={`ey-${i}`} x1={PAD_LEFT} x2={VIEW_W - PAD_RIGHT} y1={yForEle(e)} y2={yForEle(e)}
-                      stroke="#00000010" strokeWidth="1" />
-                  ))}
-
-                  <path d={areaPath} fill="url(#rp-elev-grad)" />
-                  <path d={areaPath} fill="url(#rp-hatch)" />
-                  <path d={linePath} fill="none" stroke="#2d6a4f" strokeWidth="2.5" strokeLinejoin="round" strokeLinecap="round" />
-
-                  {/* Waypoint leader ticks — the labels/markers themselves are
-                      HTML-overlaid below, so their text is never stretched. */}
-                  {waypointMarks.map(m => {
-                    const x = xForKm(m.distanceKm)
-                    const y = yForEle(m.ele)
-                    return (
-                      <line key={m.id} x1={x} x2={x} y1={PAD_TOP - 4} y2={y}
-                        stroke={m.category === 'Peak' || m.category === 'Summit' ? '#C9A96E' : '#00000030'}
-                        strokeWidth="1" strokeDasharray="2 2" />
-                    )
-                  })}
-
-                  {/* Scrub guide + marker */}
-                  <line x1={markerPos.x} x2={markerPos.x} y1={PAD_TOP} y2={VIEW_H - PAD_BOTTOM}
-                    stroke="#C9A96E" strokeWidth="1.5" strokeDasharray="3 3" />
-                  <circle cx={markerPos.x} cy={markerPos.y} r={dragging ? 8 : 6.5} fill="#C9A96E" stroke="#fff" strokeWidth="2" />
-                </>
-              ) : (
-                <>
-                  <path d={routeFallback.path} fill="none" stroke="#2d6a4f" strokeWidth="3" strokeLinejoin="round" strokeLinecap="round" />
-                  <circle cx={markerPos.x} cy={markerPos.y} r={dragging ? 8 : 6.5} fill="#C9A96E" stroke="#fff" strokeWidth="2" />
-                </>
-              )}
-            </svg>
-          )}
-
-          {/* Waypoint markers + angled name labels (HTML overlay — immune to
-              the SVG's non-uniform stretch, so rotated text stays crisp). */}
-          {view === 'elevation' && waypointMarks.length > 0 && (
-            <div className="absolute inset-0 pointer-events-none">
-              {waypointMarks.map((m, i) => {
-                const leftPct = (xForKm(m.distanceKm) / VIEW_W) * 100
-                const topPct = (yForEle(m.ele) / VIEW_H) * 100
-                const isPeak = m.category === 'Peak' || m.category === 'Summit'
-                const isHut = m.category === 'Shelter'
-                return (
-                  <div key={m.id}>
-                    {isHut ? (
-                      <div
-                        className="absolute -translate-x-1/2 -translate-y-1/2 bg-[#2d6a4f] text-white rounded-full p-1 shadow-sm"
-                        style={{ left: `${leftPct}%`, top: `${topPct}%` }}
-                      >
-                        <Home size={9} strokeWidth={2.5} />
-                      </div>
-                    ) : (
-                      <div
-                        className={`absolute -translate-x-1/2 -translate-y-1/2 flex items-center justify-center rounded-full text-white font-sans font-semibold ${isPeak ? 'bg-[#C9A96E]' : 'bg-[#2d6a4f]'}`}
-                        style={{ left: `${leftPct}%`, top: `${topPct}%`, width: 13, height: 13, fontSize: 7 }}
-                      >
-                        {i + 1}
-                      </div>
-                    )}
-                    {labelledIds.has(m.id) && (
-                      <div
-                        className={`hidden sm:block absolute font-sans whitespace-nowrap ${isPeak ? 'text-[#8a6d3b] font-medium' : 'text-gray-600'}`}
-                        style={{
-                          left: `${leftPct}%`,
-                          top: `${((PAD_TOP - 6) / VIEW_H) * 100}%`,
-                          fontSize: 10,
-                          transform: 'translateX(-2px) rotate(-55deg)',
-                          transformOrigin: 'left bottom',
-                        }}
-                      >
-                        {m.name}
-                      </div>
-                    )}
-                  </div>
-                )
-              })}
-            </div>
-          )}
-        </div>
       </div>
 
-      {/* x-axis distance labels (elevation view only — a map has no linear axis) */}
-      {view === 'elevation' && (
-        <div className="flex justify-between font-sans text-[10px] text-gray-400 mt-1 pl-11 pr-1">
-          {ticks.map((km, i) => <span key={i}>{fmtKm(km)}</span>)}
-        </div>
+      {view === 'route' ? (
+        <MapboxRouteMap points={points} />
+      ) : (
+        <>
+          <div className="flex gap-2">
+            {/* Y-axis altitude labels — plain HTML so figures never get
+                skewed by the SVG's non-uniform (preserveAspectRatio="none")
+                stretch. */}
+            <div className="relative w-9 shrink-0 h-56 sm:h-72">
+              <span className="absolute top-0 left-0 font-sans text-[8px] tracking-[0.1em] uppercase text-gray-300">Alt. m</span>
+              {eTicks.map((e, i) => (
+                <span
+                  key={i}
+                  className="absolute right-0 -translate-y-1/2 font-sans text-[9px] text-gray-400 whitespace-nowrap"
+                  style={{ top: `${(yForEle(e) / VIEW_H) * 100}%` }}
+                >
+                  {Math.round(e).toLocaleString()}
+                </span>
+              ))}
+            </div>
+
+            {/* Draggable chart */}
+            <div
+              ref={trackRef}
+              onPointerDown={onPointerDown}
+              onPointerMove={onPointerMove}
+              onPointerUp={onPointerUp}
+              className="relative flex-1 min-w-0 touch-none cursor-ew-resize select-none h-56 sm:h-72"
+            >
+              <svg viewBox={`0 0 ${VIEW_W} ${VIEW_H}`} className="absolute inset-0 w-full h-full" preserveAspectRatio="none">
+                <defs>
+                  <linearGradient id="rp-elev-grad" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="#2d6a4f" stopOpacity="0.28" />
+                    <stop offset="100%" stopColor="#2d6a4f" stopOpacity="0.03" />
+                  </linearGradient>
+                  {/* Faint diagonal hatch over the fill — texture only, one
+                      colour, no slope/gradient colour-coding. */}
+                  <pattern id="rp-hatch" width="7" height="7" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+                    <line x1="0" y1="0" x2="0" y2="7" stroke="#2d6a4f" strokeWidth="1" opacity="0.16" />
+                  </pattern>
+                </defs>
+
+                {/* Gridlines */}
+                {ticks.map((km, i) => (
+                  <line key={`ex-${i}`} x1={xForKm(km)} x2={xForKm(km)} y1={PAD_TOP} y2={VIEW_H - PAD_BOTTOM}
+                    stroke="#00000010" strokeWidth="1" />
+                ))}
+                {eTicks.map((e, i) => (
+                  <line key={`ey-${i}`} x1={PAD_LEFT} x2={VIEW_W - PAD_RIGHT} y1={yForEle(e)} y2={yForEle(e)}
+                    stroke="#00000010" strokeWidth="1" />
+                ))}
+
+                <path d={areaPath} fill="url(#rp-elev-grad)" />
+                <path d={areaPath} fill="url(#rp-hatch)" />
+                <path d={linePath} fill="none" stroke="#2d6a4f" strokeWidth="2.5" strokeLinejoin="round" strokeLinecap="round" />
+
+                {/* Waypoint leader ticks — the labels/markers themselves are
+                    HTML-overlaid below, so their text is never stretched. */}
+                {waypointMarks.map(m => {
+                  const x = xForKm(m.distanceKm)
+                  const y = yForEle(m.ele)
+                  return (
+                    <line key={m.id} x1={x} x2={x} y1={PAD_TOP - 4} y2={y}
+                      stroke={m.category === 'Peak' || m.category === 'Summit' ? '#C9A96E' : '#00000030'}
+                      strokeWidth="1" strokeDasharray="2 2" />
+                  )
+                })}
+
+                {/* Scrub guide + marker */}
+                <line x1={markerPos.x} x2={markerPos.x} y1={PAD_TOP} y2={VIEW_H - PAD_BOTTOM}
+                  stroke="#C9A96E" strokeWidth="1.5" strokeDasharray="3 3" />
+                <circle cx={markerPos.x} cy={markerPos.y} r={dragging ? 8 : 6.5} fill="#C9A96E" stroke="#fff" strokeWidth="2" />
+              </svg>
+
+              {/* Waypoint markers + angled name labels (HTML overlay —
+                  immune to the SVG's non-uniform stretch, so rotated text
+                  stays crisp). */}
+              {waypointMarks.length > 0 && (
+                <div className="absolute inset-0 pointer-events-none">
+                  {waypointMarks.map((m, i) => {
+                    const leftPct = (xForKm(m.distanceKm) / VIEW_W) * 100
+                    const topPct = (yForEle(m.ele) / VIEW_H) * 100
+                    const isPeak = m.category === 'Peak' || m.category === 'Summit'
+                    const isHut = m.category === 'Shelter'
+                    return (
+                      <div key={m.id}>
+                        {isHut ? (
+                          <div
+                            className="absolute -translate-x-1/2 -translate-y-1/2 bg-[#2d6a4f] text-white rounded-full p-1 shadow-sm"
+                            style={{ left: `${leftPct}%`, top: `${topPct}%` }}
+                          >
+                            <Home size={9} strokeWidth={2.5} />
+                          </div>
+                        ) : (
+                          <div
+                            className={`absolute -translate-x-1/2 -translate-y-1/2 flex items-center justify-center rounded-full text-white font-sans font-semibold ${isPeak ? 'bg-[#C9A96E]' : 'bg-[#2d6a4f]'}`}
+                            style={{ left: `${leftPct}%`, top: `${topPct}%`, width: 13, height: 13, fontSize: 7 }}
+                          >
+                            {i + 1}
+                          </div>
+                        )}
+                        {labelledIds.has(m.id) && (
+                          <div
+                            className={`hidden sm:block absolute font-sans whitespace-nowrap ${isPeak ? 'text-[#8a6d3b] font-medium' : 'text-gray-600'}`}
+                            style={{
+                              left: `${leftPct}%`,
+                              top: `${((PAD_TOP - 6) / VIEW_H) * 100}%`,
+                              fontSize: 10,
+                              transform: 'translateX(-2px) rotate(-55deg)',
+                              transformOrigin: 'left bottom',
+                            }}
+                          >
+                            {m.name}
+                          </div>
+                        )}
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* x-axis distance labels */}
+          <div className="flex justify-between font-sans text-[10px] text-gray-400 mt-1 pl-11 pr-1">
+            {ticks.map((km, i) => <span key={i}>{fmtKm(km)}</span>)}
+          </div>
+        </>
       )}
 
       <p className="font-sans text-xs text-gray-400 mt-2">
         {view === 'elevation'
           ? 'Drag the marker — or tap anywhere on the chart — to read elevation at any distance along the trail. Numbered points mark waypoints along the route.'
-          : useRealMap
-            ? 'Pan and zoom the map, or click anywhere on the route to jump the marker there — switch to Elevation Profile to read the height at that point.'
-            : 'A schematic trace of the route — switch to Elevation Profile to scrub the height along it.'}
+          : 'Pan and zoom to explore the route.'}
       </p>
     </div>
   )
