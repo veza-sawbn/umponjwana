@@ -6,6 +6,9 @@ import { ArrowRight, ChevronDown, X } from 'lucide-react'
 import { supabase } from '@/lib/auth'
 import { publicSupabase } from '@/lib/supabase-public'
 import { motion, AnimatePresence } from 'framer-motion'
+import { Swiper, SwiperSlide } from 'swiper/react'
+import { Autoplay } from 'swiper/modules'
+import 'swiper/css'
 import SearchBar from '@/components/search/SearchBar'
 import Footer from '@/components/layout/Footer'
 import { getAllSiteContent, SITE_CONTENT_DEFAULTS, type HomeCard } from '@/lib/site-content'
@@ -72,6 +75,39 @@ function useVisibleCards(cards: HomeCard[], inEditor: boolean) {
 
 function cardDimClass(card: HomeCard, inEditor: boolean) {
   return inEditor && card.visible === false ? 'opacity-35' : ''
+}
+
+/**
+ * Mobile-only presentation of the Regions section — a swipeable Swiper
+ * carousel rendering the same RegionCardBody as the desktop grid it
+ * replaces below the `sm` breakpoint. Looping needs enough cards to feel
+ * like a loop rather than glitch, so it falls back to a plain (still
+ * swipeable) row. Auto-advances on a timer (paused on touch/drag, and
+ * while the visual editor is open so it doesn't fight admin clicks) and
+ * resumes afterwards.
+ */
+function RegionsCarousel({ regions, inEditor }: { regions: HomeCard[]; inEditor: boolean }) {
+  const canLoop = regions.length > 2
+
+  return (
+    <Swiper
+      modules={[Autoplay]}
+      loop={canLoop}
+      autoplay={inEditor || regions.length < 2 ? false : { delay: 4000, disableOnInteraction: false, pauseOnMouseEnter: true }}
+      slidesPerView={1.15}
+      spaceBetween={12}
+      grabCursor
+      className="!pb-1"
+    >
+      {regions.map((r, index) => (
+        <SwiperSlide key={r.id} className={`h-auto self-stretch ${cardDimClass(r, inEditor)}`}>
+          <EditableCard contentKey="home_cards" fieldKey="regions" index={index} label={String(r.name ?? 'Region Card')}>
+            <RegionCardBody region={r} />
+          </EditableCard>
+        </SwiperSlide>
+      ))}
+    </Swiper>
+  )
 }
 
 /* ─── Hero ───────────────────────────────────────────────────────────────────── */
@@ -452,20 +488,9 @@ export default function HomePage() {
           </Link>
         </div>
 
-        {/* Mobile shell: swipeable carousel, one region peeking the next */}
-        <div className="flex md:hidden gap-4 overflow-x-auto snap-x snap-mandatory scrollbar-none -mx-6 px-6 pb-1">
-          {regions.map((r, index) => (
-            <div key={r.id} className={`w-[78%] shrink-0 snap-start ${cardDimClass(r, inEditor)}`}>
-              <EditableCard contentKey="home_cards" fieldKey="regions" index={index} label={String(r.name ?? 'Region Card')}>
-                <RegionCardBody region={r} />
-              </EditableCard>
-            </div>
-          ))}
-        </div>
-
-        {/* Desktop: static grid */}
+        {/* Tablet/desktop: static grid */}
         <motion.div
-          className="hidden md:grid grid-cols-3 gap-6"
+          className="hidden sm:grid sm:grid-cols-3 gap-6"
           variants={staggerContainer(0.08)}
           initial="hidden"
           whileInView="show"
@@ -479,6 +504,11 @@ export default function HomePage() {
             </motion.div>
           ))}
         </motion.div>
+
+        {/* Mobile: swipeable carousel */}
+        <div className="sm:hidden">
+          <RegionsCarousel regions={regions} inEditor={inEditor} />
+        </div>
       </div>
     </EditableSection>
   )
