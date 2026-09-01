@@ -30,7 +30,11 @@ const MIN_LABEL_GAP_PX = 42 // viewBox units — skip a label if it would crowd 
 // distorted.
 const MAP_W = 640
 const MAP_H = 400
-const MAP_PAD = 24
+// Generous margin around the fitted bounds — protects short/tight trails
+// (where the fit-bounds zoom is high) from the line's own stroke width, the
+// scrub marker's radius, or a switchback's chord momentarily poking past a
+// bounding box drawn with zero breathing room.
+const MAP_PAD = 40
 
 const MAPBOX_TOKEN = process.env.NEXT_PUBLIC_MAPBOX_TOKEN
 const MAPBOX_STYLE = 'mapbox/outdoors-v12' // built for exactly this — trails, contours, terrain shading
@@ -95,9 +99,12 @@ function zoomForBounds(minLat: number, maxLat: number, minLon: number, maxLon: n
 // (as the line used to be drawn) only ever approximates it. Only the single
 // draggable scrub marker still uses the client-side projection (mapXY
 // below), since re-fetching a static image on every pointer-move isn't
-// viable — a lone dot a few pixels off is a far smaller risk than an entire
-// mis-traced line.
-const MAX_PATH_POINTS = 300 // keeps the encoded overlay well under Mapbox's URL length limit
+// viable — so the marker is snapped to the nearest vertex of this exact
+// same decimated point set (see decimatedPoints below) rather than the
+// full-resolution track, guaranteeing it always lands on a point Mapbox
+// actually rendered instead of one a dropped-for-decimation stretch of
+// line only approximates.
+const MAX_PATH_POINTS = 800 // well under Mapbox's URL length limit even doubled (casing + line)
 
 function decimate<T>(arr: T[], maxPoints: number): T[] {
   if (arr.length <= maxPoints) return arr
@@ -186,13 +193,19 @@ export default function RouteProfileChart({ trail }: { trail: Trail }) {
     return { x: (world.x - centerWorld.x) * scale + MAP_W / 2, y: (world.y - centerWorld.y) * scale + MAP_H / 2 }
   }, [mapGeo])
 
+  // The exact same decimated point set feeds both the server-drawn overlay
+  // below and the marker snapping further down — so the marker can only
+  // ever land on a vertex Mapbox actually rendered, never on a
+  // full-resolution point a dropped-for-decimation stretch only approximates.
+  const decimatedPoints = useMemo(() => decimate(points, MAX_PATH_POINTS), [points])
+
   // White casing + green line, drawn server-side by Mapbox against its own
   // basemap — see the comment above encodePolyline for why.
   const pathOverlay = useMemo(() => {
-    if (points.length < 2) return ''
-    const encoded = encodeURIComponent(encodePolyline(decimate(points, MAX_PATH_POINTS).map(p => [p.lat, p.lon])))
+    if (decimatedPoints.length < 2) return ''
+    const encoded = encodeURIComponent(encodePolyline(decimatedPoints.map(p => [p.lat, p.lon])))
     return `path-5+ffffff-0.85(${encoded}),path-3+2d6a4f-1(${encoded})`
-  }, [points])
+  }, [decimatedPoints])
 
   const staticMapUrl = mapGeo && MAPBOX_TOKEN && pathOverlay
     ? `https://api.mapbox.com/styles/v1/${MAPBOX_STYLE}/static/${pathOverlay}/${mapGeo.center.lng},${mapGeo.center.lat},${mapGeo.zoom}/${MAP_W}x${MAP_H}@2x?access_token=${encodeURIComponent(MAPBOX_TOKEN)}`
@@ -258,9 +271,14 @@ export default function RouteProfileChart({ trail }: { trail: Trail }) {
   if (points.length === 0 || totalKm === 0) return null
 
   const current = nearestPoint(points, scrubKm)
+  // On the real map, snap to the nearest point Mapbox actually drew (the
+  // decimated set), not the full-resolution track — otherwise the marker
+  // can land on a stretch of line decimation dropped, appearing to sit off
+  // the rendered path.
+  const mapCurrent = decimatedPoints.length ? nearestPoint(decimatedPoints, scrubKm) : current
   const markerPos = view === 'elevation'
     ? { x: xForKm(current.distanceKm), y: yForEle(current.ele) }
-    : useRealMap ? mapXY(current.lat, current.lon) : routeFallback.xy(current)
+    : useRealMap ? mapXY(mapCurrent.lat, mapCurrent.lon) : routeFallback.xy(current)
 
   function scrubFromClientX(clientX: number) {
     const el = trackRef.current

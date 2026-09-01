@@ -191,7 +191,13 @@ export default function HikeDetail({
             {trail.analytics?.points.length ? (
               <div>
                 <h2 className="font-display italic text-2xl text-[#000000] mb-4">Route Profile</h2>
-                <RouteProfileChart trail={trail} />
+                {/* key={trail.id} — /hikes/[id] reuses the same component
+                    instance across a client-side navigation to a different
+                    trail (same route template), so without a key its
+                    internal state (scrub position, map-load-failed flag)
+                    would carry over from the previous trail instead of
+                    resetting for the new one. */}
+                <RouteProfileChart key={trail.id} trail={trail} />
                 <div className="mt-6">
                   <RouteStats trail={trail} />
                 </div>
