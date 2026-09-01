@@ -246,14 +246,23 @@ export default function RouteProfileChart({ trail }: { trail: Trail }) {
           className={
             view === 'elevation'
               ? 'relative flex-1 min-w-0 touch-none cursor-ew-resize select-none h-56 sm:h-72'
-              // `overflow-hidden` + `rounded-sm` clipping directly around a
-              // WebGL canvas is a known browser compositing bug (the clip
-              // can force the browser off the GPU-accelerated path for
-              // whatever's underneath it, leaving it uncomposited/invisible
-              // even though it's rendering correctly per every other
-              // check). Dropped only for the real interactive map; the
-              // schematic SVG fallback carries no such risk and keeps it.
-              : `relative flex-1 min-w-0 select-none aspect-[8/5] bg-[#e9e5dc] ${useRealMap ? '' : 'overflow-hidden rounded-sm'}`
+              // Explicit height, not `aspect-ratio` — this was the actual
+              // bug behind the map staying blank. `position:absolute;
+              // inset:0` (what MapboxRouteMap's container, and everything
+              // mapbox-gl builds inside it, uses to fill this box) only
+              // resolves against a *definite* parent height. A height
+              // purely derived from `aspect-ratio` on a flex item doesn't
+              // count as definite here — the absolutely-positioned map
+              // container measurably collapsed to zero height (confirmed
+              // via getBoundingClientRect) while the <canvas> inside it
+              // kept its own JS-set pixel size, just clipped to nothing
+              // visible. A real length value like h-56/h-72 sidesteps the
+              // ambiguity entirely — same reason the Elevation Profile
+              // view (which already used explicit heights) never hit this.
+              // No aspect-ratio-matching need either now that Map View is
+              // an interactive map, not a fixed-aspect static image — it
+              // resizes itself to whatever box it's given.
+              : 'relative flex-1 min-w-0 select-none h-56 sm:h-72 overflow-hidden rounded-sm bg-[#e9e5dc]'
           }
         >
           {view === 'route' && useRealMap && (
@@ -269,7 +278,11 @@ export default function RouteProfileChart({ trail }: { trail: Trail }) {
             <svg
               viewBox={view === 'elevation' ? `0 0 ${VIEW_W} ${VIEW_H}` : `0 0 ${MAP_W} ${MAP_H}`}
               className="absolute inset-0 w-full h-full"
-              preserveAspectRatio={view === 'elevation' ? 'none' : 'xMidYMid meet'}
+              // The fallback box is now a fixed height (see the className
+              // comment above), not an aspect-matched box, so "meet" would
+              // letterbox it — stretch to fill instead, same tradeoff the
+              // elevation view already makes.
+              preserveAspectRatio="none"
             >
               <defs>
                 <linearGradient id="rp-elev-grad" x1="0" y1="0" x2="0" y2="1">
