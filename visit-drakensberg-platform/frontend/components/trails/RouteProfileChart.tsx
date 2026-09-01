@@ -246,7 +246,14 @@ export default function RouteProfileChart({ trail }: { trail: Trail }) {
           className={
             view === 'elevation'
               ? 'relative flex-1 min-w-0 touch-none cursor-ew-resize select-none h-56 sm:h-72'
-              : 'relative flex-1 min-w-0 select-none aspect-[8/5] overflow-hidden rounded-sm bg-[#e9e5dc]'
+              // `overflow-hidden` + `rounded-sm` clipping directly around a
+              // WebGL canvas is a known browser compositing bug (the clip
+              // can force the browser off the GPU-accelerated path for
+              // whatever's underneath it, leaving it uncomposited/invisible
+              // even though it's rendering correctly per every other
+              // check). Dropped only for the real interactive map; the
+              // schematic SVG fallback carries no such risk and keeps it.
+              : `relative flex-1 min-w-0 select-none aspect-[8/5] bg-[#e9e5dc] ${useRealMap ? '' : 'overflow-hidden rounded-sm'}`
           }
         >
           {view === 'route' && useRealMap && (
