@@ -153,8 +153,32 @@ export async function POST(req: Request) {
         const value = confirmedBooking.value as {
           customerName?: string; guests?: number; userId?: string; region?: string; total?: number
           analyticsAnonId?: string; analyticsSessionId?: string | null
+          tripRequestId?: string
         } | null
         const guests = value?.guests ?? 1
+
+        // This booking was created from an accepted custom-trip quote (see
+        // lib/custom-trips.ts acceptQuote()) — flip the originating request
+        // to 'confirmed' too, so /account/requests and /supplier/requests
+        // agree with the booking that just cleared. The supplier is not
+        // notified again here: the "New booking" notification below already
+        // reaches them.
+        if (value?.tripRequestId) {
+          const { data: tripReq } = await admin.from('vd_trip_requests')
+            .select('id, status, value').eq('id', value.tripRequestId).maybeSingle()
+          if (tripReq && tripReq.status !== 'confirmed') {
+            const tripValue = { ...(tripReq.value as Record<string, unknown> ?? {}) }
+            const timeline = Array.isArray(tripValue.timeline) ? tripValue.timeline : []
+            tripValue.status = 'confirmed'
+            tripValue.timeline = [
+              ...timeline,
+              { at: new Date().toISOString(), status: 'confirmed', note: 'Payment received — booking confirmed' },
+            ]
+            await admin.from('vd_trip_requests')
+              .update({ status: 'confirmed', value: tripValue, updated_at: new Date().toISOString() })
+              .eq('id', tripReq.id)
+          }
+        }
         const rows = (confirmedBooking.supplier_ids ?? []).map((sid: string) => ({
           user_id: sid,
           type: 'booking',

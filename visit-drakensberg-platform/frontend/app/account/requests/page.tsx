@@ -12,7 +12,7 @@ import {
 import { supabase } from '@/lib/auth'
 import { formatMoney } from '@/lib/allocation'
 import {
-  getTripRequests, acceptQuote, confirmTripPayment, cancelTripRequest,
+  getTripRequests, acceptQuote, cancelTripRequest,
   TRIP_STATUS_LABELS, type TripRequest, type TripRequestStatus,
 } from '@/lib/custom-trips'
 
@@ -38,7 +38,6 @@ export default function MyRequestsPage() {
   const [requests, setRequests] = useState<TripRequest[]>([])
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState<string | null>(null)
-  const [payingId, setPayingId] = useState<string | null>(null)
 
   useEffect(() => {
     supabase.auth.getUser().then(async ({ data: { user } }) => {
@@ -57,21 +56,34 @@ export default function MyRequestsPage() {
     try {
       replace(await acceptQuote(r))
       toast.success('Quote accepted — please complete payment.')
-    } catch { toast.error('Could not accept the quote. Please try again.') }
-    finally { setBusy(null) }
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Could not accept the quote. Please try again.')
+    } finally { setBusy(null) }
   }
 
+  // Routes to the real payment gateway (iKhokha) against the booking/invoice
+  // created when the quote was accepted — never marks the trip paid itself.
+  // The trip only becomes 'confirmed' once the iKhokha webhook verifies the
+  // payment actually went through (see app/api/payments/ikhokha/webhook).
   async function handlePay(r: TripRequest) {
+    if (!r.bookingId) {
+      toast.error('This request has no payment set up yet — please contact us to arrange payment.')
+      return
+    }
     setBusy(r.id)
     try {
-      // Payment integration is deliberately deferred platform-wide (see
-      // checkout) — this mirrors the same simulated payment step.
-      await new Promise(res => setTimeout(res, 900))
-      replace(await confirmTripPayment(r))
-      setPayingId(null)
-      toast.success('Payment received — your private trip is confirmed!')
-    } catch { toast.error('Payment could not be processed. Please try again.') }
-    finally { setBusy(null) }
+      const res = await fetch('/api/payments/ikhokha/create', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ bookingId: r.bookingId }),
+      })
+      const json = await res.json()
+      if (!res.ok || !json.paylinkUrl) throw new Error(json.error || 'Could not start payment')
+      window.location.href = json.paylinkUrl
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Could not start payment. Please try again.')
+      setBusy(null)
+    }
   }
 
   async function handleCancel(r: TripRequest) {
@@ -190,26 +202,15 @@ export default function MyRequestsPage() {
                     <CheckCircle size={13} className="inline mr-1.5 -mt-0.5" />Accept Quote
                   </button>
                 )}
-                {r.status === 'awaiting_payment' && payingId !== r.id && (
+                {r.status === 'awaiting_payment' && (
                   <button
-                    onClick={() => setPayingId(r.id)}
-                    className="bg-[#2d6a4f] text-white px-5 py-2.5 font-sans text-sm hover:bg-[#235a3f] transition-colors"
+                    onClick={() => handlePay(r)}
+                    disabled={busy === r.id}
+                    className="bg-[#2d6a4f] text-white px-5 py-2.5 font-sans text-sm hover:bg-[#235a3f] transition-colors disabled:opacity-50"
                   >
-                    <CreditCard size={13} className="inline mr-1.5 -mt-0.5" />Pay {formatMoney(r.quote?.total ?? 0)}
+                    <CreditCard size={13} className="inline mr-1.5 -mt-0.5" />
+                    {busy === r.id ? 'Redirecting to payment…' : `Pay ${formatMoney(r.quote?.total ?? 0)}`}
                   </button>
-                )}
-                {payingId === r.id && r.status === 'awaiting_payment' && (
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className="font-sans text-xs text-gray-500">Confirm payment of {formatMoney(r.quote?.total ?? 0)}?</span>
-                    <button
-                      onClick={() => handlePay(r)}
-                      disabled={busy === r.id}
-                      className="bg-[#2d6a4f] text-white px-4 py-2 font-sans text-xs hover:bg-[#235a3f] transition-colors disabled:opacity-50"
-                    >
-                      {busy === r.id ? 'Processing…' : 'Confirm & Pay'}
-                    </button>
-                    <button onClick={() => setPayingId(null)} className="font-sans text-xs text-gray-400 hover:text-gray-600">Back</button>
-                  </div>
                 )}
                 {['pending_guide', 'pending_operator', 'quote_ready', 'awaiting_payment'].includes(r.status) && (
                   <button

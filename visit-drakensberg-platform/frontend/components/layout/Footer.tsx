@@ -6,6 +6,7 @@ import { Instagram, Facebook, Youtube } from 'lucide-react'
 import { getSiteContent, SITE_CONTENT_DEFAULTS } from '@/lib/site-content'
 import { useEditMode } from '@/lib/edit-mode-context'
 import Editable from '@/components/editor/Editable'
+import Logo from '@/components/Logo'
 
 const COLUMNS = [
   {
@@ -25,7 +26,6 @@ const COLUMNS = [
       { label: 'Northern Drakensberg', href: '/regions#northern' },
       { label: 'Central Drakensberg', href: '/regions#central' },
       { label: 'Southern Drakensberg', href: '/regions#southern' },
-      { label: 'Royal Natal', href: '/regions#royal-natal' },
     ],
   },
   {
@@ -41,7 +41,6 @@ const COLUMNS = [
   {
     heading: 'Company',
     links: [
-      { label: 'About', href: '/about' },
       { label: 'List With Us', href: '/list-with-us' },
       { label: 'Privacy Policy', href: '/privacy' },
       { label: 'Terms of Use', href: '/terms' },
@@ -67,8 +66,8 @@ export default function Footer() {
       <div className="max-w-[1440px] mx-auto px-6 lg:px-12 py-16">
         {/* Top row */}
         <div className="flex flex-col sm:flex-row sm:items-end gap-2 mb-10">
-          <Link href="/" className="font-display italic text-3xl text-gold leading-none">
-            Visit Drakensberg
+          <Link href="/" aria-label="Visit Drakensberg" className="text-gold shrink-0">
+            <Logo className="h-8 w-auto" />
           </Link>
           <Editable section="footer" fieldKey="tagline" value={tagline} label="Tagline" type="text" as="span">
             <span className="font-sans text-sm text-white/30 sm:ml-4 mb-0.5">

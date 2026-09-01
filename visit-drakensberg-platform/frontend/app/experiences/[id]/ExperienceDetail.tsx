@@ -7,10 +7,12 @@ import Footer from '@/components/layout/Footer'
 import {
   ArrowLeft, Calendar, Clock, Users, MapPin, Star, CheckCircle, Award,
   UserCircle, Mountain, Shield, Plus, Minus, Check, GitCompareArrows,
+  ChevronDown, Route, TrendingUp,
 } from 'lucide-react'
 import { getExperiencesByTrail, resolvePackageItinerary, type TrekkingExperience } from '@/lib/experiences'
 import { useBooking } from '@/lib/booking-context'
 import { formatMoney } from '@/lib/allocation'
+import ReadMoreText from '@/components/ui/ReadMoreText'
 
 const DIFF_COLOR: Record<string, string> = {
   Easy: '#4A7251', Moderate: '#C9A96E', Challenging: '#c0392b', Extreme: '#8e44ad', Strenuous: '#c0392b',
@@ -26,6 +28,12 @@ function addDays(iso: string, days: number) {
   return d.toISOString().slice(0, 10)
 }
 
+// Splits freeform itinerary notes into paragraphs on blank/single line breaks,
+// so a day's write-up reads as distinct paragraphs instead of one dense block.
+function toParagraphs(text: string): string[] {
+  return text.split(/\n+/).map(p => p.trim()).filter(Boolean)
+}
+
 /**
  * Client island rendered inside the server shell (page.tsx), which already
  * resolved `exp` for generateMetadata/JSON-LD and 404s server-side if the id
@@ -39,10 +47,27 @@ export default function ExperienceDetail({ exp }: { exp: TrekkingExperience }) {
   const [siblings, setSiblings] = useState<TrekkingExperience[]>([])
   const [guests, setGuests] = useState(1)
   const [packageId, setPackageId] = useState<string | null>(exp.packages[0]?.id ?? null)
+  // Which itinerary days are expanded — Day 1 open by default. Reset whenever
+  // the selected rate changes, since a different package's itinerary can have
+  // a different day count/order and stale open indices would be meaningless.
+  const [openDays, setOpenDays] = useState<Set<number>>(() => new Set([0]))
 
   useEffect(() => {
     getExperiencesByTrail(exp.trailId).then(same => setSiblings(same.filter(s => s.id !== exp.id)))
   }, [exp.trailId, exp.id])
+
+  useEffect(() => {
+    setOpenDays(new Set([0]))
+  }, [packageId])
+
+  function toggleDay(i: number) {
+    setOpenDays(prev => {
+      const next = new Set(prev)
+      if (next.has(i)) next.delete(i)
+      else next.add(i)
+      return next
+    })
+  }
 
   const full = exp.spacesAvailable === 0
   const isAdded = booking.addons.some(a => a.id === exp.id)
@@ -148,7 +173,7 @@ export default function ExperienceDetail({ exp }: { exp: TrekkingExperience }) {
             {/* About */}
             <div>
               <h2 className="font-display italic text-2xl text-[#000000] mb-4">About this Experience</h2>
-              <p className="font-sans text-gray-700 leading-relaxed">{exp.description}</p>
+              <ReadMoreText text={exp.description} />
             </div>
 
             {/* Included services */}
@@ -178,30 +203,79 @@ export default function ExperienceDetail({ exp }: { exp: TrekkingExperience }) {
                   {itinerary.days.length} day{itinerary.days.length !== 1 ? 's' : ''}
                   {hasMultiplePackages ? ' for this rate — choose a different rate below to see its itinerary.' : ''}
                 </p>
-                <div className="space-y-3">
-                  {itinerary.days.map((day, i) => (
-                    <div key={i} className="bg-white border border-gray-200 p-5">
-                      <div className="flex items-baseline gap-3 mb-1.5 flex-wrap">
-                        <span className="font-display italic text-lg text-[#2d6a4f] shrink-0">Day {i + 1}</span>
-                        <span className="font-sans text-xs text-gray-400">{formatDate(addDays(exp.departureDate, day.dateOffset))}</span>
-                        {day.label && <span className="font-sans text-sm font-medium text-gray-800">{day.label}</span>}
+                <div className="bg-white border border-gray-200 divide-y divide-gray-200">
+                  {itinerary.days.map((day, i) => {
+                    const isOpen = openDays.has(i)
+                    const panelId = `itinerary-day-${i}-panel`
+                    return (
+                      <div key={i}>
+                        <button
+                          type="button"
+                          onClick={() => toggleDay(i)}
+                          aria-expanded={isOpen}
+                          aria-controls={panelId}
+                          className="w-full flex items-center justify-between gap-3 px-5 py-4 text-left hover:bg-[#F7F5F2]/60 transition-colors"
+                        >
+                          <div className="flex items-baseline gap-3 flex-wrap min-w-0">
+                            <span className="font-display italic text-lg text-[#2d6a4f] shrink-0">Day {i + 1}</span>
+                            <span className="font-sans text-xs text-gray-400 shrink-0">{formatDate(addDays(exp.departureDate, day.dateOffset))}</span>
+                            {day.label && <span className="font-sans text-sm font-medium text-gray-800">{day.label}</span>}
+                          </div>
+                          <div className="flex items-center gap-4 shrink-0">
+                            {day.distance && (
+                              <span className="hidden sm:inline-flex items-center gap-1.5 font-sans text-xs text-gray-500">
+                                <Route size={13} className="text-[#C9A96E]" />{day.distance}
+                              </span>
+                            )}
+                            {day.elevation && (
+                              <span className="hidden sm:inline-flex items-center gap-1.5 font-sans text-xs text-gray-500">
+                                <TrendingUp size={13} className="text-[#C9A96E]" />{day.elevation}
+                              </span>
+                            )}
+                            <ChevronDown size={17} className={`text-gray-400 transition-transform shrink-0 ${isOpen ? 'rotate-180' : ''}`} />
+                          </div>
+                        </button>
+                        {isOpen && (
+                          <div id={panelId} className="px-5 pb-5">
+                            {(day.distance || day.elevation) && (
+                              <div className="flex sm:hidden items-center gap-4 mb-3">
+                                {day.distance && (
+                                  <span className="inline-flex items-center gap-1.5 font-sans text-xs text-gray-500">
+                                    <Route size={13} className="text-[#C9A96E]" />{day.distance}
+                                  </span>
+                                )}
+                                {day.elevation && (
+                                  <span className="inline-flex items-center gap-1.5 font-sans text-xs text-gray-500">
+                                    <TrendingUp size={13} className="text-[#C9A96E]" />{day.elevation}
+                                  </span>
+                                )}
+                              </div>
+                            )}
+                            {day.description && (
+                              <div className="space-y-3">
+                                {toParagraphs(day.description).map((p, pi) => (
+                                  <p key={pi} className="font-sans text-sm text-gray-600 leading-relaxed">{p}</p>
+                                ))}
+                              </div>
+                            )}
+                            {(day.accommodation || day.transport || day.meals) && (
+                              <div className="flex flex-wrap gap-x-5 gap-y-1.5 mt-4 pt-3 border-t border-gray-100">
+                                {day.accommodation && (
+                                  <span className="font-sans text-xs text-gray-500"><span className="text-gray-400">Overnight:</span> {day.accommodation}</span>
+                                )}
+                                {day.transport && (
+                                  <span className="font-sans text-xs text-gray-500"><span className="text-gray-400">Transport:</span> {day.transport}</span>
+                                )}
+                                {day.meals && (
+                                  <span className="font-sans text-xs text-gray-500"><span className="text-gray-400">Meals:</span> {day.meals}</span>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        )}
                       </div>
-                      {day.description && <p className="font-sans text-sm text-gray-600 leading-relaxed">{day.description}</p>}
-                      {(day.accommodation || day.transport || day.meals) && (
-                        <div className="flex flex-wrap gap-x-5 gap-y-1.5 mt-3 pt-3 border-t border-gray-100">
-                          {day.accommodation && (
-                            <span className="font-sans text-xs text-gray-500"><span className="text-gray-400">Overnight:</span> {day.accommodation}</span>
-                          )}
-                          {day.transport && (
-                            <span className="font-sans text-xs text-gray-500"><span className="text-gray-400">Transport:</span> {day.transport}</span>
-                          )}
-                          {day.meals && (
-                            <span className="font-sans text-xs text-gray-500"><span className="text-gray-400">Meals:</span> {day.meals}</span>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  ))}
+                    )
+                  })}
                 </div>
               </div>
             )}

@@ -79,11 +79,12 @@ function cardDimClass(card: HomeCard, inEditor: boolean) {
 
 /**
  * Mobile-only presentation of the Regions section — a swipeable Swiper
- * carousel, matching the card markup of the desktop grid it replaces below
- * the `sm` breakpoint. Looping needs enough cards to feel like a loop
- * rather than glitch, so it falls back to a plain (still swipeable) row.
- * Auto-advances on a timer (paused on touch/drag, and while the visual
- * editor is open so it doesn't fight admin clicks) and resumes afterwards.
+ * carousel rendering the same RegionCardBody as the desktop grid it
+ * replaces below the `sm` breakpoint. Looping needs enough cards to feel
+ * like a loop rather than glitch, so it falls back to a plain (still
+ * swipeable) row. Auto-advances on a timer (paused on touch/drag, and
+ * while the visual editor is open so it doesn't fight admin clicks) and
+ * resumes afterwards.
  */
 function RegionsCarousel({ regions, inEditor }: { regions: HomeCard[]; inEditor: boolean }) {
   const canLoop = regions.length > 2
@@ -101,19 +102,7 @@ function RegionsCarousel({ regions, inEditor }: { regions: HomeCard[]; inEditor:
       {regions.map((r, index) => (
         <SwiperSlide key={r.id} className={`h-auto self-stretch ${cardDimClass(r, inEditor)}`}>
           <EditableCard contentKey="home_cards" fieldKey="regions" index={index} label={String(r.name ?? 'Region Card')}>
-            <Link href={String(r.href || '/regions')} className="group block">
-              <div className="relative overflow-hidden aspect-[4/3] mb-4">
-                <img loading="lazy" decoding="async"
-                  src={String(r.img)}
-                  alt={String(r.name)}
-                  className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
-                  style={{ willChange: 'transform' }}
-                />
-              </div>
-              <p className="font-sans text-[10px] tracking-[0.15em] uppercase text-gold mb-1">{r.subtitle}</p>
-              <h3 className="font-display text-2xl text-forest mb-2">{r.name}</h3>
-              <p className="font-sans text-sm text-forest/55 leading-relaxed">{r.desc}</p>
-            </Link>
+            <RegionCardBody region={r} />
           </EditableCard>
         </SwiperSlide>
       ))}
@@ -129,12 +118,32 @@ const HERO_OVERSCALE = 1.12
 
 function HeroCarousel({ images }: { images: string[] }) {
   const [index, setIndex] = useState(0)
+  const [loaded, setLoaded] = useState<Record<number, boolean>>({})
   const hasCycledRef = useRef(false)
 
   useEffect(() => {
     setIndex(0)
     hasCycledRef.current = false
-    images.forEach(src => { const img = new window.Image(); img.src = src })
+    setLoaded({})
+  }, [images])
+
+  // Preload only the slide on screen plus the one coming up next — not the
+  // whole gallery at once — so slower connections aren't asked to fetch
+  // every hero image up front. The interval below still feels seamless
+  // because the next slide is always warmed in the background.
+  useEffect(() => {
+    if (images.length === 0) return
+    const upcoming = [index, (index + 1) % images.length]
+    upcoming.forEach(i => {
+      if (loaded[i]) return
+      const img = new window.Image()
+      img.onload = () => setLoaded(prev => (prev[i] ? prev : { ...prev, [i]: true }))
+      img.src = images[i]
+    })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [index, images])
+
+  useEffect(() => {
     if (images.length < 2) return
     const id = setInterval(() => {
       hasCycledRef.current = true
@@ -145,26 +154,40 @@ function HeroCarousel({ images }: { images: string[] }) {
 
   const panFromLeft = index % 2 === 0
   const isFirstSlide = !hasCycledRef.current
+  const currentLoaded = Boolean(loaded[index])
 
   return (
     <AnimatePresence>
       <motion.div
         key={index}
-        className="absolute inset-0 overflow-hidden"
+        className="absolute inset-0 overflow-hidden bg-slate-900"
         initial={{ opacity: isFirstSlide ? 1 : 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
         transition={{ duration: HERO_FADE_SECONDS, ease: 'easeInOut' }}
       >
+        {/* Soft placeholder until the slide's image has actually decoded —
+            avoids a blank/black flash on slower connections; the pan
+            animation itself only starts once the image is ready. */}
+        {!currentLoaded && (
+          <div className="absolute inset-0 animate-pulse bg-gradient-to-br from-slate-700/60 to-slate-900/80" />
+        )}
         <motion.img
           src={images[index]}
           alt="Drakensberg mountains"
           className="w-full h-full object-cover"
           fetchPriority={isFirstSlide ? 'high' : 'auto'}
-          loading="eager"
-          initial={{ scale: HERO_OVERSCALE, x: panFromLeft ? '-3%' : '3%', y: '-2%' }}
-          animate={{ scale: HERO_OVERSCALE, x: panFromLeft ? '3%' : '-3%', y: '2%' }}
-          transition={{ duration: HERO_SLIDE_SECONDS + HERO_FADE_SECONDS, ease: 'linear' }}
+          loading={isFirstSlide ? 'eager' : 'lazy'}
+          decoding="async"
+          onLoad={() => setLoaded(prev => (prev[index] ? prev : { ...prev, [index]: true }))}
+          initial={{ scale: HERO_OVERSCALE, x: panFromLeft ? '-3%' : '3%', y: '-2%', opacity: 0 }}
+          animate={currentLoaded
+            ? { scale: HERO_OVERSCALE, x: panFromLeft ? '3%' : '-3%', y: '2%', opacity: 1 }
+            : { scale: HERO_OVERSCALE, x: panFromLeft ? '-3%' : '3%', y: '-2%', opacity: 0 }}
+          transition={{
+            default: { duration: HERO_SLIDE_SECONDS + HERO_FADE_SECONDS, ease: 'linear' },
+            opacity: { duration: 0.6, ease: 'easeOut' },
+          }}
         />
       </motion.div>
     </AnimatePresence>
@@ -181,7 +204,7 @@ function HeroSection({ hero }: { hero: typeof SITE_CONTENT_DEFAULTS.hero }) {
   const overlayOpacity = Number(editMode?.getValue('hero', 'overlay_opacity', hero.overlay_opacity) ?? hero.overlay_opacity)
 
   return (
-    <EditableSection id="hero" label="Hero" className="relative h-screen min-h-[600px] flex flex-col">
+    <EditableSection id="hero" label="Hero" className="relative h-[80vh] min-h-[480px] lg:h-screen lg:min-h-[600px] flex flex-col">
       <div className="absolute inset-0 bg-slate-900">
         {hero.video_url ? (
           <video src={hero.video_url} autoPlay muted loop playsInline className="w-full h-full object-cover" />
@@ -195,6 +218,7 @@ function HeroSection({ hero }: { hero: typeof SITE_CONTENT_DEFAULTS.hero }) {
               className="w-full h-full object-cover"
               fetchPriority="high"
               loading="eager"
+              decoding="async"
             />
           </Editable>
         )}
@@ -205,7 +229,7 @@ function HeroSection({ hero }: { hero: typeof SITE_CONTENT_DEFAULTS.hero }) {
       </div>
 
       <motion.div
-        className="relative flex-1 flex flex-col justify-end pb-20 pt-32 lg:pt-0 px-6 lg:px-20 max-w-[1440px] mx-auto w-full"
+        className="relative flex-1 flex flex-col justify-end pb-20 pt-[102px] lg:pt-0 px-6 lg:px-20 max-w-[1440px] mx-auto w-full"
         variants={staggerContainer(0.12, 0.2)}
         initial="hidden"
         animate="show"
@@ -234,6 +258,28 @@ function HeroSection({ hero }: { hero: typeof SITE_CONTENT_DEFAULTS.hero }) {
         <ChevronDown className="w-5 h-5 animate-bounce-slow" />
       </div>
     </EditableSection>
+  )
+}
+
+/* ─── Regions ────────────────────────────────────────────────────────────────── */
+
+// Shared by the mobile carousel and the desktop grid so both render the
+// exact same card — only the surrounding layout differs.
+function RegionCardBody({ region: r }: { region: HomeCard }) {
+  return (
+    <Link href={String(r.href || '/regions')} className="group block">
+      <div className="relative overflow-hidden aspect-[4/3] mb-4">
+        <img loading="lazy" decoding="async"
+          src={String(r.img)}
+          alt={String(r.name)}
+          className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+          style={{ willChange: 'transform' }}
+        />
+      </div>
+      <p className="font-sans text-[10px] tracking-[0.15em] uppercase text-gold mb-1">{r.subtitle}</p>
+      <h3 className="font-display text-2xl text-forest mb-2">{r.name}</h3>
+      <p className="font-sans text-sm text-forest/55 leading-relaxed">{r.desc}</p>
+    </Link>
   )
 }
 
@@ -453,19 +499,7 @@ export default function HomePage() {
           {regions.map((r, index) => (
             <motion.div key={r.id} variants={staggerChild} className={cardDimClass(r, inEditor)}>
               <EditableCard contentKey="home_cards" fieldKey="regions" index={index} label={String(r.name ?? 'Region Card')}>
-                <Link href={String(r.href || '/regions')} className="group block">
-                  <div className="relative overflow-hidden aspect-[4/3] mb-4">
-                    <img loading="lazy" decoding="async"
-                      src={String(r.img)}
-                      alt={String(r.name)}
-                      className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
-                      style={{ willChange: 'transform' }}
-                    />
-                  </div>
-                  <p className="font-sans text-[10px] tracking-[0.15em] uppercase text-gold mb-1">{r.subtitle}</p>
-                  <h3 className="font-display text-2xl text-forest mb-2">{r.name}</h3>
-                  <p className="font-sans text-sm text-forest/55 leading-relaxed">{r.desc}</p>
-                </Link>
+                <RegionCardBody region={r} />
               </EditableCard>
             </motion.div>
           ))}

@@ -74,3 +74,16 @@ export function formatMoney(amount: number, currency = 'ZAR'): string {
   const body = `${symbol}${digits}`
   return value < 0 ? `(${body})` : body
 }
+
+/**
+ * Formats a stored rate (e.g. 0.125) as the exact percentage a booking was
+ * actually charged — "12.5%" — rather than re-deriving it by dividing
+ * rounded money amounts back out, which distorts any fractional rate
+ * (vd_finance_settings allows 0.1% increments) and can even misreport a
+ * whole-number rate on a small subtotal. One decimal place only when the
+ * rate isn't a whole percent, so the common case still reads "12%".
+ */
+export function formatRate(rate: number): string {
+  const pct = rate * 100
+  return `${pct.toFixed(Math.abs(pct % 1) < 1e-9 ? 0 : 1)}%`
+}

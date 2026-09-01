@@ -27,6 +27,16 @@ export type SavedBooking = {
   serviceFee: number
   vat: number
   total: number
+  /**
+   * The service-fee / VAT rates actually applied to this booking's amounts
+   * above, straight from vd_finance_settings at checkout time — not
+   * hardcoded, and not re-derived later from the rounded money amounts
+   * (which distorts a configured fractional rate, e.g. 12.5%). Optional:
+   * bookings saved before this existed don't carry it; callers that display
+   * a rate should fall back to omitting the percentage rather than
+   * guessing. */
+  serviceFeeRate?: number
+  vatRate?: number
   status: 'pending' | 'confirmed' | 'cancelled'
   createdAt: string
   /** The visitor session that created this booking (§21), carried through
@@ -36,6 +46,13 @@ export type SavedBooking = {
    *  bookings saved before this existed simply don't get attributed. */
   analyticsAnonId?: string
   analyticsSessionId?: string | null
+  /** Set when this booking was created from an accepted custom-trip quote
+   *  (see lib/custom-trips.ts acceptQuote()) rather than at checkout. Carried
+   *  through the same way as the analytics ids above, so the iKhokha
+   *  webhook — no browser session there either — can flip the originating
+   *  vd_trip_requests row to 'confirmed' alongside this booking once payment
+   *  actually clears. */
+  tripRequestId?: string
 }
 
 type Row = {
