@@ -88,6 +88,51 @@ function zoomForBounds(minLat: number, maxLat: number, minLon: number, maxLon: n
   return Math.max(1, Math.min(latZoom, lonZoom, ZOOM_MAX))
 }
 
+// ── Server-drawn route line — the GPX track is encoded and handed to
+// Mapbox as a path overlay so *Mapbox itself* renders the line, in its own
+// projection, directly against its own basemap. That guarantees pixel-exact
+// alignment with the terrain — reconstructing Mapbox's rendering client-side
+// (as the line used to be drawn) only ever approximates it. Only the single
+// draggable scrub marker still uses the client-side projection (mapXY
+// below), since re-fetching a static image on every pointer-move isn't
+// viable — a lone dot a few pixels off is a far smaller risk than an entire
+// mis-traced line.
+const MAX_PATH_POINTS = 300 // keeps the encoded overlay well under Mapbox's URL length limit
+
+function decimate<T>(arr: T[], maxPoints: number): T[] {
+  if (arr.length <= maxPoints) return arr
+  const stride = Math.ceil(arr.length / maxPoints)
+  const out: T[] = []
+  for (let i = 0; i < arr.length; i += stride) out.push(arr[i])
+  if (out[out.length - 1] !== arr[arr.length - 1]) out.push(arr[arr.length - 1])
+  return out
+}
+
+/** Standard Google/Mapbox polyline encoding (precision 1e5). */
+function encodePolyline(coords: [number, number][]): string {
+  let output = ''
+  let prevLat = 0, prevLng = 0
+  const encodeNumber = (num: number) => {
+    let n = num, out = ''
+    while (n >= 0x20) {
+      out += String.fromCharCode((0x20 | (n & 0x1f)) + 63)
+      n >>= 5
+    }
+    return out + String.fromCharCode(n + 63)
+  }
+  for (const [lat, lng] of coords) {
+    const lat5 = Math.round(lat * 1e5)
+    const lng5 = Math.round(lng * 1e5)
+    for (const delta of [lat5 - prevLat, lng5 - prevLng]) {
+      const sgn = delta < 0 ? ~(delta << 1) : delta << 1
+      output += encodeNumber(sgn)
+    }
+    prevLat = lat5
+    prevLng = lng5
+  }
+  return output
+}
+
 function fmtKm(km: number) { return `${km.toFixed(km < 10 ? 1 : 0)} km` }
 function fmtM(m: number) { return `${Math.round(m)} m` }
 
@@ -141,15 +186,18 @@ export default function RouteProfileChart({ trail }: { trail: Trail }) {
     return { x: (world.x - centerWorld.x) * scale + MAP_W / 2, y: (world.y - centerWorld.y) * scale + MAP_H / 2 }
   }, [mapGeo])
 
-  const staticMapUrl = mapGeo && MAPBOX_TOKEN
-    ? `https://api.mapbox.com/styles/v1/${MAPBOX_STYLE}/static/${mapGeo.center.lng},${mapGeo.center.lat},${mapGeo.zoom}/${MAP_W}x${MAP_H}@2x?access_token=${encodeURIComponent(MAPBOX_TOKEN)}`
+  // White casing + green line, drawn server-side by Mapbox against its own
+  // basemap — see the comment above encodePolyline for why.
+  const pathOverlay = useMemo(() => {
+    if (points.length < 2) return ''
+    const encoded = encodeURIComponent(encodePolyline(decimate(points, MAX_PATH_POINTS).map(p => [p.lat, p.lon])))
+    return `path-5+ffffff-0.85(${encoded}),path-3+2d6a4f-1(${encoded})`
+  }, [points])
+
+  const staticMapUrl = mapGeo && MAPBOX_TOKEN && pathOverlay
+    ? `https://api.mapbox.com/styles/v1/${MAPBOX_STYLE}/static/${pathOverlay}/${mapGeo.center.lng},${mapGeo.center.lat},${mapGeo.zoom}/${MAP_W}x${MAP_H}@2x?access_token=${encodeURIComponent(MAPBOX_TOKEN)}`
     : null
   const useRealMap = view === 'route' && !!staticMapUrl && !mapImgFailed
-
-  const mapRoutePath = useMemo(() => {
-    if (!mapGeo || points.length === 0) return ''
-    return points.map((p, i) => { const xy = mapXY(p.lat, p.lon); return `${i ? 'L' : 'M'} ${xy.x.toFixed(1)} ${xy.y.toFixed(1)}` }).join(' ')
-  }, [mapGeo, points, mapXY])
 
   // Bounding-box fallback trace (no API key, or the image failed to load) —
   // a schematic top-down line, not a real map, same as before this feature.
@@ -372,14 +420,10 @@ export default function RouteProfileChart({ trail }: { trail: Trail }) {
                 <circle cx={markerPos.x} cy={markerPos.y} r={dragging ? 8 : 6.5} fill="#C9A96E" stroke="#fff" strokeWidth="2" />
               </>
             ) : useRealMap ? (
-              <>
-                {/* White casing under the green line for legibility over a
-                    photographic/terrain background — same convention as
-                    GPS-track overlays on any real map. */}
-                <path d={mapRoutePath} fill="none" stroke="#ffffff" strokeWidth="5" strokeLinejoin="round" strokeLinecap="round" opacity="0.85" />
-                <path d={mapRoutePath} fill="none" stroke="#2d6a4f" strokeWidth="3" strokeLinejoin="round" strokeLinecap="round" />
-                <circle cx={markerPos.x} cy={markerPos.y} r={dragging ? 8 : 6.5} fill="#C9A96E" stroke="#fff" strokeWidth="2" />
-              </>
+              // The route line itself is already baked into the fetched
+              // image (drawn by Mapbox, not here) — only the scrub marker
+              // is a client-side overlay.
+              <circle cx={markerPos.x} cy={markerPos.y} r={dragging ? 8 : 6.5} fill="#C9A96E" stroke="#fff" strokeWidth="2" />
             ) : (
               <>
                 <path d={routeFallback.path} fill="none" stroke="#2d6a4f" strokeWidth="3" strokeLinejoin="round" strokeLinecap="round" />
