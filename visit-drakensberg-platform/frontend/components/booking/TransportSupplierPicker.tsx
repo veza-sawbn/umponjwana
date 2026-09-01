@@ -26,6 +26,7 @@ export function TransportSupplierPicker({
   selected,
   onSelect,
   onCandidates,
+  onLowestPrice,
 }: {
   pickup: GeoPoint
   dropoff: GeoPoint
@@ -36,6 +37,12 @@ export function TransportSupplierPicker({
   selected: ShuttleSupplierChoice | null
   onSelect: (choice: ShuttleSupplierChoice | null) => void
   onCandidates?: (eligibleCount: number) => void
+  /** The cheapest fare among this route's eligible, listed suppliers — lets
+   *  a caller show a real market price (e.g. the "Live route estimate"
+   *  above this list) instead of the generic distance-based formula, before
+   *  the visitor has picked a specific company. Null once there are no
+   *  eligible suppliers for the route. */
+  onLowestPrice?: (price: number | null) => void
 }) {
   const [loading, setLoading] = useState(true)
   const [candidates, setCandidates] = useState<ScoredCandidate[]>([])
@@ -55,6 +62,9 @@ export function TransportSupplierPicker({
         const eligible = ranked.filter(c => c.eligible)
         setCandidates(eligible)
         onCandidates?.(eligible.length)
+        onLowestPrice?.(eligible.length
+          ? Math.min(...eligible.map(c => companyTransferPrice(c.company, distanceKm, passengers, shuttleType)))
+          : null)
         // A previous selection that no longer applies is cleared.
         if (selected && !eligible.some(c => c.company.id === selected.companyId)) onSelect(null)
       })

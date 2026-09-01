@@ -4,7 +4,7 @@ import Link from 'next/link'
 import { SlidersHorizontal, X } from 'lucide-react'
 import Footer from '@/components/layout/Footer'
 import EditablePageHeader from '@/components/editor/EditablePageHeader'
-import { getProperties, type Property } from '@/lib/properties'
+import { getProperties, type Property, PROPERTY_TYPES, propertyTypeFromSlug } from '@/lib/properties'
 import { getRoomsByProperty } from '@/lib/rooms'
 import { regionsMatch } from '@/lib/regions'
 import { formatMoney } from '@/lib/allocation'
@@ -40,6 +40,23 @@ function propToCard(p: Property, minPrice = 0): StayCard {
   }
 }
 
+// Display label for each accommodation type's section heading / tab — kept
+// as an explicit map (rather than naively appending "s") since a couple of
+// PROPERTY_TYPES (lib/properties.ts) pluralize irregularly ("Backpackers",
+// "Glamping" are already plural/uncountable).
+const TYPE_LABELS: Record<string, string> = {
+  Lodge: 'Lodges',
+  Guesthouse: 'Guesthouses',
+  Hotel: 'Hotels',
+  'Self-catering Cottage': 'Self-catering Cottages',
+  Campsite: 'Campsites',
+  Backpackers: 'Backpackers',
+  'Boutique Hotel': 'Boutique Hotels',
+  Resort: 'Resorts',
+  Glamping: 'Glamping',
+  'Farm Stay': 'Farm Stays',
+}
+
 const AMENITY_OPTS = ['pool', 'wifi', 'braai', 'hiking']
 const SORT_OPTS = ['Recommended', 'Price: Low to High', 'Price: High to Low', 'Rating']
 
@@ -50,10 +67,20 @@ export default function StaysPage() {
   const [showFilters, setShowFilters] = useState(false)
   const [liveProperties, setLiveProperties] = useState<StayCard[]>([])
   const [regionFilter, setRegionFilter] = useState('')
+  // '' = All types. Pre-filled from ?type=<slug> — the Stay nav menu's
+  // per-type sub-items (lib/destination-ia.ts) link in this way, e.g.
+  // Stay ▸ Lodges → /stays?type=lodge.
+  const [typeFilter, setTypeFilter] = useState('')
 
   useEffect(() => {
-    const regionParam = new URLSearchParams(window.location.search).get('region')
+    const params = new URLSearchParams(window.location.search)
+    const regionParam = params.get('region')
     if (regionParam) setRegionFilter(regionParam)
+    const typeParam = params.get('type')
+    if (typeParam) {
+      const resolved = propertyTypeFromSlug(typeParam)
+      if (resolved) setTypeFilter(resolved)
+    }
 
     getProperties().then(async props => {
       const active = props.filter(p => p.status === 'active')
@@ -73,7 +100,8 @@ export default function StaysPage() {
     .filter((s) =>
       (!s.price || s.price <= maxPrice) &&
       (!amenities.length || amenities.every((a) => s.amenities.includes(a))) &&
-      (!regionFilter || regionsMatch(s.location, regionFilter))
+      (!regionFilter || regionsMatch(s.location, regionFilter)) &&
+      (!typeFilter || s.category === typeFilter)
     )
     .sort((a, b) => {
       if (sortBy === 'Price: Low to High') return a.price - b.price
@@ -82,12 +110,47 @@ export default function StaysPage() {
       return 0
     })
 
+  // Sections by accommodation type, in PROPERTY_TYPES order, skipping any
+  // type with no matching stays — a selected typeFilter naturally collapses
+  // this to a single section since `filtered` already excludes every other
+  // type. Order within each group is inherited from the sort above.
+  const sections = PROPERTY_TYPES
+    .map(type => ({ type, stays: filtered.filter(s => s.category === type) }))
+    .filter(g => g.stays.length > 0)
+  // Any stay whose type isn't in PROPERTY_TYPES (a legacy/custom value) still
+  // needs to render somewhere rather than silently vanishing from the page.
+  const knownTypes = new Set(PROPERTY_TYPES)
+  const otherStays = filtered.filter(s => !knownTypes.has(s.category))
+
   return (
     <main className="bg-mist min-h-screen pt-16">
       {/* Header */}
       <EditablePageHeader section="stays_page" />
 
       <div className="max-w-[1440px] mx-auto px-6 lg:px-12 py-10">
+        {/* Type tabs */}
+        <div className="flex flex-wrap gap-2 mb-6 border-b border-black/8">
+          <button
+            onClick={() => setTypeFilter('')}
+            className={`font-sans text-sm px-4 py-3 -mb-px border-b-2 transition-colors ${
+              !typeFilter ? 'border-forest text-forest' : 'border-transparent text-forest/40 hover:text-forest'
+            }`}
+          >
+            All Stays
+          </button>
+          {PROPERTY_TYPES.map((t) => (
+            <button
+              key={t}
+              onClick={() => setTypeFilter(t)}
+              className={`font-sans text-sm px-4 py-3 -mb-px border-b-2 transition-colors whitespace-nowrap ${
+                typeFilter === t ? 'border-forest text-forest' : 'border-transparent text-forest/40 hover:text-forest'
+              }`}
+            >
+              {TYPE_LABELS[t] ?? t}
+            </button>
+          ))}
+        </div>
+
         {/* Toolbar */}
         <div className="flex items-center justify-between mb-8">
           <p className="font-sans text-sm text-forest/50">
@@ -135,7 +198,7 @@ export default function StaysPage() {
               </div>
             </div>
             <div className="sm:col-span-2 lg:col-span-2 flex items-end">
-              <button onClick={() => { setAmenities([]); setMaxPrice(5000) }}
+              <button onClick={() => { setAmenities([]); setMaxPrice(5000); setTypeFilter('') }}
                 className="font-sans text-xs text-forest/40 hover:text-forest transition-colors inline-flex items-center gap-1">
                 <X className="w-3 h-3" /> Clear filters
               </button>
@@ -143,74 +206,95 @@ export default function StaysPage() {
           </div>
         )}
 
-        {/* Grid */}
+        {/* Sections, grouped by accommodation type */}
         {filtered.length === 0 && (
           <p className="font-sans text-sm text-forest/40 py-16 text-center">No stays match these filters yet.</p>
         )}
-        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-10">
-          {filtered.map((stay) => {
-            const discountedPrice = stay.discount ? Math.round(stay.price * (1 - stay.discount / 100)) : null
-            return (
-              <Link key={stay.id} href={`/stays/${stay.id}`} className="group block">
-                <div className="relative overflow-hidden aspect-[4/3] mb-4 bg-[#2d6a4f]/10">
-                  {stay.img ? (
-                    <img src={stay.img} alt={stay.title}
-                      className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" />
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center bg-[#C9A96E]/10">
-                      <span className="font-display italic text-2xl text-[#C9A96E]/40">{stay.category}</span>
-                    </div>
-                  )}
-                  {stay.featured && (
-                    <span className="absolute top-3 left-3 font-sans text-[10px] tracking-[0.15em] uppercase bg-gold text-forest px-2.5 py-1">
-                      Featured
-                    </span>
-                  )}
-                  {stay.discount && (
-                    <span className="absolute top-3 right-3 font-sans text-[10px] tracking-[0.1em] bg-forest text-white px-2 py-1">
-                      -{stay.discount}%
-                    </span>
-                  )}
-                </div>
-                <p className="font-sans text-[10px] tracking-[0.15em] uppercase text-gold mb-1">{stay.category} · {stay.location}</p>
-                <h3 className="font-display text-xl text-forest leading-snug mb-2 group-hover:text-sage transition-colors">{stay.title}</h3>
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-1">
-                    {stay.rating ? (
-                      <>
-                        <span className="text-gold text-sm">★</span>
-                        <span className="font-sans text-sm text-forest/70">{stay.rating}</span>
-                        {stay.reviews && <span className="font-sans text-xs text-forest/35">({stay.reviews})</span>}
-                      </>
-                    ) : (
-                      <span className="font-sans text-xs text-forest/35">New listing</span>
-                    )}
-                  </div>
-                  <div className="text-right">
-                    {stay.price > 0 ? (
-                      discountedPrice ? (
-                        <div>
-                          <span className="font-sans text-xs text-forest/35 line-through mr-1">{formatMoney(stay.price)}</span>
-                          <span className="font-display text-lg text-forest">{formatMoney(discountedPrice)}</span>
-                          <span className="font-sans text-xs text-forest/40"> /night</span>
-                        </div>
-                      ) : (
-                        <span>
-                          <span className="font-display text-lg text-forest">{formatMoney(stay.price)}</span>
-                          <span className="font-sans text-xs text-forest/40"> /night</span>
-                        </span>
-                      )
-                    ) : (
-                      <span className="font-sans text-xs text-forest/40">Contact for rates</span>
-                    )}
-                  </div>
-                </div>
-              </Link>
-            )
-          })}
+        <div className="space-y-14">
+          {sections.map(({ type, stays }) => (
+            <section key={type}>
+              {!typeFilter && (
+                <h2 className="font-display text-2xl text-forest mb-5">{TYPE_LABELS[type] ?? type}</h2>
+              )}
+              <StayGrid stays={stays} />
+            </section>
+          ))}
+          {otherStays.length > 0 && (
+            <section>
+              {!typeFilter && <h2 className="font-display text-2xl text-forest mb-5">Other Stays</h2>}
+              <StayGrid stays={otherStays} />
+            </section>
+          )}
         </div>
       </div>
       <Footer />
     </main>
+  )
+}
+
+function StayGrid({ stays }: { stays: StayCard[] }) {
+  return (
+    <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-10">
+      {stays.map((stay) => {
+        const discountedPrice = stay.discount ? Math.round(stay.price * (1 - stay.discount / 100)) : null
+        return (
+          <Link key={stay.id} href={`/stays/${stay.id}`} className="group block">
+            <div className="relative overflow-hidden aspect-[4/3] mb-4 bg-[#2d6a4f]/10">
+              {stay.img ? (
+                <img src={stay.img} alt={stay.title}
+                  className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" />
+              ) : (
+                <div className="w-full h-full flex items-center justify-center bg-[#C9A96E]/10">
+                  <span className="font-display italic text-2xl text-[#C9A96E]/40">{stay.category}</span>
+                </div>
+              )}
+              {stay.featured && (
+                <span className="absolute top-3 left-3 font-sans text-[10px] tracking-[0.15em] uppercase bg-gold text-forest px-2.5 py-1">
+                  Featured
+                </span>
+              )}
+              {stay.discount && (
+                <span className="absolute top-3 right-3 font-sans text-[10px] tracking-[0.1em] bg-forest text-white px-2 py-1">
+                  -{stay.discount}%
+                </span>
+              )}
+            </div>
+            <p className="font-sans text-[10px] tracking-[0.15em] uppercase text-gold mb-1">{stay.category} · {stay.location}</p>
+            <h3 className="font-display text-xl text-forest leading-snug mb-2 group-hover:text-sage transition-colors">{stay.title}</h3>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-1">
+                {stay.rating ? (
+                  <>
+                    <span className="text-gold text-sm">★</span>
+                    <span className="font-sans text-sm text-forest/70">{stay.rating}</span>
+                    {stay.reviews && <span className="font-sans text-xs text-forest/35">({stay.reviews})</span>}
+                  </>
+                ) : (
+                  <span className="font-sans text-xs text-forest/35">New listing</span>
+                )}
+              </div>
+              <div className="text-right">
+                {stay.price > 0 ? (
+                  discountedPrice ? (
+                    <div>
+                      <span className="font-sans text-xs text-forest/35 line-through mr-1">{formatMoney(stay.price)}</span>
+                      <span className="font-display text-lg text-forest">{formatMoney(discountedPrice)}</span>
+                      <span className="font-sans text-xs text-forest/40"> /night</span>
+                    </div>
+                  ) : (
+                    <span>
+                      <span className="font-display text-lg text-forest">{formatMoney(stay.price)}</span>
+                      <span className="font-sans text-xs text-forest/40"> /night</span>
+                    </span>
+                  )
+                ) : (
+                  <span className="font-sans text-xs text-forest/40">Contact for rates</span>
+                )}
+              </div>
+            </div>
+          </Link>
+        )
+      })}
+    </div>
   )
 }
