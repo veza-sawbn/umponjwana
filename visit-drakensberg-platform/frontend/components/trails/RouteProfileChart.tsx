@@ -11,9 +11,11 @@ import type { GpxPoint, TrailWaypoint } from '@/lib/gpx'
 // off the trail's own GPX waypoints), plus a draggable circular marker that
 // reads off elevation at any point along the route. Deliberately a single
 // trail-green fill throughout — no colour-coding by slope/gradient.
-// "Route Profile" swaps the same marker onto a top-down trace of the actual
-// path (still driven by the same distance scrubber), so both views answer
-// "where am I / how high am I" the same way.
+// "Map View" swaps the same marker onto the actual route traced over a
+// real Google Maps terrain tile (still driven by the same distance
+// scrubber), so both views answer "where am I / how high am I" the same
+// way. Renders for any trail with GPX track data — day hike, multi-day, or
+// speciality walk alike.
 
 const VIEW_W = 640
 const VIEW_H = 260
@@ -22,6 +24,15 @@ const PAD_RIGHT = 10
 const PAD_TOP = 96 // label lane for angled waypoint names
 const PAD_BOTTOM = 28
 const MIN_LABEL_GAP_PX = 42 // viewBox units — skip a label if it would crowd the previous one
+
+// Map view is a fixed-aspect box (rather than the elevation chart's
+// stretch-to-fill box) so the underlying satellite/terrain image is never
+// distorted.
+const MAP_W = 640
+const MAP_H = 400
+const MAP_PAD = 24
+
+const GOOGLE_MAPS_API_KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY
 
 type WaypointMark = { id: string; name: string; category: TrailWaypoint['category']; distanceKm: number; ele: number }
 
@@ -45,6 +56,36 @@ function niceStep(range: number, count: number): number {
   return nice * mag
 }
 
+// ── Web Mercator projection — matches how Google renders both its Static
+// Maps image and its dynamic map, so a route drawn with these formulas
+// lines up with the fetched map tile underneath. Formulas follow Google's
+// own documented world-coordinate conversion.
+const TILE_SIZE = 256
+function mercatorWorld(lat: number, lng: number) {
+  const siny = Math.min(Math.max(Math.sin(lat * Math.PI / 180), -0.9999), 0.9999)
+  return {
+    x: TILE_SIZE / 2 + lng * (TILE_SIZE / 360),
+    y: TILE_SIZE / 2 + 0.5 * Math.log((1 + siny) / (1 - siny)) * -(TILE_SIZE / (2 * Math.PI)),
+  }
+}
+function latRad(lat: number) {
+  const sin = Math.sin(lat * Math.PI / 180)
+  const rad = Math.log((1 + sin) / (1 - sin)) / 2
+  return Math.max(Math.min(rad, Math.PI), -Math.PI) / 2
+}
+/** Integer zoom that fits a lat/lon bounding box inside w×h (minus padding) — same "fit bounds" math Google Maps itself uses. */
+function zoomForBounds(minLat: number, maxLat: number, minLon: number, maxLon: number, w: number, h: number, pad: number): number {
+  const ZOOM_MAX = 18
+  const latFraction = (latRad(maxLat) - latRad(minLat)) / Math.PI
+  let lonDiff = maxLon - minLon
+  if (lonDiff < 0) lonDiff += 360
+  const lonFraction = lonDiff / 360
+  const zoomFor = (px: number, fraction: number) => (fraction > 0 ? Math.floor(Math.log2(px / TILE_SIZE / fraction)) : ZOOM_MAX)
+  const latZoom = zoomFor(h - pad * 2, latFraction)
+  const lonZoom = zoomFor(w - pad * 2, lonFraction)
+  return Math.max(1, Math.min(latZoom, lonZoom, ZOOM_MAX))
+}
+
 function fmtKm(km: number) { return `${km.toFixed(km < 10 ? 1 : 0)} km` }
 function fmtM(m: number) { return `${Math.round(m)} m` }
 
@@ -54,6 +95,7 @@ export default function RouteProfileChart({ trail }: { trail: Trail }) {
   const [view, setView] = useState<'elevation' | 'route'>('elevation')
   const [dragging, setDragging] = useState(false)
   const [scrubKm, setScrubKm] = useState(0)
+  const [mapImgFailed, setMapImgFailed] = useState(false)
   const trackRef = useRef<HTMLDivElement>(null)
 
   const totalKm = analysis?.statistics.totalDistanceKm || points[points.length - 1]?.distanceKm || 0
@@ -69,20 +111,56 @@ export default function RouteProfileChart({ trail }: { trail: Trail }) {
     [minE, maxE],
   )
 
-  const { linePath, areaPath, routePath, routeXY } = useMemo(() => {
-    if (points.length === 0) return { linePath: '', areaPath: '', routePath: '', routeXY: () => ({ x: 0, y: 0 }) }
+  const { linePath, areaPath } = useMemo(() => {
+    if (points.length === 0) return { linePath: '', areaPath: '' }
+    const line = points.map((p, i) => `${i ? 'L' : 'M'} ${xForKm(p.distanceKm).toFixed(1)} ${yForEle(p.ele).toFixed(1)}`).join(' ')
+    const area = `${line} L ${xForKm(totalKm).toFixed(1)} ${VIEW_H - PAD_BOTTOM} L ${xForKm(0).toFixed(1)} ${VIEW_H - PAD_BOTTOM} Z`
+    return { linePath: line, areaPath: area }
+  }, [points, totalKm, xForKm, yForEle])
+
+  // Real map geometry: centre + integer zoom that fits the whole track,
+  // used both for the Static Maps image URL and for projecting every point
+  // onto that same image.
+  const mapGeo = useMemo(() => {
+    if (points.length === 0) return null
     const lats = points.map(p => p.lat), lons = points.map(p => p.lon)
     const minLat = Math.min(...lats), maxLat = Math.max(...lats)
     const minLon = Math.min(...lons), maxLon = Math.max(...lons)
-    const rx = (lon: number) => PAD_LEFT + ((lon - minLon) / (maxLon - minLon || 1)) * (VIEW_W - PAD_LEFT - PAD_RIGHT)
-    const ry = (lat: number) => VIEW_H - PAD_BOTTOM - ((lat - minLat) / (maxLat - minLat || 1)) * (VIEW_H - PAD_TOP - PAD_BOTTOM)
+    const center = { lat: (minLat + maxLat) / 2, lng: (minLon + maxLon) / 2 }
+    const zoom = zoomForBounds(minLat, maxLat, minLon, maxLon, MAP_W, MAP_H, MAP_PAD)
+    return { center, zoom }
+  }, [points])
 
-    const line = points.map((p, i) => `${i ? 'L' : 'M'} ${xForKm(p.distanceKm).toFixed(1)} ${yForEle(p.ele).toFixed(1)}`).join(' ')
-    const area = `${line} L ${xForKm(totalKm).toFixed(1)} ${VIEW_H - PAD_BOTTOM} L ${xForKm(0).toFixed(1)} ${VIEW_H - PAD_BOTTOM} Z`
-    const route = points.map((p, i) => `${i ? 'L' : 'M'} ${rx(p.lon).toFixed(1)} ${ry(p.lat).toFixed(1)}`).join(' ')
+  const mapXY = useCallback((lat: number, lng: number) => {
+    if (!mapGeo) return { x: MAP_W / 2, y: MAP_H / 2 }
+    const scale = 2 ** mapGeo.zoom
+    const centerWorld = mercatorWorld(mapGeo.center.lat, mapGeo.center.lng)
+    const world = mercatorWorld(lat, lng)
+    return { x: (world.x - centerWorld.x) * scale + MAP_W / 2, y: (world.y - centerWorld.y) * scale + MAP_H / 2 }
+  }, [mapGeo])
 
-    return { linePath: line, areaPath: area, routePath: route, routeXY: (p: GpxPoint) => ({ x: rx(p.lon), y: ry(p.lat) }) }
-  }, [points, totalKm, xForKm, yForEle])
+  const staticMapUrl = mapGeo && GOOGLE_MAPS_API_KEY
+    ? `https://maps.googleapis.com/maps/api/staticmap?center=${mapGeo.center.lat},${mapGeo.center.lng}&zoom=${mapGeo.zoom}&size=${MAP_W}x${MAP_H}&scale=2&maptype=terrain&key=${encodeURIComponent(GOOGLE_MAPS_API_KEY)}`
+    : null
+  const useRealMap = view === 'route' && !!staticMapUrl && !mapImgFailed
+
+  const mapRoutePath = useMemo(() => {
+    if (!mapGeo || points.length === 0) return ''
+    return points.map((p, i) => { const xy = mapXY(p.lat, p.lon); return `${i ? 'L' : 'M'} ${xy.x.toFixed(1)} ${xy.y.toFixed(1)}` }).join(' ')
+  }, [mapGeo, points, mapXY])
+
+  // Bounding-box fallback trace (no API key, or the image failed to load) —
+  // a schematic top-down line, not a real map, same as before this feature.
+  const routeFallback = useMemo(() => {
+    if (points.length === 0) return { path: '', xy: (_p: GpxPoint) => ({ x: 0, y: 0 }) }
+    const lats = points.map(p => p.lat), lons = points.map(p => p.lon)
+    const minLat = Math.min(...lats), maxLat = Math.max(...lats)
+    const minLon = Math.min(...lons), maxLon = Math.max(...lons)
+    const rx = (lon: number) => MAP_PAD + ((lon - minLon) / (maxLon - minLon || 1)) * (MAP_W - MAP_PAD * 2)
+    const ry = (lat: number) => MAP_H - MAP_PAD - ((lat - minLat) / (maxLat - minLat || 1)) * (MAP_H - MAP_PAD * 2)
+    const path = points.map((p, i) => `${i ? 'L' : 'M'} ${rx(p.lon).toFixed(1)} ${ry(p.lat).toFixed(1)}`).join(' ')
+    return { path, xy: (p: GpxPoint) => ({ x: rx(p.lon), y: ry(p.lat) }) }
+  }, [points])
 
   // Waypoints projected onto the drawn curve — snapped to the nearest track
   // point (by lat/lon) so a marker always sits exactly on the plotted line
@@ -132,7 +210,7 @@ export default function RouteProfileChart({ trail }: { trail: Trail }) {
   const current = nearestPoint(points, scrubKm)
   const markerPos = view === 'elevation'
     ? { x: xForKm(current.distanceKm), y: yForEle(current.ele) }
-    : routeXY(current)
+    : useRealMap ? mapXY(current.lat, current.lon) : routeFallback.xy(current)
 
   function scrubFromClientX(clientX: number) {
     const el = trackRef.current
@@ -149,16 +227,22 @@ export default function RouteProfileChart({ trail }: { trail: Trail }) {
     setScrubKm(ratio * totalKm)
   }
 
+  // Only the elevation view is drag-scrubbable — a real map's horizontal
+  // pixels don't correspond linearly to distance along a winding trail, so
+  // the map view instead just displays wherever the scrubber was last left
+  // (see the caption below).
   function onPointerDown(e: React.PointerEvent) {
+    if (view !== 'elevation') return
     e.currentTarget.setPointerCapture(e.pointerId)
     setDragging(true)
     scrubFromClientX(e.clientX)
   }
   function onPointerMove(e: React.PointerEvent) {
-    if (!dragging) return
+    if (!dragging || view !== 'elevation') return
     scrubFromClientX(e.clientX)
   }
   function onPointerUp(e: React.PointerEvent) {
+    if (view !== 'elevation') return
     setDragging(false)
     try { e.currentTarget.releasePointerCapture(e.pointerId) } catch {}
   }
@@ -180,7 +264,7 @@ export default function RouteProfileChart({ trail }: { trail: Trail }) {
                 view === v ? 'bg-[#2d6a4f] text-white' : 'text-gray-500 hover:text-[#2d6a4f]'
               }`}
             >
-              {v === 'elevation' ? 'Elevation Profile' : 'Route Profile'}
+              {v === 'elevation' ? 'Elevation Profile' : 'Map View'}
             </button>
           ))}
         </div>
@@ -192,7 +276,8 @@ export default function RouteProfileChart({ trail }: { trail: Trail }) {
 
       <div className="flex gap-2">
         {/* Y-axis altitude labels — plain HTML so figures never get skewed by
-            the SVG's non-uniform (preserveAspectRatio="none") stretch. */}
+            the SVG's non-uniform (preserveAspectRatio="none") stretch. Only
+            meaningful for the elevation view — the map has no linear axis. */}
         {view === 'elevation' && (
           <div className="relative w-9 shrink-0 h-56 sm:h-72">
             <span className="absolute top-0 left-0 font-sans text-[8px] tracking-[0.1em] uppercase text-gray-300">Alt. m</span>
@@ -214,9 +299,31 @@ export default function RouteProfileChart({ trail }: { trail: Trail }) {
           onPointerDown={onPointerDown}
           onPointerMove={onPointerMove}
           onPointerUp={onPointerUp}
-          className="relative flex-1 touch-none cursor-ew-resize select-none min-w-0 h-56 sm:h-72"
+          className={
+            view === 'elevation'
+              ? 'relative flex-1 min-w-0 touch-none cursor-ew-resize select-none h-56 sm:h-72'
+              : 'relative flex-1 min-w-0 select-none aspect-[8/5] overflow-hidden rounded-sm bg-[#e9e5dc]'
+          }
         >
-          <svg viewBox={`0 0 ${VIEW_W} ${VIEW_H}`} className="w-full h-full" preserveAspectRatio="none">
+          {/* Real Google Maps terrain tile behind the route trace. Falls
+              back silently (onError) to the schematic bounding-box trace if
+              the key is missing, unset for this project, or the request
+              fails — the interactive scrubber still works either way. */}
+          {view === 'route' && staticMapUrl && !mapImgFailed && (
+            <img
+              src={staticMapUrl}
+              alt=""
+              draggable={false}
+              className="absolute inset-0 w-full h-full object-cover"
+              onError={() => setMapImgFailed(true)}
+            />
+          )}
+
+          <svg
+            viewBox={view === 'elevation' ? `0 0 ${VIEW_W} ${VIEW_H}` : `0 0 ${MAP_W} ${MAP_H}`}
+            className="absolute inset-0 w-full h-full"
+            preserveAspectRatio={view === 'elevation' ? 'none' : 'xMidYMid meet'}
+          >
             <defs>
               <linearGradient id="rp-elev-grad" x1="0" y1="0" x2="0" y2="1">
                 <stop offset="0%" stopColor="#2d6a4f" stopOpacity="0.28" />
@@ -256,15 +363,27 @@ export default function RouteProfileChart({ trail }: { trail: Trail }) {
                       strokeWidth="1" strokeDasharray="2 2" />
                   )
                 })}
+
+                {/* Scrub guide + marker */}
+                <line x1={markerPos.x} x2={markerPos.x} y1={PAD_TOP} y2={VIEW_H - PAD_BOTTOM}
+                  stroke="#C9A96E" strokeWidth="1.5" strokeDasharray="3 3" />
+                <circle cx={markerPos.x} cy={markerPos.y} r={dragging ? 8 : 6.5} fill="#C9A96E" stroke="#fff" strokeWidth="2" />
+              </>
+            ) : useRealMap ? (
+              <>
+                {/* White casing under the green line for legibility over a
+                    photographic/terrain background — same convention as
+                    GPS-track overlays on any real map. */}
+                <path d={mapRoutePath} fill="none" stroke="#ffffff" strokeWidth="5" strokeLinejoin="round" strokeLinecap="round" opacity="0.85" />
+                <path d={mapRoutePath} fill="none" stroke="#2d6a4f" strokeWidth="3" strokeLinejoin="round" strokeLinecap="round" />
+                <circle cx={markerPos.x} cy={markerPos.y} r={dragging ? 8 : 6.5} fill="#C9A96E" stroke="#fff" strokeWidth="2" />
               </>
             ) : (
-              <path d={routePath} fill="none" stroke="#2d6a4f" strokeWidth="3" strokeLinejoin="round" strokeLinecap="round" />
+              <>
+                <path d={routeFallback.path} fill="none" stroke="#2d6a4f" strokeWidth="3" strokeLinejoin="round" strokeLinecap="round" />
+                <circle cx={markerPos.x} cy={markerPos.y} r={dragging ? 8 : 6.5} fill="#C9A96E" stroke="#fff" strokeWidth="2" />
+              </>
             )}
-
-            {/* Scrub guide + marker */}
-            <line x1={markerPos.x} x2={markerPos.x} y1={PAD_TOP} y2={VIEW_H - PAD_BOTTOM}
-              stroke="#C9A96E" strokeWidth="1.5" strokeDasharray="3 3" opacity={view === 'elevation' ? 1 : 0} />
-            <circle cx={markerPos.x} cy={markerPos.y} r={dragging ? 8 : 6.5} fill="#C9A96E" stroke="#fff" strokeWidth="2" />
           </svg>
 
           {/* Waypoint markers + angled name labels (HTML overlay — immune to
@@ -312,6 +431,11 @@ export default function RouteProfileChart({ trail }: { trail: Trail }) {
               })}
             </div>
           )}
+
+          {/* Attribution required by Google's Static Maps terms of use. */}
+          {useRealMap && (
+            <span className="absolute bottom-0.5 right-1 font-sans text-[8px] text-white/80 drop-shadow">© Google</span>
+          )}
         </div>
       </div>
 
@@ -325,7 +449,9 @@ export default function RouteProfileChart({ trail }: { trail: Trail }) {
       <p className="font-sans text-xs text-gray-400 mt-2">
         {view === 'elevation'
           ? 'Drag the marker — or tap anywhere on the chart — to read elevation at any distance along the trail. Numbered points mark waypoints along the route.'
-          : 'Drag across the route to see where you are and how high, at any distance along the trail.'}
+          : useRealMap
+            ? 'The route traced over the actual terrain — switch to Elevation Profile to scrub the height along it.'
+            : 'A schematic trace of the route — switch to Elevation Profile to scrub the height along it.'}
       </p>
     </div>
   )
