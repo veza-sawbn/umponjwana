@@ -4,7 +4,7 @@ import { useState, useEffect, Suspense } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import Footer from '@/components/layout/Footer'
-import { Calendar, Users, MapPin, ArrowRight, Search, SlidersHorizontal, X, Check, Bed } from 'lucide-react'
+import { Calendar, Users, MapPin, ArrowRight, Search, SlidersHorizontal, X, Check, Bed, ChevronDown } from 'lucide-react'
 import { useBooking } from '@/lib/booking-context'
 import { fuzzyFilter } from '@/lib/fuzzy'
 import { getRegionNames, DEFAULT_REGIONS, regionsMatch } from '@/lib/regions'
@@ -13,7 +13,7 @@ import { getRoomsByProperty } from '@/lib/rooms'
 import { getActivities, type Activity } from '@/lib/activities'
 import { getTrails, trailStartPoint, type Trail } from '@/lib/trails'
 import { getSupplierEntities } from '@/lib/supplier-entities'
-import { StayDistance } from '@/lib/stay-distance'
+import { StayDistance, useStayCoords, haversineKm } from '@/lib/stay-distance'
 import { trackEvent, AnalyticsEvent } from '@/lib/analytics'
 import { formatMoney } from '@/lib/allocation'
 
@@ -123,6 +123,28 @@ function fmt(date: string) {
   return new Date(date).toLocaleDateString('en-ZA', { day: 'numeric', month: 'short' })
 }
 
+// Nearest-first once there's a real reference point (the selected stay);
+// items without coordinates sink to the end rather than disappearing.
+// Takes a coordinate extractor since categories name their lat/lng fields
+// differently (LiveHike.lat/lng vs LiveActivity.gpsLat/gpsLng).
+function sortByProximity<T>(
+  items: T[],
+  origin: { lat: number; lng: number } | null,
+  coords: (item: T) => [string | undefined, string | undefined],
+): T[] {
+  if (!origin) return items
+  return [...items].sort((a, b) => {
+    const [aLat, aLng] = coords(a)
+    const [bLat, bLng] = coords(b)
+    const dA = aLat && aLng ? haversineKm(origin.lat, origin.lng, parseFloat(aLat), parseFloat(aLng)) : Infinity
+    const dB = bLat && bLng ? haversineKm(origin.lat, origin.lng, parseFloat(bLat), parseFloat(bLng)) : Infinity
+    return dA - dB
+  })
+}
+
+// How many cards show per category before "View more" is needed.
+const PREVIEW_COUNT = 3
+
 /* ── Section wrappers ─────────────────────────────────────────────────────── */
 
 function SectionHeader({ label, heading, count, href }: { label: string; heading: string; count: number; href?: string }) {
@@ -140,6 +162,22 @@ function SectionHeader({ label, heading, count, href }: { label: string; heading
         <span className="font-sans text-xs text-gray-400 hidden sm:block">{count} in this area</span>
       )}
     </div>
+  )
+}
+
+// Reveals the rest of a category's (already proximity-sorted) results —
+// each section previews only its PREVIEW_COUNT closest items by default.
+function ViewMoreButton({ total, expanded, onToggle }: { total: number; expanded: boolean; onToggle: () => void }) {
+  if (total <= PREVIEW_COUNT) return null
+  return (
+    <button
+      type="button"
+      onClick={onToggle}
+      className="mt-6 mx-auto flex items-center gap-1.5 font-sans text-sm font-medium text-[#2d6a4f] hover:text-[#C9A96E] transition-colors"
+    >
+      {expanded ? 'Show fewer' : `View all ${total}`}
+      <ChevronDown className={`w-4 h-4 transition-transform ${expanded ? 'rotate-180' : ''}`} />
+    </button>
   )
 }
 
@@ -256,7 +294,30 @@ function SearchResults() {
     q, e => `${e.title} ${e.location} event`,
   )
 
+  // Once a stay is chosen, everything below it is quite literally "what's
+  // closest to where you're staying" — sorted nearest-first from there.
+  // Events carry no coordinates, so they keep their existing order.
+  const stayOrigin = useStayCoords()
+  const sortedHikes = sortByProximity(hikes, stayOrigin, h => [h.lat, h.lng])
+  const sortedActivities = sortByProximity(activities, stayOrigin, a => [a.gpsLat, a.gpsLng])
+
   const hasResults = stays.length + hikes.length + activities.length + events.length > 0
+
+  // Each category previews its closest PREVIEW_COUNT by default; a new
+  // search (region/query change) collapses everything back down rather
+  // than leaving a stale expanded section from the previous results.
+  const [expandStays, setExpandStays] = useState(false)
+  const [expandHikes, setExpandHikes] = useState(false)
+  const [expandActivities, setExpandActivities] = useState(false)
+  const [expandEvents, setExpandEvents] = useState(false)
+  useEffect(() => {
+    setExpandStays(false); setExpandHikes(false); setExpandActivities(false); setExpandEvents(false)
+  }, [effectiveRegion, q])
+
+  const visibleStays = expandStays ? stays : stays.slice(0, PREVIEW_COUNT)
+  const visibleHikes = expandHikes ? sortedHikes : sortedHikes.slice(0, PREVIEW_COUNT)
+  const visibleActivities = expandActivities ? sortedActivities : sortedActivities.slice(0, PREVIEW_COUNT)
+  const visibleEvents = expandEvents ? events : events.slice(0, PREVIEW_COUNT)
 
   return (
     <div className="min-h-screen bg-[#F7F5F2]">
@@ -384,7 +445,7 @@ function SearchResults() {
               <SectionHeader label="Where to sleep" heading="Accommodation" count={stays.length} href="/stays" />
             )}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-              {stays.map(stay => {
+              {visibleStays.map(stay => {
                 const isSelected = booking.stay?.id === stay.id
                 return (
                   <div key={stay.id} className={`group bg-white flex flex-col ${!stay.available ? 'opacity-60' : ''} border ${isSelected ? 'border-[#2d6a4f]' : 'border-transparent'}`}>
@@ -453,6 +514,7 @@ function SearchResults() {
                 )
               })}
             </div>
+            <ViewMoreButton total={stays.length} expanded={expandStays} onToggle={() => setExpandStays(v => !v)} />
             <div className="mt-4 sm:hidden">
               <Link href="/stays" className="font-sans text-sm text-[#2d6a4f]">See all accommodation →</Link>
             </div>
@@ -464,7 +526,7 @@ function SearchResults() {
           <section>
             <SectionHeader label="On foot" heading="Hikes & Trails" count={hikes.length} href="/hikes" />
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-              {hikes.map(h => (
+              {visibleHikes.map(h => (
                 <Link key={h.id} href={`/hikes/${h.id}`} className="group bg-white">
                   <div className="aspect-[4/3] overflow-hidden relative bg-[#2d6a4f]/10">
                     {h.img ? (
@@ -487,6 +549,7 @@ function SearchResults() {
                 </Link>
               ))}
             </div>
+            <ViewMoreButton total={hikes.length} expanded={expandHikes} onToggle={() => setExpandHikes(v => !v)} />
           </section>
         )}
 
@@ -495,7 +558,7 @@ function SearchResults() {
           <section>
             <SectionHeader label="Things to do" heading="Activities & Experiences" count={activities.length} href="/activities" />
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-              {activities.map(a => (
+              {visibleActivities.map(a => (
                 <Link key={a.id} href={`/activities/${a.id}`} className="group bg-white">
                   <div className="aspect-[4/3] overflow-hidden relative bg-[#C9A96E]/10">
                     {a.img ? (
@@ -520,6 +583,7 @@ function SearchResults() {
                 </Link>
               ))}
             </div>
+            <ViewMoreButton total={activities.length} expanded={expandActivities} onToggle={() => setExpandActivities(v => !v)} />
           </section>
         )}
 
@@ -528,7 +592,7 @@ function SearchResults() {
           <section>
             <SectionHeader label="What's on" heading="Events & Specials" count={events.length} href="/events" />
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-              {events.map(ev => (
+              {visibleEvents.map(ev => (
                 <Link key={ev.id} href="/events" className="group bg-white">
                   <div className={`aspect-[3/2] overflow-hidden flex items-center justify-center ${ev.event_type === 'special' ? 'bg-[#2d6a4f]' : 'bg-[#1a1a2e]'}`}>
                     <span className="font-display italic text-lg text-white/70 px-4 text-center">{ev.title}</span>
@@ -542,6 +606,7 @@ function SearchResults() {
                 </Link>
               ))}
             </div>
+            <ViewMoreButton total={events.length} expanded={expandEvents} onToggle={() => setExpandEvents(v => !v)} />
           </section>
         )}
 
