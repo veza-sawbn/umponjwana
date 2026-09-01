@@ -81,7 +81,22 @@ export const DESTINATION_GRAPH_NAV: NavNode[] = [
     label: 'Hikes', href: '/hikes', type: 'landing_page', status: 'live',
     children: [
       { label: 'All Hikes', href: '/hikes', type: 'landing_page', status: 'live' },
+      // Pre-filtered views of the same /hikes listing (facets, not distinct
+      // entities) — category via ?category=, matching hikes/page.tsx's
+      // CATEGORY_TABS values; region browsing reuses the Explore section's
+      // /regions entity rather than duplicating it here.
+      { label: 'Day Hikes', href: '/hikes?category=day_hike', type: 'landing_page', status: 'live' },
+      { label: 'Multi-Day Hikes', href: '/hikes?category=multi_day_hike', type: 'landing_page', status: 'live' },
+      { label: 'Hikes by Region', href: '/regions', type: 'landing_page', status: 'live' },
       { label: 'Grand Traverse', href: '/hikes/grand-traverse', type: 'entity', status: 'live' },
+      {
+        label: 'Little Berg Traverse', href: '/hikes/little-berg-traverse', type: 'entity', status: 'planned',
+        requires: 'admin creates the trail record — no such trail exists in the data yet (only Grand Traverse does)',
+      },
+      {
+        label: "Giant's Cup", href: '/hikes/giants-cup', type: 'entity', status: 'planned',
+        requires: 'admin creates the trail record — no such trail exists in the data yet (only Grand Traverse does)',
+      },
       {
         label: 'Northern Traverse', href: '/hikes/northern-traverse', type: 'entity', status: 'planned',
         requires: 'admin creates the trail record — no such trail exists in the data yet (only Grand Traverse does)',

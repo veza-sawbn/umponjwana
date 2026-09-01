@@ -50,6 +50,11 @@ export default function HikesPage() {
     const params = new URLSearchParams(window.location.search)
     const regionParam = params.get('region')
     if (regionParam) setRegion(regionParam)
+    // Pre-filters the category tabs from a nav link (e.g. Hikes ▸ Day Hikes
+    // → /hikes?category=day_hike) — only a recognised CATEGORY_TABS value
+    // is honoured, so a stray/old param can't land on a blank tab state.
+    const categoryParam = params.get('category')
+    if (CATEGORY_TABS.some(c => c.value === categoryParam)) setCategory(categoryParam as TrailCategory)
     const reserveParam = params.get('nature-reserves')
     if (reserveParam) {
       setReserveId(reserveParam)

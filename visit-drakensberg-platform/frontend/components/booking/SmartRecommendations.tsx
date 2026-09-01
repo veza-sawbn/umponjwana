@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
-import { MapPin, Star, Mountain, Zap, Compass, Bus, Plus, Navigation } from 'lucide-react'
+import { MapPin, Star, Mountain, Zap, Compass, Bus, Plus, Navigation, ChevronDown } from 'lucide-react'
 import { useBooking } from '@/lib/booking-context'
 import { useShuttleRecommendations } from '@/lib/shuttle-service'
 import { useAutoDrivingDistances, type DistancePlace } from '@/components/maps/GoogleAddressField'
@@ -38,6 +38,9 @@ const TYPE_COLOR: Record<string, string> = {
 }
 
 const FALLBACK_IMAGE = 'https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=400&q=80'
+// Shown closest-first by default; "View all" reveals the rest of this cap.
+const PREVIEW_COUNT = 3
+const MAX_RECOMMENDATIONS = 9
 
 interface Props {
   region: string
@@ -140,22 +143,33 @@ export default function SmartRecommendations({ region, excludeListingId, originL
           return dA - dB
         })
       }
-      // Show up to 6 so multiple listing types can be represented
-      setRecommendations(all.slice(0, 6))
+      // Cap so multiple listing types can be represented; only the closest
+      // PREVIEW_COUNT show by default, "View all" reveals up to this cap.
+      setRecommendations(all.slice(0, MAX_RECOMMENDATIONS))
       setLoading(false)
     })
 
     return () => { cancelled = true }
   }, [region, excludeListingId, checkIn, checkOut, originLat, originLng])
 
+  // Starts collapsed to the closest few on every new set of recommendations
+  // (a new region/stay), rather than staying expanded from a previous one.
+  const [expanded, setExpanded] = useState(false)
+  useEffect(() => { setExpanded(false) }, [region, excludeListingId])
+
+  const visibleRecommendations = expanded ? recommendations : recommendations.slice(0, PREVIEW_COUNT)
+  const hasMore = recommendations.length > PREVIEW_COUNT
+
   const origin: DistancePlace | null = originLocation ? { address: `${originLocation}, South Africa`, lat: originLat, lng: originLng } : null
   const destinations: DistancePlace[] = [
-    ...recommendations.map(item => ({ address: `${item.location}, South Africa`, lat: item.lat, lng: item.lng })),
+    // Only the visible ones are quoted live — no point spending a Distance
+    // Matrix call on a recommendation the visitor may never expand to see.
+    ...visibleRecommendations.map(item => ({ address: `${item.location}, South Africa`, lat: item.lat, lng: item.lng })),
     ...shuttleRecommendations.map(shuttle => ({ address: `${shuttle.destination || shuttle.label}, South Africa` })),
   ]
   const { results: distances, status: distanceStatus } = useAutoDrivingDistances(origin, destinations)
-  const recommendationDistances = distances.slice(0, recommendations.length)
-  const shuttleDistances = distances.slice(recommendations.length)
+  const recommendationDistances = distances.slice(0, visibleRecommendations.length)
+  const shuttleDistances = distances.slice(visibleRecommendations.length)
 
   if (!loading && recommendations.length === 0 && shuttleRecommendations.length === 0) return null
 
@@ -205,7 +219,7 @@ export default function SmartRecommendations({ region, excludeListingId, originL
         <p className="font-sans text-xs text-gray-400 text-center py-4">Finding things nearby…</p>
       ) : recommendations.length > 0 ? (
         <div className="space-y-3">
-          {recommendations.map((item, i) => {
+          {visibleRecommendations.map((item, i) => {
             const distanceLabel = formatDistance(recommendationDistances[i]) || (distanceStatus === 'calculating' && origin ? 'Calculating…' : null)
             return (
               <Link
@@ -251,6 +265,17 @@ export default function SmartRecommendations({ region, excludeListingId, originL
         </div>
       ) : (
         <p className="font-sans text-xs text-gray-400 text-center py-4">No trails or activities published for {region} yet.</p>
+      )}
+
+      {hasMore && (
+        <button
+          type="button"
+          onClick={() => setExpanded(v => !v)}
+          className="mt-3 w-full flex items-center justify-center gap-1 font-sans text-xs font-medium text-[#2d6a4f] hover:text-[#C9A96E] transition-colors"
+        >
+          {expanded ? 'Show fewer' : `View all ${recommendations.length}`}
+          <ChevronDown className={`w-3.5 h-3.5 transition-transform ${expanded ? 'rotate-180' : ''}`} />
+        </button>
       )}
 
       {recommendations.length > 0 && (
