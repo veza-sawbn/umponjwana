@@ -7,6 +7,7 @@ import { supabase } from '@/lib/auth'
 import { publicSupabase } from '@/lib/supabase-public'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Swiper, SwiperSlide } from 'swiper/react'
+import { Autoplay } from 'swiper/modules'
 import 'swiper/css'
 import SearchBar from '@/components/search/SearchBar'
 import Footer from '@/components/layout/Footer'
@@ -81,13 +82,17 @@ function cardDimClass(card: HomeCard, inEditor: boolean) {
  * carousel, matching the card markup of the desktop grid it replaces below
  * the `sm` breakpoint. Looping needs enough cards to feel like a loop
  * rather than glitch, so it falls back to a plain (still swipeable) row.
+ * Auto-advances on a timer (paused on touch/drag, and while the visual
+ * editor is open so it doesn't fight admin clicks) and resumes afterwards.
  */
 function RegionsCarousel({ regions, inEditor }: { regions: HomeCard[]; inEditor: boolean }) {
   const canLoop = regions.length > 2
 
   return (
     <Swiper
+      modules={[Autoplay]}
       loop={canLoop}
+      autoplay={inEditor || regions.length < 2 ? false : { delay: 4000, disableOnInteraction: false, pauseOnMouseEnter: true }}
       slidesPerView={1.15}
       spaceBetween={12}
       grabCursor
