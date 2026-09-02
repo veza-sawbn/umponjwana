@@ -1,4 +1,4 @@
-import { Document, Page, View, Text, StyleSheet, renderToBuffer } from '@react-pdf/renderer'
+import { Document, Page, View, Text, StyleSheet, Svg, G, Path, renderToBuffer } from '@react-pdf/renderer'
 import { formatMoney } from './allocation'
 // Type-only: pulls in no runtime code, so this stays safe to import from a
 // server route — lib/invoices.ts constructs a browser-oriented Supabase
@@ -34,6 +34,8 @@ export type InvoicePdfData = {
   order: InvoiceCustomerOrder | null
   receipts: Receipt[]
   business: BusinessDetails
+  /** Shown as the "Website" line on the letterhead — the request's own origin, not stored data. */
+  siteUrl?: string
 }
 
 // A real, server-rendered PDF document — not a browser print of the on-screen
@@ -43,80 +45,104 @@ export type InvoicePdfData = {
 // setting that changes the result. Sticking to the built-in Helvetica family
 // means no font file has to be fetched at render time — nothing for a cold
 // serverless invocation to wait on or fail to reach.
+//
+// Laid out to match the plain, businesslike invoice format the operator
+// already sends customers from their invoicing tool — same section
+// headings, same table columns, same overall shape — but kept in Visit
+// Drakensberg's own green/gold brand colours rather than adopting that
+// tool's neutral palette, so this still reads as *our* document.
 
+const INK = '#1a1a1a'
+const MUTED = '#4b5563'
+const FAINT = '#9ca3af'
+const LINE = '#e2e2e2'
 const GREEN = '#2d6a4f'
 const GOLD = '#8B6914'
-const GOLD_BG = '#F6F1E7'
-const GRAY_900 = '#1a1a1a'
-const GRAY_600 = '#525252'
-const GRAY_400 = '#9ca3af'
-const GRAY_200 = '#e5e7eb'
-const RED = '#dc2626'
-const RED_BG = '#fef2f2'
+const HEAD_BG = '#EAF3EE'
+const RED = '#c0392b'
+
+// The real Visit Drakensberg wordmark — the exact same vector path as
+// components/Logo.tsx, ported to @react-pdf/renderer's own <Svg>/<Path>
+// primitives (it can't render a plain DOM <svg>). Copied programmatically
+// from that file rather than redrawn, so it can't drift out of sync with
+// the on-screen logo.
+const LOGO_VIEWBOX = '0 0 448.91446 100.88535'
+const LOGO_TRANSFORM = 'translate(-34.862396,-61.913559)'
+const LOGO_D = 'm 293.93867,162.12323 c -6.50377,-1.94073 -9.91523,-5.80495 -11.10649,-12.58051 l -0.3215,-1.82861 h 5.08966 5.08967 l 0.32075,1.39436 c 1.07747,4.684 8.52661,5.97149 12.18962,2.10682 1.43221,-1.51105 1.61179,-4.41863 0.38796,-6.28139 -1.32098,-2.01061 -3.2946,-2.95993 -7.29764,-3.51017 -5.44898,-0.749 -8.73004,-2.21329 -11.54207,-5.15106 -7.0246,-7.33868 -4.38779,-19.2092 5.25647,-23.66387 3.74793,-1.73116 10.12456,-1.94127 14.2999,-0.47117 5.61276,1.9762 9.95885,7.53876 9.95885,12.74634 v 1.37438 h -4.86452 -4.86452 l -0.29791,-1.42227 c -0.7815,-3.7309 -6.59996,-5.69052 -10.30452,-3.4705 -1.70191,1.0199 -3.16121,3.50758 -3.16121,5.38896 0,1.64862 1.43843,3.82118 3.0601,4.62188 0.83087,0.41024 2.95281,0.88353 4.71542,1.05174 9.95135,0.9497 15.8244,6.70072 15.85927,15.52976 0.0343,8.68757 -6.95702,14.9258 -16.63168,14.84012 -2.02592,-0.0179 -4.65194,-0.32161 -5.83561,-0.67481 z m 159.69691,0.2019 c -8.06618,-1.82954 -14.88569,-7.94381 -17.41529,-15.61428 -1.33993,-4.06305 -1.80562,-11.16998 -0.99459,-15.17848 1.88279,-9.30559 9.19065,-16.891 18.89498,-19.61261 3.39262,-0.95147 10.57351,-1.00968 14.07952,-0.11412 3.60394,0.92056 7.27979,2.80411 9.95886,5.10302 l 2.29819,1.97209 -3.36565,3.24061 -3.36565,3.24061 -2.92551,-1.95671 c -6.75512,-4.51814 -15.17078,-3.88676 -21.00018,1.57551 -3.82135,3.58069 -5.00198,6.82504 -4.72376,12.98072 0.25239,5.58398 1.48158,8.65151 4.66037,11.63027 5.29547,4.96225 14.97514,5.32273 21.39992,0.79697 l 2.42587,-1.70884 v -3.40868 -3.40867 h -4.59639 -4.59639 v -4.38868 -4.38868 h 9.70349 9.7035 v 14.62893 14.62892 h -4.59639 -4.5964 v -2.43067 -2.43067 l -2.68123,1.95107 c -1.47467,1.07308 -3.81458,2.2766 -5.19979,2.67448 -2.71001,0.7784 -10.05621,0.9009 -13.06748,0.21789 z M 34.862398,136.98885 v -25.48904 l 9.320466,0.2714 c 6.316103,0.18392 10.308201,0.53191 12.384728,1.07959 9.337935,2.46284 15.239745,7.79303 17.275077,15.60189 2.736935,10.50067 0.485116,20.79117 -5.810881,26.55492 -5.330694,4.88004 -11.915916,6.80716 -24.61499,7.20338 l -8.5544,0.2669 z m 17.142681,15.55934 c 5.823316,-1.01818 10.026157,-4.17163 11.739501,-8.80831 1.727818,-4.67585 1.383102,-10.9431 -0.830867,-15.10589 -1.289408,-2.4244 -5.142495,-5.55041 -8.034259,-6.5182 -1.31865,-0.44131 -4.178648,-0.92801 -6.355552,-1.08156 l -3.958005,-0.27917 v 15.8364 c 0,8.71003 0.153213,15.9827 0.340473,16.1615 0.507801,0.48485 3.6775,0.39342 7.098709,-0.20477 z m 26.60818,9.46975 c -0.187261,-0.1788 -0.340474,-6.87153 -0.340474,-14.87274 v -14.54765 h 3.884969 c 2.924668,0 3.82363,-0.15262 3.636821,-0.61744 -0.136482,-0.33959 -1.893326,-3.10475 -3.904098,-6.1448 l -3.655949,-5.52737 0.146806,-4.21735 0.146807,-4.21734 9.448143,-0.14711 c 10.311313,-0.16055 14.143166,0.29209 17.912716,2.11594 3.57696,1.73067 5.38343,3.40198 6.92151,6.40364 1.14097,2.22667 1.39608,3.39438 1.40668,6.43872 0.0212,6.10195 -2.52375,10.18272 -7.88181,12.63813 l -3.02018,1.38404 5.46969,8.36679 c 3.00833,4.60174 5.61031,8.20819 5.78218,8.01433 0.17186,-0.19385 4.16417,-9.89783 8.87179,-21.56439 10.70303,-26.52456 10.34596,-25.73223 11.19396,-24.83872 0.36591,0.38555 4.87083,11.1241 10.01094,23.86346 5.14011,12.73935 9.54589,23.37092 9.79062,23.6257 0.25338,0.26379 0.44497,-9.65712 0.44497,-23.04055 v -23.5038 h 4.84267 4.84267 l 0.13676,11.82257 0.13675,11.82257 9.9771,-11.70066 9.97709,-11.70066 h 23.72979 23.7298 v 4.38867 4.38868 l -12.65621,0.13046 -12.65621,0.13046 0.1438,5.72111 0.14381,5.72111 10.72492,0.24381 10.72492,0.24382 v 4.14486 4.14486 l -10.72492,0.24382 -10.72492,0.24381 v 5.60775 5.60776 l 12.89544,0.13028 12.89544,0.13028 v 4.62619 4.6262 l -24.22585,-0.014 -24.22585,-0.0139 -7.82123,-9.21727 -7.82123,-9.21726 -2.14764,2.28039 -2.14763,2.2804 -0.0229,6.95927 -0.0229,6.95927 -9.75537,-0.13244 -9.75537,-0.13244 -1.12871,-2.68197 -1.1287,-2.68197 h -8.62535 -8.62534 l -1.07193,2.68197 -1.07193,2.68197 h -8.89275 -8.89276 l -6.542697,-9.99643 -6.542701,-9.99643 -2.031124,-0.14994 -2.031124,-0.14995 v 10.26828 10.26829 h -4.766631 c -2.621647,0 -4.919844,-0.14629 -5.107104,-0.32509 z M 197.26832,136.87787 c 0,-24.27713 -0.009,-24.48155 -0.995,-23.52819 -2.15958,2.08734 -20.44141,23.90334 -20.32257,24.25125 0.15968,0.46747 20.87309,23.76684 21.129,23.76684 0.10371,0 0.18857,-11.02046 0.18857,-24.4899 z m -57.83588,10.71433 c -0.12918,-0.33525 -1.32192,-3.73647 -2.65054,-7.55828 -1.32862,-3.8218 -2.49246,-6.94874 -2.58632,-6.94874 -0.0939,0 -1.25771,3.12694 -2.58633,6.94874 -1.32861,3.82181 -2.52136,7.22303 -2.65054,7.55828 -0.17866,0.46365 1.07468,0.60954 5.23687,0.60954 4.16218,0 5.41553,-0.14589 5.23686,-0.60954 z M 101.0106,131.40543 c 3.37913,-1.34808 4.30791,-6.11142 1.64079,-8.41496 -0.6277,-0.54213 -1.92249,-1.23553 -2.877299,-1.54088 -2.173923,-0.69522 -9.244255,-0.74046 -9.244255,-0.0592 0,0.27282 1.512344,2.79631 3.360766,5.60776 3.611417,5.49296 3.919884,5.6839 7.119998,4.40723 z m 134.05029,5.59846 v -25.37446 l 4.97943,0.0155 4.97942,0.0154 11.74634,16.10718 c 6.46049,8.85894 12.03362,16.33961 12.38473,16.6237 0.50881,0.41169 0.63839,-2.8609 0.63839,-16.12262 v -16.63915 h 4.85175 4.85175 v 25.37446 25.37445 l -4.9388,-0.13956 -4.93879,-0.13957 -12.04233,-16.42298 -12.04233,-16.42298 -0.25535,16.42298 -0.25536,16.42298 -4.97942,0.13957 -4.97943,0.13956 z m 84.26722,-0.0177 v -25.3568 h 10.26817 c 13.1148,0 16.74207,0.76672 21.16372,4.47353 3.0614,2.56648 4.0384,4.89792 4.05129,9.66776 0.0134,4.96505 -1.00882,7.27153 -4.21429,9.5088 -1.15279,0.80459 -2.11002,1.60085 -2.12719,1.76946 -0.0172,0.16861 0.65931,0.57966 1.50328,0.91344 3.73536,1.47731 6.52499,6.99703 5.8472,11.56958 -0.70688,4.76879 -3.28437,8.37705 -7.42462,10.39379 -3.89023,1.89496 -7.8333,2.40244 -18.72567,2.41003 l -10.34189,0.007 z m 21.91802,15.61583 c 5.38533,-1.4747 6.24617,-7.69565 1.35822,-9.81534 -1.62464,-0.70453 -3.34336,-0.90512 -7.82725,-0.91347 l -5.74549,-0.0107 v 5.60775 5.60775 h 5.23815 c 2.88099,0 6.02035,-0.21419 6.97637,-0.47598 z m -1.92157,-20.55382 c 3.71597,-0.76091 5.53907,-2.55054 5.53907,-5.43736 0,-1.61985 -0.31466,-2.48483 -1.25721,-3.45589 -1.84229,-1.89803 -3.32508,-2.26058 -9.2456,-2.26058 h -5.32921 v 5.52649 c 0,3.03956 0.15321,5.67277 0.34047,5.85157 0.54562,0.52095 7.02641,0.37494 9.95248,-0.22423 z m 19.05423,29.69158 c -0.13589,-0.33873 -0.18728,-11.69728 -0.1142,-25.24122 l 0.13287,-24.62535 h 17.61951 17.61951 v 4.38867 4.38868 l -12.65621,0.13046 -12.65622,0.13046 0.14381,5.72111 0.14381,5.72111 10.59724,0.1318 10.59724,0.1318 v 4.37878 4.37879 h -10.72492 -10.72492 v 5.85156 5.85157 h 13.04228 13.04229 l -0.14685,4.51059 -0.14684,4.51058 -17.76067,0.12824 c -13.93419,0.10062 -17.8139,-0.004 -18.00773,-0.48763 z m 38.0666,-14.25187 v -14.8904 h 3.83033 c 2.10668,0 3.83032,-0.11589 3.83032,-0.25753 0,-0.14164 -1.72364,-2.85014 -3.83032,-6.01888 l -3.83033,-5.76134 v -4.46519 -4.46518 h 9.63379 c 5.29858,0 10.8549,0.22111 12.34736,0.49136 6.33745,1.14756 11.44381,4.78051 12.99764,9.24724 1.58382,4.55295 0.9304,10.48704 -1.50128,13.63405 -1.30188,1.68486 -5.64044,4.90396 -6.62743,4.9174 -2.24331,0.0305 -1.83077,0.97198 4.9741,11.35123 3.79136,5.78282 6.76186,10.63979 6.60112,10.79327 -0.16074,0.15348 -2.72452,0.27613 -5.69728,0.27256 l -5.40501,-0.006 -6.63924,-10.22728 -6.63924,-10.22728 -1.9048,-0.006 -1.9048,-0.006 -0.13804,10.11833 -0.13804,10.11834 -4.97943,0.13957 -4.97942,0.13956 z m 23.70317,-16.61388 c 0.72606,-0.45423 1.57413,-1.65 1.89463,-2.67139 0.49158,-1.5666 0.43362,-2.13568 -0.37942,-3.72531 -0.542,-1.0597 -1.62643,-2.18325 -2.49177,-2.58166 -1.5026,-0.69182 -10.98027,-1.40402 -10.98027,-0.82511 0,0.16088 0.84112,1.55851 1.86916,3.10585 1.02804,1.54734 2.65161,3.99179 3.60795,5.4321 1.64249,2.47371 1.83368,2.60405 3.45205,2.3533 0.94229,-0.146 2.30474,-0.6355 3.02767,-1.08778 z M 252.38896,103.1862 c -5.22969,-1.40377 -9.37208,-4.856997 -10.95057,-9.128738 -1.39485,-3.774775 -1.30217,-3.883784 3.3021,-3.883784 h 4.06178 l 0.97118,2.072431 c 1.19927,2.559186 2.32732,3.541112 5.16703,4.497745 4.76249,1.604368 10.47892,0.34028 11.75413,-2.599217 0.79334,-1.828754 0.36647,-4.504605 -0.8921,-5.592123 -1.33895,-1.156975 -4.23947,-2.202809 -8.39886,-3.028352 -9.98512,-1.981823 -14.05463,-4.518208 -15.14222,-9.437627 -1.35831,-6.143951 1.89616,-11.452359 8.21599,-13.401197 3.15273,-0.972202 9.62018,-1.037687 12.78099,-0.129412 5.00644,1.438626 8.90196,5.108851 10.37175,9.771904 l 0.70658,2.241665 -4.18894,-0.02276 -4.18893,-0.02276 -1.03918,-2.019321 c -3.08583,-5.996366 -15.0482,-5.471762 -15.0482,0.659932 0,2.405094 2.71275,4.024819 9.25627,5.526719 10.75107,2.467641 14.56362,4.931967 15.80156,10.213706 1.32186,5.639734 -1.20829,10.80317 -6.50739,13.280069 -2.61486,1.22223 -3.62097,1.40433 -8.33623,1.50884 -3.20636,0.0711 -6.30101,-0.13308 -7.69674,-0.50772 z M 191.12634,83.301174 c -4.06552,-11.021194 -7.46846,-20.237415 -7.56209,-20.480491 -0.0936,-0.243076 1.74493,-0.437765 4.08569,-0.432643 l 4.25592,0.0093 5.06938,14.985331 c 2.78817,8.241933 5.2759,15.533916 5.5283,16.204408 0.38385,1.019678 1.35842,-1.412994 5.95829,-14.872737 l 5.49938,-16.091814 4.16596,-0.141629 c 2.29128,-0.0779 4.16596,-0.03313 4.16596,0.09947 0,0.132606 -3.33239,9.280657 -7.4053,20.329003 -4.07292,11.048346 -7.4053,20.164938 -7.4053,20.259108 0,0.0942 -2.01698,0.17121 -4.48217,0.17121 h -4.48217 z m 35.25247,-0.441957 V 62.378726 h 4.08569 4.08568 v 20.480491 20.480493 h -4.08568 -4.08569 z m 55.15673,0 V 62.378726 h 4.08568 4.08569 v 20.480491 20.480493 h -4.08569 -4.08568 z m 25.53552,3.413415 V 69.205557 h -6.63923 -6.63924 v -3.413416 -3.413415 h 17.1088 17.1088 v 3.413415 3.413416 h -6.38388 -6.38388 v 17.067075 17.067078 h -4.08569 -4.08568 z'
+
+function LogoMark({ width = 120, color = GREEN }: { width?: number; color?: string }) {
+  const [, , vbWidth, vbHeight] = LOGO_VIEWBOX.split(' ').map(Number)
+  return (
+    <Svg viewBox={LOGO_VIEWBOX} width={width} height={width * (vbHeight / vbWidth)}>
+      <G transform={LOGO_TRANSFORM}>
+        <Path d={LOGO_D} fill={color} />
+      </G>
+    </Svg>
+  )
+}
 
 const styles = StyleSheet.create({
   page: {
-    padding: 40,
+    padding: 42,
     fontFamily: 'Helvetica',
     fontSize: 9.5,
-    color: GRAY_900,
+    color: INK,
   },
-  label: { fontSize: 7.5, letterSpacing: 1, textTransform: 'uppercase', color: GRAY_400, marginBottom: 4 },
+  label: { fontSize: 8, color: FAINT, marginBottom: 4 },
+  heading: { fontFamily: 'Helvetica-Bold', fontSize: 12, color: INK, marginBottom: 10 },
 
   // Header
-  header: { flexDirection: 'row', justifyContent: 'space-between', paddingBottom: 20, borderBottomWidth: 1, borderBottomColor: GRAY_200, borderBottomStyle: 'solid' },
-  businessName: { fontFamily: 'Helvetica-Bold', fontSize: 12, color: GRAY_900, marginBottom: 6 },
-  businessLine: { fontSize: 8.5, color: GRAY_400, lineHeight: 1.5 },
-  invoiceEyebrow: { fontSize: 8, letterSpacing: 1.6, textTransform: 'uppercase', color: GOLD, marginBottom: 3, textAlign: 'right' },
-  invoiceNumber: { fontFamily: 'Helvetica-BoldOblique', fontSize: 20, color: GRAY_900, textAlign: 'right' },
-  issued: { fontSize: 8.5, color: GRAY_400, marginTop: 4, textAlign: 'right' },
-  statusPill: { fontSize: 7.5, letterSpacing: 0.8, textTransform: 'uppercase', paddingVertical: 3, paddingHorizontal: 7, marginTop: 6, alignSelf: 'flex-end' },
+  header: { flexDirection: 'row', justifyContent: 'space-between' },
+  businessLine: { fontSize: 9, color: INK, lineHeight: 1.5 },
+  website: { fontSize: 9, color: INK, marginTop: 8 },
+  invoiceEyebrow: { fontSize: 8, letterSpacing: 1.4, textTransform: 'uppercase', color: GOLD, marginBottom: 3, textAlign: 'right' },
+  invoiceNumber: { fontFamily: 'Helvetica-BoldOblique', fontSize: 17, color: INK, textAlign: 'right' },
+  issued: { fontSize: 9, color: INK, marginTop: 6, textAlign: 'right' },
+  statusPill: { fontSize: 7.5, letterSpacing: 0.6, textTransform: 'uppercase', paddingVertical: 3, paddingHorizontal: 7, marginTop: 6, alignSelf: 'flex-end' },
+  divider: { borderBottomWidth: 1, borderBottomColor: LINE, borderBottomStyle: 'solid', marginVertical: 18 },
 
-  // Bill to / trip
-  billTrip: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 18, borderBottomWidth: 1, borderBottomColor: GRAY_200, borderBottomStyle: 'solid' },
-  billCol: { width: '48%' },
-  name: { fontFamily: 'Helvetica-Bold', fontSize: 10, color: GRAY_900, marginBottom: 2 },
-  muted: { fontSize: 8.5, color: GRAY_600 },
-  mutedSmall: { fontSize: 8, color: GRAY_400, marginTop: 2 },
+  // Customer info
+  customerBlock: { marginBottom: 20 },
+  customerName: { fontFamily: 'Helvetica-Bold', fontSize: 10, color: INK, marginTop: 2 },
+  customerLine: { fontSize: 9, color: INK, marginTop: 2 },
+  tripLine: { fontSize: 8.5, color: FAINT, marginTop: 6 },
 
   // Table
-  table: { marginTop: 18, marginBottom: 4 },
-  thead: { flexDirection: 'row', borderBottomWidth: 1.4, borderBottomColor: GRAY_900, borderBottomStyle: 'solid', paddingBottom: 6 },
-  tr: { flexDirection: 'row', borderBottomWidth: 0.6, borderBottomColor: GRAY_200, borderBottomStyle: 'solid', paddingVertical: 8 },
-  th: { fontSize: 7.5, letterSpacing: 0.8, textTransform: 'uppercase', color: GRAY_600 },
+  thead: { flexDirection: 'row', backgroundColor: HEAD_BG, paddingVertical: 7, paddingHorizontal: 8 },
+  tr: { flexDirection: 'row', alignItems: 'center', borderBottomWidth: 1, borderBottomColor: LINE, borderBottomStyle: 'solid', paddingVertical: 10, paddingHorizontal: 8 },
+  th: { fontSize: 8, fontFamily: 'Helvetica-Bold', color: INK },
   colService: { flex: 1, paddingRight: 10 },
-  colQty: { width: 70, textAlign: 'right' },
+  colQty: { width: 60, textAlign: 'right' },
   colPrice: { width: 80, textAlign: 'right' },
-  colAmount: { width: 80, textAlign: 'right' },
-  lineTitle: { fontSize: 9.5, color: GRAY_900 },
-  lineDesc: { fontSize: 8, color: GRAY_600, marginTop: 2 },
-  lineCategory: { fontSize: 7.5, color: GRAY_400, marginTop: 2, textTransform: 'capitalize' },
-  cellText: { fontSize: 9, color: GRAY_600 },
-  cellTextStrong: { fontSize: 9, color: GRAY_900 },
+  colTotal: { width: 80, textAlign: 'right' },
+  lineTitle: { fontFamily: 'Helvetica-Bold', fontSize: 9.5, color: INK },
+  lineDesc: { fontSize: 8.5, color: MUTED, marginTop: 3, lineHeight: 1.5 },
+  cellText: { fontSize: 9, color: INK },
 
   // Totals
-  totalsWrap: { flexDirection: 'row', justifyContent: 'flex-end', marginTop: 4 },
-  totalsBox: { width: 220 },
+  totalsWrap: { flexDirection: 'row', justifyContent: 'flex-end', marginTop: 18 },
+  totalsBox: { width: 230 },
   totalsRow: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 3 },
-  totalsMuted: { fontSize: 9, color: GRAY_600 },
-  totalsFinal: { flexDirection: 'row', justifyContent: 'space-between', borderTopWidth: 1.4, borderTopColor: GRAY_900, borderTopStyle: 'solid', marginTop: 4, paddingTop: 6 },
-  totalsFinalLabel: { fontFamily: 'Helvetica-Bold', fontSize: 10.5, color: GRAY_900 },
-  totalsFinalValue: { fontFamily: 'Helvetica-Bold', fontSize: 10.5, color: GRAY_900 },
+  totalsMuted: { fontSize: 9, color: MUTED },
+  totalsFinal: { flexDirection: 'row', justifyContent: 'space-between', borderTopWidth: 1, borderTopColor: LINE, borderTopStyle: 'solid', marginTop: 4, paddingTop: 7 },
+  totalsFinalLabel: { fontFamily: 'Helvetica-Bold', fontSize: 9.5, color: INK },
+  totalsFinalValue: { fontFamily: 'Helvetica-Bold', fontSize: 9.5, color: INK },
   totalsPaid: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 3 },
   totalsPaidText: { fontSize: 9, color: GREEN },
-  totalsDue: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 3 },
-  totalsDueText: { fontFamily: 'Helvetica-Bold', fontSize: 9, color: GRAY_900 },
+  totalsDue: { flexDirection: 'row', justifyContent: 'space-between', borderTopWidth: 1, borderTopColor: LINE, borderTopStyle: 'solid', marginTop: 4, paddingTop: 7 },
+  totalsDueLabel: { fontFamily: 'Helvetica-Bold', fontSize: 12, color: INK },
+  totalsDueValue: { fontFamily: 'Helvetica-Bold', fontSize: 12, color: INK },
 
   // Sections below totals
-  section: { marginTop: 24, paddingTop: 14, borderTopWidth: 1, borderTopColor: GRAY_200, borderTopStyle: 'solid' },
+  section: { marginTop: 26 },
   receiptRow: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 2 },
-  receiptText: { fontSize: 8, color: GRAY_600 },
-  eftGrid: { flexDirection: 'row', flexWrap: 'wrap', maxWidth: 320 },
-  eftPair: { flexDirection: 'row', width: '100%', paddingVertical: 1.5 },
-  eftLabel: { width: 110, fontSize: 8, color: GRAY_400 },
-  eftValue: { fontSize: 8, color: GRAY_600 },
-  footerNote: { fontSize: 8, color: GRAY_400, lineHeight: 1.5, marginTop: 14 },
-  closingNote: { fontSize: 8, color: GRAY_400, lineHeight: 1.5, marginTop: 20, paddingTop: 14, borderTopWidth: 1, borderTopColor: GRAY_200, borderTopStyle: 'solid' },
+  receiptText: { fontSize: 8.5, color: MUTED },
+  eftRow: { flexDirection: 'row', paddingVertical: 2 },
+  eftLabel: { width: 110, fontSize: 9, color: FAINT },
+  eftValue: { fontSize: 9, color: INK },
+  note: { fontSize: 8.5, color: MUTED, lineHeight: 1.6, marginTop: 20 },
+  legalHeading: { fontFamily: 'Helvetica-Bold', fontSize: 10.5, color: INK, marginTop: 22, marginBottom: 8 },
+  legalBody: { fontSize: 8, color: MUTED, lineHeight: 1.6 },
 })
 
 function fmtDate(d?: string | null) {
@@ -124,87 +150,83 @@ function fmtDate(d?: string | null) {
 }
 
 function statusStyle(status: string) {
-  if (status === 'paid') return { backgroundColor: '#E8F1EC', color: GREEN }
-  if (status === 'void' || status === 'refunded') return { backgroundColor: RED_BG, color: RED }
-  return { backgroundColor: GOLD_BG, color: GOLD }
+  if (status === 'paid') return { backgroundColor: '#E6F1EC', color: GREEN }
+  if (status === 'void' || status === 'refunded') return { backgroundColor: '#FBEAEA', color: RED }
+  return { backgroundColor: '#F6F1E4', color: GOLD }
 }
 
-function InvoiceDocument({ invoice, order, receipts, business }: InvoicePdfData) {
+function InvoiceDocument({ invoice, order, receipts, business, siteUrl }: InvoicePdfData) {
   const addressLine = [business.address_line1, business.address_line2, business.city, business.country]
     .filter(Boolean).join(', ') || 'KwaZulu-Natal, South Africa'
   const hasDiscount = Number(invoice.discount) > 0
   const hasEft = Number(invoice.balance) > 0 && !!business.bank_account_number
   const st = statusStyle(invoice.status)
+  const website = siteUrl ? siteUrl.replace(/^https?:\/\//, '') : ''
 
   return (
     <Document title={`Invoice ${invoice.invoice_number}`}>
       <Page size="A4" style={styles.page}>
-        {/* Header */}
+        {/* Header: business letterhead left, invoice number right */}
         <View style={styles.header}>
-          <View style={{ maxWidth: 260 }}>
-            <Text style={styles.businessName}>{business.business_name}</Text>
-            <Text style={styles.businessLine}>{addressLine}</Text>
+          <View style={{ maxWidth: 280 }}>
+            <LogoMark width={120} />
+            <Text style={[styles.businessLine, { marginTop: 10 }]}>{addressLine}</Text>
             <Text style={styles.businessLine}>{business.email}</Text>
-            {business.phone && <Text style={styles.businessLine}>{business.phone}</Text>}
-            {business.registration_number && <Text style={styles.businessLine}>Reg. {business.registration_number}</Text>}
-            {business.vat_number && <Text style={styles.businessLine}>VAT {business.vat_number}</Text>}
+            {!!business.phone && <Text style={styles.businessLine}>Phone: {business.phone}</Text>}
+            {!!business.registration_number && <Text style={styles.businessLine}>Company ID: {business.registration_number}</Text>}
+            {!!business.vat_number && <Text style={styles.businessLine}>VAT: {business.vat_number}</Text>}
+            {!!website && <Text style={styles.website}>Website: {website}</Text>}
           </View>
           <View>
             <Text style={styles.invoiceEyebrow}>{invoice.status === 'void' ? 'Void Invoice' : 'Tax Invoice'}</Text>
-            <Text style={styles.invoiceNumber}>{invoice.invoice_number}</Text>
-            <Text style={styles.issued}>Issued {fmtDate(invoice.issued_at)}</Text>
+            <Text style={styles.invoiceNumber}>Invoice #{invoice.invoice_number}</Text>
+            <Text style={styles.issued}>Issue Date: {fmtDate(invoice.issued_at)}</Text>
             <Text style={[styles.statusPill, { backgroundColor: st.backgroundColor, color: st.color }]}>
-              {invoice.status}
+              {invoice.status === 'void' ? 'Void' : invoice.status}
             </Text>
           </View>
         </View>
 
-        {/* Billed to / trip */}
-        <View style={styles.billTrip}>
-          <View style={styles.billCol}>
-            <Text style={styles.label}>Billed To</Text>
-            <Text style={styles.name}>{order?.customer_name || '—'}</Text>
-            <Text style={styles.muted}>{order?.customer_email}</Text>
-          </View>
-          <View style={[styles.billCol, { alignItems: 'flex-end' }]}>
-            <Text style={styles.label}>Trip</Text>
-            <Text style={[styles.muted, { color: GRAY_900 }]}>{order?.trip_name || '—'}</Text>
-            <Text style={styles.mutedSmall}>
-              Order {order?.order_number}
-              {order?.travel_start
-                ? ` · ${fmtDate(order.travel_start)}${order.travel_end && order.travel_end !== order.travel_start ? ` — ${fmtDate(order.travel_end)}` : ''}`
-                : ''}
-            </Text>
-          </View>
+        <View style={styles.divider} />
+
+        {/* Customer info */}
+        <View style={styles.customerBlock}>
+          <Text style={styles.label}>Customer Info:</Text>
+          <Text style={styles.customerName}>{order?.customer_name || '—'}</Text>
+          {!!order?.customer_email && <Text style={styles.customerLine}>{order.customer_email}</Text>}
+          <Text style={styles.tripLine}>
+            {order?.trip_name ? `${order.trip_name} · ` : ''}Order {order?.order_number}
+            {order?.travel_start
+              ? ` · ${fmtDate(order.travel_start)}${order.travel_end && order.travel_end !== order.travel_start ? ` — ${fmtDate(order.travel_end)}` : ''}`
+              : ''}
+          </Text>
         </View>
 
         {/* Line items */}
-        <View style={styles.table}>
+        <View>
           <View style={styles.thead}>
-            <Text style={[styles.th, styles.colService]}>Service</Text>
-            <Text style={[styles.th, styles.colQty]}>Qty</Text>
-            <Text style={[styles.th, styles.colPrice]}>Unit Price</Text>
-            <Text style={[styles.th, styles.colAmount]}>Amount</Text>
+            <Text style={[styles.th, styles.colService]}>Product or Service</Text>
+            <Text style={[styles.th, styles.colQty]}>Quantity</Text>
+            <Text style={[styles.th, styles.colPrice]}>Price</Text>
+            <Text style={[styles.th, styles.colTotal]}>Line Total</Text>
           </View>
           {invoice.lines.map((l, i) => (
             <View style={styles.tr} key={i} wrap={false}>
               <View style={styles.colService}>
                 <Text style={styles.lineTitle}>{l.title}</Text>
-                {l.description && <Text style={styles.lineDesc}>{l.description}</Text>}
-                <Text style={styles.lineCategory}>{l.category}</Text>
+                {!!l.description && <Text style={styles.lineDesc}>{l.description}</Text>}
               </View>
-              <Text style={[styles.cellText, styles.colQty]}>
-                {Number(l.quantity)} {l.unitLabel}{Number(l.quantity) !== 1 ? 's' : ''}
-              </Text>
+              <Text style={[styles.cellText, styles.colQty]}>{Number(l.quantity)}</Text>
               <Text style={[styles.cellText, styles.colPrice]}>{formatMoney(Number(l.unitPrice), invoice.currency)}</Text>
-              <Text style={[styles.cellTextStrong, styles.colAmount]}>{formatMoney(Number(l.total), invoice.currency)}</Text>
+              <Text style={[styles.cellText, styles.colTotal]}>{formatMoney(Number(l.total), invoice.currency)}</Text>
             </View>
           ))}
         </View>
 
-        {/* Totals */}
+        {/* Summary */}
         <View style={styles.totalsWrap} wrap={false}>
           <View style={styles.totalsBox}>
+            <Text style={styles.heading}>Summary</Text>
             <View style={styles.totalsRow}>
               <Text style={styles.totalsMuted}>Subtotal</Text>
               <Text style={styles.totalsMuted}>{formatMoney(Number(invoice.subtotal), invoice.currency)}</Text>
@@ -220,11 +242,11 @@ function InvoiceDocument({ invoice, order, receipts, business }: InvoicePdfData)
               <Text style={styles.totalsMuted}>{formatMoney(Number(invoice.service_fee), invoice.currency)}</Text>
             </View>
             <View style={styles.totalsRow}>
-              <Text style={styles.totalsMuted}>VAT</Text>
+              <Text style={styles.totalsMuted}>Tax total</Text>
               <Text style={styles.totalsMuted}>{formatMoney(Number(invoice.tax_amount), invoice.currency)}</Text>
             </View>
             <View style={styles.totalsFinal}>
-              <Text style={styles.totalsFinalLabel}>Total</Text>
+              <Text style={styles.totalsFinalLabel}>Invoice Total</Text>
               <Text style={styles.totalsFinalValue}>{formatMoney(Number(invoice.total), invoice.currency)}</Text>
             </View>
             <View style={styles.totalsPaid}>
@@ -232,8 +254,8 @@ function InvoiceDocument({ invoice, order, receipts, business }: InvoicePdfData)
               <Text style={styles.totalsPaidText}>{formatMoney(Number(invoice.amount_paid), invoice.currency)}</Text>
             </View>
             <View style={styles.totalsDue}>
-              <Text style={styles.totalsDueText}>Balance due</Text>
-              <Text style={styles.totalsDueText}>{formatMoney(Number(invoice.balance), invoice.currency)}</Text>
+              <Text style={styles.totalsDueLabel}>Balance Due</Text>
+              <Text style={styles.totalsDueValue}>{formatMoney(Number(invoice.balance), invoice.currency)}</Text>
             </View>
           </View>
         </View>
@@ -259,28 +281,32 @@ function InvoiceDocument({ invoice, order, receipts, business }: InvoicePdfData)
         {hasEft && (
           <View style={styles.section} wrap={false}>
             <Text style={styles.label}>Pay by EFT</Text>
-            <View style={styles.eftGrid}>
-              {business.bank_name && (
-                <View style={styles.eftPair}><Text style={styles.eftLabel}>Bank</Text><Text style={styles.eftValue}>{business.bank_name}</Text></View>
-              )}
-              {business.bank_account_holder && (
-                <View style={styles.eftPair}><Text style={styles.eftLabel}>Account holder</Text><Text style={styles.eftValue}>{business.bank_account_holder}</Text></View>
-              )}
-              <View style={styles.eftPair}><Text style={styles.eftLabel}>Account number</Text><Text style={styles.eftValue}>{business.bank_account_number}</Text></View>
-              {business.bank_branch_code && (
-                <View style={styles.eftPair}><Text style={styles.eftLabel}>Branch code</Text><Text style={styles.eftValue}>{business.bank_branch_code}</Text></View>
-              )}
-              <View style={styles.eftPair}><Text style={styles.eftLabel}>Reference</Text><Text style={styles.eftValue}>{invoice.invoice_number}</Text></View>
-            </View>
+            {!!business.bank_name && (
+              <View style={styles.eftRow}><Text style={styles.eftLabel}>Bank</Text><Text style={styles.eftValue}>{business.bank_name}</Text></View>
+            )}
+            {!!business.bank_account_holder && (
+              <View style={styles.eftRow}><Text style={styles.eftLabel}>Account holder</Text><Text style={styles.eftValue}>{business.bank_account_holder}</Text></View>
+            )}
+            <View style={styles.eftRow}><Text style={styles.eftLabel}>Account number</Text><Text style={styles.eftValue}>{business.bank_account_number}</Text></View>
+            {!!business.bank_branch_code && (
+              <View style={styles.eftRow}><Text style={styles.eftLabel}>Branch code</Text><Text style={styles.eftValue}>{business.bank_branch_code}</Text></View>
+            )}
+            <View style={styles.eftRow}><Text style={styles.eftLabel}>Reference</Text><Text style={styles.eftValue}>{invoice.invoice_number}</Text></View>
           </View>
         )}
 
-        {business.invoice_footer_note && <Text style={styles.footerNote}>{business.invoice_footer_note}</Text>}
-
-        <Text style={styles.closingNote}>
+        <Text style={styles.note}>
           This invoice covers all services in your trip, arranged through {business.business_name}.
           Payments reconcile against order {order?.order_number}. Thank you for exploring the Drakensberg with us.
         </Text>
+
+        {/* Legal terms — free text, edited from Admin → Settings → Invoice footer note */}
+        {!!business.invoice_footer_note && (
+          <View wrap={false}>
+            <Text style={styles.legalHeading}>Legal Terms</Text>
+            <Text style={styles.legalBody}>{business.invoice_footer_note}</Text>
+          </View>
+        )}
       </Page>
     </Document>
   )
