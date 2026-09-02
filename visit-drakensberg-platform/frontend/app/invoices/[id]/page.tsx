@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback, useMemo, Suspense } from 'react'
 import { useParams, useRouter, useSearchParams } from 'next/navigation'
-import { Printer, ArrowLeft, CreditCard, Loader2, Copy, Check } from 'lucide-react'
+import { Download, ArrowLeft, CreditCard, Loader2, Copy, Check } from 'lucide-react'
 import {
   getInvoiceById, getInvoicePublic, getInvoiceByToken, getReceipts, getFinanceSettings,
   markInvoiceViewed, invoiceShareUrl,
@@ -244,6 +244,10 @@ function PrintableInvoiceInner() {
   // one to offer — unless staff have withdrawn it, in which case passing it
   // on would only send someone to the error above.
   const shareUrl = invoice.share_revoked_at ? '' : invoiceShareUrl(invoice)
+  // A real, server-generated PDF (see app/api/invoices/[id]/pdf) — not a
+  // browser print of this page, so it never carries the site nav bar, the
+  // trip-cart bar, or a browser's own address-bar/date/page-count footer.
+  const pdfUrl = `/api/invoices/${encodeURIComponent(invoice.id)}/pdf${shareToken ? `?t=${encodeURIComponent(shareToken)}` : ''}`
 
   return (
     <div className="min-h-screen print:min-h-0 bg-[#F7F5F2] print:bg-white pt-28 print:pt-0 pb-16 print:pb-0 px-4 print:px-0">
@@ -380,9 +384,14 @@ function PrintableInvoiceInner() {
                 <CreditCard size={14} /> {paying ? 'Redirecting…' : `Pay Now — ${formatMoney(Number(invoice.balance) + tip, invoice.currency)}`}
               </button>
             )}
-            <button onClick={() => window.print()} className="inline-flex items-center gap-2 bg-[#2d6a4f] text-white px-5 py-2.5 font-sans text-sm hover:bg-[#245741] transition-colors">
-              <Printer size={14} /> Print / Save as PDF
-            </button>
+            <a
+              href={pdfUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-2 bg-[#2d6a4f] text-white px-5 py-2.5 font-sans text-sm hover:bg-[#245741] transition-colors"
+            >
+              <Download size={14} /> Download PDF
+            </a>
           </div>
         </div>
         {payError && <p className="font-sans text-xs text-red-600 mb-4 print:hidden text-right">{payError}</p>}

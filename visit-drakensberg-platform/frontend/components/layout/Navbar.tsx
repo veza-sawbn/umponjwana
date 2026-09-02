@@ -283,7 +283,7 @@ export default function Navbar() {
     <>
       {/* ═══ HEADER BAR ═══════════════════════════════════════════════════════ */}
       <header
-        className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
+        className={`print:hidden fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
           transparent
             ? 'bg-transparent'
             : 'bg-white border-b border-black/10'
@@ -436,7 +436,7 @@ export default function Navbar() {
       <AnimatePresence>
         {menuOpen && (
           <motion.div
-            className="fixed inset-0 z-50 bg-[#0D0D0D] flex flex-col"
+            className="print:hidden fixed inset-0 z-50 bg-[#0D0D0D] flex flex-col"
             variants={overlayAnim}
             initial="hidden" animate="show" exit="exit"
           >
