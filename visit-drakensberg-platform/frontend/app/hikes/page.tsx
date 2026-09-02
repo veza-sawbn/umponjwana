@@ -3,14 +3,14 @@ import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import Footer from '@/components/layout/Footer'
 import { X, SlidersHorizontal, ChevronDown } from 'lucide-react'
-import { getTrails, trailStartPoint, trailCategory, type Trail, type TrailCategory } from '@/lib/trails'
+import { getTrails, trailCategory, type Trail, type TrailCategory } from '@/lib/trails'
 import { regionsMatch } from '@/lib/regions'
 import { getReserves, type Reserve } from '@/lib/reserves'
-import TrailExperiences from '@/components/experiences/TrailExperiences'
 import { getUpcomingExperiences, type TrekkingExperience } from '@/lib/experiences'
 import TrailCardsCarousel from '@/components/trails/TrailCardsCarousel'
+import HikesRegionExplorer from '@/components/trails/HikesRegionExplorer'
+import TrailExperiencesCarousel from '@/components/experiences/TrailExperiencesCarousel'
 import HikesHero from '@/components/trails/HikesHero'
-import { StayDistance } from '@/lib/stay-distance'
 import { ROUTE_TYPES } from '@/lib/gpx'
 
 const DIFF_COLOR: Record<string, string> = { Easy: '#4A7251', Moderate: '#C9A96E', Strenuous: '#c0392b', Extreme: '#7f1d1d' }
@@ -212,80 +212,29 @@ export default function HikesPage() {
                 No trails match your filters
               </div>
             ) : (
-              <>
-                {/* Card carousel */}
-                <div className="mb-10">
-                  <TrailCardsCarousel trails={filtered} difficultyColor={DIFF_COLOR} />
-                </div>
-
-                {/* Table-style list */}
-                <div className="h-px bg-black/8 mb-10" />
-                <div className="bg-white border border-black/8 divide-y divide-black/6">
-                  {filtered.map((t) => {
-                    const start = trailStartPoint(t)
-                    return (
-                    <Link key={t.id} href={`/hikes/${t.id}`}
-                      className="group flex items-center gap-6 px-6 py-5 hover:bg-mist transition-colors">
-                      <div className="w-20 h-14 shrink-0 overflow-hidden hidden sm:block">
-                        <img src={t.image} alt={t.name} className="w-full h-full object-cover" />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <h3 className="font-display text-lg text-forest group-hover:text-sage transition-colors">{t.name}</h3>
-                        <p className="font-sans text-xs text-forest/40 mt-0.5">
-                          {t.region}{t.trail_type ? ` · ${t.trail_type}` : ''}
-                          {trailCategory(t) === 'speciality_walk' && t.speciality_type ? ` · ${t.speciality_type}` : ''}
-                          {trailCategory(t) === 'multi_day_hike' ? ' · Multi-day' : ''}
-                        </p>
-                        <StayDistance lat={start?.lat} lng={start?.lng} className="mt-0.5" />
-                      </div>
-                      <div className="hidden md:flex items-center gap-8 shrink-0">
-                        <div className="text-center">
-                          <p className="font-display text-base text-forest">{t.distance}</p>
-                          <p className="font-sans text-[10px] text-forest/35 uppercase tracking-wide">Distance</p>
-                        </div>
-                        <div className="text-center">
-                          <p className="font-display text-base text-forest">{t.elevation}</p>
-                          <p className="font-sans text-[10px] text-forest/35 uppercase tracking-wide">Elevation</p>
-                        </div>
-                        <div className="text-center">
-                          <p className="font-sans text-xs font-medium" style={{ color: DIFF_COLOR[t.difficulty] }}>{t.difficulty}</p>
-                          <p className="font-sans text-[10px] text-forest/35 uppercase tracking-wide">{t.duration}</p>
-                        </div>
-                        {t.permit_required && (
-                          <span className="font-sans text-[10px] border border-gold text-gold px-2 py-0.5 uppercase tracking-wide">Permit</span>
-                        )}
-                      </div>
-                      <span className="text-forest/20 group-hover:text-gold transition-colors shrink-0">→</span>
-                    </Link>
-                    )
-                  })}
-                </div>
-              </>
+              <div className="mb-10">
+                <TrailCardsCarousel trails={filtered} difficultyColor={DIFF_COLOR} />
+              </div>
             )}
 
-            {/* Marketplace: upcoming trekking experiences across these trails */}
+            {/* Explore by region — a way to narrow down trails independent of
+                (and even from) an empty filtered result, so it isn't gated
+                behind filtered.length. */}
+            <div className="h-px bg-black/8 mb-10" />
+            <HikesRegionExplorer onSelectRegion={setRegion} />
+
+            {/* What's on: upcoming trekking experiences across these trails */}
             {experienceGroups.length > 0 && (
               <>
                 <div className="h-px bg-black/8 mt-12 mb-10" />
                 <div className="mb-8">
-                  <p className="font-sans text-xs tracking-[0.2em] uppercase text-gold mb-2">Marketplace</p>
+                  <p className="font-sans text-xs tracking-[0.2em] uppercase text-gold mb-2">What's on</p>
                   <h2 className="font-display text-3xl text-forest leading-none mb-2">Upcoming Trekking Experiences</h2>
                   <p className="font-sans text-sm text-forest/50">
-                    Commercial departures offered by marketplace suppliers on these trails — compare and book, or open a trail for the full route details
+                    departures offered by trusted suppliers on these trails - compare and book, or open a trail for the full route details
                   </p>
                 </div>
-                <div className="space-y-12">
-                  {experienceGroups.map(({ trail, exps }) => (
-                    <TrailExperiences
-                      key={trail.id}
-                      trailId={trail.id}
-                      experiences={exps}
-                      title={trail.name}
-                      subtitle={`${trail.region} · ${trail.distance} · ${trail.difficulty}`}
-                      titleHref={`/hikes/${trail.id}`}
-                    />
-                  ))}
-                </div>
+                <TrailExperiencesCarousel groups={experienceGroups} />
               </>
             )}
           </>
