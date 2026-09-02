@@ -88,7 +88,7 @@ export const SITE_CONTENT_DEFAULTS = {
   // Section layout for the homepage: render order, hidden sections, and
   // per-section style overrides (keyed by section id, shared by all pages).
   home_layout: {
-    section_order: ['stats', 'categories', 'regions', 'stories', 'trails', 'experiences', 'newsletter'] as string[],
+    section_order: ['stats', 'categories', 'regions', 'stories', 'trails', 'experiences', 'journeys', 'newsletter'] as string[],
     hidden: [] as string[],
     styles: {} as Record<string, SectionStyle>,
   },
@@ -102,6 +102,7 @@ export const SITE_CONTENT_DEFAULTS = {
     stories_eyebrow: 'Journal', stories_heading: 'Stories from the Berg',
     trails_eyebrow: 'On foot', trails_heading: 'Top trails',
     experiences_eyebrow: "What's on", experiences_heading: 'Events & Experiences',
+    journeys_eyebrow: 'Curated journeys', journeys_heading: 'Multi-day packages',
     newsletter_eyebrow: 'Stay informed', newsletter_heading: 'Berg dispatches',
     newsletter_body: 'Seasonal trail conditions, new accommodation, and stories from the escarpment — delivered monthly.',
   },
