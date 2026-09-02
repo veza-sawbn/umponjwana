@@ -67,10 +67,10 @@ export default function AdminFieldGuideListPage() {
     setError(null)
     try {
       if (page.status === 'published') {
-        await unpublishFieldGuidePage(page.id, supabase)
+        await unpublishFieldGuidePage(page.id, page.slug, supabase)
         setPages(p => p.map(x => x.id === page.id ? { ...x, status: 'draft' } : x))
       } else {
-        await publishFieldGuidePage(page.id, supabase)
+        await publishFieldGuidePage(page.id, page.slug, supabase)
         const now = new Date().toISOString()
         setPages(p => p.map(x => x.id === page.id ? { ...x, status: 'published', published_at: now } : x))
       }
@@ -91,7 +91,7 @@ export default function AdminFieldGuideListPage() {
   }
 
   return (
-    <div className="p-8">
+    <div className="p-4 sm:p-6 lg:p-8">
       <div className="flex items-start justify-between mb-8 gap-4">
         <div>
           <p className="font-sans text-[10px] tracking-[0.14em] uppercase text-gray-400 mb-1">Admin Console</p>
@@ -152,8 +152,8 @@ export default function AdminFieldGuideListPage() {
           <p className="font-sans text-sm text-gray-400">No layered guides yet.</p>
         </div>
       ) : (
-        <div className="bg-white border border-gray-200">
-          <table className="w-full">
+        <div className="bg-white border border-gray-200 overflow-x-auto">
+          <table className="w-full min-w-[640px]">
             <thead>
               <tr className="border-b border-gray-100">
                 {['Guide', 'Slug', 'Status', 'Last published', ''].map((h, i) => (

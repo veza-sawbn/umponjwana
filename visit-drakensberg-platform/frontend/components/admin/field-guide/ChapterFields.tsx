@@ -41,10 +41,10 @@ export default function ChapterFields({
   }
 
   return (
-    <div className="grid lg:grid-cols-[minmax(0,1fr)_300px] gap-6">
+    <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_300px] gap-6">
       <div className="space-y-4">
         <SectionHeading>Specimen record</SectionHeading>
-        <div className="grid md:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <TextField label="Common name" value={chapter.common_name} onChange={v => onPatch({ common_name: v })} placeholder="Bearded Vulture" />
           <TextField label="Scientific name" value={chapter.scientific_name ?? ''} onChange={v => onPatch({ scientific_name: v })} placeholder="Gypaetus barbatus" />
           <TextField label="Category" value={chapter.category ?? ''} onChange={v => onPatch({ category: v })} placeholder="Bird, Flora, Insect…" />

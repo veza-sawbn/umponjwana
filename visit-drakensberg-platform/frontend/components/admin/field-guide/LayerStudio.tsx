@@ -238,9 +238,9 @@ export default function LayerStudio({
   }
 
   return (
-    <div className="grid lg:grid-cols-[minmax(0,1fr)_360px] gap-6">
+    <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_360px] gap-6">
       {/* ── Preview ─────────────────────────────────────────────────────── */}
-      <div>
+      <div className="min-w-0">
         <div className="flex items-center justify-between gap-3 mb-3 flex-wrap">
           <SectionHeading>Live preview</SectionHeading>
           <div className="flex items-center gap-2">
@@ -271,8 +271,8 @@ export default function LayerStudio({
           </div>
         </div>
 
-        <div ref={frameRef} className="border border-gray-200 bg-[#F7F5F2] overflow-hidden">
-          <div style={{ height: logical.h * scale }}>
+        <div ref={frameRef} className="w-full border border-gray-200 bg-[#F7F5F2] overflow-hidden">
+          <div className="overflow-hidden" style={{ height: logical.h * scale }}>
             <div
               ref={stageRef}
               className={`fg-stage fg-preview-stage fg-preview-${device}`}
@@ -354,7 +354,7 @@ export default function LayerStudio({
       </div>
 
       {/* ── Stack + inspector ───────────────────────────────────────────── */}
-      <div className="space-y-6">
+      <div className="space-y-6 min-w-0">
         <div>
           <SectionHeading>Layers ({layers.length})</SectionHeading>
           <div className="border border-gray-200 bg-white divide-y divide-gray-50">
