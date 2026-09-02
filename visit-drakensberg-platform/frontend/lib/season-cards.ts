@@ -30,7 +30,7 @@ export function toSeasonCard(entry: SeasonalItem): SeasonCard {
       eyebrow: `${t.distance} · ${t.difficulty}`,
       title: t.name,
       description: t.description,
-      price: t.permit_required ? (t.permit_cost > 0 ? formatMoney(t.permit_cost) : 'Free') : 'Free',
+      price: t.permit_required && t.permit_cost > 0 ? formatMoney(t.permit_cost) : '',
       priceNote: t.permit_required ? 'permit req.' : '',
     }
   }
