@@ -63,8 +63,9 @@ export async function GET(req: Request, { params }: { params: { id: string } }) 
 
   const { data: contentRow } = await publicSupabase.from('site_content').select('value').eq('key', 'business_details').maybeSingle()
   const business = { ...BUSINESS_DETAILS_DEFAULTS, ...(contentRow?.value as object | undefined) }
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || new URL(req.url).origin
 
-  const pdf = await renderInvoicePdf({ invoice: shared.invoice, order: shared.order, receipts: shared.receipts, business })
+  const pdf = await renderInvoicePdf({ invoice: shared.invoice, order: shared.order, receipts: shared.receipts, business, siteUrl })
 
   return new NextResponse(new Uint8Array(pdf), {
     headers: {

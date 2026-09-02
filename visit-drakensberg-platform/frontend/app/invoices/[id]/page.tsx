@@ -248,6 +248,7 @@ function PrintableInvoiceInner() {
   // browser print of this page, so it never carries the site nav bar, the
   // trip-cart bar, or a browser's own address-bar/date/page-count footer.
   const pdfUrl = `/api/invoices/${encodeURIComponent(invoice.id)}/pdf${shareToken ? `?t=${encodeURIComponent(shareToken)}` : ''}`
+  const siteHost = typeof window !== 'undefined' ? window.location.host : ''
 
   return (
     <div className="min-h-screen print:min-h-0 bg-[#F7F5F2] print:bg-white pt-28 print:pt-0 pb-16 print:pb-0 px-4 print:px-0">
@@ -405,10 +406,11 @@ function PrintableInvoiceInner() {
                 {business.business_name}<br />
                 {[business.address_line1, business.address_line2, business.city, business.country].filter(Boolean).join(', ') || 'KwaZulu-Natal, South Africa'}<br />
                 {business.email}
-                {business.phone && <><br />{business.phone}</>}
-                {business.registration_number && <><br />Reg. {business.registration_number}</>}
-                {business.vat_number && <><br />VAT {business.vat_number}</>}
+                {business.phone && <><br />Phone: {business.phone}</>}
+                {business.registration_number && <><br />Company ID: {business.registration_number}</>}
+                {business.vat_number && <><br />VAT: {business.vat_number}</>}
               </p>
+              {siteHost && <p className="font-sans text-xs text-gray-400 mt-2">Website: {siteHost}</p>}
             </div>
             <div className="text-left sm:text-right shrink-0 sm:pl-6">
               <p className="font-sans text-[10px] tracking-[0.2em] uppercase text-[#C9A96E] mb-1">
@@ -428,7 +430,7 @@ function PrintableInvoiceInner() {
           {/* Bill to / trip */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 sm:gap-8 py-8 print:py-5 border-b border-gray-200">
             <div>
-              <p className="font-sans text-[10px] tracking-[0.14em] uppercase text-gray-400 mb-2">Billed To</p>
+              <p className="font-sans text-[10px] tracking-[0.14em] uppercase text-gray-400 mb-2">Customer Info</p>
               <p className="font-sans text-sm font-medium text-gray-800">{order?.customer_name || '—'}</p>
               <p className="font-sans text-xs text-gray-500 mt-0.5">{order?.customer_email}</p>
             </div>
@@ -446,10 +448,10 @@ function PrintableInvoiceInner() {
           <table className="w-full my-8 print:my-5 min-w-[480px]">
             <thead>
               <tr className="border-b-2 border-gray-800">
-                <th className="text-left py-2.5 print:py-1.5 font-sans text-[10px] tracking-[0.14em] uppercase text-gray-500">Service</th>
-                <th className="text-right py-2.5 print:py-1.5 font-sans text-[10px] tracking-[0.14em] uppercase text-gray-500">Qty</th>
-                <th className="text-right py-2.5 print:py-1.5 font-sans text-[10px] tracking-[0.14em] uppercase text-gray-500">Unit Price</th>
-                <th className="text-right py-2.5 print:py-1.5 font-sans text-[10px] tracking-[0.14em] uppercase text-gray-500">Amount</th>
+                <th className="text-left py-2.5 print:py-1.5 font-sans text-[10px] tracking-[0.14em] uppercase text-gray-500">Product or Service</th>
+                <th className="text-right py-2.5 print:py-1.5 font-sans text-[10px] tracking-[0.14em] uppercase text-gray-500">Quantity</th>
+                <th className="text-right py-2.5 print:py-1.5 font-sans text-[10px] tracking-[0.14em] uppercase text-gray-500">Price</th>
+                <th className="text-right py-2.5 print:py-1.5 font-sans text-[10px] tracking-[0.14em] uppercase text-gray-500">Line Total</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
@@ -460,7 +462,6 @@ function PrintableInvoiceInner() {
                     {l.description && (
                       <p className="font-sans text-[12px] text-gray-600 mt-0.5 whitespace-pre-wrap">{l.description}</p>
                     )}
-                    <p className="font-sans text-[11px] text-gray-400 capitalize mt-0.5">{l.category}</p>
                   </td>
                   <td className="py-3 print:py-1.5 text-right font-sans text-sm text-gray-600 whitespace-nowrap">{Number(l.quantity)} {l.unitLabel}{Number(l.quantity) !== 1 ? 's' : ''}</td>
                   <td className="py-3 print:py-1.5 text-right font-sans text-sm text-gray-600 whitespace-nowrap">{formatMoney(Number(l.unitPrice), invoice.currency)}</td>
@@ -479,12 +480,12 @@ function PrintableInvoiceInner() {
                 <div className="flex justify-between text-gray-600"><span>Discount</span><span>−{formatMoney(Number(invoice.discount), invoice.currency)}</span></div>
               )}
               <div className="flex justify-between text-gray-600"><span>Service fee</span><span>{formatMoney(Number(invoice.service_fee), invoice.currency)}</span></div>
-              <div className="flex justify-between text-gray-600"><span>VAT</span><span>{formatMoney(Number(invoice.tax_amount), invoice.currency)}</span></div>
+              <div className="flex justify-between text-gray-600"><span>Tax total</span><span>{formatMoney(Number(invoice.tax_amount), invoice.currency)}</span></div>
               <div className="flex justify-between font-medium text-base text-[#000000] border-t-2 border-gray-800 pt-2">
-                <span>Total</span><span>{formatMoney(Number(invoice.total), invoice.currency)}</span>
+                <span>Invoice Total</span><span>{formatMoney(Number(invoice.total), invoice.currency)}</span>
               </div>
               <div className="flex justify-between text-[#2d6a4f]"><span>Amount paid</span><span>{formatMoney(Number(invoice.amount_paid), invoice.currency)}</span></div>
-              <div className="flex justify-between font-medium text-gray-800"><span>Balance due</span><span>{formatMoney(Number(invoice.balance), invoice.currency)}</span></div>
+              <div className="flex justify-between font-medium text-base text-gray-800 border-t-2 border-gray-800 pt-2"><span>Balance Due</span><span>{formatMoney(Number(invoice.balance), invoice.currency)}</span></div>
             </div>
           </div>
 
@@ -514,14 +515,17 @@ function PrintableInvoiceInner() {
             </div>
           )}
 
-          {business.invoice_footer_note && (
-            <p className="mt-6 print:mt-4 font-sans text-[11px] text-gray-400 leading-relaxed whitespace-pre-line">{business.invoice_footer_note}</p>
-          )}
-
           <p className="mt-10 print:mt-6 pt-6 print:pt-4 border-t border-gray-200 font-sans text-[11px] text-gray-400 leading-relaxed">
             This invoice covers all services in your trip, arranged through {business.business_name}.
             Payments reconcile against order {order?.order_number}. Thank you for exploring the Drakensberg with us.
           </p>
+
+          {business.invoice_footer_note && (
+            <div className="mt-6 print:mt-4">
+              <p className="font-sans text-sm font-semibold text-gray-800 mb-2">Legal Terms</p>
+              <p className="font-sans text-[11px] text-gray-400 leading-relaxed whitespace-pre-line">{business.invoice_footer_note}</p>
+            </div>
+          )}
         </div>
       </div>
     </div>

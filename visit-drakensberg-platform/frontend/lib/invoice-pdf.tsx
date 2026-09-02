@@ -34,6 +34,8 @@ export type InvoicePdfData = {
   order: InvoiceCustomerOrder | null
   receipts: Receipt[]
   business: BusinessDetails
+  /** Shown as the "Website" line on the letterhead — the request's own origin, not stored data. */
+  siteUrl?: string
 }
 
 // A real, server-rendered PDF document — not a browser print of the on-screen
@@ -43,80 +45,82 @@ export type InvoicePdfData = {
 // setting that changes the result. Sticking to the built-in Helvetica family
 // means no font file has to be fetched at render time — nothing for a cold
 // serverless invocation to wait on or fail to reach.
+//
+// Styled to match the plain, businesslike invoice format the operator
+// already sends customers from their invoicing tool — a neutral black/white
+// document with a single light accent band on the table header, rather than
+// the site's own green/gold branding — so a customer holding both doesn't
+// see two different companies.
 
-const GREEN = '#2d6a4f'
-const GOLD = '#8B6914'
-const GOLD_BG = '#F6F1E7'
-const GRAY_900 = '#1a1a1a'
-const GRAY_600 = '#525252'
-const GRAY_400 = '#9ca3af'
-const GRAY_200 = '#e5e7eb'
-const RED = '#dc2626'
-const RED_BG = '#fef2f2'
+const INK = '#1a1a1a'
+const MUTED = '#4b5563'
+const FAINT = '#9ca3af'
+const LINE = '#e2e2e2'
+const HEAD_BG = '#EAF1FB'
+const RED = '#c0392b'
 
 const styles = StyleSheet.create({
   page: {
-    padding: 40,
+    padding: 42,
     fontFamily: 'Helvetica',
     fontSize: 9.5,
-    color: GRAY_900,
+    color: INK,
   },
-  label: { fontSize: 7.5, letterSpacing: 1, textTransform: 'uppercase', color: GRAY_400, marginBottom: 4 },
+  label: { fontSize: 8, color: FAINT, marginBottom: 4 },
+  heading: { fontFamily: 'Helvetica-Bold', fontSize: 12, color: INK, marginBottom: 10 },
 
   // Header
-  header: { flexDirection: 'row', justifyContent: 'space-between', paddingBottom: 20, borderBottomWidth: 1, borderBottomColor: GRAY_200, borderBottomStyle: 'solid' },
-  businessName: { fontFamily: 'Helvetica-Bold', fontSize: 12, color: GRAY_900, marginBottom: 6 },
-  businessLine: { fontSize: 8.5, color: GRAY_400, lineHeight: 1.5 },
-  invoiceEyebrow: { fontSize: 8, letterSpacing: 1.6, textTransform: 'uppercase', color: GOLD, marginBottom: 3, textAlign: 'right' },
-  invoiceNumber: { fontFamily: 'Helvetica-BoldOblique', fontSize: 20, color: GRAY_900, textAlign: 'right' },
-  issued: { fontSize: 8.5, color: GRAY_400, marginTop: 4, textAlign: 'right' },
-  statusPill: { fontSize: 7.5, letterSpacing: 0.8, textTransform: 'uppercase', paddingVertical: 3, paddingHorizontal: 7, marginTop: 6, alignSelf: 'flex-end' },
+  header: { flexDirection: 'row', justifyContent: 'space-between' },
+  businessName: { fontFamily: 'Helvetica-Bold', fontSize: 10, color: INK, marginBottom: 4 },
+  businessLine: { fontSize: 9, color: INK, lineHeight: 1.5 },
+  website: { fontSize: 9, color: INK, marginTop: 8 },
+  invoiceNumber: { fontFamily: 'Helvetica-Bold', fontSize: 15, color: INK, textAlign: 'right' },
+  issued: { fontSize: 9, color: INK, marginTop: 6, textAlign: 'right' },
+  statusPill: { fontSize: 7.5, letterSpacing: 0.6, textTransform: 'uppercase', paddingVertical: 3, paddingHorizontal: 7, marginTop: 6, alignSelf: 'flex-end' },
+  divider: { borderBottomWidth: 1, borderBottomColor: LINE, borderBottomStyle: 'solid', marginVertical: 18 },
 
-  // Bill to / trip
-  billTrip: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 18, borderBottomWidth: 1, borderBottomColor: GRAY_200, borderBottomStyle: 'solid' },
-  billCol: { width: '48%' },
-  name: { fontFamily: 'Helvetica-Bold', fontSize: 10, color: GRAY_900, marginBottom: 2 },
-  muted: { fontSize: 8.5, color: GRAY_600 },
-  mutedSmall: { fontSize: 8, color: GRAY_400, marginTop: 2 },
+  // Customer info
+  customerBlock: { marginBottom: 20 },
+  customerName: { fontFamily: 'Helvetica-Bold', fontSize: 10, color: INK, marginTop: 2 },
+  customerLine: { fontSize: 9, color: INK, marginTop: 2 },
+  tripLine: { fontSize: 8.5, color: FAINT, marginTop: 6 },
 
   // Table
-  table: { marginTop: 18, marginBottom: 4 },
-  thead: { flexDirection: 'row', borderBottomWidth: 1.4, borderBottomColor: GRAY_900, borderBottomStyle: 'solid', paddingBottom: 6 },
-  tr: { flexDirection: 'row', borderBottomWidth: 0.6, borderBottomColor: GRAY_200, borderBottomStyle: 'solid', paddingVertical: 8 },
-  th: { fontSize: 7.5, letterSpacing: 0.8, textTransform: 'uppercase', color: GRAY_600 },
+  thead: { flexDirection: 'row', backgroundColor: HEAD_BG, paddingVertical: 7, paddingHorizontal: 8 },
+  tr: { flexDirection: 'row', alignItems: 'center', borderBottomWidth: 1, borderBottomColor: LINE, borderBottomStyle: 'solid', paddingVertical: 10, paddingHorizontal: 8 },
+  th: { fontSize: 8, fontFamily: 'Helvetica-Bold', color: INK },
   colService: { flex: 1, paddingRight: 10 },
-  colQty: { width: 70, textAlign: 'right' },
+  colQty: { width: 60, textAlign: 'right' },
   colPrice: { width: 80, textAlign: 'right' },
-  colAmount: { width: 80, textAlign: 'right' },
-  lineTitle: { fontSize: 9.5, color: GRAY_900 },
-  lineDesc: { fontSize: 8, color: GRAY_600, marginTop: 2 },
-  lineCategory: { fontSize: 7.5, color: GRAY_400, marginTop: 2, textTransform: 'capitalize' },
-  cellText: { fontSize: 9, color: GRAY_600 },
-  cellTextStrong: { fontSize: 9, color: GRAY_900 },
+  colTotal: { width: 80, textAlign: 'right' },
+  lineTitle: { fontFamily: 'Helvetica-Bold', fontSize: 9.5, color: INK },
+  lineDesc: { fontSize: 8.5, color: MUTED, marginTop: 3, lineHeight: 1.5 },
+  cellText: { fontSize: 9, color: INK },
 
   // Totals
-  totalsWrap: { flexDirection: 'row', justifyContent: 'flex-end', marginTop: 4 },
-  totalsBox: { width: 220 },
+  totalsWrap: { flexDirection: 'row', justifyContent: 'flex-end', marginTop: 18 },
+  totalsBox: { width: 230 },
   totalsRow: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 3 },
-  totalsMuted: { fontSize: 9, color: GRAY_600 },
-  totalsFinal: { flexDirection: 'row', justifyContent: 'space-between', borderTopWidth: 1.4, borderTopColor: GRAY_900, borderTopStyle: 'solid', marginTop: 4, paddingTop: 6 },
-  totalsFinalLabel: { fontFamily: 'Helvetica-Bold', fontSize: 10.5, color: GRAY_900 },
-  totalsFinalValue: { fontFamily: 'Helvetica-Bold', fontSize: 10.5, color: GRAY_900 },
+  totalsMuted: { fontSize: 9, color: MUTED },
+  totalsFinal: { flexDirection: 'row', justifyContent: 'space-between', borderTopWidth: 1, borderTopColor: LINE, borderTopStyle: 'solid', marginTop: 4, paddingTop: 7 },
+  totalsFinalLabel: { fontFamily: 'Helvetica-Bold', fontSize: 9.5, color: INK },
+  totalsFinalValue: { fontFamily: 'Helvetica-Bold', fontSize: 9.5, color: INK },
   totalsPaid: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 3 },
-  totalsPaidText: { fontSize: 9, color: GREEN },
-  totalsDue: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 3 },
-  totalsDueText: { fontFamily: 'Helvetica-Bold', fontSize: 9, color: GRAY_900 },
+  totalsPaidText: { fontSize: 9, color: MUTED },
+  totalsDue: { flexDirection: 'row', justifyContent: 'space-between', borderTopWidth: 1, borderTopColor: LINE, borderTopStyle: 'solid', marginTop: 4, paddingTop: 7 },
+  totalsDueLabel: { fontFamily: 'Helvetica-Bold', fontSize: 12, color: INK },
+  totalsDueValue: { fontFamily: 'Helvetica-Bold', fontSize: 12, color: INK },
 
   // Sections below totals
-  section: { marginTop: 24, paddingTop: 14, borderTopWidth: 1, borderTopColor: GRAY_200, borderTopStyle: 'solid' },
+  section: { marginTop: 26 },
   receiptRow: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 2 },
-  receiptText: { fontSize: 8, color: GRAY_600 },
-  eftGrid: { flexDirection: 'row', flexWrap: 'wrap', maxWidth: 320 },
-  eftPair: { flexDirection: 'row', width: '100%', paddingVertical: 1.5 },
-  eftLabel: { width: 110, fontSize: 8, color: GRAY_400 },
-  eftValue: { fontSize: 8, color: GRAY_600 },
-  footerNote: { fontSize: 8, color: GRAY_400, lineHeight: 1.5, marginTop: 14 },
-  closingNote: { fontSize: 8, color: GRAY_400, lineHeight: 1.5, marginTop: 20, paddingTop: 14, borderTopWidth: 1, borderTopColor: GRAY_200, borderTopStyle: 'solid' },
+  receiptText: { fontSize: 8.5, color: MUTED },
+  eftRow: { flexDirection: 'row', paddingVertical: 2 },
+  eftLabel: { width: 110, fontSize: 9, color: FAINT },
+  eftValue: { fontSize: 9, color: INK },
+  note: { fontSize: 8.5, color: MUTED, lineHeight: 1.6, marginTop: 20 },
+  legalHeading: { fontFamily: 'Helvetica-Bold', fontSize: 10.5, color: INK, marginTop: 22, marginBottom: 8 },
+  legalBody: { fontSize: 8, color: MUTED, lineHeight: 1.6 },
 })
 
 function fmtDate(d?: string | null) {
@@ -124,87 +128,82 @@ function fmtDate(d?: string | null) {
 }
 
 function statusStyle(status: string) {
-  if (status === 'paid') return { backgroundColor: '#E8F1EC', color: GREEN }
-  if (status === 'void' || status === 'refunded') return { backgroundColor: RED_BG, color: RED }
-  return { backgroundColor: GOLD_BG, color: GOLD }
+  if (status === 'paid') return { backgroundColor: '#E6F4EC', color: '#1e7a46' }
+  if (status === 'void' || status === 'refunded') return { backgroundColor: '#FBEAEA', color: RED }
+  return { backgroundColor: '#FBF3E4', color: '#8B6914' }
 }
 
-function InvoiceDocument({ invoice, order, receipts, business }: InvoicePdfData) {
+function InvoiceDocument({ invoice, order, receipts, business, siteUrl }: InvoicePdfData) {
   const addressLine = [business.address_line1, business.address_line2, business.city, business.country]
     .filter(Boolean).join(', ') || 'KwaZulu-Natal, South Africa'
   const hasDiscount = Number(invoice.discount) > 0
   const hasEft = Number(invoice.balance) > 0 && !!business.bank_account_number
   const st = statusStyle(invoice.status)
+  const website = siteUrl ? siteUrl.replace(/^https?:\/\//, '') : ''
 
   return (
     <Document title={`Invoice ${invoice.invoice_number}`}>
       <Page size="A4" style={styles.page}>
-        {/* Header */}
+        {/* Header: business letterhead left, invoice number right */}
         <View style={styles.header}>
-          <View style={{ maxWidth: 260 }}>
+          <View style={{ maxWidth: 280 }}>
             <Text style={styles.businessName}>{business.business_name}</Text>
             <Text style={styles.businessLine}>{addressLine}</Text>
             <Text style={styles.businessLine}>{business.email}</Text>
-            {business.phone && <Text style={styles.businessLine}>{business.phone}</Text>}
-            {business.registration_number && <Text style={styles.businessLine}>Reg. {business.registration_number}</Text>}
-            {business.vat_number && <Text style={styles.businessLine}>VAT {business.vat_number}</Text>}
+            {!!business.phone && <Text style={styles.businessLine}>Phone: {business.phone}</Text>}
+            {!!business.registration_number && <Text style={styles.businessLine}>Company ID: {business.registration_number}</Text>}
+            {!!business.vat_number && <Text style={styles.businessLine}>VAT: {business.vat_number}</Text>}
+            {!!website && <Text style={styles.website}>Website: {website}</Text>}
           </View>
           <View>
-            <Text style={styles.invoiceEyebrow}>{invoice.status === 'void' ? 'Void Invoice' : 'Tax Invoice'}</Text>
-            <Text style={styles.invoiceNumber}>{invoice.invoice_number}</Text>
-            <Text style={styles.issued}>Issued {fmtDate(invoice.issued_at)}</Text>
+            <Text style={styles.invoiceNumber}>Invoice #{invoice.invoice_number}</Text>
+            <Text style={styles.issued}>Issue Date: {fmtDate(invoice.issued_at)}</Text>
             <Text style={[styles.statusPill, { backgroundColor: st.backgroundColor, color: st.color }]}>
-              {invoice.status}
+              {invoice.status === 'void' ? 'Void' : invoice.status}
             </Text>
           </View>
         </View>
 
-        {/* Billed to / trip */}
-        <View style={styles.billTrip}>
-          <View style={styles.billCol}>
-            <Text style={styles.label}>Billed To</Text>
-            <Text style={styles.name}>{order?.customer_name || '—'}</Text>
-            <Text style={styles.muted}>{order?.customer_email}</Text>
-          </View>
-          <View style={[styles.billCol, { alignItems: 'flex-end' }]}>
-            <Text style={styles.label}>Trip</Text>
-            <Text style={[styles.muted, { color: GRAY_900 }]}>{order?.trip_name || '—'}</Text>
-            <Text style={styles.mutedSmall}>
-              Order {order?.order_number}
-              {order?.travel_start
-                ? ` · ${fmtDate(order.travel_start)}${order.travel_end && order.travel_end !== order.travel_start ? ` — ${fmtDate(order.travel_end)}` : ''}`
-                : ''}
-            </Text>
-          </View>
+        <View style={styles.divider} />
+
+        {/* Customer info */}
+        <View style={styles.customerBlock}>
+          <Text style={styles.label}>Customer Info:</Text>
+          <Text style={styles.customerName}>{order?.customer_name || '—'}</Text>
+          {!!order?.customer_email && <Text style={styles.customerLine}>{order.customer_email}</Text>}
+          <Text style={styles.tripLine}>
+            {order?.trip_name ? `${order.trip_name} · ` : ''}Order {order?.order_number}
+            {order?.travel_start
+              ? ` · ${fmtDate(order.travel_start)}${order.travel_end && order.travel_end !== order.travel_start ? ` — ${fmtDate(order.travel_end)}` : ''}`
+              : ''}
+          </Text>
         </View>
 
         {/* Line items */}
-        <View style={styles.table}>
+        <View>
           <View style={styles.thead}>
-            <Text style={[styles.th, styles.colService]}>Service</Text>
-            <Text style={[styles.th, styles.colQty]}>Qty</Text>
-            <Text style={[styles.th, styles.colPrice]}>Unit Price</Text>
-            <Text style={[styles.th, styles.colAmount]}>Amount</Text>
+            <Text style={[styles.th, styles.colService]}>Product or Service</Text>
+            <Text style={[styles.th, styles.colQty]}>Quantity</Text>
+            <Text style={[styles.th, styles.colPrice]}>Price</Text>
+            <Text style={[styles.th, styles.colTotal]}>Line Total</Text>
           </View>
           {invoice.lines.map((l, i) => (
             <View style={styles.tr} key={i} wrap={false}>
               <View style={styles.colService}>
                 <Text style={styles.lineTitle}>{l.title}</Text>
-                {l.description && <Text style={styles.lineDesc}>{l.description}</Text>}
-                <Text style={styles.lineCategory}>{l.category}</Text>
+                {!!l.description && <Text style={styles.lineDesc}>{l.description}</Text>}
               </View>
-              <Text style={[styles.cellText, styles.colQty]}>
-                {Number(l.quantity)} {l.unitLabel}{Number(l.quantity) !== 1 ? 's' : ''}
-              </Text>
+              <Text style={[styles.cellText, styles.colQty]}>{Number(l.quantity)}</Text>
               <Text style={[styles.cellText, styles.colPrice]}>{formatMoney(Number(l.unitPrice), invoice.currency)}</Text>
-              <Text style={[styles.cellTextStrong, styles.colAmount]}>{formatMoney(Number(l.total), invoice.currency)}</Text>
+              <Text style={[styles.cellText, styles.colTotal]}>{formatMoney(Number(l.total), invoice.currency)}</Text>
             </View>
           ))}
         </View>
 
-        {/* Totals */}
+        {/* Summary */}
         <View style={styles.totalsWrap} wrap={false}>
           <View style={styles.totalsBox}>
+            <Text style={styles.heading}>Summary</Text>
             <View style={styles.totalsRow}>
               <Text style={styles.totalsMuted}>Subtotal</Text>
               <Text style={styles.totalsMuted}>{formatMoney(Number(invoice.subtotal), invoice.currency)}</Text>
@@ -220,20 +219,20 @@ function InvoiceDocument({ invoice, order, receipts, business }: InvoicePdfData)
               <Text style={styles.totalsMuted}>{formatMoney(Number(invoice.service_fee), invoice.currency)}</Text>
             </View>
             <View style={styles.totalsRow}>
-              <Text style={styles.totalsMuted}>VAT</Text>
+              <Text style={styles.totalsMuted}>Tax total</Text>
               <Text style={styles.totalsMuted}>{formatMoney(Number(invoice.tax_amount), invoice.currency)}</Text>
             </View>
             <View style={styles.totalsFinal}>
-              <Text style={styles.totalsFinalLabel}>Total</Text>
+              <Text style={styles.totalsFinalLabel}>Invoice Total</Text>
               <Text style={styles.totalsFinalValue}>{formatMoney(Number(invoice.total), invoice.currency)}</Text>
             </View>
             <View style={styles.totalsPaid}>
-              <Text style={styles.totalsPaidText}>Amount paid</Text>
-              <Text style={styles.totalsPaidText}>{formatMoney(Number(invoice.amount_paid), invoice.currency)}</Text>
+              <Text style={styles.totalsMuted}>Amount paid</Text>
+              <Text style={styles.totalsMuted}>{formatMoney(Number(invoice.amount_paid), invoice.currency)}</Text>
             </View>
             <View style={styles.totalsDue}>
-              <Text style={styles.totalsDueText}>Balance due</Text>
-              <Text style={styles.totalsDueText}>{formatMoney(Number(invoice.balance), invoice.currency)}</Text>
+              <Text style={styles.totalsDueLabel}>Balance Due</Text>
+              <Text style={styles.totalsDueValue}>{formatMoney(Number(invoice.balance), invoice.currency)}</Text>
             </View>
           </View>
         </View>
@@ -259,28 +258,32 @@ function InvoiceDocument({ invoice, order, receipts, business }: InvoicePdfData)
         {hasEft && (
           <View style={styles.section} wrap={false}>
             <Text style={styles.label}>Pay by EFT</Text>
-            <View style={styles.eftGrid}>
-              {business.bank_name && (
-                <View style={styles.eftPair}><Text style={styles.eftLabel}>Bank</Text><Text style={styles.eftValue}>{business.bank_name}</Text></View>
-              )}
-              {business.bank_account_holder && (
-                <View style={styles.eftPair}><Text style={styles.eftLabel}>Account holder</Text><Text style={styles.eftValue}>{business.bank_account_holder}</Text></View>
-              )}
-              <View style={styles.eftPair}><Text style={styles.eftLabel}>Account number</Text><Text style={styles.eftValue}>{business.bank_account_number}</Text></View>
-              {business.bank_branch_code && (
-                <View style={styles.eftPair}><Text style={styles.eftLabel}>Branch code</Text><Text style={styles.eftValue}>{business.bank_branch_code}</Text></View>
-              )}
-              <View style={styles.eftPair}><Text style={styles.eftLabel}>Reference</Text><Text style={styles.eftValue}>{invoice.invoice_number}</Text></View>
-            </View>
+            {!!business.bank_name && (
+              <View style={styles.eftRow}><Text style={styles.eftLabel}>Bank</Text><Text style={styles.eftValue}>{business.bank_name}</Text></View>
+            )}
+            {!!business.bank_account_holder && (
+              <View style={styles.eftRow}><Text style={styles.eftLabel}>Account holder</Text><Text style={styles.eftValue}>{business.bank_account_holder}</Text></View>
+            )}
+            <View style={styles.eftRow}><Text style={styles.eftLabel}>Account number</Text><Text style={styles.eftValue}>{business.bank_account_number}</Text></View>
+            {!!business.bank_branch_code && (
+              <View style={styles.eftRow}><Text style={styles.eftLabel}>Branch code</Text><Text style={styles.eftValue}>{business.bank_branch_code}</Text></View>
+            )}
+            <View style={styles.eftRow}><Text style={styles.eftLabel}>Reference</Text><Text style={styles.eftValue}>{invoice.invoice_number}</Text></View>
           </View>
         )}
 
-        {business.invoice_footer_note && <Text style={styles.footerNote}>{business.invoice_footer_note}</Text>}
-
-        <Text style={styles.closingNote}>
+        <Text style={styles.note}>
           This invoice covers all services in your trip, arranged through {business.business_name}.
           Payments reconcile against order {order?.order_number}. Thank you for exploring the Drakensberg with us.
         </Text>
+
+        {/* Legal terms — free text, edited from Admin → Settings → Invoice footer note */}
+        {!!business.invoice_footer_note && (
+          <View wrap={false}>
+            <Text style={styles.legalHeading}>Legal Terms</Text>
+            <Text style={styles.legalBody}>{business.invoice_footer_note}</Text>
+          </View>
+        )}
       </Page>
     </Document>
   )
