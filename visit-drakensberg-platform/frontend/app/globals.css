@@ -146,3 +146,158 @@ body {
   outline-offset: 2px;
   cursor: text;
 }
+
+/* ─────────────────────────────────────────────────────────────────────────
+   Layered Field Guide (/field-guide/[slug] and the dashboard's live preview)
+
+   Every rule here is shared by the public page and the layer editor, so what
+   an editor positions in the console is literally the same geometry the
+   visitor gets. Positions are percentages of the pinned stage — never pixels
+   — which is what keeps one composition working from a 360px phone to a
+   2560px display.
+
+   Only opacity and transform are animated. Nothing here reads or writes
+   layout during scroll.
+   ───────────────────────────────────────────────────────────────────────── */
+
+.fg-stage {
+  position: relative;
+  overflow: hidden;
+}
+
+/* One layer = one DOM element. Uploaded artwork is never composited into a
+   flattened image; each file keeps its own node, z-index and reveal. */
+.fg-layer {
+  position: absolute;
+  left: var(--fg-mx);
+  top: var(--fg-my);
+  width: var(--fg-mw);
+  transform:
+    translate(-50%, -50%)
+    translateY(var(--fg-float, 55px))
+    rotate(var(--fg-rot, 0deg));
+  opacity: 0;
+  transition:
+    opacity var(--fg-dur, 700ms) var(--ease-out) var(--fg-delay, 0ms),
+    transform var(--fg-dur, 700ms) var(--ease-out) var(--fg-delay, 0ms);
+  will-change: opacity, transform;
+}
+
+/* Revealed layers settle at their configured position and stay there for the
+   rest of the chapter — the attribute only flips back when the reader
+   scrolls back above the trigger, which is what reverses the entrance. */
+.fg-layer[data-revealed='true'] {
+  opacity: var(--fg-opacity, 1);
+  transform:
+    translate(-50%, -50%)
+    translateY(0)
+    rotate(var(--fg-rot, 0deg));
+}
+
+@media (min-width: 768px) {
+  .fg-layer {
+    left: var(--fg-x);
+    top: var(--fg-y);
+    width: var(--fg-w);
+  }
+}
+
+.fg-layer img,
+.fg-layer svg {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+/* The completed composition leaves as one scene. Driven by a single inline
+   style write per frame on this element, not per layer. */
+.fg-scene {
+  position: absolute;
+  inset: 0;
+  will-change: opacity, transform;
+}
+
+/* Reduced motion: no pinning, no entrance, no scene transition. Each specimen
+   becomes a single static plate with every layer already in its final place —
+   the same composition, delivered all at once. */
+.fg-reduced .fg-chapter {
+  height: auto !important;
+}
+.fg-reduced .fg-pin {
+  position: relative !important;
+  top: auto !important;
+}
+.fg-reduced .fg-layer,
+.fg-reduced .fg-layer[data-revealed='true'] {
+  opacity: var(--fg-opacity, 1);
+  transform: translate(-50%, -50%) rotate(var(--fg-rot, 0deg));
+  transition: none;
+  will-change: auto;
+}
+.fg-reduced .fg-scene {
+  opacity: 1 !important;
+  transform: none !important;
+}
+
+/* Plate heading — the specimen's name, set on the plate itself. Revealed
+   with the specimen, so the chapter announces what it is before any detail
+   arrives. Corner-anchored rather than centre-anchored, which is why it is
+   not a .fg-layer. */
+.fg-label {
+  position: absolute;
+  left: 6%;
+  right: 6%;
+  top: 5%;
+  z-index: 60;
+  opacity: 0;
+  transform: translateY(26px);
+  transition: opacity 800ms var(--ease-out), transform 800ms var(--ease-out);
+  will-change: opacity, transform;
+}
+.fg-label[data-revealed='true'] {
+  opacity: 1;
+  transform: translateY(0);
+}
+@media (min-width: 768px) {
+  .fg-label {
+    left: 4%;
+    right: auto;
+    top: 8%;
+    max-width: 26%;
+  }
+}
+.fg-reduced .fg-label,
+.fg-reduced .fg-label[data-revealed='true'] {
+  opacity: 1;
+  transform: none;
+  transition: none;
+  will-change: auto;
+}
+
+/* Dashboard preview. The public stylesheet switches between desktop and
+   mobile geometry on the viewport; inside a preview box the viewport is the
+   wrong thing to ask, so these two classes force the choice. Two class
+   selectors, so they outrank the public rule and its media query. */
+.fg-preview-desktop .fg-layer {
+  left: var(--fg-x);
+  top: var(--fg-y);
+  width: var(--fg-w);
+}
+.fg-preview-mobile .fg-layer {
+  left: var(--fg-mx);
+  top: var(--fg-my);
+  width: var(--fg-mw);
+}
+/* A layer being dragged follows the pointer immediately — a transition here
+   would make it lag behind the cursor. */
+.fg-preview-stage .fg-layer[data-dragging='true'] {
+  transition: none;
+  cursor: grabbing;
+}
+.fg-preview-stage .fg-layer {
+  cursor: grab;
+}
+.fg-preview-stage .fg-layer[data-selected='true'] {
+  outline: 1px dashed #2d6a4f;
+  outline-offset: 6px;
+}
