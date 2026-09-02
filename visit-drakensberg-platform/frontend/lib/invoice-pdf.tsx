@@ -93,7 +93,6 @@ const styles = StyleSheet.create({
 
   // Header
   header: { flexDirection: 'row', justifyContent: 'space-between' },
-  businessName: { fontFamily: 'Helvetica-Bold', fontSize: 10, color: INK, marginBottom: 4 },
   businessLine: { fontSize: 9, color: INK, lineHeight: 1.5 },
   website: { fontSize: 9, color: INK, marginTop: 8 },
   invoiceEyebrow: { fontSize: 8, letterSpacing: 1.4, textTransform: 'uppercase', color: GOLD, marginBottom: 3, textAlign: 'right' },
@@ -171,8 +170,7 @@ function InvoiceDocument({ invoice, order, receipts, business, siteUrl }: Invoic
         <View style={styles.header}>
           <View style={{ maxWidth: 280 }}>
             <LogoMark width={120} />
-            <Text style={[styles.businessName, { marginTop: 10 }]}>{business.business_name}</Text>
-            <Text style={styles.businessLine}>{addressLine}</Text>
+            <Text style={[styles.businessLine, { marginTop: 10 }]}>{addressLine}</Text>
             <Text style={styles.businessLine}>{business.email}</Text>
             {!!business.phone && <Text style={styles.businessLine}>Phone: {business.phone}</Text>}
             {!!business.registration_number && <Text style={styles.businessLine}>Company ID: {business.registration_number}</Text>}
