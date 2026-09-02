@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="900" height="380" viewBox="0 0 900 380" fill="none">
+  <!-- Habitat: basalt escarpment profile, looking west. -->
+  <g stroke="#2B2418" fill="none" stroke-linejoin="round" stroke-linecap="round">
+    <path d="M0 300 78 262l52 22 60-64 44 26 66-92 58 40 52-70 74 58 60-40 66 52 58-30 76 46 56-24 44 34v100H0Z" stroke-width="1.9" fill="#EDE6D6" fill-opacity="0.5"/>
+    <path d="M0 322l96-24 74 18 82-28 78 24 88-30 92 26 84-22 90 28 76-20 40 12" stroke-width="1.3" opacity="0.75"/>
+    <g stroke-width="0.8" opacity="0.45">
+      <path d="M96 296v52"/><path d="M148 302v46"/><path d="M212 282v66"/><path d="M268 296v52"/>
+      <path d="M330 262v86"/><path d="M392 288v60"/><path d="M452 254v94"/><path d="M520 292v56"/>
+      <path d="M584 266v82"/><path d="M646 300v48"/><path d="M710 272v76"/><path d="M772 296v52"/>
+      <path d="M836 280v68"/>
+    </g>
+    <path d="M0 360h900" stroke-width="1.6"/>
+  </g>
+  <g stroke="#2B2418" stroke-width="0.9" opacity="0.35">
+    <path d="M120 120c60-26 130-22 180 6"/>
+    <path d="M520 84c56-24 122-20 168 6"/>
+  </g>
+</svg>

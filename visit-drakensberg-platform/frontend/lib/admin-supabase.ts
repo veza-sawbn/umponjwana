@@ -73,7 +73,37 @@ function imageDimensions(file: File): Promise<string> {
   })
 }
 
+// Mirrors the `media` bucket's own allowed_mime_types / file_size_limit
+// (supabase/migrations/20260719_media_storage.sql). Checking here as well is
+// not redundant: the bucket rejects a 60 MB file only after it has been
+// uploaded, and returns a generic error when it does.
+const MEDIA_MIME_TYPES = [
+  'image/jpeg', 'image/png', 'image/webp', 'image/gif', 'image/svg+xml', 'image/avif',
+  'video/mp4', 'video/webm', 'video/quicktime', 'application/pdf',
+]
+const MEDIA_SIZE_LIMIT = 50 * 1024 * 1024
+
+/** Rejects a file the storage bucket would reject anyway, but early and with
+ *  a message that says which rule it broke. Returns null when the file is
+ *  acceptable. */
+export function validateMediaFile(file: File): string | null {
+  if (file.size > MEDIA_SIZE_LIMIT) {
+    return `${file.name} is ${(file.size / 1024 / 1024).toFixed(1)} MB — the limit is 50 MB.`
+  }
+  if (file.size === 0) return `${file.name} is empty.`
+  if (file.type && !MEDIA_MIME_TYPES.includes(file.type)) {
+    return `${file.type} files are not accepted. Use PNG, WebP, JPEG, GIF, SVG, AVIF, MP4, WebM, MOV or PDF.`
+  }
+  return null
+}
+
 export async function uploadAdminMedia(file: File): Promise<AdminMedia> {
+  const invalid = validateMediaFile(file)
+  if (invalid) throw new Error(invalid)
+
+  // Safe name: the original filename is kept only as a display label. The
+  // storage key is generated, so a file called "../../x .png" cannot steer
+  // the upload path or collide with someone else's object.
   const ext = (file.name.split('.').pop() || 'bin').toLowerCase().replace(/[^a-z0-9]/g, '') || 'bin'
   const path = `admin/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`
   const { error } = await supabase.storage.from('media').upload(path, file, {

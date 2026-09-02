@@ -4,7 +4,7 @@ import {
   Globe, MapPin, Image, Store, Package, ShieldCheck,
   Receipt, Landmark, Banknote, ClipboardList, MessageSquare, Bus,
   TreePine, Building2, FileSignature, UserCog, Wallet, Send, Briefcase,
-  UserCircle, BookUser, Inbox,
+  UserCircle, BookUser, Inbox, Feather,
 } from 'lucide-react'
 
 // Single source of truth for admin navigation. The desktop sidebar renders
@@ -42,6 +42,7 @@ export const ADMIN_NAV: AdminNavItem[] = [
   { href: '/admin/marketplace', label: 'Marketplace', icon: Store },
   { href: '/admin/packages', label: 'Package Builder', icon: Package },
   { href: '/admin/blog', label: 'Blog & Content', icon: FileText },
+  { href: '/admin/field-guide', label: 'Layered Field Guide', short: 'Field Guide', icon: Feather },
   { href: '/admin/editor', label: 'Visual Editor', icon: Globe },
   { href: '/admin/website', label: 'Website Settings', icon: Settings },
   { href: '/admin/trails', label: 'Hiking Trails', icon: Mountain },
@@ -73,7 +74,7 @@ export const ADMIN_NAV_GROUPS = [
   ]),
   group('Money', ['/admin/finance', '/admin/settlements']),
   group('Supply', ['/admin/listings', '/admin/listing-applications', '/admin/suppliers', '/admin/verification', '/admin/marketplace', '/admin/packages']),
-  group('Content', ['/admin/blog', '/admin/editor', '/admin/website', '/admin/media', '/admin/seo']),
+  group('Content', ['/admin/blog', '/admin/field-guide', '/admin/editor', '/admin/website', '/admin/media', '/admin/seo']),
   group('Places', ['/admin/trails', '/admin/regions', '/admin/reserves', '/admin/towns']),
   group('Platform', ['/admin/analytics', '/admin/roles', '/admin/settings']),
 ]

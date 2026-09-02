@@ -656,3 +656,67 @@ row's JSON value rather than a new table).
 - Remaining-seat counts shown while picking a timeslot are best-effort
   (read once with the page load), same tradeoff already accepted for tour
   departures — the atomic RPC at checkout is the actual source of truth.
+
+---
+
+## UPDATE — Layered Field Guide (2026-09-04)
+
+**Branch:** `claude/layered-field-guide-dashboard-trjkc4`
+Run `frontend/supabase/migrations/20260904_layered_field_guide.sql`.
+
+An admin-managed, layered-scroll natural-history page. Nothing here touches
+booking, supplier or transport code; it is a new content module beside
+Blog & Content.
+
+### Routes
+| Route | What it is |
+|-------|------------|
+| `/field-guide` | Index of published guides (public) |
+| `/field-guide/[slug]` | The layered scroll experience (public) |
+| `/admin/field-guide` | Guide list — create, publish, unpublish, delete |
+| `/admin/field-guide/[id]` | Page settings, specimen chapters, layer studio |
+
+### Tables
+`vd_field_guide_pages` → `vd_field_guide_chapters` → `vd_field_guide_layers`,
+all admin-only under RLS (`is_admin()`), with anon table grants revoked.
+
+### Publishing
+The public site never reads the working rows. `vd_publish_field_guide_page()`
+flattens the **enabled** chapters and layers into
+`vd_field_guide_pages.published_snapshot`, and `vd_field_guide_public(slug)`
+(SECURITY DEFINER, anon-callable) returns only that. So a draft edit cannot
+reach the live page, a disabled specimen is absent from the payload rather
+than hidden in the browser, and the last published composition survives
+untouched until someone publishes again. There is no generic revision system
+on the platform to reuse — `blog_posts` is a plain status column, which
+cannot preserve "last published" while a multi-row composition is edited in
+place.
+
+### Public rendering
+Every layer is its own DOM element, positioned in percentages of a pinned
+stage (separate desktop and mobile coordinates), revealed by a scroll trigger
+and never moved again for the rest of the chapter. Scroll drives one data
+attribute per layer plus two inline styles per chapter — no animation
+library, no per-frame React state. `prefers-reduced-motion` un-pins every
+chapter and renders each plate complete and static.
+
+**Watch out:** `globals.css` sets `html, body { overflow-x: hidden }`, which
+makes body a scroll container and silently disables `position: sticky`
+everywhere inside it. `components/field-guide/LayeredFieldGuide.tsx` scopes
+`overflow-x: clip` to this page to get the pin back. Any future pinned-scroll
+work on the site will hit the same wall.
+
+### Media
+Reuses the Media Library and the `media` bucket. `uploadAdminMedia()` gained
+client-side type/size validation mirroring the bucket's own limits, and the
+Media Library refuses to delete a file a guide still references
+(`vd_field_guide_media_usage()`). Supabase JS v2 storage exposes no upload
+progress, so the uploader shows an indeterminate state rather than a bar.
+
+### Still open
+- Layer reordering is arrow-buttons in the stack list; the preview supports
+  drag-to-position but the list itself is not drag-sortable.
+- One guide is seeded (`drakensberg-field-guide`) whose main specimen images
+  are Unsplash URLs, same as `lib/reserves.ts` and the blog. Replace them
+  with cut-out transparent PNGs for the intended look — the detail layers
+  already ship as local SVG line art in `frontend/public/field-guide/`.

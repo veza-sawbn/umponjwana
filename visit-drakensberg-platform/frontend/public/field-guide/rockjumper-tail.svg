@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="420" height="300" viewBox="0 0 420 300" fill="none">
+  <!-- Rectrices, spread. Detail study. -->
+  <g stroke="#2B2418" stroke-width="1.5" fill="#F6F1E6" fill-opacity="0.4" stroke-linejoin="round">
+    <path d="M42 250c46-70 100-126 160-166 12-8 22-6 24 6 4 26-6 62-26 98-24 44-62 76-108 88-32 8-56 0-50-26Z"/>
+    <path d="M78 262c50-66 108-118 170-154 12-7 22-4 23 8 2 26-10 60-32 94-26 42-66 72-112 82-32 6-55-4-49-30Z"/>
+    <path d="M118 270c52-62 112-110 176-142 12-6 21-2 21 10 0 26-14 58-38 90-28 40-70 68-116 76-32 5-54-8-43-34Z"/>
+  </g>
+  <g stroke="#2B2418" stroke-width="0.8" opacity="0.55" stroke-linecap="round">
+    <path d="M96 232c46-58 98-104 152-136"/>
+    <path d="M136 246c48-54 102-98 156-128"/>
+    <path d="M176 254c50-50 104-92 158-120"/>
+  </g>
+</svg>
