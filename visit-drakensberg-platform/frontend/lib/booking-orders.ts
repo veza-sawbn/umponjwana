@@ -41,7 +41,14 @@ export type SupplierOrder = {
   nights?: number
   items: OrderItem[]
   orderTotal: number
-  status: 'confirmed' | 'cancelled'
+  /**
+   * Mirrors the parent booking's status. 'requested' is a request-to-book
+   * stay waiting on this supplier's answer — the one state where the
+   * supplier is being asked something rather than told (see
+   * vd_decide_stay_request and lib/stay-requests.ts); 'pending' means they
+   * confirmed the dates and the guest is paying.
+   */
+  status: 'requested' | 'pending' | 'confirmed' | 'cancelled' | 'declined' | 'expired'
   createdAt: string
 }
 

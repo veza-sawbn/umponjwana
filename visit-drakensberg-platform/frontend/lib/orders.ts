@@ -329,6 +329,36 @@ export async function createOrderForBooking(booking: SavedBooking): Promise<Crea
   )
 }
 
+/**
+ * The Master Order for a booking, creating it if it doesn't exist yet.
+ *
+ * A request-to-book stay has no financial object while it waits on its
+ * operator — no order, no invoice, no ledger entries for a trip that may be
+ * declined (see addBooking()). Once the operator approves and the guest goes
+ * to pay, the invoice has to exist for /api/payments/ikhokha/create to resolve
+ * it. Creating it here, from the guest's own session, keeps the order
+ * attributed to the guest — vd_create_order reads auth.uid(), so building it
+ * from the operator's or a webhook's session would file it under the wrong
+ * user.
+ *
+ * Idempotent: a second call returns the existing order rather than raising a
+ * duplicate invoice for the same booking.
+ */
+export async function ensureOrderForBooking(
+  booking: SavedBooking,
+): Promise<{ orderId: string; invoiceId: string | null }> {
+  const { data } = await supabase
+    .from('vd_orders').select('id').eq('booking_id', booking.id).maybeSingle()
+  if (data) {
+    const existing = data as { id: string }
+    const { data: invoice } = await supabase
+      .from('vd_invoices').select('id').eq('order_id', existing.id).maybeSingle()
+    return { orderId: existing.id, invoiceId: (invoice as { id: string } | null)?.id ?? null }
+  }
+  const created = await createOrderForBooking(booking)
+  return { orderId: created.orderId, invoiceId: created.invoiceId }
+}
+
 /** Cancel the financial side of an order when its booking is cancelled. */
 export async function cancelOrderForBooking(bookingId: string): Promise<void> {
   try {

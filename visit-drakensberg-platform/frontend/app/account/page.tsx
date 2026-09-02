@@ -9,16 +9,29 @@ import { getDepartures, releaseDepartureSeats } from '@/lib/departures'
 import { releaseActivityTimeslot } from '@/lib/activities'
 import { supabase } from '@/lib/auth'
 import { formatMoney } from '@/lib/allocation'
+import { holdDeadlineLabel, holdHasLapsed } from '@/lib/stay-requests'
 
 const STATUS_STYLE: Record<string, string> = {
   confirmed: 'bg-[#2d6a4f]/10 text-[#2d6a4f]',
   pending: 'bg-[#C9A96E]/15 text-[#8B6914]',
+  requested: 'bg-blue-50 text-blue-700',
+  declined: 'bg-red-50 text-red-400',
+  expired: 'bg-gray-100 text-gray-500',
   cancelled: 'bg-red-50 text-red-400',
   completed: 'bg-gray-100 text-gray-500',
 }
 
 const STATUS_ICON: Record<string, any> = {
-  confirmed: CheckCircle, pending: Clock, cancelled: XCircle, completed: CheckCircle,
+  confirmed: CheckCircle, pending: Clock, requested: Clock, declined: XCircle,
+  expired: XCircle, cancelled: XCircle, completed: CheckCircle,
+}
+
+// 'requested' and 'pending' read as internal jargon on a guest's own
+// bookings page — say what is actually happening to them instead.
+const STATUS_LABEL: Record<string, string> = {
+  requested: 'awaiting confirmation',
+  pending: 'payment due',
+  declined: 'not available',
 }
 
 function fmt(d: string) {
@@ -46,7 +59,7 @@ function BookingCard({ b, onCancel }: { b: SavedBooking; onCancel?: (b: SavedBoo
               <p className="font-sans text-xs text-gray-400 mt-0.5">Ref: {b.reference}</p>
             </div>
             <span className={`inline-flex items-center gap-1 px-2.5 py-1 font-sans text-[10px] tracking-[0.1em] uppercase shrink-0 ${STATUS_STYLE[status] || STATUS_STYLE.confirmed}`}>
-              <Icon size={9} /> {status}
+              <Icon size={9} /> {STATUS_LABEL[status] ?? status}
             </span>
           </div>
           <div className="flex flex-wrap gap-4 font-sans text-xs text-gray-500 mt-3">
@@ -62,10 +75,34 @@ function BookingCard({ b, onCancel }: { b: SavedBooking; onCancel?: (b: SavedBoo
             </p>
           )}
         </div>
+        {b.status === 'requested' && (
+          <p className="font-sans text-xs text-blue-700 mt-2 flex items-center gap-1.5">
+            <Clock size={11} /> Waiting on the property to confirm your dates — you have not been charged.
+          </p>
+        )}
+        {b.status === 'pending' && b.holdExpiresAt && (
+          <p className={`font-sans text-xs mt-2 flex items-center gap-1.5 ${holdHasLapsed(b.holdExpiresAt) ? 'text-red-500' : 'text-[#8B6914]'}`}>
+            <Clock size={11} />
+            {holdHasLapsed(b.holdExpiresAt)
+              ? 'Your payment window has passed — pay now to try to keep this booking.'
+              : `Dates confirmed — pay by ${holdDeadlineLabel(b.holdExpiresAt)} to hold your room.`}
+          </p>
+        )}
+        {b.status === 'declined' && b.declineReason && (
+          <p className="font-sans text-xs text-gray-500 mt-2 italic">{b.declineReason}</p>
+        )}
         <div className="flex items-center justify-between mt-4 pt-3 border-t border-gray-100">
           <p className="font-display italic text-2xl text-[#2d6a4f]">{formatMoney(b.total)}</p>
           <div className="flex gap-2">
-            {onCancel && status === 'confirmed' && (
+            {status === 'pending' && (
+              <Link
+                href={`/checkout/success?id=${b.id}`}
+                className="inline-flex items-center gap-1 bg-[#C9A96E] text-[#1a1a1a] px-3 py-1.5 font-sans text-xs font-medium hover:bg-[#b8935e] transition-colors"
+              >
+                Pay {formatMoney(b.total)}
+              </Link>
+            )}
+            {onCancel && (status === 'confirmed' || status === 'requested') && (
               <button
                 onClick={() => onCancel(b)}
                 className="inline-flex items-center gap-1 border border-red-200 text-red-500 px-3 py-1.5 font-sans text-xs hover:bg-red-50 transition-colors"
@@ -102,11 +139,17 @@ export default function AccountBookingsPage() {
     })
   }, [])
 
-  const upcoming = bookings.filter(b => b.status !== 'cancelled' && (b.checkOut >= today || (!b.stay && b.addons.some(a => (a.date || '') >= today))))
-  const past = bookings.filter(b => b.status === 'cancelled' || (!upcoming.includes(b)))
+  // A declined or expired request is over, the same way a cancelled booking
+  // is — it belongs under Past, not among the trips still ahead.
+  const DEAD: string[] = ['cancelled', 'declined', 'expired']
+  const upcoming = bookings.filter(b => !DEAD.includes(b.status) && (b.checkOut >= today || (!b.stay && b.addons.some(a => (a.date || '') >= today))))
+  const past = bookings.filter(b => DEAD.includes(b.status) || (!upcoming.includes(b)))
 
   async function cancelBooking(b: SavedBooking) {
-    if (!window.confirm(`Cancel booking ${b.reference}? Free cancellation applies until 48 hours before check-in.`)) return
+    const withdrawing = b.status === 'requested'
+    if (!window.confirm(withdrawing
+      ? `Withdraw request ${b.reference}? The property will be told you no longer need these dates.`
+      : `Cancel booking ${b.reference}? Free cancellation applies until 48 hours before check-in.`)) return
     try {
       await updateBookingStatus(b.id, 'cancelled', { notifySuppliers: true })
       // Release any tour departure seats and activity timeslots held by this booking.
@@ -120,7 +163,7 @@ export default function AccountBookingsPage() {
           .map(a => releaseActivityTimeslot(a.activityId!, a.date!, a.timeslotId!, a.guests).catch(() => {})),
       ])
       setBookings(prev => prev.map(x => x.id === b.id ? { ...x, status: 'cancelled' } : x))
-      toast.success('Booking cancelled. The suppliers have been notified.')
+      toast.success(withdrawing ? 'Request withdrawn.' : 'Booking cancelled. The suppliers have been notified.')
     } catch {
       toast.error('Could not cancel this booking. Please try again.')
     }

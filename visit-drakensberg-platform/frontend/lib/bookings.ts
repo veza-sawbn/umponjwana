@@ -37,7 +37,14 @@ export type SavedBooking = {
    * guessing. */
   serviceFeeRate?: number
   vatRate?: number
-  status: 'pending' | 'confirmed' | 'cancelled'
+  /**
+   * 'requested' is a question, not a sale: a request-to-book stay waiting on
+   * its operator (see lib/stay-requests.ts). It holds no inventory and has no
+   * Master Order, invoice or ledger entries — those come into being only when
+   * the operator approves and the booking becomes 'pending'. 'declined' and
+   * 'expired' are its two dead ends.
+   */
+  status: 'requested' | 'pending' | 'confirmed' | 'cancelled' | 'declined' | 'expired'
   createdAt: string
   /** The visitor session that created this booking (§21), carried through
    *  to payment confirmation so the server-side iKhokha webhook — which has
@@ -53,6 +60,12 @@ export type SavedBooking = {
    *  vd_trip_requests row to 'confirmed' alongside this booking once payment
    *  actually clears. */
   tripRequestId?: string
+  /** When an approved stay request's inventory hold lapses, ISO-8601. Set by
+   *  vd_decide_stay_request on approval; absent on an instant booking, which
+   *  the flat abandoned-checkout TTL covers instead. */
+  holdExpiresAt?: string
+  /** Why the operator turned a stay request down — shown to the guest. */
+  declineReason?: string
 }
 
 type Row = {
@@ -151,11 +164,33 @@ export async function addBooking(
   }
 
   // Split into per-supplier orders: each supplier receives only their own
-  // items and the guest details needed to deliver the service.
+  // items and the guest details needed to deliver the service. A request-to-
+  // book stay needs this too — the operator's own order row is both how they
+  // see the request and what vd_decide_stay_request authorises them against.
   try {
     await createOrdersForBooking(newBooking)
   } catch (err) {
     console.error('Order fan-out failed (booking saved):', err)
+  }
+
+  // Everything below turns a booking into a sale, and a 'requested' booking
+  // is not one yet: the operator has not agreed to the dates. No Master
+  // Order, no invoice, no ledger entries and no transport dispatched for a
+  // trip that may be declined. All of it happens once the request is
+  // approved and the guest pays (see ensureOrderForBooking in lib/orders.ts).
+  if (newBooking.status === 'requested') {
+    // The operator has to actually hear about it — a request nobody is told
+    // about is just a guest waiting in silence. This is the one notification
+    // that fires before payment, because the whole point of the request flow
+    // is that the operator answers first.
+    await Promise.all(supplierIds.map(sid =>
+      notify(sid, 'approval', `Booking request ${newBooking.reference}`,
+        `${newBooking.customerName} is asking about ${newBooking.checkIn} → ${newBooking.checkOut} `
+        + `(${newBooking.guests} guest${newBooking.guests !== 1 ? 's' : ''}). `
+        + 'They cannot pay until you confirm the dates are available.',
+        '/supplier/bookings')
+    ))
+    return { booking: newBooking, invoiceId: null }
   }
 
   // Master Order: the trip's single financial source of truth — line items

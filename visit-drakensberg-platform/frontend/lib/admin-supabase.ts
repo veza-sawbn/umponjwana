@@ -187,6 +187,10 @@ export type AdminListing = {
   supplierId: string | null
   supplierName: string
   status: string
+  /** Properties only — 'request' diverts the stay to request-to-book (see
+   *  lib/stay-requests.ts). Absent/'instant' books and charges straight
+   *  through checkout, which is what every listing does by default. */
+  bookingMode: 'instant' | 'request'
   createdAt: string
 }
 
@@ -205,8 +209,33 @@ export async function getAdminListings(): Promise<AdminListing[]> {
     supplierId: row.owner_id,
     supplierName: row.value?.supplierName ?? '—',
     status: row.status,
+    bookingMode: row.value?.bookingMode === 'request' ? 'request' : 'instant',
     createdAt: row.created_at,
   }))
+}
+
+/**
+ * Switch a property between instant booking and request-to-book.
+ *
+ * Deliberately admin/ops-only (RLS on vd_entities admits admins; a supplier
+ * editing their own property has no field for this): whether a stay sells
+ * instantly is a commercial decision about the property, not a preference its
+ * operator can flip unilaterally — otherwise instant booking quietly erodes
+ * across the marketplace one property at a time.
+ */
+export async function setAdminListingBookingMode(
+  id: string,
+  bookingMode: 'instant' | 'request',
+): Promise<void> {
+  const { data } = await supabase.from('vd_entities').select('value').eq('kind', 'property').eq('id', id).maybeSingle()
+  if (!data) return
+  const value = { ...(data.value as object), bookingMode }
+  const { error } = await supabase
+    .from('vd_entities')
+    .update({ value, updated_at: new Date().toISOString() })
+    .eq('kind', 'property')
+    .eq('id', id)
+  if (error) throw error
 }
 
 export async function setAdminListingStatus(kind: string, id: string, status: string): Promise<void> {

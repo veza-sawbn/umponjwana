@@ -8,8 +8,9 @@ import { MapPin, Star, Users, Wifi, Flame, Utensils, Car, ArrowLeft, Calendar, W
 import SmartRecommendations from '@/components/booking/SmartRecommendations'
 import RoomDetailModal, { type RoomDetail } from '@/components/listings/RoomDetailModal'
 import { useBooking } from '@/lib/booking-context'
-import { Check } from 'lucide-react'
+import { Check, Clock } from 'lucide-react'
 import type { Property } from '@/lib/properties'
+import { isRequestMode } from '@/lib/stay-requests'
 import { getRoomUnitsLeft, type Room } from '@/lib/rooms'
 import { formatMoney } from '@/lib/allocation'
 import ReadMoreText from '@/components/ui/ReadMoreText'
@@ -72,6 +73,10 @@ export default function StayDetail({ property, rooms: roomsData, id }: { propert
   const booking = useBooking()
 
   const stay = propToStay(property, roomsData)
+  // This property's operator holds the real availability and confirms dates
+  // before any payment is taken (see lib/stay-requests.ts). Say so here,
+  // before the guest builds a whole trip around it.
+  const requestOnly = isRequestMode(property)
 
   const [selectedRoom, setSelectedRoom] = useState<any>(null)
   const [showRooms, setShowRooms] = useState(false)
@@ -472,7 +477,19 @@ export default function StayDetail({ property, rooms: roomsData, id }: { propert
                   Proceed to Checkout →
                 </button>
               )}
-              <p className="font-sans text-xs text-center text-gray-400 mt-3">Free cancellation up to 48 hours before check-in</p>
+              {requestOnly ? (
+                <div className="mt-3 bg-[#2d6a4f]/5 border border-[#2d6a4f]/20 px-3 py-2.5">
+                  <p className="font-sans text-xs text-gray-600 leading-relaxed flex items-start gap-1.5">
+                    <Clock size={12} className="text-[#2d6a4f] mt-0.5 shrink-0" />
+                    <span>
+                      <span className="text-[#2d6a4f] font-medium">Confirmed by the property.</span> You won&apos;t be
+                      charged when you book — they check these dates first, then you pay to confirm.
+                    </span>
+                  </p>
+                </div>
+              ) : (
+                <p className="font-sans text-xs text-center text-gray-400 mt-3">Free cancellation up to 48 hours before check-in</p>
+              )}
 
               <div className="mt-6">
                 <SmartRecommendations

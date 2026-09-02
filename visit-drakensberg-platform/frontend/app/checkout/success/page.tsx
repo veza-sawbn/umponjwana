@@ -5,8 +5,10 @@ import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import toast from 'react-hot-toast'
 import Footer from '@/components/layout/Footer'
-import { CheckCircle, Download, Calendar, MapPin, Users, ArrowRight, Mail, Mountain, Bus, Printer, CreditCard, Loader2 } from 'lucide-react'
+import { CheckCircle, Download, Calendar, MapPin, Users, ArrowRight, Mail, Mountain, Bus, Printer, CreditCard, Loader2, Clock } from 'lucide-react'
 import { getBookingById, type SavedBooking } from '@/lib/bookings'
+import { ensureOrderForBooking } from '@/lib/orders'
+import { holdDeadlineLabel, holdHasLapsed, paymentWindowLabel } from '@/lib/stay-requests'
 import { formatMoney, formatRate } from '@/lib/allocation'
 
 function fmt(iso: string) {
@@ -51,9 +53,15 @@ function SuccessInner() {
   }, [paymentResult, id, load])
 
   async function payNow() {
-    if (!id) return
+    if (!id || !booking) return
     setPaying(true)
     try {
+      // An approved request has no Master Order yet — nothing financial is
+      // created while a request is still a question (see addBooking()). Build
+      // it here, from the guest's own session so the order is attributed to
+      // them, before asking iKhokha for a paylink against it. Idempotent, so
+      // a retried payment reuses the same invoice.
+      await ensureOrderForBooking(booking)
       const res = await fetch('/api/payments/ikhokha/create', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -100,7 +108,52 @@ function SuccessInner() {
     )
   }
 
+  // Request-to-book: the operator holds the real availability and has to
+  // confirm the dates before there is anything to pay.
+  if (booking.status === 'requested') {
+    return (
+      <div className="min-h-screen bg-[#F7F5F2] flex items-center justify-center px-6">
+        <div className="max-w-md w-full bg-white border border-gray-200 p-8 text-center">
+          <span className="font-sans text-[10px] tracking-[0.2em] uppercase text-gray-400 block mb-2">Request {booking.reference}</span>
+          <Clock size={28} className="text-[#C9A96E] mx-auto mb-4" />
+          <h1 className="font-display italic text-2xl text-[#000000] mb-2">Request sent</h1>
+          <p className="font-sans text-sm text-gray-500 leading-relaxed mb-6">
+            {booking.stay?.title ?? 'The property'} confirms availability before taking payment. You&apos;ll be
+            emailed the moment they answer — usually within a day. Once they confirm, you&apos;ll have{' '}
+            {paymentWindowLabel(booking.checkIn)} to pay while your room is held.
+            <span className="block mt-2 text-[#2d6a4f]">You have not been charged.</span>
+          </p>
+          <Link href="/account" className="font-sans text-sm text-[#2d6a4f] hover:underline">Track it in My Bookings</Link>
+        </div>
+      </div>
+    )
+  }
+
+  if (booking.status === 'declined' || booking.status === 'expired') {
+    const declined = booking.status === 'declined'
+    return (
+      <div className="min-h-screen bg-[#F7F5F2] flex items-center justify-center px-6">
+        <div className="max-w-md w-full bg-white border border-gray-200 p-8 text-center">
+          <span className="font-sans text-[10px] tracking-[0.2em] uppercase text-gray-400 block mb-2">Request {booking.reference}</span>
+          <h1 className="font-display italic text-2xl text-[#000000] mb-2">
+            {declined ? 'Dates not available' : 'Request expired'}
+          </h1>
+          <p className="font-sans text-sm text-gray-500 leading-relaxed mb-6">
+            {declined
+              ? (booking.declineReason || 'The property cannot accommodate these dates.')
+              : 'The property did not confirm your dates in time, so this request has expired.'}
+            <span className="block mt-2 text-[#2d6a4f]">You were not charged.</span>
+          </p>
+          <Link href="/stays" className="inline-block bg-[#2d6a4f] text-white px-6 py-3 font-sans text-sm hover:bg-[#235a3f] transition-colors">
+            Find another stay
+          </Link>
+        </div>
+      </div>
+    )
+  }
+
   if (booking.status !== 'confirmed') {
+    const lapsed = holdHasLapsed(booking.holdExpiresAt)
     return (
       <div className="min-h-screen bg-[#F7F5F2] flex items-center justify-center px-6">
         <div className="max-w-md w-full bg-white border border-gray-200 p-8 text-center">
@@ -119,7 +172,20 @@ function SuccessInner() {
                 {paymentResult === 'failed' ? "Payment didn't go through" : paymentResult === 'cancelled' ? 'Payment cancelled' : 'Complete your payment'}
               </h1>
               <p className="font-sans text-sm text-gray-500 leading-relaxed mb-6">
-                Your booking is on hold — the room/seats are reserved, but it won&apos;t be confirmed until payment succeeds.
+                {booking.holdExpiresAt ? (
+                  lapsed ? (
+                    <>The property confirmed your dates, but the payment window has passed and your room is no
+                    longer held. You can still try to pay — if it has since gone, we&apos;ll refund you in full.</>
+                  ) : (
+                    <>
+                      <span className="text-[#2d6a4f]">The property confirmed your dates.</span> Your room is held
+                      until <span className="font-medium">{holdDeadlineLabel(booking.holdExpiresAt)}</span> — pay
+                      before then to confirm the booking.
+                    </>
+                  )
+                ) : (
+                  <>Your booking is on hold — the room/seats are reserved, but it won&apos;t be confirmed until payment succeeds.</>
+                )}
               </p>
               <button
                 onClick={payNow}

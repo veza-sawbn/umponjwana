@@ -2,19 +2,31 @@
 
 import { useState, useEffect } from 'react'
 import toast from 'react-hot-toast'
-import { CalendarDays, Search, Phone, Mail, Users, MessageSquare, XCircle, CheckCircle2 } from 'lucide-react'
+import { CalendarDays, Search, Phone, Mail, Users, MessageSquare, XCircle, CheckCircle2, Clock, AlertTriangle } from 'lucide-react'
 import { getMyOrders, cancelOrderAsSupplier, type SupplierOrder } from '@/lib/booking-orders'
 import { getMyOrderLinesForBooking, setLineFulfilment, type OrderLine } from '@/lib/orders'
 import { getMyDepartures, releaseDepartureSeats } from '@/lib/departures'
 import { releaseActivityTimeslot } from '@/lib/activities'
 import { supabase } from '@/lib/auth'
+import { readManagedSupplierId } from '@/lib/effective-supplier'
 import { formatMoney } from '@/lib/allocation'
+import { decideStayRequest, holdDeadlineLabel, paymentWindowHours } from '@/lib/stay-requests'
 
-type Status = 'all' | 'confirmed' | 'cancelled'
+type Status = 'all' | 'requested' | 'confirmed' | 'cancelled'
 
 const STATUS_CHIP: Record<string, string> = {
+  requested: 'bg-blue-100 text-blue-700',
+  pending: 'bg-amber-100 text-amber-700',
   confirmed: 'bg-emerald-100 text-emerald-700',
+  declined: 'bg-red-100 text-red-600',
+  expired: 'bg-gray-100 text-gray-500',
   cancelled: 'bg-red-100 text-red-600',
+}
+
+// What each state means from the operator's side of the desk.
+const STATUS_LABEL: Record<string, string> = {
+  requested: 'awaiting your confirmation',
+  pending: 'guest paying',
 }
 
 function fmt(d?: string) {
@@ -30,13 +42,21 @@ export default function BookingsPage() {
   const [expanded, setExpanded] = useState<string | null>(null)
   const [linesByBooking, setLinesByBooking] = useState<Record<string, OrderLine[]>>({})
   const [linesLoading, setLinesLoading] = useState<Record<string, boolean>>({})
+  const [deciding, setDeciding] = useState<string | null>(null)
+  const [decliningId, setDecliningId] = useState<string | null>(null)
+  const [declineReason, setDeclineReason] = useState('')
 
   useEffect(() => {
     supabase.auth.getUser().then(async ({ data: { user } }) => {
       if (!user) { setLoading(false); return }
       // RLS returns only this supplier's orders — each order holds just the
-      // items this supplier delivers, never the guest's full itinerary.
-      setOrders(await getMyOrders())
+      // items this supplier delivers, never the guest's full itinerary. An
+      // operations employee managing several suppliers is admitted to all of
+      // theirs, so narrow to the one they have actually entered, the way
+      // every other supplier-portal screen does.
+      const rows = await getMyOrders()
+      const managed = readManagedSupplierId()
+      setOrders(managed ? rows.filter(o => o.supplierId === managed) : rows)
       setLoading(false)
     })
   }, [])
@@ -59,6 +79,33 @@ export default function BookingsPage() {
       toast.success('Your service was cancelled and the guest notified.')
     } catch {
       toast.error('Could not cancel this booking. Please try again.')
+    }
+  }
+
+  // Request-to-book stays: the guest asked, this operator answers. Goes
+  // through vd_decide_stay_request rather than a direct write — the decision
+  // has to touch the parent booking, which suppliers deliberately cannot
+  // reach (20260705 revoked that access; they see only their own order
+  // slice). The RPC authorises against the stay order below, re-checks the
+  // room is still free on approval, sets the payment deadline and tells the
+  // guest.
+  async function decide(o: SupplierOrder, approve: boolean) {
+    setDeciding(o.id)
+    try {
+      const result = await decideStayRequest(o.bookingId, approve, declineReason.trim())
+      setOrders(prev => prev.map(x => x.bookingId === o.bookingId ? { ...x, status: result.status } : x))
+      setDecliningId(null)
+      setDeclineReason('')
+      toast.success(approve
+        ? `Dates confirmed. ${o.customerName} has until ${holdDeadlineLabel(result.holdExpiresAt ?? undefined)} to pay.`
+        : 'Request declined and the guest told. They were never charged.')
+    } catch (e) {
+      const message = e instanceof Error ? e.message : ''
+      toast.error(/sold out/i.test(message)
+        ? 'That room is no longer free for these dates — decline the request instead.'
+        : message || 'Could not record your decision. Please try again.')
+    } finally {
+      setDeciding(null)
     }
   }
 
@@ -106,6 +153,19 @@ export default function BookingsPage() {
         <h1 className="font-display italic text-2xl text-black/90">Bookings</h1>
       </div>
 
+      {orders.some(o => o.status === 'requested') && (
+        <div className="flex items-start gap-2.5 bg-blue-50 border border-blue-200 px-4 py-3">
+          <AlertTriangle size={15} className="text-blue-600 mt-0.5 shrink-0" />
+          <p className="font-sans text-sm text-black/70">
+            <span className="font-medium">
+              {orders.filter(o => o.status === 'requested').length} booking request
+              {orders.filter(o => o.status === 'requested').length !== 1 ? 's are' : ' is'} waiting on you.
+            </span>{' '}
+            These guests can&apos;t pay until you confirm the dates are available.
+          </p>
+        </div>
+      )}
+
       <div className="flex flex-wrap gap-3">
         <div className="relative">
           <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-black/30" />
@@ -118,7 +178,7 @@ export default function BookingsPage() {
           />
         </div>
         <div className="flex gap-1.5">
-          {(['all', 'confirmed', 'cancelled'] as Status[]).map(s => (
+          {(['all', 'requested', 'confirmed', 'cancelled'] as Status[]).map(s => (
             <button
               key={s}
               onClick={() => setFilter(s)}
@@ -180,9 +240,78 @@ export default function BookingsPage() {
                     <p className="font-sans text-sm text-black/80 font-medium">{formatMoney(o.orderTotal)}</p>
                   </div>
                   <div>
-                    <span className={`font-sans text-xs px-2.5 py-1 capitalize ${STATUS_CHIP[o.status] || 'bg-gray-100 text-gray-500'}`}>{o.status}</span>
+                    <span className={`font-sans text-xs px-2.5 py-1 ${STATUS_CHIP[o.status] || 'bg-gray-100 text-gray-500'}`}>{STATUS_LABEL[o.status] ?? o.status}</span>
                   </div>
                 </button>
+
+                {/* Request-to-book: this stay isn't sold until you confirm it. */}
+                {o.status === 'requested' && (
+                  <div className="border-t border-black/6 px-5 py-4 bg-blue-50/40">
+                    <div className="flex items-start gap-2 mb-3">
+                      <Clock size={14} className="text-blue-600 mt-0.5 shrink-0" />
+                      <p className="font-sans text-xs text-black/60 leading-relaxed">
+                        {o.customerName} is asking about {fmt(o.checkIn)} → {fmt(o.checkOut)}
+                        {o.nights ? ` (${o.nights} night${o.nights !== 1 ? 's' : ''})` : ''} for {o.guests} guest{o.guests !== 1 ? 's' : ''}.
+                        They have not been charged. Confirming holds the room and gives them{' '}
+                        {paymentWindowHours(o.checkIn ?? '')} hours to pay; if they don&apos;t, it releases automatically.
+                      </p>
+                    </div>
+                    {decliningId === o.id ? (
+                      <div className="space-y-2">
+                        <textarea
+                          rows={2}
+                          value={declineReason}
+                          onChange={e => setDeclineReason(e.target.value)}
+                          placeholder="Why these dates don't work — shared with the guest (optional)…"
+                          className="w-full font-sans text-sm border border-black/10 px-3 py-2 outline-none focus:border-[#C9A96E]/50 bg-white resize-none"
+                        />
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => decide(o, false)}
+                            disabled={deciding === o.id}
+                            className="bg-red-500 text-white font-sans text-sm px-4 py-2 hover:bg-red-600 disabled:opacity-50 transition-colors"
+                          >
+                            <XCircle size={13} className="inline mr-1.5 -mt-0.5" />
+                            {deciding === o.id ? 'Declining…' : 'Decline request'}
+                          </button>
+                          <button
+                            onClick={() => { setDecliningId(null); setDeclineReason('') }}
+                            className="font-sans text-sm px-4 py-2 border border-black/10 text-black/50 hover:border-black/20 transition-colors"
+                          >
+                            Back
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="flex gap-2 flex-wrap">
+                        <button
+                          onClick={() => decide(o, true)}
+                          disabled={deciding === o.id}
+                          className="bg-[#2d6a4f] text-white font-sans text-sm px-4 py-2 hover:bg-[#235a3f] disabled:opacity-50 transition-colors"
+                        >
+                          <CheckCircle2 size={13} className="inline mr-1.5 -mt-0.5" />
+                          {deciding === o.id ? 'Confirming…' : 'Confirm availability'}
+                        </button>
+                        <button
+                          onClick={() => setDecliningId(o.id)}
+                          disabled={deciding === o.id}
+                          className="font-sans text-sm px-4 py-2 border border-red-200 text-red-500 hover:bg-red-50 disabled:opacity-50 transition-colors"
+                        >
+                          Decline
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {o.status === 'pending' && (
+                  <div className="border-t border-black/6 px-5 py-3 bg-amber-50/50">
+                    <p className="font-sans text-xs text-amber-800 flex items-center gap-1.5">
+                      <Clock size={12} /> You confirmed these dates — the room is held while {o.customerName} pays.
+                      It releases automatically if they don&apos;t.
+                    </p>
+                  </div>
+                )}
 
                 {/* Expanded details — scoped to this supplier's order only */}
                 {expanded === o.id && (
