@@ -2,13 +2,13 @@
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import Footer from '@/components/layout/Footer'
-import { X } from 'lucide-react'
+import { X, SlidersHorizontal, ChevronDown } from 'lucide-react'
 import { getTrails, trailStartPoint, trailCategory, type Trail, type TrailCategory } from '@/lib/trails'
 import { regionsMatch } from '@/lib/regions'
 import { getReserves, type Reserve } from '@/lib/reserves'
 import TrailExperiences from '@/components/experiences/TrailExperiences'
 import { getUpcomingExperiences, type TrekkingExperience } from '@/lib/experiences'
-import ExploreCard from '@/components/trails/ExploreCard'
+import TrailCardsCarousel from '@/components/trails/TrailCardsCarousel'
 import HikesHero from '@/components/trails/HikesHero'
 import { StayDistance } from '@/lib/stay-distance'
 import { ROUTE_TYPES } from '@/lib/gpx'
@@ -43,6 +43,10 @@ export default function HikesPage() {
   // a reserve can span, or be narrower than, a region.
   const [reserveId, setReserveId] = useState<string | null>(null)
   const [reserve, setReserve] = useState<Reserve | null>(null)
+  // Secondary filters (difficulty/region/route type/distance) stay collapsed
+  // behind a toggle by default — the category tabs above already narrow most
+  // browsing, so a minimalist first view doesn't need every control exposed.
+  const [filtersOpen, setFiltersOpen] = useState(false)
 
   useEffect(() => {
     getTrails().then(all => setTrails(all.filter(t => t.status === 'published')))
@@ -87,6 +91,13 @@ export default function HikesPage() {
 
   const allKms = trails.map(t => parseKm(t.distance))
   const sliderMax = allKms.length ? Math.max(...allKms) : 250
+
+  // maxDist only counts as "active" once it's actually excluding something —
+  // comparing to sliderMax directly would misfire while trails are still
+  // loading (sliderMax briefly sits at the 250 fallback, same as maxDist's
+  // initial state, so this stays correct as the real max comes in too).
+  const activeFilterCount = [diff !== 'All', region !== 'All', routeType !== 'All', maxDist < sliderMax]
+    .filter(Boolean).length
 
   return (
     <main className="bg-mist min-h-screen pt-16">
@@ -133,119 +144,124 @@ export default function HikesPage() {
           </div>
         )}
 
-        {/* Filters */}
-        <div className="flex flex-wrap items-center gap-4 mb-8">
-          <div className="flex gap-2 flex-wrap">
-            {DIFF_OPTS.map((d) => (
-              <button key={d} onClick={() => setDiff(d)}
-                className={`font-sans text-xs px-4 py-2 border transition-colors ${diff === d ? 'bg-forest border-forest text-white' : 'bg-white border-black/15 text-forest/60 hover:border-forest'}`}>
-                {d}
-              </button>
-            ))}
-          </div>
-          <select
-            value={region}
-            onChange={(e) => setRegion(e.target.value)}
-            className="font-sans text-xs border border-black/15 bg-white px-3 py-2 text-forest/70 focus:outline-none hover:border-forest transition-colors"
-            aria-label="Filter by region"
+        {/* Filters — collapsed behind a toggle by default; the category
+            tabs above already narrow most browsing. */}
+        <div className="flex flex-wrap items-center gap-4 mb-6">
+          <button
+            onClick={() => setFiltersOpen(o => !o)}
+            className={`inline-flex items-center gap-2 font-sans text-xs px-4 py-2 border transition-colors ${
+              filtersOpen ? 'bg-forest border-forest text-white' : 'bg-white border-black/15 text-forest/60 hover:border-forest'
+            }`}
+            aria-expanded={filtersOpen}
           >
-            {regionOpts.map((r) => <option key={r} value={r}>{r === 'All' ? 'All regions' : r}</option>)}
-          </select>
-          <select
-            value={routeType}
-            onChange={(e) => setRouteType(e.target.value)}
-            className="font-sans text-xs border border-black/15 bg-white px-3 py-2 text-forest/70 focus:outline-none hover:border-forest transition-colors"
-            aria-label="Filter by route type"
-          >
-            {TYPE_OPTS.map((t) => <option key={t} value={t}>{t === 'All' ? 'All route types' : t}</option>)}
-          </select>
-          <div className="flex items-center gap-3 ml-auto">
-            <span className="font-sans text-xs text-forest/40">Max {maxDist} km</span>
-            <input type="range" min={1} max={sliderMax} step={1} value={maxDist}
-              onChange={(e) => setMaxDist(Number(e.target.value))}
-              className="w-28 accent-forest" />
-          </div>
+            <SlidersHorizontal size={13} />
+            Filters
+            {activeFilterCount > 0 && (
+              <span className={`font-sans text-[10px] px-1.5 rounded-full ${filtersOpen ? 'bg-white text-forest' : 'bg-forest text-white'}`}>
+                {activeFilterCount}
+              </span>
+            )}
+            <ChevronDown size={13} className={`transition-transform ${filtersOpen ? 'rotate-180' : ''}`} />
+          </button>
           <p className="font-sans text-sm text-forest/50">
             <span className="text-forest font-medium">{filtered.length}</span> trails
           </p>
         </div>
 
+        {filtersOpen && (
+          <div className="flex flex-wrap items-center gap-4 mb-8 pb-6 border-b border-black/8">
+            <div className="flex gap-2 flex-wrap">
+              {DIFF_OPTS.map((d) => (
+                <button key={d} onClick={() => setDiff(d)}
+                  className={`font-sans text-xs px-4 py-2 border transition-colors ${diff === d ? 'bg-forest border-forest text-white' : 'bg-white border-black/15 text-forest/60 hover:border-forest'}`}>
+                  {d}
+                </button>
+              ))}
+            </div>
+            <select
+              value={region}
+              onChange={(e) => setRegion(e.target.value)}
+              className="font-sans text-xs border border-black/15 bg-white px-3 py-2 text-forest/70 focus:outline-none hover:border-forest transition-colors"
+              aria-label="Filter by region"
+            >
+              {regionOpts.map((r) => <option key={r} value={r}>{r === 'All' ? 'All regions' : r}</option>)}
+            </select>
+            <select
+              value={routeType}
+              onChange={(e) => setRouteType(e.target.value)}
+              className="font-sans text-xs border border-black/15 bg-white px-3 py-2 text-forest/70 focus:outline-none hover:border-forest transition-colors"
+              aria-label="Filter by route type"
+            >
+              {TYPE_OPTS.map((t) => <option key={t} value={t}>{t === 'All' ? 'All route types' : t}</option>)}
+            </select>
+            <div className="flex items-center gap-3 ml-auto">
+              <span className="font-sans text-xs text-forest/40">Max {maxDist} km</span>
+              <input type="range" min={1} max={sliderMax} step={1} value={maxDist}
+                onChange={(e) => setMaxDist(Number(e.target.value))}
+                className="w-28 accent-forest" />
+            </div>
+          </div>
+        )}
+
         {trails.length === 0 ? (
           <div className="py-20 text-center font-sans text-sm text-forest/30">Loading trails…</div>
         ) : (
           <>
-            {/* Table-style list */}
-            <div className="bg-white border border-black/8 divide-y divide-black/6 mb-10">
-              {filtered.map((t) => {
-                const start = trailStartPoint(t)
-                return (
-                <Link key={t.id} href={`/hikes/${t.id}`}
-                  className="group flex items-center gap-6 px-6 py-5 hover:bg-mist transition-colors">
-                  <div className="w-20 h-14 shrink-0 overflow-hidden hidden sm:block">
-                    <img src={t.image} alt={t.name} className="w-full h-full object-cover" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <h3 className="font-display text-lg text-forest group-hover:text-sage transition-colors">{t.name}</h3>
-                    <p className="font-sans text-xs text-forest/40 mt-0.5">
-                      {t.region}{t.trail_type ? ` · ${t.trail_type}` : ''}
-                      {trailCategory(t) === 'speciality_walk' && t.speciality_type ? ` · ${t.speciality_type}` : ''}
-                      {trailCategory(t) === 'multi_day_hike' ? ' · Multi-day' : ''}
-                    </p>
-                    <StayDistance lat={start?.lat} lng={start?.lng} className="mt-0.5" />
-                  </div>
-                  <div className="hidden md:flex items-center gap-8 shrink-0">
-                    <div className="text-center">
-                      <p className="font-display text-base text-forest">{t.distance}</p>
-                      <p className="font-sans text-[10px] text-forest/35 uppercase tracking-wide">Distance</p>
-                    </div>
-                    <div className="text-center">
-                      <p className="font-display text-base text-forest">{t.elevation}</p>
-                      <p className="font-sans text-[10px] text-forest/35 uppercase tracking-wide">Elevation</p>
-                    </div>
-                    <div className="text-center">
-                      <p className="font-sans text-xs font-medium" style={{ color: DIFF_COLOR[t.difficulty] }}>{t.difficulty}</p>
-                      <p className="font-sans text-[10px] text-forest/35 uppercase tracking-wide">{t.duration}</p>
-                    </div>
-                    {t.permit_required && (
-                      <span className="font-sans text-[10px] border border-gold text-gold px-2 py-0.5 uppercase tracking-wide">Permit</span>
-                    )}
-                  </div>
-                  <span className="text-forest/20 group-hover:text-gold transition-colors shrink-0">→</span>
-                </Link>
-                )
-              })}
-              {filtered.length === 0 && (
-                <div className="px-6 py-12 text-center font-sans text-sm text-forest/30">No trails match your filters</div>
-              )}
-            </div>
+            {filtered.length === 0 ? (
+              <div className="bg-white border border-black/8 px-6 py-12 text-center font-sans text-sm text-forest/30">
+                No trails match your filters
+              </div>
+            ) : (
+              <>
+                {/* Card carousel */}
+                <div className="mb-10">
+                  <TrailCardsCarousel trails={filtered} difficultyColor={DIFF_COLOR} />
+                </div>
 
-            {/* Card grid */}
-            <div className="h-px bg-black/8 mb-10" />
-            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-10">
-              {filtered.map((t) => {
-                const start = trailStartPoint(t)
-                return (
-                <ExploreCard
-                  key={t.id}
-                  href={`/hikes/${t.id}`}
-                  image={t.image}
-                  imageAlt={t.name}
-                  eyebrow={t.region}
-                  title={t.name}
-                  difficultyLabel={t.difficulty}
-                  difficultyColor={DIFF_COLOR[t.difficulty]}
-                  bottomRightBadge={trailCategory(t) === 'speciality_walk' ? t.speciality_type : undefined}
-                  routeArtworkTrail={t}
-                  meta={
-                    <>
-                      <p className="font-sans text-xs text-forest/40">{t.distance} · {t.elevation} · {t.duration}</p>
-                      <StayDistance lat={start?.lat} lng={start?.lng} className="mt-1" />
-                    </>
-                  }
-                />
-                )
-              })}
-            </div>
+                {/* Table-style list */}
+                <div className="h-px bg-black/8 mb-10" />
+                <div className="bg-white border border-black/8 divide-y divide-black/6">
+                  {filtered.map((t) => {
+                    const start = trailStartPoint(t)
+                    return (
+                    <Link key={t.id} href={`/hikes/${t.id}`}
+                      className="group flex items-center gap-6 px-6 py-5 hover:bg-mist transition-colors">
+                      <div className="w-20 h-14 shrink-0 overflow-hidden hidden sm:block">
+                        <img src={t.image} alt={t.name} className="w-full h-full object-cover" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <h3 className="font-display text-lg text-forest group-hover:text-sage transition-colors">{t.name}</h3>
+                        <p className="font-sans text-xs text-forest/40 mt-0.5">
+                          {t.region}{t.trail_type ? ` · ${t.trail_type}` : ''}
+                          {trailCategory(t) === 'speciality_walk' && t.speciality_type ? ` · ${t.speciality_type}` : ''}
+                          {trailCategory(t) === 'multi_day_hike' ? ' · Multi-day' : ''}
+                        </p>
+                        <StayDistance lat={start?.lat} lng={start?.lng} className="mt-0.5" />
+                      </div>
+                      <div className="hidden md:flex items-center gap-8 shrink-0">
+                        <div className="text-center">
+                          <p className="font-display text-base text-forest">{t.distance}</p>
+                          <p className="font-sans text-[10px] text-forest/35 uppercase tracking-wide">Distance</p>
+                        </div>
+                        <div className="text-center">
+                          <p className="font-display text-base text-forest">{t.elevation}</p>
+                          <p className="font-sans text-[10px] text-forest/35 uppercase tracking-wide">Elevation</p>
+                        </div>
+                        <div className="text-center">
+                          <p className="font-sans text-xs font-medium" style={{ color: DIFF_COLOR[t.difficulty] }}>{t.difficulty}</p>
+                          <p className="font-sans text-[10px] text-forest/35 uppercase tracking-wide">{t.duration}</p>
+                        </div>
+                        {t.permit_required && (
+                          <span className="font-sans text-[10px] border border-gold text-gold px-2 py-0.5 uppercase tracking-wide">Permit</span>
+                        )}
+                      </div>
+                      <span className="text-forest/20 group-hover:text-gold transition-colors shrink-0">→</span>
+                    </Link>
+                    )
+                  })}
+                </div>
+              </>
+            )}
 
             {/* Marketplace: upcoming trekking experiences across these trails */}
             {experienceGroups.length > 0 && (

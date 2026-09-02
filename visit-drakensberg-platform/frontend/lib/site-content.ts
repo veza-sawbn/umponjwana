@@ -113,10 +113,14 @@ export const SITE_CONTENT_DEFAULTS = {
   },
   hikes_page: {
     eyebrow: 'On foot',
-    // The hero prefixes this with the live trail count ("+160 Hikes and
-    // Trails") — see components/trails/HikesHero.tsx.
+    // Editable marketing figure, not derived from the live trail count —
+    // the published catalogue in a given environment can be smaller than the
+    // real total, so this is set (and kept current) by hand instead of
+    // silently understating it. Rendered before the heading; see
+    // components/trails/HikesHero.tsx.
+    trail_count_label: '+160',
     heading: 'Hikes and Trails',
-    subheading: 'recorded hikes across the Drakensberg, every one of them plannable and bookable through us',
+    subheading: 'recorded across the Drakensberg, every one of them plannable and bookable through us',
   },
   activities_page: {
     eyebrow: 'Things to do',
