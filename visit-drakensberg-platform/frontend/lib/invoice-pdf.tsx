@@ -46,17 +46,19 @@ export type InvoicePdfData = {
 // means no font file has to be fetched at render time — nothing for a cold
 // serverless invocation to wait on or fail to reach.
 //
-// Styled to match the plain, businesslike invoice format the operator
-// already sends customers from their invoicing tool — a neutral black/white
-// document with a single light accent band on the table header, rather than
-// the site's own green/gold branding — so a customer holding both doesn't
-// see two different companies.
+// Laid out to match the plain, businesslike invoice format the operator
+// already sends customers from their invoicing tool — same section
+// headings, same table columns, same overall shape — but kept in Visit
+// Drakensberg's own green/gold brand colours rather than adopting that
+// tool's neutral palette, so this still reads as *our* document.
 
 const INK = '#1a1a1a'
 const MUTED = '#4b5563'
 const FAINT = '#9ca3af'
 const LINE = '#e2e2e2'
-const HEAD_BG = '#EAF1FB'
+const GREEN = '#2d6a4f'
+const GOLD = '#8B6914'
+const HEAD_BG = '#EAF3EE'
 const RED = '#c0392b'
 
 const styles = StyleSheet.create({
@@ -74,7 +76,8 @@ const styles = StyleSheet.create({
   businessName: { fontFamily: 'Helvetica-Bold', fontSize: 10, color: INK, marginBottom: 4 },
   businessLine: { fontSize: 9, color: INK, lineHeight: 1.5 },
   website: { fontSize: 9, color: INK, marginTop: 8 },
-  invoiceNumber: { fontFamily: 'Helvetica-Bold', fontSize: 15, color: INK, textAlign: 'right' },
+  invoiceEyebrow: { fontSize: 8, letterSpacing: 1.4, textTransform: 'uppercase', color: GOLD, marginBottom: 3, textAlign: 'right' },
+  invoiceNumber: { fontFamily: 'Helvetica-BoldOblique', fontSize: 17, color: INK, textAlign: 'right' },
   issued: { fontSize: 9, color: INK, marginTop: 6, textAlign: 'right' },
   statusPill: { fontSize: 7.5, letterSpacing: 0.6, textTransform: 'uppercase', paddingVertical: 3, paddingHorizontal: 7, marginTop: 6, alignSelf: 'flex-end' },
   divider: { borderBottomWidth: 1, borderBottomColor: LINE, borderBottomStyle: 'solid', marginVertical: 18 },
@@ -106,7 +109,7 @@ const styles = StyleSheet.create({
   totalsFinalLabel: { fontFamily: 'Helvetica-Bold', fontSize: 9.5, color: INK },
   totalsFinalValue: { fontFamily: 'Helvetica-Bold', fontSize: 9.5, color: INK },
   totalsPaid: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 3 },
-  totalsPaidText: { fontSize: 9, color: MUTED },
+  totalsPaidText: { fontSize: 9, color: GREEN },
   totalsDue: { flexDirection: 'row', justifyContent: 'space-between', borderTopWidth: 1, borderTopColor: LINE, borderTopStyle: 'solid', marginTop: 4, paddingTop: 7 },
   totalsDueLabel: { fontFamily: 'Helvetica-Bold', fontSize: 12, color: INK },
   totalsDueValue: { fontFamily: 'Helvetica-Bold', fontSize: 12, color: INK },
@@ -128,9 +131,9 @@ function fmtDate(d?: string | null) {
 }
 
 function statusStyle(status: string) {
-  if (status === 'paid') return { backgroundColor: '#E6F4EC', color: '#1e7a46' }
+  if (status === 'paid') return { backgroundColor: '#E6F1EC', color: GREEN }
   if (status === 'void' || status === 'refunded') return { backgroundColor: '#FBEAEA', color: RED }
-  return { backgroundColor: '#FBF3E4', color: '#8B6914' }
+  return { backgroundColor: '#F6F1E4', color: GOLD }
 }
 
 function InvoiceDocument({ invoice, order, receipts, business, siteUrl }: InvoicePdfData) {
@@ -156,6 +159,7 @@ function InvoiceDocument({ invoice, order, receipts, business, siteUrl }: Invoic
             {!!website && <Text style={styles.website}>Website: {website}</Text>}
           </View>
           <View>
+            <Text style={styles.invoiceEyebrow}>{invoice.status === 'void' ? 'Void Invoice' : 'Tax Invoice'}</Text>
             <Text style={styles.invoiceNumber}>Invoice #{invoice.invoice_number}</Text>
             <Text style={styles.issued}>Issue Date: {fmtDate(invoice.issued_at)}</Text>
             <Text style={[styles.statusPill, { backgroundColor: st.backgroundColor, color: st.color }]}>
@@ -227,8 +231,8 @@ function InvoiceDocument({ invoice, order, receipts, business, siteUrl }: Invoic
               <Text style={styles.totalsFinalValue}>{formatMoney(Number(invoice.total), invoice.currency)}</Text>
             </View>
             <View style={styles.totalsPaid}>
-              <Text style={styles.totalsMuted}>Amount paid</Text>
-              <Text style={styles.totalsMuted}>{formatMoney(Number(invoice.amount_paid), invoice.currency)}</Text>
+              <Text style={styles.totalsPaidText}>Amount paid</Text>
+              <Text style={styles.totalsPaidText}>{formatMoney(Number(invoice.amount_paid), invoice.currency)}</Text>
             </View>
             <View style={styles.totalsDue}>
               <Text style={styles.totalsDueLabel}>Balance Due</Text>
