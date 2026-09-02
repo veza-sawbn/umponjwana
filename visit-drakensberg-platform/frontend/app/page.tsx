@@ -24,6 +24,7 @@ import { getSupplierEntities } from '@/lib/supplier-entities'
 import { getActivities, type Activity } from '@/lib/activities'
 import { trackEvent, AnalyticsEvent } from '@/lib/analytics'
 import { getPublishedPosts, type BlogPost } from '@/lib/blog-posts'
+import { getPublishedPackages, type MarketplacePackage } from '@/lib/packages'
 import { formatMoney } from '@/lib/allocation'
 
 /* ─── Data ─────────────────────────────────────────────────────────────────── */
@@ -93,7 +94,8 @@ function RegionsCarousel({ regions, inEditor }: { regions: HomeCard[]; inEditor:
     <Swiper
       modules={[Autoplay]}
       loop={canLoop}
-      autoplay={inEditor || regions.length < 2 ? false : { delay: 4000, disableOnInteraction: false, pauseOnMouseEnter: true }}
+      speed={700}
+      autoplay={inEditor || regions.length < 2 ? false : { delay: 6000, disableOnInteraction: false, pauseOnMouseEnter: true }}
       slidesPerView={1.15}
       spaceBetween={12}
       grabCursor
@@ -283,6 +285,84 @@ function RegionCardBody({ region: r }: { region: HomeCard }) {
   )
 }
 
+/* ─── Journeys ───────────────────────────────────────────────────────────────── */
+
+function JourneyCardBody({ pkg }: { pkg: MarketplacePackage }) {
+  const nights = pkg.durationNights
+  return (
+    <Link href={`/packages/${pkg.id}`} className="group block bg-white border border-black/8 hover:border-forest/30 transition-colors h-full">
+      <div className="relative overflow-hidden aspect-[4/3]">
+        <img loading="lazy" decoding="async"
+          src={pkg.image || 'https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?w=900&q=80'}
+          alt={pkg.title}
+          className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+          style={{ willChange: 'transform' }}
+        />
+        {pkg.tag && (
+          <span className="absolute top-3 left-3 font-sans text-[10px] tracking-[0.15em] uppercase bg-gold text-forest px-2.5 py-1">
+            {pkg.tag}
+          </span>
+        )}
+      </div>
+      <div className="p-5">
+        <p className="font-sans text-[10px] tracking-[0.15em] uppercase text-gold mb-1">
+          {pkg.region || 'Drakensberg'} · {nights} night{nights !== 1 ? 's' : ''}
+        </p>
+        <h3 className="font-display text-xl text-forest mb-2 group-hover:text-sage transition-colors">{pkg.title}</h3>
+        <div className="flex items-center justify-between pt-3 border-t border-black/6">
+          <span>
+            {pkg.originalPrice && (
+              <span className="font-sans text-xs text-forest/30 line-through mr-1.5">{formatMoney(pkg.originalPrice)}</span>
+            )}
+            <span className="font-display text-lg text-forest">{formatMoney(pkg.pricePerPerson)}</span>
+            <span className="font-sans text-xs text-forest/40"> pp</span>
+          </span>
+          <span className="font-sans text-xs text-forest group-hover:text-gold transition-colors inline-flex items-center gap-1">
+            View <ArrowRight className="w-3 h-3" />
+          </span>
+        </div>
+      </div>
+    </Link>
+  )
+}
+
+/**
+ * Curated-journeys carousel — a promotional showcase of published packages,
+ * always presented as a Swiper carousel (unlike Regions, which only swaps
+ * to a carousel on mobile) since it's meant to read as a scrolling reel of
+ * deals rather than a fixed grid. Peeks progressively more of the next
+ * card as the viewport widens. Auto-advances on a timer (paused on
+ * touch/drag and while the visual editor is open) and resumes afterwards.
+ */
+function JourneysCarousel({ journeys }: { journeys: MarketplacePackage[] }) {
+  const editMode = useEditMode()
+  const inEditor = Boolean(editMode)
+  const canLoop = journeys.length > 3
+
+  return (
+    <Swiper
+      modules={[Autoplay]}
+      loop={canLoop}
+      speed={700}
+      autoplay={inEditor || journeys.length < 2 ? false : { delay: 6000, disableOnInteraction: false, pauseOnMouseEnter: true }}
+      spaceBetween={20}
+      grabCursor
+      slidesPerView={1.15}
+      breakpoints={{
+        640: { slidesPerView: 2.15 },
+        1024: { slidesPerView: 3.2 },
+      }}
+      className="!pb-1"
+    >
+      {journeys.map(pkg => (
+        <SwiperSlide key={pkg.id} className="h-auto self-stretch">
+          <JourneyCardBody pkg={pkg} />
+        </SwiperSlide>
+      ))}
+    </Swiper>
+  )
+}
+
 /* ─── Events & Experiences columns ──────────────────────────────────────────── */
 
 function MiniListItem({ item }: { item: MiniListItemData }) {
@@ -341,6 +421,7 @@ export default function HomePage() {
   const [newsletterEmail, setNewsletterEmail] = useState('')
   const [subscribing, setSubscribing] = useState(false)
   const [stories, setStories] = useState<BlogPost[]>([])
+  const [journeys, setJourneys] = useState<MarketplacePackage[]>([])
 
   const trailImageById = useMemo(() => new Map(trails.map(t => [t.id, t.image])), [trails])
 
@@ -405,6 +486,9 @@ export default function HomePage() {
     getPublishedPosts()
       .then(posts => setStories(posts.slice(0, 3)))
       .catch(() => setStories([]))
+    getPublishedPackages()
+      .then(all => setJourneys([...all].sort((a, b) => Number(b.featured) - Number(a.featured)).slice(0, 8)))
+      .catch(() => setJourneys([]))
   }, [])
 
   /* ── Reorderable sections ── */
@@ -687,6 +771,32 @@ export default function HomePage() {
     </EditableSection>
   )
 
+  const journeysSection = (
+    <EditableSection key="journeys" id="journeys" label="Curated Journeys" className="bg-white">
+      <div className="max-w-[1440px] mx-auto px-6 lg:px-12 py-20">
+        <div className="flex items-end justify-between mb-10">
+          <div>
+            <Editable section="home_sections" fieldKey="journeys_eyebrow" value={hs.journeys_eyebrow} label="Journeys Eyebrow" type="text">
+              <p className="font-sans text-xs tracking-[0.2em] uppercase text-forest/40 mb-2">{hs.journeys_eyebrow}</p>
+            </Editable>
+            <Editable section="home_sections" fieldKey="journeys_heading" value={hs.journeys_heading} label="Journeys Heading" type="text">
+              <h2 className="font-display text-4xl text-forest">{hs.journeys_heading}</h2>
+            </Editable>
+          </div>
+          <Link href="/packages" className="hidden sm:flex items-center gap-2 font-sans text-sm text-forest/50 hover:text-forest transition-colors">
+            All packages <ArrowRight className="w-4 h-4" />
+          </Link>
+        </div>
+
+        {journeys.length === 0 ? (
+          <p className="font-sans text-sm text-forest/40 py-8">No packages published yet — check back soon.</p>
+        ) : (
+          <JourneysCarousel journeys={journeys} />
+        )}
+      </div>
+    </EditableSection>
+  )
+
   const newsletterSection = (
     <EditableSection key="newsletter" id="newsletter" label="Newsletter" className="bg-mist">
       <div className="max-w-[1440px] mx-auto px-6 lg:px-12 py-20">
@@ -733,6 +843,7 @@ export default function HomePage() {
     stories: storiesSection,
     trails: trailsSection,
     experiences: experiencesSection,
+    journeys: journeysSection,
     newsletter: newsletterSection,
   }
 

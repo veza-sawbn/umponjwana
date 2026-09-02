@@ -171,6 +171,15 @@ export const EDITOR_PAGES: EditorPage[] = [
         note: 'Trail rows are live data from published trails — edit them under Admin → Hiking Trails.',
       },
       {
+        id: 'journeys',
+        label: 'Curated Journeys',
+        contentKey: 'home_sections',
+        reorderable: true,
+        hideable: true,
+        fields: [text('journeys_eyebrow', 'Eyebrow'), text('journeys_heading', 'Heading')],
+        note: 'Journey cards are live data from published packages — edit them under Admin → Package Builder.',
+      },
+      {
         id: 'newsletter',
         label: 'Newsletter',
         contentKey: 'home_sections',
