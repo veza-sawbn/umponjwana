@@ -370,17 +370,44 @@ export async function deleteFieldGuidePage(id: string, client: SupabaseClient = 
   if (error) throw error
 }
 
-/** Flatten the enabled chapters and layers into the page's live snapshot. */
-export async function publishFieldGuidePage(id: string, client: SupabaseClient = supabase): Promise<void> {
+// The public guide is ISR-cached for an hour (app/field-guide/[slug]/page.tsx),
+// so writing the snapshot is only half of publishing — without this the change
+// sits invisible until that window happens to expire. Best-effort and
+// non-blocking, exactly like lib/activities.ts's revalidateActivityPage: a
+// failed call leaves the publish itself intact, just stale for a while.
+function revalidateGuidePage(slug: string): void {
+  if (typeof fetch !== 'function' || !slug) return
+  fetch('/api/revalidate/field-guide', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ slug }),
+  }).catch(() => {})
+}
+
+/** Flatten the enabled chapters and layers into the page's live snapshot, then
+ *  bust the public page's cache so the change is live on the next request. */
+export async function publishFieldGuidePage(
+  id: string,
+  slug: string,
+  client: SupabaseClient = supabase,
+): Promise<void> {
   const { error } = await client.rpc('vd_publish_field_guide_page', { p_page_id: id })
   if (error) throw error
+  revalidateGuidePage(slug)
 }
 
 /** Take the page off the public site. The snapshot survives, so re-publishing
  *  with no further edits restores exactly what was live. */
-export async function unpublishFieldGuidePage(id: string, client: SupabaseClient = supabase): Promise<void> {
+export async function unpublishFieldGuidePage(
+  id: string,
+  slug: string,
+  client: SupabaseClient = supabase,
+): Promise<void> {
   const { error } = await client.rpc('vd_unpublish_field_guide_page', { p_page_id: id })
   if (error) throw error
+  // The route stays cached with the old composition otherwise, so an
+  // unpublished guide would keep serving until the window expired.
+  revalidateGuidePage(slug)
 }
 
 /** Everywhere a media file is referenced by this module — the Media Library

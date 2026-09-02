@@ -230,7 +230,7 @@ export default function AdminFieldGuideEditor({ params }: { params: { id: string
     try {
       if (timer.current) { clearTimeout(timer.current); timer.current = null }
       await flush()
-      await publishFieldGuidePage(page.id, supabase)
+      await publishFieldGuidePage(page.id, page.slug, supabase)
       const now = new Date().toISOString()
       setPage(p => p ? { ...p, status: 'published', published_at: now } : p)
       setNotice('Published. The live page now shows exactly what is in this editor.')
@@ -243,7 +243,7 @@ export default function AdminFieldGuideEditor({ params }: { params: { id: string
     if (!page || busy) return
     setBusy(true); setError(null); setNotice(null)
     try {
-      await unpublishFieldGuidePage(page.id, supabase)
+      await unpublishFieldGuidePage(page.id, page.slug, supabase)
       setPage(p => p ? { ...p, status: 'draft' } : p)
       setNotice('Taken off the public site. Publishing again restores the last published version.')
     } catch (err: any) {
@@ -252,12 +252,12 @@ export default function AdminFieldGuideEditor({ params }: { params: { id: string
   }
 
   if (loading) {
-    return <div className="p-8 py-24 flex justify-center"><Loader2 className="w-5 h-5 text-gray-300 animate-spin" /></div>
+    return <div className="p-4 sm:p-6 lg:p-8 py-24 flex justify-center"><Loader2 className="w-5 h-5 text-gray-300 animate-spin" /></div>
   }
 
   if (!page) {
     return (
-      <div className="p-8">
+      <div className="p-4 sm:p-6 lg:p-8">
         <p className="font-sans text-sm text-red-600 mb-4">{error ?? 'Guide not found.'}</p>
         <Link href="/admin/field-guide" className="font-sans text-sm text-[#2d6a4f]">← Back to Layered Field Guide</Link>
       </div>
@@ -269,7 +269,7 @@ export default function AdminFieldGuideEditor({ params }: { params: { id: string
   const enabledCount = chapters.filter(c => c.is_enabled).length
 
   return (
-    <div className="p-8">
+    <div className="p-4 sm:p-6 lg:p-8">
       <Link href="/admin/field-guide" className="inline-flex items-center gap-1.5 font-sans text-xs text-gray-400 hover:text-[#2d6a4f] transition-colors mb-4">
         <ArrowLeft size={13} /> Layered Field Guide
       </Link>
@@ -285,7 +285,7 @@ export default function AdminFieldGuideEditor({ params }: { params: { id: string
             {enabledCount} enabled
           </p>
         </div>
-        <div className="flex items-center gap-2.5">
+        <div className="flex flex-wrap items-center gap-2.5">
           <SaveBadge state={saveState} />
           {page.status === 'published' && (
             <a
@@ -324,7 +324,7 @@ export default function AdminFieldGuideEditor({ params }: { params: { id: string
         </div>
       )}
 
-      <div className="flex border-b border-gray-200 mb-6">
+      <div className="flex border-b border-gray-200 mb-6 overflow-x-auto">
         {([['specimens', 'Specimens & layers'], ['page', 'Page settings']] as const).map(([key, label]) => (
           <button
             key={key}
@@ -340,7 +340,7 @@ export default function AdminFieldGuideEditor({ params }: { params: { id: string
       </div>
 
       {tab === 'page' ? (
-        <div className="bg-white border border-gray-200 p-6 grid lg:grid-cols-[minmax(0,1fr)_300px] gap-8">
+        <div className="bg-white border border-gray-200 p-4 sm:p-6 grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_300px] gap-8">
           <div className="space-y-4">
             <SectionHeading>Page</SectionHeading>
             <div className="grid md:grid-cols-2 gap-4">
@@ -394,7 +394,7 @@ export default function AdminFieldGuideEditor({ params }: { params: { id: string
           </div>
         </div>
       ) : (
-        <div className="grid lg:grid-cols-[260px_minmax(0,1fr)] gap-6 items-start">
+        <div className="grid grid-cols-1 lg:grid-cols-[260px_minmax(0,1fr)] gap-6 items-start">
           {/* Specimen list */}
           <div className="bg-white border border-gray-200">
             <div className="px-4 py-3 border-b border-gray-100">
@@ -455,10 +455,10 @@ export default function AdminFieldGuideEditor({ params }: { params: { id: string
           {/* Active specimen */}
           {activeChapter ? (
             <div className="space-y-6 min-w-0">
-              <div className="bg-white border border-gray-200 p-6">
+              <div className="bg-white border border-gray-200 p-4 sm:p-6">
                 <ChapterFields chapter={activeChapter} onPatch={patch => patchChapter(activeChapter.id, patch)} />
               </div>
-              <div className="bg-white border border-gray-200 p-6">
+              <div className="bg-white border border-gray-200 p-4 sm:p-6">
                 <LayerStudio
                   chapter={activeChapter}
                   layers={activeLayers}
