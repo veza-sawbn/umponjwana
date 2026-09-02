@@ -65,7 +65,17 @@ export async function GET(req: Request, { params }: { params: { id: string } }) 
   const business = { ...BUSINESS_DETAILS_DEFAULTS, ...(contentRow?.value as object | undefined) }
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || new URL(req.url).origin
 
-  const pdf = await renderInvoicePdf({ invoice: shared.invoice, order: shared.order, receipts: shared.receipts, business, siteUrl })
+  let pdf: Buffer
+  try {
+    pdf = await renderInvoicePdf({ invoice: shared.invoice, order: shared.order, receipts: shared.receipts, business, siteUrl })
+  } catch (err) {
+    // Surface the real cause in the function logs rather than a bare 500 —
+    // a rendering failure here (bad font metrics, a malformed style, a
+    // bundling issue with @react-pdf/renderer's own dependencies) otherwise
+    // looks identical to "the download button doesn't work" with no lead.
+    console.error('[invoice pdf] render failed', { invoiceId: shared.invoice.id, err })
+    return NextResponse.json({ error: 'Could not generate the invoice PDF' }, { status: 500 })
+  }
 
   return new NextResponse(new Uint8Array(pdf), {
     headers: {
