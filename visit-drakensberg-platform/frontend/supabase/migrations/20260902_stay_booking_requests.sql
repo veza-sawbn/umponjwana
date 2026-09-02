@@ -213,11 +213,16 @@ begin
     raise exception 'no stay on this booking to decide on';
   end if;
 
-  if not (
+  -- coalesce for the same reason as in vd_expire_stay_requests below: a
+  -- NULL inside the disjunction would make `not (...)` NULL, and IF would
+  -- wave it through. The auth.uid() guard above already rules that out here,
+  -- but an authorisation check should not depend on a check three
+  -- statements away staying where it is.
+  if not coalesce(
     v_supplier = auth.uid()
     or has_supplier_permission(v_supplier, 'manage_bookings')
     or is_admin()
-  ) then
+  , false) then
     raise exception 'not authorised to decide this request';
   end if;
 
@@ -355,7 +360,11 @@ declare
   v_booking record;
   v_count int := 0;
 begin
-  if not (is_admin() or auth.role() = 'service_role') then
+  -- coalesce, not a bare `not (...)`: auth.role() is NULL on a direct
+  -- database connection, and `not (false or NULL)` is NULL, which IF treats
+  -- as false — so the bare form lets an unauthenticated caller straight
+  -- through the guard it looks like it is enforcing.
+  if not coalesce(is_admin() or auth.role() = 'service_role', false) then
     raise exception 'admin or service role only';
   end if;
 
