@@ -10,6 +10,7 @@ import { getReserves, type Reserve } from '@/lib/reserves'
 import TrailExperiences from '@/components/experiences/TrailExperiences'
 import { getUpcomingExperiences, type TrekkingExperience } from '@/lib/experiences'
 import ExploreCard from '@/components/trails/ExploreCard'
+import NewsletterSignup from '@/components/marketing/NewsletterSignup'
 import { StayDistance } from '@/lib/stay-distance'
 import { ROUTE_TYPES } from '@/lib/gpx'
 
@@ -88,10 +89,42 @@ export default function HikesPage() {
   const allKms = trails.map(t => parseKm(t.distance))
   const sliderMax = allKms.length ? Math.max(...allKms) : 250
 
+  // Hero headline figure, straight off the published catalogue so it keeps
+  // itself honest as trails are added. Rounded down to the nearest ten and
+  // shown as "160+" once there are enough to round; below that the exact
+  // count reads better than "0+".
+  const trailCount = trails.length
+  const trailCountLabel = trailCount >= 10 ? `${Math.floor(trailCount / 10) * 10}+` : String(trailCount)
+
   return (
     <main className="bg-mist min-h-screen pt-16">
       {/* Header */}
-      <EditablePageHeader section="hikes_page" />
+      <EditablePageHeader section="hikes_page">
+        {trailCount > 0 && (
+          <div className="mt-8 pt-8 border-t border-white/10 flex flex-col lg:flex-row lg:items-end lg:justify-between gap-8">
+            <div>
+              <p className="font-display text-4xl text-gold leading-none mb-2">{trailCountLabel}</p>
+              <p className="font-sans text-sm text-white/50 max-w-md">
+                recorded hikes across the Drakensberg — every one of them plannable and bookable through us.
+              </p>
+            </div>
+            <div className="lg:text-right">
+              <p className="font-sans text-sm text-white/70 mb-3">
+                New trails are added all the time. Join the mailing list and we’ll email you as they land.
+              </p>
+              <NewsletterSignup
+                source="hikes_hero"
+                inputId="hikes-notify-email"
+                label="Email address for new trail alerts"
+                buttonLabel="Notify me"
+                successMessage="You’re on the list — we’ll email you as new trails are added."
+                tone="dark"
+                className="lg:ml-auto"
+              />
+            </div>
+          </div>
+        )}
+      </EditablePageHeader>
 
       <div className="max-w-[1440px] mx-auto px-6 lg:px-12 py-10">
         {reserveId && (
