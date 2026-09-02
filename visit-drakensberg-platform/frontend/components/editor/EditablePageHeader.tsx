@@ -5,10 +5,8 @@ import { useSiteSection } from '@/lib/use-site-section'
 import type { SiteContentKey } from '@/lib/site-content'
 
 // Shared page header (eyebrow / heading / subheading) driven by a site-content
-// section, with every element clickable in the admin visual editor. `children`
-// renders inside the same hero band, for pages that carry extra hero content
-// (a live stat line, a signup CTA…) that isn't part of the CMS copy.
-export default function EditablePageHeader({ section, subClassName = '', children }: { section: SiteContentKey; subClassName?: string; children?: React.ReactNode }) {
+// section, with every element clickable in the admin visual editor.
+export default function EditablePageHeader({ section, subClassName = '' }: { section: SiteContentKey; subClassName?: string }) {
   const c = useSiteSection(section) as unknown as Record<string, string>
   return (
     <EditableSection id={section} label="Page Header" className="bg-forest text-white py-16 px-6 lg:px-12">
@@ -22,7 +20,6 @@ export default function EditablePageHeader({ section, subClassName = '', childre
         <Editable section={section} fieldKey="subheading" value={c.subheading} label="Subheading" type="textarea">
           <p className={`font-sans text-sm text-white/50 ${subClassName}`}>{c.subheading}</p>
         </Editable>
-        {children}
       </div>
     </EditableSection>
   )

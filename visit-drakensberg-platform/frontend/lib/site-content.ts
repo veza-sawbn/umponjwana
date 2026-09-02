@@ -113,8 +113,10 @@ export const SITE_CONTENT_DEFAULTS = {
   },
   hikes_page: {
     eyebrow: 'On foot',
-    heading: 'Hikes & Trails',
-    subheading: 'From gentle valley walks to multi-day escarpment routes',
+    // The hero prefixes this with the live trail count ("+160 Hikes and
+    // Trails") — see components/trails/HikesHero.tsx.
+    heading: 'Hikes and Trails',
+    subheading: 'recorded hikes across the Drakensberg, every one of them plannable and bookable through us',
   },
   activities_page: {
     eyebrow: 'Things to do',
