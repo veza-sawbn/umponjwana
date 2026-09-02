@@ -12,9 +12,9 @@ import { getTours } from '@/lib/tours'
 import { getExperiencesByTrail, type TrekkingExperience } from '@/lib/experiences'
 import type { TourDate } from '@/components/tours/UpcomingDepartures'
 import { CalendarPlus } from 'lucide-react'
-import TrailPlanner from '@/components/trails/TrailPlanner'
 import RouteArtwork from '@/components/trails/RouteArtwork'
 import RouteProfileChart from '@/components/trails/RouteProfileChart'
+import RouteStats from '@/components/trails/RouteStats'
 import type { Property } from '@/lib/properties'
 import type { Activity } from '@/lib/activities'
 import { formatMoney } from '@/lib/allocation'
@@ -185,7 +185,24 @@ export default function HikeDetail({
               </div>
             )}
 
-            <TrailPlanner trail={trail} />
+            {/* Route Profile — replaces the old "Interactive Route Planner".
+                Renders for any trail with GPX track data (day hike,
+                multi-day, or speciality walk alike), not just day hikes. */}
+            {trail.analytics?.points.length ? (
+              <div>
+                <h2 className="font-display italic text-2xl text-[#000000] mb-4">Route Profile</h2>
+                {/* key={trail.id} — /hikes/[id] reuses the same component
+                    instance across a client-side navigation to a different
+                    trail (same route template), so without a key its
+                    internal state (scrub position, map-load-failed flag)
+                    would carry over from the previous trail instead of
+                    resetting for the new one. */}
+                <RouteProfileChart key={trail.id} trail={trail} />
+                <div className="mt-6">
+                  <RouteStats trail={trail} />
+                </div>
+              </div>
+            ) : null}
 
             {/* Upcoming departures */}
             <UpcomingDepartures
@@ -232,16 +249,6 @@ export default function HikeDetail({
                 </div>
               </div>
             )}
-
-            {/* Elevation / Route Profile (single-day only — multi-day trails get
-                the Daily Breakdown above instead) — driven by the trail's own
-                GPX analysis, not a decorative placeholder. */}
-            {!trail.is_multi_day && trail.analytics?.points.length ? (
-              <div>
-                <h2 className="font-display italic text-2xl text-[#000000] mb-4">Route Profile</h2>
-                <RouteProfileChart trail={trail} />
-              </div>
-            ) : null}
 
             {/* Gallery */}
             {(trail.gallery.length > 0 || trail.image) && (

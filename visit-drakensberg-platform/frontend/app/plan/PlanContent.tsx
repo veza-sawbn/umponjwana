@@ -2,7 +2,7 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { ArrowRight, Sun, Cloud, Snowflake, Leaf, Calendar, Users, MapPin, Compass, Loader2 } from 'lucide-react'
+import { ArrowRight, Calendar, Users, MapPin, Compass, Loader2 } from 'lucide-react'
 import Footer from '@/components/layout/Footer'
 import Editable from '@/components/editor/Editable'
 import { useSiteSection } from '@/lib/use-site-section'
@@ -11,50 +11,6 @@ import { getRegionNames } from '@/lib/regions'
 import { getRecommendations, type Recommendation } from '@/lib/recommendations'
 import { getUser } from '@/lib/auth'
 import { formatMoney } from '@/lib/allocation'
-
-const SEASONS = [
-  {
-    name: 'Summer',
-    months: 'Nov — Feb',
-    icon: Sun,
-    temp: '18–28°C',
-    summary: 'Peak season. Lush green landscapes, wildflowers, and afternoon thunderstorms. Waterfalls at their fullest.',
-    pros: ['Wildflowers', 'Full waterfalls', 'Long days'],
-    cons: ['Afternoon storms', 'Busiest period', 'Higher rates'],
-    color: '#C9A96E',
-  },
-  {
-    name: 'Autumn',
-    months: 'Mar — May',
-    icon: Leaf,
-    temp: '10–22°C',
-    summary: 'Ideal hiking weather. Clear skies, golden grass, and quieter trails. The best time to visit.',
-    pros: ['Best weather', 'Fewer crowds', 'Clear views'],
-    cons: ['Shorter days', 'Evenings cool quickly'],
-    color: '#4A7251',
-    recommended: true,
-  },
-  {
-    name: 'Winter',
-    months: 'Jun — Aug',
-    icon: Snowflake,
-    temp: '-5–18°C',
-    summary: 'Dry, crystal clear and cold. Snow on the high peaks. Fantastic photography conditions.',
-    pros: ['Snow & ice', 'Crystal clarity', 'Cheapest rates'],
-    cons: ['Freezing nights', 'Some passes closed', 'Short days'],
-    color: '#4A90D9',
-  },
-  {
-    name: 'Spring',
-    months: 'Sep — Oct',
-    icon: Cloud,
-    temp: '12–24°C',
-    summary: 'Grasses green up after winter burns. Newborn lambs and foals. Excellent game viewing.',
-    pros: ['Game viewing', 'Greening landscape', 'Shoulder rates'],
-    cons: ['Some trail burns', 'Variable weather'],
-    color: '#5fa37a',
-  },
-]
 
 const TRIP_TYPES = [
   {
@@ -318,55 +274,6 @@ export default function PlanContent() {
               )}
             </div>
           )}
-        </div>
-      </section>
-
-      {/* Seasons */}
-      <section className="py-20">
-        <div className="max-w-[1440px] mx-auto px-6 lg:px-12">
-          <div className="mb-10">
-            <Editable section="plan_page" fieldKey="seasons_eyebrow" value={c.seasons_eyebrow} label="Seasons Eyebrow" type="text">
-              <p className="font-sans text-xs tracking-[0.2em] uppercase text-forest/40 mb-2">{c.seasons_eyebrow}</p>
-            </Editable>
-            <Editable section="plan_page" fieldKey="seasons_heading" value={c.seasons_heading} label="Seasons Heading" type="text">
-              <h2 className="font-display text-4xl text-forest">{c.seasons_heading}</h2>
-            </Editable>
-          </div>
-
-          <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-6">
-            {SEASONS.map((s) => {
-              const Icon = s.icon
-              return (
-                <div
-                  key={s.name}
-                  className={`bg-white p-7 relative ${s.recommended ? 'ring-1 ring-gold' : ''}`}
-                >
-                  {s.recommended && (
-                    <span className="absolute -top-3 left-6 font-sans text-[10px] tracking-[0.15em] uppercase bg-gold text-forest px-3 py-1">
-                      Recommended
-                    </span>
-                  )}
-                  <Icon className="w-5 h-5 mb-4" style={{ color: s.color }} />
-                  <p className="font-display text-xl text-forest mb-1">{s.name}</p>
-                  <p className="font-sans text-xs text-forest/35 mb-1">{s.months}</p>
-                  <p className="font-sans text-xs text-forest/35 mb-4">{s.temp}</p>
-                  <p className="font-sans text-sm text-forest/60 leading-relaxed mb-5">{s.summary}</p>
-                  <div className="space-y-1.5">
-                    {s.pros.map((p) => (
-                      <p key={p} className="font-sans text-xs text-sage flex items-center gap-2">
-                        <span className="w-1 h-1 rounded-full bg-sage" />{p}
-                      </p>
-                    ))}
-                    {s.cons.map((con) => (
-                      <p key={con} className="font-sans text-xs text-forest/35 flex items-center gap-2">
-                        <span className="w-1 h-1 rounded-full bg-forest/20" />{con}
-                      </p>
-                    ))}
-                  </div>
-                </div>
-              )
-            })}
-          </div>
         </div>
       </section>
 

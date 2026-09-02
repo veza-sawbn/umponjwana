@@ -76,7 +76,7 @@ const PRIMARY_ENRICHMENT: Record<string, Pick<NavItem, 'image' | 'imageAlt' | 's
   Transport: {
     image:    'https://images.unsplash.com/photo-1501854140801-50d01698950b?w=1200&q=80',
     imageAlt: 'Road into the Drakensberg',
-    sublabel: 'Shuttles, transfers and fixed-price shuttle routes',
+    sublabel: 'Door-to-door shuttles and transfers',
   },
 }
 
@@ -272,6 +272,11 @@ export default function Navbar() {
   const role       = user?.app_metadata?.role ?? user?.user_metadata?.role
   const isSupplier = role === 'supplier'
   const isAdmin    = role === 'admin'
+  // VD Operations employees keep role='visitor' — staff_role is the signal
+  // (see middleware.ts) — same claim, just a different field, so this stays
+  // free like isAdmin/isSupplier rather than a profiles lookup.
+  const staffRole  = user?.app_metadata?.staff_role ?? user?.user_metadata?.staff_role
+  const isOps      = staffRole === 'operations'
 
   // ── Render ──────────────────────────────────────────────────────────────────
   return (
@@ -364,6 +369,12 @@ export default function Navbar() {
                           <Link href="/admin" prefetch={false} onClick={() => setDropdownOpen(false)}
                             className="flex items-center gap-2.5 px-4 py-2.5 font-sans text-sm text-forest hover:bg-mist transition-colors">
                             <LayoutDashboard className="w-4 h-4 text-forest/40" /> Admin Panel
+                          </Link>
+                        )}
+                        {isOps && (
+                          <Link href="/operations" prefetch={false} onClick={() => setDropdownOpen(false)}
+                            className="flex items-center gap-2.5 px-4 py-2.5 font-sans text-sm text-forest hover:bg-mist transition-colors">
+                            <LayoutDashboard className="w-4 h-4 text-forest/40" /> Operations Dashboard
                           </Link>
                         )}
                         {isSupplier ? (

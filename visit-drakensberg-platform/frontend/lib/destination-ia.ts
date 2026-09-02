@@ -1,4 +1,5 @@
 import type { BookingState } from './booking-context'
+import { PROPERTY_TYPES, propertyTypeSlug } from './properties'
 
 export type DestinationCategory = 'destination' | 'attraction' | 'nature' | 'experience' | 'summer' | 'winter'
 
@@ -119,6 +120,12 @@ export const DESTINATION_GRAPH_NAV: NavNode[] = [
     label: 'Stay', href: '/stays', type: 'landing_page', status: 'live',
     children: [
       { label: 'All Accommodation', href: '/stays', type: 'landing_page', status: 'live' },
+      // One sub-item per accommodation type (lib/properties.ts PROPERTY_TYPES)
+      // — a facet, not a distinct page, so it links back to /stays filtered
+      // via ?type=<slug> rather than getting its own NavNode entity.
+      ...PROPERTY_TYPES.map(t => ({
+        label: t, href: `/stays?type=${propertyTypeSlug(t)}`, type: 'landing_page' as const, status: 'live' as const,
+      })),
     ],
   },
   {
@@ -162,7 +169,6 @@ export const DESTINATION_GRAPH_NAV: NavNode[] = [
     label: 'Transport', href: '/shuttles', type: 'landing_page', status: 'live',
     children: [
       { label: 'Shuttles', href: '/shuttles', type: 'landing_page', status: 'live' },
-      { label: 'Shuttle Routes', href: '/transport', type: 'entity', status: 'live' },
     ],
   },
 ]

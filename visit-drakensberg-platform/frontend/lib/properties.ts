@@ -16,6 +16,20 @@ export const PROPERTY_TYPES = [
   'Resort', 'Glamping', 'Farm Stay',
 ]
 
+/** URL-safe segment for a property type (e.g. "Self-catering Cottage" →
+ *  "self-catering-cottage") — used by the "Stay" nav menu's per-type
+ *  sub-items and read back by /stays via propertyTypeFromSlug(). */
+export function propertyTypeSlug(type: string): string {
+  return slugify(type)
+}
+
+/** Reverses propertyTypeSlug() against the current PROPERTY_TYPES list.
+ *  Returns null for an unrecognised slug so a stray/old URL param can't
+ *  land the page on a blank filter. */
+export function propertyTypeFromSlug(slug: string): string | null {
+  return PROPERTY_TYPES.find(t => propertyTypeSlug(t) === slug) ?? null
+}
+
 export const PROPERTY_AMENITIES = [
   'Swimming Pool', 'Braai Facilities', 'Wi-Fi', 'Restaurant', 'Bar', 'Spa', 'Gym', 'Laundry',
   'Pet-Friendly', 'Wheelchair Access', 'Airport Transfers', 'Hiking Trails Access',
