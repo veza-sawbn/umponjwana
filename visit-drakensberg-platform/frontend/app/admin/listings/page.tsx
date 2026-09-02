@@ -1,9 +1,11 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { Search, Archive, Trash2, CheckCircle } from 'lucide-react'
+import { Search, Archive, Trash2, CheckCircle, Zap, Clock } from 'lucide-react'
+import toast from 'react-hot-toast'
 import {
-  getAdminListings, setAdminListingStatus, deleteAdminListing, type AdminListing,
+  getAdminListings, setAdminListingStatus, setAdminListingBookingMode,
+  deleteAdminListing, type AdminListing,
 } from '@/lib/admin-supabase'
 
 const TYPE_LABEL: Record<string, string> = {
@@ -47,6 +49,24 @@ export default function AdminListingsPage() {
   async function setStatus(l: AdminListing, status: string) {
     await setAdminListingStatus(l.kind, l.id, status)
     setListings(p => p.map(x => x.id === l.id ? { ...x, status } : x))
+  }
+
+  // Instant vs request-to-book, for properties whose operator holds the real
+  // availability and has to confirm dates before a guest is charged. Ops-set
+  // rather than supplier-set, so it stays a deliberate commercial decision.
+  async function toggleBookingMode(l: AdminListing) {
+    const next = l.bookingMode === 'request' ? 'instant' : 'request'
+    const previous = l.bookingMode
+    setListings(p => p.map(x => x.id === l.id ? { ...x, bookingMode: next } : x))
+    try {
+      await setAdminListingBookingMode(l.id, next)
+      toast.success(next === 'request'
+        ? `${l.name} now takes booking requests — guests aren't charged until the operator confirms.`
+        : `${l.name} is back to instant booking.`)
+    } catch {
+      setListings(p => p.map(x => x.id === l.id ? { ...x, bookingMode: previous } : x))
+      toast.error('Could not change the booking mode. Please try again.')
+    }
   }
 
   async function remove(l: AdminListing) {
@@ -108,7 +128,7 @@ export default function AdminListingsPage() {
         <table className="w-full min-w-[720px]">
           <thead>
             <tr className="border-b border-gray-100">
-              {['Title', 'Type', 'Supplier', 'Region', 'Status', 'Actions'].map(h => (
+              {['Title', 'Type', 'Supplier', 'Region', 'Status', 'Booking', 'Actions'].map(h => (
                 <th key={h} className="text-left px-5 py-3 font-sans text-[10px] tracking-[0.12em] uppercase text-gray-400">{h}</th>
               ))}
             </tr>
@@ -127,6 +147,25 @@ export default function AdminListingsPage() {
                 <td className="px-5 py-4 font-sans text-sm text-gray-500">{l.region}</td>
                 <td className="px-5 py-4">
                   <span className={`font-sans text-[10px] tracking-[0.1em] uppercase px-2.5 py-1 ${STATUS_STYLE[l.status] || 'bg-gray-100 text-gray-500'}`}>{l.status}</span>
+                </td>
+                <td className="px-5 py-4">
+                  {l.kind === 'property' ? (
+                    <button
+                      onClick={() => toggleBookingMode(l)}
+                      title={l.bookingMode === 'request'
+                        ? 'Guests request these dates and the operator confirms before payment. Click to switch to instant booking.'
+                        : 'Books and charges instantly. Click to require the operator to confirm availability first.'}
+                      className={`inline-flex items-center gap-1.5 px-2.5 py-1 font-sans text-[10px] tracking-[0.1em] uppercase transition-colors ${
+                        l.bookingMode === 'request'
+                          ? 'bg-blue-50 text-blue-700 hover:bg-blue-100'
+                          : 'bg-[#F7F5F2] text-gray-500 hover:bg-gray-200'
+                      }`}
+                    >
+                      {l.bookingMode === 'request' ? <><Clock size={10} /> On request</> : <><Zap size={10} /> Instant</>}
+                    </button>
+                  ) : (
+                    <span className="font-sans text-xs text-gray-300">—</span>
+                  )}
                 </td>
                 <td className="px-5 py-4">
                   <div className="flex items-center gap-1">

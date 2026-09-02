@@ -11,6 +11,8 @@ import { addBooking } from '@/lib/bookings'
 import { getDepartures, bookDepartureSeats, releaseDepartureSeats } from '@/lib/departures'
 import { bookActivityTimeslot, releaseActivityTimeslot } from '@/lib/activities'
 import { getSupplierEntities } from '@/lib/supplier-entities'
+import { getPropertyById } from '@/lib/properties'
+import { isRequestMode, paymentWindowLabel } from '@/lib/stay-requests'
 import { supabase } from '@/lib/auth'
 import { trackEvent, AnalyticsEvent, getAnalyticsIds } from '@/lib/analytics'
 import { formatMoney, formatRate } from '@/lib/allocation'
@@ -37,6 +39,15 @@ export default function CheckoutPage() {
   // below only cover the brief window before the real settings load.
   const [serviceFeeRate, setServiceFeeRate] = useState(0.12)
   const [vatRate, setVatRate] = useState(0.15)
+  // Whether the stay in this cart is a request-to-book property. Resolved
+  // before the guest commits so the whole page can say so up front, rather
+  // than surprising them after they press the button.
+  const [requestMode, setRequestMode] = useState(false)
+  // Submission waits on this the way it waits on the finance rates below:
+  // submitting before the property's booking mode is known would send a
+  // request-only stay down the instant-payment path and charge a guest for
+  // dates its operator has not agreed to.
+  const [modeResolved, setModeResolved] = useState(false)
   // Submission is blocked until the real rates are in: vd_create_order
   // independently recalculates the invoice from the database settings, so
   // submitting on the (possibly wrong) 12%/15% defaults could charge a
@@ -49,6 +60,24 @@ export default function CheckoutPage() {
       setVatRate(s.vatRate)
     }).finally(() => setSettingsLoaded(true))
   }, [])
+
+  // A request-to-book property can't be sold instantly — the operator holds
+  // the real availability and confirms the dates first. Resolved here so the
+  // page can say so before the guest commits, and so submit() knows which of
+  // the two paths it is on.
+  const stayId = booking.stay?.id
+  useEffect(() => {
+    let cancelled = false
+    setModeResolved(false)
+    if (!stayId?.startsWith('prop-')) { setRequestMode(false); setModeResolved(true); return }
+    getPropertyById(stayId)
+      .then(p => { if (!cancelled) setRequestMode(isRequestMode(p)) })
+      // A lookup failure must never quietly downgrade a request-only property
+      // into an instant sale its operator never agreed to.
+      .catch(() => { if (!cancelled) setRequestMode(true) })
+      .finally(() => { if (!cancelled) setModeResolved(true) })
+    return () => { cancelled = true }
+  }, [stayId])
 
   const isEmpty = !booking.stay && booking.addons.length === 0 && booking.shuttles.length === 0
 
@@ -130,9 +159,14 @@ export default function CheckoutPage() {
       // Reserve departure seats and activity timeslots FIRST — both atomic
       // and capacity-checked server-side, so a full departure/timeslot
       // aborts the booking cleanly before anything is persisted.
-      const allDeps = await getDepartures()
-      const departureAddons = snap.addons.filter(a => allDeps.some(d => d.id === a.id))
-      const slotAddons = snap.addons.filter(a => a.activityId && a.timeslotId && a.date)
+      // A request-to-book trip reserves nothing yet: the operator has not
+      // agreed to the dates, and holding seats for a trip that may be
+      // declined would take them from guests who can book now. This is what
+      // the guest is told beneath the button — the rest of the trip isn't
+      // held until the property confirms.
+      const allDeps = requestMode ? [] : await getDepartures()
+      const departureAddons = requestMode ? [] : snap.addons.filter(a => allDeps.some(d => d.id === a.id))
+      const slotAddons = requestMode ? [] : snap.addons.filter(a => a.activityId && a.timeslotId && a.date)
       const reserved: { id: string; seats: number }[] = []
       const reservedSlots: { activityId: string; date: string; timeslotId: string; seats: number }[] = []
       try {
@@ -166,8 +200,11 @@ export default function CheckoutPage() {
       // booking, once payment actually clears.
       const { anonId: analyticsAnonId, sessionId: analyticsSessionId } = await getAnalyticsIds()
 
-      // Persist booking as 'pending' — holds the room/seats, but isn't
+      // Persist the booking. 'pending' holds the room/seats but isn't
       // confirmed until iKhokha verifies a real payment (see the webhook).
+      // 'requested' is the request-to-book path: the operator has to confirm
+      // the dates before there is anything to pay, so it holds nothing and
+      // creates no invoice (see addBooking()).
       const { booking: saved, invoiceId } = await addBooking({
         userId: user.id,
         customerName: `${firstName} ${lastName}`.trim(),
@@ -181,13 +218,22 @@ export default function CheckoutPage() {
         serviceFeeRate,
         vatRate,
         total,
-        status: 'pending',
+        status: requestMode ? 'requested' : 'pending',
         analyticsAnonId,
         analyticsSessionId,
       })
 
       completedRef.current = true
       booking.clearBooking()
+
+      // Request-to-book: nothing is owed until the operator confirms the
+      // dates. The guest is sent to their booking's page, which tracks the
+      // request and grows a Pay button the moment it is approved.
+      if (requestMode) {
+        toast.success('Request sent — the property will confirm your dates.')
+        router.push(`/checkout/success?id=${saved.id}`)
+        return
+      }
 
       if (!invoiceId) {
         // Booking + inventory hold succeeded but the order/invoice failed —
@@ -393,13 +439,28 @@ export default function CheckoutPage() {
                   <span className="font-sans text-xs">{booking.guests} guest{booking.guests !== 1 ? 's' : ''}{nights > 0 ? ` · ${nights} night${nights !== 1 ? 's' : ''}` : ''}</span>
                 </div>
 
-                <button type="submit" disabled={!agreed || loading || !settingsLoaded} className={`w-full py-4 font-sans text-sm font-medium transition-colors ${agreed && !loading && settingsLoaded ? 'bg-[#C9A96E] text-[#000000] hover:bg-[#b8945a]' : 'bg-white/10 text-white/30 cursor-not-allowed'}`}>
-                  {loading ? 'Redirecting to payment…' : !settingsLoaded ? 'Loading rates…' : `Continue to Payment — ${formatMoney(total)}`}
+                <button type="submit" disabled={!agreed || loading || !settingsLoaded || !modeResolved} className={`w-full py-4 font-sans text-sm font-medium transition-colors ${agreed && !loading && settingsLoaded && modeResolved ? 'bg-[#C9A96E] text-[#000000] hover:bg-[#b8945a]' : 'bg-white/10 text-white/30 cursor-not-allowed'}`}>
+                  {loading
+                    ? (requestMode ? 'Sending your request…' : 'Redirecting to payment…')
+                    : !settingsLoaded || !modeResolved ? 'Loading rates…'
+                    : requestMode ? `Request to Book — ${formatMoney(total)}`
+                    : `Continue to Payment — ${formatMoney(total)}`}
                 </button>
-                <div className="flex items-center justify-center gap-2 mt-4 text-white/30">
-                  <ShieldCheck size={12} />
-                  <span className="font-sans text-xs">Secure payment · SSL encrypted</span>
-                </div>
+                {requestMode ? (
+                  <p className="font-sans text-xs text-white/50 leading-relaxed mt-4">
+                    <span className="text-[#C9A96E]">You won&apos;t be charged yet.</span> This property confirms
+                    availability before taking payment. Once they confirm, you&apos;ll have{' '}
+                    {paymentWindowLabel(booking.checkIn)} to pay while your room is held — we&apos;ll email you.
+                    {(booking.addons.length > 0 || booking.shuttles.length > 0) && (
+                      <> Anything else in this trip is requested at the same time and isn&apos;t held until then.</>
+                    )}
+                  </p>
+                ) : (
+                  <div className="flex items-center justify-center gap-2 mt-4 text-white/30">
+                    <ShieldCheck size={12} />
+                    <span className="font-sans text-xs">Secure payment · SSL encrypted</span>
+                  </div>
+                )}
               </div>
 
               <div className="bg-white border border-gray-200 p-5">

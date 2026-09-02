@@ -54,6 +54,17 @@ export type Property = {
   cancellationPolicy: string
   photos: string[]
   status: 'active' | 'draft'
+  /**
+   * How this property takes bookings.
+   *
+   * 'instant' (the default, and what an absent value means — every property
+   * that existed before this field) books and charges straight through
+   * checkout. 'request' diverts it to the request-to-book flow: the guest
+   * asks, the operator confirms the dates from their own availability, and
+   * only then is there anything to pay. Set by ops/admin on /admin/listings,
+   * not by the supplier, so it stays a deliberate commercial decision.
+   */
+  bookingMode?: 'instant' | 'request'
   createdAt: string
 } & GraphFields
 
