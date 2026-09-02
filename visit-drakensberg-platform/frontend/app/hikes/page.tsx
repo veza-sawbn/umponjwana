@@ -2,7 +2,6 @@
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import Footer from '@/components/layout/Footer'
-import EditablePageHeader from '@/components/editor/EditablePageHeader'
 import { X } from 'lucide-react'
 import { getTrails, trailStartPoint, trailCategory, type Trail, type TrailCategory } from '@/lib/trails'
 import { regionsMatch } from '@/lib/regions'
@@ -10,6 +9,7 @@ import { getReserves, type Reserve } from '@/lib/reserves'
 import TrailExperiences from '@/components/experiences/TrailExperiences'
 import { getUpcomingExperiences, type TrekkingExperience } from '@/lib/experiences'
 import ExploreCard from '@/components/trails/ExploreCard'
+import HikesHero from '@/components/trails/HikesHero'
 import { StayDistance } from '@/lib/stay-distance'
 import { ROUTE_TYPES } from '@/lib/gpx'
 
@@ -91,7 +91,7 @@ export default function HikesPage() {
   return (
     <main className="bg-mist min-h-screen pt-16">
       {/* Header */}
-      <EditablePageHeader section="hikes_page" />
+      <HikesHero trails={trails} />
 
       <div className="max-w-[1440px] mx-auto px-6 lg:px-12 py-10">
         {reserveId && (
