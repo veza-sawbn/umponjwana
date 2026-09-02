@@ -218,7 +218,13 @@ export const EDITOR_PAGES: EditorPage[] = [
     label: 'Hikes',
     path: '/hikes',
     sections: [
-      pageHeader('hikes_page', 'hikes_page'),
+      {
+        ...pageHeader('hikes_page', 'hikes_page'),
+        fields: [
+          text('trail_count_label', 'Trail Count (e.g. "+160")'),
+          text('eyebrow', 'Eyebrow'), text('heading', 'Heading'), textarea('subheading', 'Subheading'),
+        ],
+      },
       { id: 'hikes-listings', label: 'Trails & Hikes', note: 'Trails are live data — edit them under Admin → Hiking Trails.' },
       FOOTER_SECTION,
     ],

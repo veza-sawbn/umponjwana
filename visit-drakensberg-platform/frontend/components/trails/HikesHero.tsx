@@ -34,12 +34,6 @@ export default function HikesHero({ trails }: { trails: Trail[] }) {
     .sort((a, b) => Number(b.featured) - Number(a.featured))
     .slice(0, MAX_SLIDES)
 
-  // Count line is read off the published catalogue rather than hardcoded, so
-  // it keeps itself honest as trails are added. Rounded down to the nearest
-  // ten ("+160" at 168 trails); under ten the exact figure reads better.
-  const trailCount = trails.length
-  const countLabel = trailCount >= 10 ? `+${Math.floor(trailCount / 10) * 10}` : `+${trailCount}`
-
   useEffect(() => {
     setIndex(0)
   }, [slides.length])
@@ -105,11 +99,15 @@ export default function HikesHero({ trails }: { trails: Trail[] }) {
         <Editable section="hikes_page" fieldKey="eyebrow" value={c.eyebrow} label="Eyebrow" type="text">
           <p className="font-sans text-xs tracking-[0.2em] uppercase text-white/30 mb-3">{c.eyebrow}</p>
         </Editable>
-        <Editable section="hikes_page" fieldKey="heading" value={c.heading} label="Heading" type="text">
-          <h1 className="font-display text-5xl lg:text-6xl text-white leading-none mb-4">
-            {trailCount > 0 && <span className="text-gold">{countLabel} </span>}{c.heading}
-          </h1>
-        </Editable>
+        <h1 className="font-display text-5xl lg:text-6xl text-white leading-none mb-4">
+          <Editable section="hikes_page" fieldKey="trail_count_label" value={c.trail_count_label} label='Trail Count (e.g. "+160")' type="text" as="span">
+            <span className="text-gold">{c.trail_count_label}</span>
+          </Editable>
+          {' '}
+          <Editable section="hikes_page" fieldKey="heading" value={c.heading} label="Heading" type="text" as="span">
+            {c.heading}
+          </Editable>
+        </h1>
         <Editable section="hikes_page" fieldKey="subheading" value={c.subheading} label="Subheading" type="textarea">
           <p className="font-sans text-sm text-white/60 max-w-xl">{c.subheading}</p>
         </Editable>
