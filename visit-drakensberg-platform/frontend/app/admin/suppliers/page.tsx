@@ -12,6 +12,8 @@ import type { AgreementDocument } from '@/lib/supplier-agreement'
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
 
+export type SupplierStatus = 'approved' | 'suspended' | 'rejected' | 'pending'
+
 type SupplierRow = {
   id: string
   businessName: string
@@ -21,12 +23,49 @@ type SupplierRow = {
   bio: string | null
   website: string | null
   isApproved: boolean
+  approvalStatus: SupplierStatus
   isVdManaged: boolean
   createdAt: string
   lastSignIn: string | null
 }
 
 const SUPPLIER_TYPES = ['Accommodation', 'Activity', 'Guided Tours', 'Shuttle', 'Experience']
+
+// Only 'approved' puts a supplier's content on the public site. The other three
+// all hide it — they differ in what they mean to staff, not in effect.
+const STATUS_OPTIONS: {
+  id: SupplierStatus; label: string; blurb: string
+  activeBorder: string; activeBg: string; activeText: string
+}[] = [
+  { id: 'approved',  label: 'Approved',  blurb: 'Listings live on the site',
+    activeBorder: 'border-[#2d6a4f]', activeBg: 'bg-[#2d6a4f]/5', activeText: 'text-[#2d6a4f]' },
+  { id: 'pending',   label: 'Pending',   blurb: 'Not yet reviewed — hidden',
+    activeBorder: 'border-[#C9A96E]', activeBg: 'bg-[#C9A96E]/10', activeText: 'text-[#8B6914]' },
+  { id: 'suspended', label: 'Suspended', blurb: 'Temporarily off the site',
+    activeBorder: 'border-orange-400', activeBg: 'bg-orange-50', activeText: 'text-orange-700' },
+  { id: 'rejected',  label: 'Removed',   blurb: 'Off the site for good',
+    activeBorder: 'border-red-400', activeBg: 'bg-red-50', activeText: 'text-red-600' },
+]
+
+const STATUS_LABEL: Record<SupplierStatus, string> = {
+  approved: 'Approved', pending: 'Pending', suspended: 'Suspended', rejected: 'Removed',
+}
+const STATUS_TEXT: Record<SupplierStatus, string> = {
+  approved: 'text-[#2d6a4f]', pending: 'text-[#8B6914]',
+  suspended: 'text-orange-700', rejected: 'text-red-600',
+}
+const STATUS_BADGE: Record<SupplierStatus, string> = {
+  approved: 'bg-[#2d6a4f]/10 text-[#2d6a4f]', pending: 'bg-[#C9A96E]/15 text-[#8B6914]',
+  suspended: 'bg-orange-100 text-orange-700', rejected: 'bg-red-50 text-red-500',
+}
+
+/** approval_status is authoritative; is_approved is the older boolean mirror. */
+function statusOf(approvalStatus: string | null, isApproved: boolean): SupplierStatus {
+  if (approvalStatus === 'suspended' || approvalStatus === 'rejected' || approvalStatus === 'approved' || approvalStatus === 'pending') {
+    return approvalStatus
+  }
+  return isApproved ? 'approved' : 'pending'
+}
 
 // ─── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -67,7 +106,7 @@ function SupplierDetailPanel({
   const [bio, setBio] = useState(supplier.bio ?? '')
   const [website, setWebsite] = useState(supplier.website ?? '')
   const [ownerContactEmail, setOwnerContactEmail] = useState(supplier.ownerContactEmail ?? '')
-  const [isApproved, setIsApproved] = useState(supplier.isApproved)
+  const [approvalStatus, setApprovalStatus] = useState<SupplierStatus>(supplier.approvalStatus)
   const [saving, setSaving] = useState(false)
 
   // Supplier documents
@@ -91,7 +130,7 @@ function SupplierDetailPanel({
           bio: bio || undefined,
           website: website.trim() || undefined,
           ownerContactEmail: ownerContactEmail.trim() || null,
-          isApproved,
+          approvalStatus,
         }),
       })
       const json = await res.json()
@@ -189,19 +228,49 @@ function SupplierDetailPanel({
               <p className="text-gray-800">{fmt(supplier.lastSignIn)}</p>
             </div>
             <div className="px-3 py-2.5">
-              <p className="text-gray-400 uppercase tracking-[0.1em] text-[10px] mb-0.5">Approval</p>
-              <div className="flex items-center gap-1.5">
-                <button
-                  onClick={() => setIsApproved(a => !a)}
-                  className={`relative w-8 h-4 rounded-full transition-colors ${isApproved ? 'bg-[#2d6a4f]' : 'bg-gray-300'}`}
-                >
-                  <span className={`absolute top-0.5 w-3 h-3 bg-white rounded-full transition-all ${isApproved ? 'left-[18px]' : 'left-[2px]'}`} />
-                </button>
-                <span className={isApproved ? 'text-[#2d6a4f]' : 'text-gray-400'}>
-                  {isApproved ? 'Approved' : 'Pending'}
-                </span>
-              </div>
+              <p className="text-gray-400 uppercase tracking-[0.1em] text-[10px] mb-0.5">Status</p>
+              <span className={`font-sans text-xs ${STATUS_TEXT[approvalStatus]}`}>
+                {STATUS_LABEL[approvalStatus]}
+              </span>
             </div>
+          </div>
+
+          {/* Status — the control that decides whether this supplier's content
+              is on the public site at all. Suspending or removing hides every
+              listing, room, departure, vehicle and guide profile they own
+              (vd_owner_is_listable, 20260906); their own portal still shows
+              them, so nothing is destroyed and reinstating restores it. */}
+          <div>
+            <label className={labelCls}>Status</label>
+            <div className="grid grid-cols-2 gap-2">
+              {STATUS_OPTIONS.map(opt => {
+                const on = approvalStatus === opt.id
+                return (
+                  <button
+                    key={opt.id}
+                    type="button"
+                    onClick={() => setApprovalStatus(opt.id)}
+                    className={`text-left border px-3 py-2.5 transition-colors ${
+                      on ? `${opt.activeBorder} ${opt.activeBg}` : 'border-gray-200 hover:border-gray-400'
+                    }`}
+                  >
+                    <span className={`block font-sans text-xs ${on ? opt.activeText : 'text-gray-700'}`}>
+                      {opt.label}
+                    </span>
+                    <span className="block font-sans text-[11px] text-gray-400 mt-0.5 leading-snug">
+                      {opt.blurb}
+                    </span>
+                  </button>
+                )
+              })}
+            </div>
+            {approvalStatus !== supplier.approvalStatus && (
+              <p className="font-sans text-[11px] text-amber-700 bg-amber-50 border border-amber-200 px-3 py-2 mt-2 leading-relaxed">
+                {approvalStatus === 'approved'
+                  ? 'Save to restore this supplier’s listings to the public site.'
+                  : 'Save to take every listing this supplier owns off the public site. Existing bookings are not cancelled.'}
+              </p>
+            )}
           </div>
 
           {/* Business details */}
@@ -366,7 +435,7 @@ function SupplierDetailPanel({
 export default function AdminSuppliersPage() {
   const [suppliers, setSuppliers] = useState<SupplierRow[]>([])
   const [search, setSearch] = useState('')
-  const [filter, setFilter] = useState<'all' | 'pending' | 'approved' | 'vd_managed'>('all')
+  const [filter, setFilter] = useState<'all' | 'pending' | 'approved' | 'hidden' | 'vd_managed'>('all')
   const [loading, setLoading] = useState(true)
   const [selected, setSelected] = useState<SupplierRow | null>(null)
 
@@ -376,7 +445,7 @@ export default function AdminSuppliersPage() {
       // Fetch all supplier profiles
       const { data, error } = await supabase
         .from('profiles')
-        .select('id, full_name, email, bio, is_approved, supplier_type, website, created_at')
+        .select('id, full_name, email, bio, is_approved, approval_status, supplier_type, website, created_at')
         .eq('role', 'supplier')
         .order('created_at', { ascending: false })
 
@@ -400,6 +469,7 @@ export default function AdminSuppliersPage() {
           bio: p.bio ?? null,
           website: p.website ?? null,
           isApproved: Boolean(p.is_approved),
+          approvalStatus: statusOf(p.approval_status ?? null, Boolean(p.is_approved)),
           isVdManaged,
           createdAt: p.created_at ?? '',
           lastSignIn: null, // loaded on detail open
@@ -436,8 +506,11 @@ export default function AdminSuppliersPage() {
       const matchSearch = searchable.includes(search.toLowerCase())
       const matchFilter =
         filter === 'all' ? true
-        : filter === 'pending' ? !s.isApproved
-        : filter === 'approved' ? s.isApproved
+        : filter === 'pending' ? s.approvalStatus === 'pending'
+        : filter === 'approved' ? s.approvalStatus === 'approved'
+        // Suspended and removed differ in intent, not in effect — both are off
+        // the public site — so they share one tab.
+        : filter === 'hidden' ? s.approvalStatus === 'suspended' || s.approvalStatus === 'rejected'
         : filter === 'vd_managed' ? s.isVdManaged
         : true
       return matchSearch && matchFilter
@@ -446,8 +519,9 @@ export default function AdminSuppliersPage() {
 
   const counts = {
     all: suppliers.length,
-    pending: suppliers.filter(s => !s.isApproved).length,
-    approved: suppliers.filter(s => s.isApproved).length,
+    pending: suppliers.filter(s => s.approvalStatus === 'pending').length,
+    approved: suppliers.filter(s => s.approvalStatus === 'approved').length,
+    hidden: suppliers.filter(s => s.approvalStatus === 'suspended' || s.approvalStatus === 'rejected').length,
     vd_managed: suppliers.filter(s => s.isVdManaged).length,
   }
 
@@ -455,6 +529,7 @@ export default function AdminSuppliersPage() {
     { key: 'all', label: 'All' },
     { key: 'pending', label: 'Pending approval' },
     { key: 'approved', label: 'Approved' },
+    { key: 'hidden', label: 'Suspended / Removed' },
     { key: 'vd_managed', label: 'VD Managed' },
   ]
 
@@ -465,7 +540,7 @@ export default function AdminSuppliersPage() {
           <p className="font-sans text-[10px] tracking-[0.14em] uppercase text-gray-400 mb-1">Admin Console</p>
           <h1 className="font-display italic text-3xl text-[#000000]">Suppliers</h1>
           <p className="font-sans text-sm text-gray-500 mt-1">
-            All supplier profiles — approved, pending, and VD-managed.
+            All supplier profiles. Only approved suppliers appear on the public site — suspending or removing one hides every listing they own.
           </p>
         </div>
         <button
@@ -541,9 +616,9 @@ export default function AdminSuppliersPage() {
                 <td className="px-5 py-4">{typeBadge(s.supplierType)}</td>
                 <td className="px-5 py-4">
                   <span className={`font-sans text-[10px] tracking-[0.1em] uppercase px-2.5 py-1 ${
-                    s.isApproved ? 'bg-[#2d6a4f]/10 text-[#2d6a4f]' : 'bg-[#C9A96E]/15 text-[#8B6914]'
+                    STATUS_BADGE[s.approvalStatus]
                   }`}>
-                    {s.isApproved ? 'Approved' : 'Pending'}
+                    {STATUS_LABEL[s.approvalStatus]}
                   </span>
                 </td>
                 <td className="px-5 py-4 font-sans text-xs text-gray-400">{fmt(s.createdAt)}</td>
