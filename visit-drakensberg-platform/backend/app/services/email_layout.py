@@ -15,11 +15,17 @@ site itself uses.
 
 Two rules that shape the whole file:
 
-  1. logo-email.png is WHITE artwork on a transparent background, so it is
-     invisible on anything light. It may only ever be placed on the ink bands
-     (the masthead and the footer). The same measurement rules out brand gold
-     on the card: #C9A96E is 2.3:1 on white against a 4.5:1 floor, but 9.3:1
-     on black, so gold appears on the ink bands and nowhere else.
+  1. The logo carries its own dark ground. logo-email.png is WHITE artwork on
+     transparency, so it only reads on a dark band — and relying on the cell
+     for that is not enough: clients that force-invert for dark mode (the
+     Gmail app, Outlook.com) repaint a #000000 cell white and leave the image
+     alone, which left a white wordmark on white. logo-email-onink.png is the
+     same artwork composited onto opaque ink, so the contrast lives inside the
+     image and no client can repaint it away. The ink cells also carry a
+     bgcolor attribute beside the CSS background, for clients that drop one
+     but honour the other. Gold has the same constraint by a different route:
+     #C9A96E is 2.3:1 on white against a 4.5:1 floor, but 9.3:1 on black, so
+     gold stays on the ink bands and nowhere else.
 
   2. The <style> block is a progressive enhancement, not the design. Gmail and
      Outlook drop or mangle parts of it, so every element carries the inline
@@ -46,12 +52,12 @@ FOOT_SEP = "#4A4A44"     # separators between footer links
 
 # Dark-mode counterparts. The ink bands already read correctly on a dark
 # device, so only the card and its contents flip.
-D_PAGE = "#0F1210"
-D_CARD = "#1A1D1A"
-D_BORDER = "#2C312C"
-D_TEXT = "#D9DCD6"
+D_PAGE = "#151813"
+D_CARD = "#22271F"
+D_BORDER = "#363C33"
+D_TEXT = "#DDE0DA"
 D_STRONG = "#F2F4EF"
-D_MUTED = "#9AA096"
+D_MUTED = "#A0A89A"
 
 # Montserrat Medium (500) for headings, labels and buttons; Regular (400) for
 # body copy. Gmail and most of Outlook block webfonts, so the fallback chain
@@ -100,7 +106,7 @@ _STYLE = Template("""<style>
 
     @media (max-width:620px) {
       .pad { padding-left:22px !important; padding-right:22px !important; }
-      .h1 { font-size:24px !important; }
+      .h1 { font-size:20px !important; }
       .frame { padding:14px 0 !important; }
     }
 
@@ -134,17 +140,17 @@ def _footer_block(origin: str) -> str:
     separator = f'<span style="color:{FOOT_SEP};padding:0 9px;">&middot;</span>'
     nav = separator.join(
         f'<a href="{origin}{path}" style="color:#ffffff;font-family:{FONT};'
-        f'font-weight:500;font-size:12px;letter-spacing:.04em;">{label}</a>'
+        f'font-weight:500;font-size:11.5px;letter-spacing:.04em;">{label}</a>'
         for label, path in links
     )
 
     return f"""
   <tr>
-    <td class="pad" style="background:{INK};padding:30px 40px;">
-      <p style="margin:0 0 2px;font-family:{FONT};font-weight:400;font-size:13px;color:#ffffff;">Warm regards,</p>
-      <p style="margin:0 0 20px;font-family:{FONT};font-weight:500;font-size:13px;color:{GOLD};">The Visit Drakensberg Team</p>
+    <td class="pad" bgcolor="{INK}" style="background:{INK};padding:28px 44px;">
+      <p style="margin:0 0 2px;font-family:{FONT};font-weight:400;font-size:12px;color:#ffffff;">Warm regards,</p>
+      <p style="margin:0 0 20px;font-family:{FONT};font-weight:500;font-size:12px;color:{GOLD};">The Visit Drakensberg Team</p>
       <p style="margin:0 0 18px;">{nav}</p>
-      <p style="margin:0;font-family:{FONT};font-weight:400;font-size:11.5px;line-height:1.7;color:{FOOT_TEXT};">
+      <p style="margin:0;font-family:{FONT};font-weight:400;font-size:11px;line-height:1.7;color:{FOOT_TEXT};">
         Visit Drakensberg &middot; <a href="{origin}" style="color:{FOOT_TEXT};">visitdrakensberg.com</a><br/>
         This is an automated message — please do not reply directly to this email.
       </p>
@@ -169,8 +175,8 @@ def email_shell(
     preview = preheader if preheader is not None else heading
 
     eyebrow_html = (
-        f'<p style="margin:0 0 10px;font-family:{FONT};font-weight:500;font-size:11px;'
-        f'letter-spacing:.22em;text-transform:uppercase;color:{GOLD};">{esc(eyebrow)}</p>'
+        f'<p style="margin:0 0 10px;font-family:{FONT};font-weight:500;font-size:10px;'
+        f'letter-spacing:.2em;text-transform:uppercase;color:{GOLD};">{esc(eyebrow)}</p>'
         if eyebrow else ""
     )
 
@@ -204,17 +210,17 @@ def email_shell(
                style="width:{CONTAINER}px;max-width:100%;background:{CARD};border:1px solid {BORDER};border-radius:4px;overflow:hidden;">
 
           <tr>
-            <td class="pad" style="background:{INK};padding:38px 40px 34px;">
-              <img src="{origin}/logo-email.png" width="196" alt="Visit Drakensberg"
-                   style="display:block;width:196px;height:auto;border:0;" />
-              <div style="width:34px;height:1px;background:{GOLD};margin:26px 0 16px;font-size:0;line-height:0;">&nbsp;</div>
+            <td class="pad" bgcolor="{INK}" style="background:{INK};padding:34px 44px 32px;">
+              <img src="{origin}/logo-email-onink.png" width="188" alt="Visit Drakensberg"
+                   style="display:block;width:188px;height:auto;border:0;" />
+              <div style="width:34px;height:1px;background:{GOLD};margin:22px 0 14px;font-size:0;line-height:0;">&nbsp;</div>
               {eyebrow_html}
-              <h1 class="h1" style="margin:0;font-family:{FONT};font-weight:500;font-size:28px;line-height:1.28;letter-spacing:-.01em;color:#ffffff;">{esc(heading)}</h1>
+              <h1 class="h1" style="margin:0;font-family:{FONT};font-weight:500;font-size:23px;line-height:1.4;letter-spacing:-.01em;color:#ffffff;">{esc(heading)}</h1>
             </td>
           </tr>
 
           <tr>
-            <td class="pad body-cell" style="background:{CARD};padding:36px 40px 40px;font-family:{FONT};font-weight:400;font-size:15px;line-height:1.75;color:{BODY_TEXT};">
+            <td class="pad body-cell" style="background:{CARD};padding:32px 44px 38px;font-family:{FONT};font-weight:400;font-size:14px;line-height:1.75;color:{BODY_TEXT};">
               {body_html}
             </td>
           </tr>
@@ -233,7 +239,7 @@ def greeting(name: str | None) -> str:
     """Opening line. Falls back the way the frontend's templates do."""
     return (
         f'<p class="greet" style="margin:0 0 18px;font-family:{FONT};font-weight:500;'
-        f'font-size:16px;color:{INK_TEXT};">Hi {esc(name or "there")},</p>'
+        f'font-size:14.5px;color:{INK_TEXT};">Hi {esc(name or "there")},</p>'
     )
 
 
@@ -251,8 +257,8 @@ def cta_button(href: str, label: str) -> str:
     """
     return f"""<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:32px 0 0;">
     <tr>
-      <td style="background:{SAGE};border-radius:3px;padding:15px 32px;">
-        <a href="{esc(href)}" style="display:inline-block;font-family:{FONT};font-weight:500;font-size:13.5px;letter-spacing:.06em;color:#ffffff;">{esc(label)}</a>
+      <td style="background:{SAGE};border-radius:3px;padding:14px 28px;">
+        <a href="{esc(href)}" style="display:inline-block;font-family:{FONT};font-weight:500;font-size:12.5px;letter-spacing:.06em;color:#ffffff;">{esc(label)}</a>
       </td>
     </tr>
   </table>"""
@@ -269,16 +275,16 @@ def detail_table(
     """
     body = "".join(
         f"""<tr>
-      <td class="lbl rule" style="padding:11px 0;border-bottom:1px solid {BORDER};font-family:{FONT};font-weight:400;font-size:12px;letter-spacing:.03em;color:{MUTED};">{esc(key)}</td>
-      <td class="val rule" align="right" style="padding:11px 0;border-bottom:1px solid {BORDER};font-family:{FONT};font-weight:500;font-size:13px;color:{INK_TEXT};">{esc(value)}</td>
+      <td class="lbl rule" style="padding:10px 0;border-bottom:1px solid {BORDER};font-family:{FONT};font-weight:400;font-size:11px;letter-spacing:.03em;color:{MUTED};">{esc(key)}</td>
+      <td class="val rule" align="right" style="padding:10px 0;border-bottom:1px solid {BORDER};font-family:{FONT};font-weight:500;font-size:12px;color:{INK_TEXT};">{esc(value)}</td>
     </tr>"""
         for key, value in rows
     )
 
     total_row = (
         f"""<tr>
-        <td class="lbl" style="padding:16px 0 0;font-family:{FONT};font-weight:500;font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:{MUTED};">{esc(total[0])}</td>
-        <td class="val" align="right" style="padding:16px 0 0;font-family:{FONT};font-weight:500;font-size:20px;color:{INK_TEXT};">{esc(total[1])}</td>
+        <td class="lbl" style="padding:15px 0 0;font-family:{FONT};font-weight:500;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:{MUTED};">{esc(total[0])}</td>
+        <td class="val" align="right" style="padding:15px 0 0;font-family:{FONT};font-weight:500;font-size:17px;color:{INK_TEXT};">{esc(total[1])}</td>
       </tr>"""
         if total else ""
     )
@@ -296,8 +302,8 @@ def section_label(label: str) -> str:
     card behind this.
     """
     return (
-        f'<p class="lbl" style="margin:30px 0 8px;font-family:{FONT};font-weight:500;'
-        f'font-size:10.5px;letter-spacing:.2em;text-transform:uppercase;color:{MUTED};">{esc(label)}</p>'
+        f'<p class="lbl" style="margin:28px 0 8px;font-family:{FONT};font-weight:500;'
+        f'font-size:10px;letter-spacing:.2em;text-transform:uppercase;color:{MUTED};">{esc(label)}</p>'
     )
 
 
@@ -309,7 +315,7 @@ def quote_block(text: str) -> str:
     """
     return (
         f'<div class="quote" style="margin:4px 0 8px;padding:2px 0 2px 16px;border-left:2px solid {GOLD};">'
-        f'<p style="margin:0;font-family:{FONT};font-weight:400;font-size:15px;line-height:1.7;'
+        f'<p style="margin:0;font-family:{FONT};font-weight:400;font-size:14px;line-height:1.7;'
         f'color:{BODY_TEXT};white-space:pre-wrap;">{esc(text)}</p></div>'
     )
 
@@ -318,5 +324,5 @@ def fine_print(html: str) -> str:
     """Trailing note — records, expiry, "ignore this if it wasn't you"."""
     return (
         f'<p class="fine" style="margin:24px 0 0;font-family:{FONT};font-weight:400;'
-        f'font-size:11.5px;line-height:1.7;color:{MUTED};">{html}</p>'
+        f'font-size:11px;line-height:1.7;color:{MUTED};">{html}</p>'
     )
