@@ -1,6 +1,6 @@
 import { supabaseAdmin } from './supabase-admin'
 import { sendMail } from './mailer'
-import { emailShell, ctaButton, esc, getFeaturedExperiences } from './email-layout'
+import { emailShell, ctaButton, esc } from './email-layout'
 
 // SERVER ONLY — only ever import from app/api/*/route.ts handlers.
 //
@@ -46,13 +46,11 @@ function notificationHtml(o: {
   link: string | null
   name: string | null
   origin: string
-  featured: Awaited<ReturnType<typeof getFeaturedExperiences>>
 }) {
   return emailShell({
     origin: o.origin,
     heading: o.title,
     preheader: o.body.slice(0, 140),
-    featured: o.featured,
     bodyHtml: `
       <p style="margin:0 0 4px;">Dear ${esc(o.name || 'there')},</p>
       <p style="margin:0 0 20px;white-space:pre-wrap;">${esc(o.body)}</p>
@@ -98,7 +96,6 @@ export async function notifyServer(n: ServerNotification, origin: string): Promi
       return result
     }
 
-    const featured = await getFeaturedExperiences(origin)
     const { sent, error } = await sendMail({
       to: profile.email,
       subject: n.title,
@@ -108,7 +105,6 @@ export async function notifyServer(n: ServerNotification, origin: string): Promi
         link: n.link ? `${origin}${n.link}` : null,
         name: profile.full_name,
         origin,
-        featured,
       }),
     })
     result.emailed = sent

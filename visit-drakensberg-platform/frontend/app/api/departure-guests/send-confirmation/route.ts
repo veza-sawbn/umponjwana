@@ -3,7 +3,7 @@ import { cookies } from 'next/headers'
 import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs'
 import { sendMail } from '@/lib/mailer'
 import {
-  emailShell, ctaButton, detailTable, itineraryBlock, esc, getFeaturedExperiences,
+  emailShell, ctaButton, detailTable, itineraryBlock, esc, sectionLabel, finePrint,
   type EmailItineraryDay,
 } from '@/lib/email-layout'
 import { getDepartures, type DeparturePackage } from '@/lib/departures'
@@ -123,14 +123,12 @@ export async function POST(req: Request) {
     const origin = getSiteOrigin(req)
     const tripName = tour?.name || departure.tour
     const operatorName = departure.supplierName || tour?.supplierName || 'Visit Drakensberg'
-    const featured = await getFeaturedExperiences(origin)
 
     const html = emailShell({
       origin,
       eyebrow: 'Booking Confirmed',
       heading: tripName,
       preheader: `Your booking for ${tripName} on ${fmtDate(departure.date)} is confirmed.`,
-      featured,
       bodyHtml: `
         <p style="margin:0 0 4px;">Dear ${esc(guest.name)},</p>
         <p style="margin:0 0 20px;">Your booking with <strong>${esc(operatorName)}</strong> is confirmed. Here are your trip details.</p>
@@ -143,13 +141,12 @@ export async function POST(req: Request) {
           ...(departure.guide ? ([['Guide', departure.guide]] as [string, string][]) : []),
         ])}
         ${itineraryDays.length > 0 ? `
-          <p style="margin:24px 0 8px;font-family:Arial,Helvetica,sans-serif;font-size:10px;letter-spacing:2px;text-transform:uppercase;color:#C9A96E;">Day-by-Day Itinerary</p>
+          ${sectionLabel('Day-by-day itinerary')}
           ${itineraryBlock(itineraryDays)}
         ` : ''}
         ${ctaButton(`${origin}/experiences/${departure.id}`, 'View this experience')}
-        <p style="margin:20px 0 0;font-family:Arial,Helvetica,sans-serif;font-size:11px;color:#aaaaaa;line-height:1.6;">
-          Keep this email for your records. If anything above doesn't look right, get in touch with ${esc(operatorName)} directly.
-        </p>`,
+        ${finePrint(`Keep this email for your records. If anything above doesn't look right,
+          get in touch with ${esc(operatorName)} directly.`)}`,
     })
 
     const result = await sendMail({

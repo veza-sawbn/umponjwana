@@ -3,7 +3,7 @@ import { cookies } from 'next/headers'
 import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 import { sendMail } from '@/lib/mailer'
-import { emailShell, ctaButton, esc, getFeaturedExperiences, type FeaturedExperience } from '@/lib/email-layout'
+import { emailShell, ctaButton, esc } from '@/lib/email-layout'
 
 export const dynamic = 'force-dynamic'
 
@@ -22,13 +22,11 @@ function emailHtml(o: {
   link: string | null
   name: string | null
   origin: string
-  featured: FeaturedExperience[]
 }) {
   return emailShell({
     origin: o.origin,
     heading: o.title,
     preheader: o.body.slice(0, 140),
-    featured: o.featured,
     bodyHtml: `
       <p style="margin:0 0 4px;">Dear ${esc(o.name || 'there')},</p>
       <p style="margin:0 0 20px;white-space:pre-wrap;">${esc(o.body)}</p>
@@ -57,13 +55,12 @@ export async function POST(req: Request) {
 
   const origin = process.env.NEXT_PUBLIC_SITE_URL || new URL(req.url).origin
   const link = payload.link ? `${origin}${payload.link}` : null
-  const featured = await getFeaturedExperiences(origin)
 
   const { sent, error } = await sendMail({
     to: profile.email,
     subject: payload.title,
     html: emailHtml({
-      title: payload.title, body: payload.body, link, name: profile.full_name, origin, featured,
+      title: payload.title, body: payload.body, link, name: profile.full_name, origin,
     }),
   })
 

@@ -4,7 +4,7 @@ import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 import { sendMail } from '@/lib/mailer'
 import { formatMoney as money } from '@/lib/allocation'
-import { emailShell, ctaButton, detailTable, esc, getFeaturedExperiences, type FeaturedExperience } from '@/lib/email-layout'
+import { emailShell, ctaButton, detailTable, esc, finePrint } from '@/lib/email-layout'
 
 export const dynamic = 'force-dynamic'
 
@@ -39,7 +39,6 @@ function receiptHtml(o: {
   balance: number
   invoiceUrl: string
   origin: string
-  featured: FeaturedExperience[]
 }) {
   return emailShell({
     origin: o.origin,
@@ -48,7 +47,6 @@ function receiptHtml(o: {
     preheader: o.isRefund
       ? `Refund of ${money(o.amount, o.currency)} processed against your booking.`
       : `Payment of ${money(o.amount, o.currency)} received — thank you.`,
-    featured: o.featured,
     bodyHtml: `
       <p style="margin:0 0 4px;">Dear ${esc(o.customerName || 'traveller')},</p>
       <p style="margin:0 0 20px;">
@@ -64,13 +62,10 @@ function receiptHtml(o: {
         ['Date', fmtDate(o.date)],
         ['Payment method', o.method.replace(/_/g, ' ')],
         ['Total paid to date', money(o.totalPaid, o.currency)],
-        ['Balance due', money(o.balance, o.currency)],
-      ])}
+      ], ['Balance due', money(o.balance, o.currency)])}
       ${ctaButton(o.invoiceUrl, 'View your invoice')}
-      <p style="margin:24px 0 0;font-family:Arial,Helvetica,sans-serif;font-size:11px;color:#aaaaaa;line-height:1.6;">
-        This receipt covers your single trip invoice with Visit Drakensberg — all accommodation,
-        activities, transfers and extras appear on one document. Keep this email for your records.
-      </p>`,
+      ${finePrint(`This receipt covers your single trip invoice with Visit Drakensberg — all accommodation,
+        activities, transfers and extras appear on one document. Keep this email for your records.`)}`,
   })
 }
 
@@ -122,7 +117,6 @@ export async function POST(req: Request) {
   let sendError: string | null = null
 
   if (email) {
-    const featured = await getFeaturedExperiences(origin)
     const result = await sendMail({
       to: email,
       subject: isRefund
@@ -143,7 +137,6 @@ export async function POST(req: Request) {
         balance: Number(order.outstanding_balance),
         invoiceUrl,
         origin,
-        featured,
       }),
     })
     sent = result.sent

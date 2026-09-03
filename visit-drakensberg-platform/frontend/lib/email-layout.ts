@@ -1,29 +1,62 @@
-import { getPublishedPackages } from './packages'
-import { formatMoney as money } from './allocation'
-
 // SERVER ONLY — shared presentation for every transactional email we send
-// (receipts, invoices, quotes, in-app notification mirrors).
+// (receipts, invoices, quotes, waivers, password resets, staff notifications,
+// departure confirmations, supplier agreements).
 //
-// The four send routes previously each carried their own copy of the same
-// black-header/white-card markup, so brand changes had to be made in four
+// The send routes previously each carried their own copy of the same
+// black-header/white-card markup, so brand changes had to be made in several
 // places and drifted. They now compose this shell instead.
 //
-// Email HTML is not web HTML: no external stylesheets, no <style> blocks that
-// survive Gmail, no flexbox or grid in Outlook, and SVG is stripped outright.
+// Email HTML is not web HTML: no external stylesheets that survive every
+// client, no flexbox or grid in Outlook, and SVG is stripped outright.
 // Everything here is table-based with inline styles, and the logo is a PNG
 // raster of public/logo.svg (public/logo-email.png) rather than the SVG the
 // site itself uses.
+//
+// Two rules that shape the whole file:
+//
+//   1. logo-email.png is WHITE artwork on a transparent background, so it is
+//      invisible on anything light. It may only ever be placed on the ink
+//      bands (the masthead and the footer). Same for gold text: #C9A96E
+//      measures 2.3:1 on white — far under the 4.5:1 floor — but 9.3:1 on
+//      black, so gold appears on the ink bands and nowhere else.
+//
+//   2. The <style> block is a progressive enhancement, not the design. Gmail
+//      and Outlook drop or mangle parts of it, so every element carries the
+//      inline styles it needs to stand alone; the block only adds the
+//      dark-mode and narrow-screen refinements on clients that honour it.
+//      That is also why the dark overrides all carry !important — they are
+//      competing with those inline styles.
 
-// Brand tokens, mirroring the site's palette (see globals.css / Tailwind use).
-const INK = '#000000'
-const GOLD = '#C9A96E'
-const GREEN = '#2d6a4f'
-const CREAM = '#F7F5F2'
-const BORDER = '#e5e5e5'
-const BODY_TEXT = '#444444'
-const MUTED = '#8a8a8a'
-const SERIF = 'Georgia,\'Times New Roman\',serif'
-const SANS = 'Arial,Helvetica,sans-serif'
+// Brand tokens, mirroring the site's palette (globals.css / tailwind.config.ts).
+const INK = '#000000'          // masthead and footer bands
+const INK_TEXT = '#14140F'     // headings and figures on paper
+const GOLD = '#C9A96E'         // accent — ink bands only, see note above
+const SAGE = '#4A7251'         // brand green (was #2d6a4f here, off-token)
+const CREAM = '#F7F5F2'        // page ground behind the card
+const CARD = '#FFFFFF'
+const BORDER = '#E8E5DF'
+const BODY_TEXT = '#3B3B36'
+const MUTED = '#6E6E68'
+const FOOT_TEXT = '#8E8E88'    // fine print on ink
+const FOOT_SEP = '#4A4A44'     // separators between footer links
+
+// Dark-mode counterparts. The ink bands already read correctly on a dark
+// device, so only the card and its contents flip.
+const D_PAGE = '#0F1210'
+const D_CARD = '#1A1D1A'
+const D_BORDER = '#2C312C'
+const D_TEXT = '#D9DCD6'
+const D_STRONG = '#F2F4EF'
+const D_MUTED = '#9AA096'
+
+// Montserrat Medium (500) for headings, labels and buttons; Regular (400) for
+// body copy. Gmail and most of Outlook block webfonts, so the fallback chain
+// matters as much as the request: both land on a neutral grotesque rather than
+// dropping to a serif.
+const FONT = "'Montserrat','Helvetica Neue',Helvetica,Arial,sans-serif"
+
+const CONTAINER = 640          // widest a bordered card goes before Outlook's
+                               // reading pane and Gmail mobile start clipping
 
 /**
  * Escapes text interpolated into email HTML. Customer names, trip names and
@@ -39,145 +72,104 @@ export function esc(value: unknown): string {
     .replace(/'/g, '&#39;')
 }
 
-export type FeaturedExperience = {
-  title: string
-  region: string
-  image: string
-  priceFrom: number
-  nights: number
-  url: string
-}
-
 /**
- * Published packages to promote in the email footer, newest featured first.
- * Never throws — a promo block is not worth failing a receipt over, so any
- * lookup problem simply yields no block.
+ * Webfont request plus the two enhancements the inline styles can't express:
+ * the dark palette, and the narrow-screen padding. Both are additive — a
+ * client that drops this block still renders the light design correctly.
  */
-export async function getFeaturedExperiences(origin: string, limit = 3): Promise<FeaturedExperience[]> {
-  try {
-    const published = await getPublishedPackages()
-    const ranked = [...published].sort((a, b) => Number(b.featured) - Number(a.featured))
-    return ranked
-      .filter(p => p.image && p.title)
-      .slice(0, limit)
-      .map(p => ({
-        title: p.title,
-        region: p.region,
-        // Package images are usually absolute (CDN/Unsplash); tolerate a
-        // site-relative path too, since email clients can't resolve those.
-        image: /^https?:\/\//i.test(p.image) ? p.image : `${origin}${p.image.startsWith('/') ? '' : '/'}${p.image}`,
-        priceFrom: Number(p.pricePerPerson) || 0,
-        nights: Number(p.durationNights) || 0,
-        url: `${origin}/packages/${p.id}`,
-      }))
-  } catch {
-    return []
-  }
-}
+function styleBlock(): string {
+  return `<style>
+    @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500&display=swap');
 
-function featuredBlock(items: FeaturedExperience[]): string {
-  if (items.length === 0) return ''
+    body { margin:0; padding:0; width:100%; }
+    table { border-collapse:collapse; }
+    img { border:0; outline:none; text-decoration:none; -ms-interpolation-mode:bicubic; }
+    a { text-decoration:none; }
+    /* Montserrat ships 400 and 500 only, so bold copy resolves to Medium
+       rather than a synthesised 700 that doesn't match the headings. */
+    strong, b { font-weight:500; }
 
-  const rows = items.map(x => `
-    <tr>
-      <td style="padding:0 0 14px;">
-        <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">
-          <tr>
-            <td width="96" valign="top" style="padding-right:14px;">
-              <a href="${esc(x.url)}" style="text-decoration:none;">
-                <!-- height:auto rather than a fixed box: object-fit is ignored in
-                     Outlook, which would stretch the thumbnail instead of cropping. -->
-                <img src="${esc(x.image)}" width="96" alt="${esc(x.title)}"
-                     style="display:block;width:96px;height:auto;border:0;" />
-              </a>
-            </td>
-            <td valign="top">
-              <a href="${esc(x.url)}" style="text-decoration:none;color:${INK};font-family:${SERIF};font-size:15px;font-style:italic;">${esc(x.title)}</a>
-              <p style="margin:3px 0 0;font-family:${SANS};font-size:11px;color:${MUTED};">
-                ${esc(x.region)}${x.nights > 0 ? ` &middot; ${x.nights} night${x.nights === 1 ? '' : 's'}` : ''}
-              </p>
-              ${x.priceFrom > 0 ? `<p style="margin:4px 0 0;font-family:${SANS};font-size:12px;color:${GREEN};">from ${money(x.priceFrom)} per person</p>` : ''}
-            </td>
-          </tr>
-        </table>
-      </td>
-    </tr>`).join('')
+    @media (max-width:620px) {
+      .pad { padding-left:22px !important; padding-right:22px !important; }
+      .h1 { font-size:24px !important; }
+      .frame { padding:14px 0 !important; }
+    }
 
-  return `
-  <div style="background:#ffffff;border:1px solid ${BORDER};border-top:none;padding:24px 32px 10px;">
-    <p style="margin:0 0 16px;font-family:${SANS};font-size:10px;letter-spacing:2px;text-transform:uppercase;color:${GOLD};">Featured experiences</p>
-    <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">${rows}</table>
-  </div>`
-}
-
-function footerBlock(origin: string): string {
-  return `
-  <div style="background:${INK};padding:22px 32px;">
-    <p style="margin:0 0 4px;font-family:${SERIF};font-size:13px;color:#ffffff;">Warm regards,</p>
-    <p style="margin:0 0 14px;font-family:${SERIF};font-size:13px;color:${GOLD};">The Visit Drakensberg Team</p>
-    <p style="margin:0 0 12px;font-family:${SANS};font-size:11px;">
-      <a href="${origin}/packages" style="color:#ffffff;text-decoration:none;">Packages</a>
-      <span style="color:#555;">&nbsp;&middot;&nbsp;</span>
-      <a href="${origin}/hikes" style="color:#ffffff;text-decoration:none;">Hikes</a>
-      <span style="color:#555;">&nbsp;&middot;&nbsp;</span>
-      <a href="${origin}/stays" style="color:#ffffff;text-decoration:none;">Stays</a>
-      <span style="color:#555;">&nbsp;&middot;&nbsp;</span>
-      <a href="${origin}/experiences" style="color:#ffffff;text-decoration:none;">Experiences</a>
-    </p>
-    <p style="margin:0;font-family:${SANS};font-size:10px;color:#777777;line-height:1.7;">
-      Visit Drakensberg &middot; <a href="${origin}" style="color:#777777;">visitdrakensberg.com</a><br/>
-      This is an automated message — please do not reply directly to this email.
-    </p>
-  </div>`
+    @media (prefers-color-scheme: dark) {
+      .page { background:${D_PAGE} !important; }
+      .card { background:${D_CARD} !important; border-color:${D_BORDER} !important; }
+      .body-cell { background:${D_CARD} !important; color:${D_TEXT} !important; }
+      .body-cell p, .body-cell li, .body-cell td { color:${D_TEXT} !important; }
+      .greet, .val, .body-cell strong { color:${D_STRONG} !important; }
+      .lbl, .fine { color:${D_MUTED} !important; }
+      .rule { border-color:${D_BORDER} !important; }
+      .day { border-color:${D_BORDER} !important; background:${D_CARD} !important; }
+    }
+  </style>`
 }
 
 export type EmailShell = {
   origin: string
   /** Inbox preview line. Falls back to the heading when omitted. */
   preheader?: string
-  /** Small gold uppercase line above the heading. */
+  /** Small gold uppercase line above the heading, on the ink masthead. */
   eyebrow?: string
   heading: string
   /** Main content. Already-built HTML — escape any user values with esc(). */
   bodyHtml: string
-  featured?: FeaturedExperience[]
 }
 
 /** Wraps content in the branded shell shared by every transactional email. */
 export function emailShell(o: EmailShell): string {
   const preheader = o.preheader ?? o.heading
+
   return `<!doctype html>
 <html lang="en">
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
-<meta name="color-scheme" content="light only" />
+<!-- Declaring both schemes is what stops Apple Mail and the Gmail app from
+     inverting the card on their own terms; the palette below is ours. -->
+<meta name="color-scheme" content="light dark" />
+<meta name="supported-color-schemes" content="light dark" />
 <title>${esc(o.heading)}</title>
+<!-- Webfont, requested two ways because clients disagree about which they
+     honour, and hidden from Outlook's Word engine, which renders a stray
+     block of the stylesheet URL as text if it sees the link. Gmail ignores
+     both and falls back down the stack in FONT. -->
+<!--[if !mso]><!-->
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500&display=swap" />
+<!--<![endif]-->
+${styleBlock()}
 </head>
-<body style="margin:0;padding:0;background:${CREAM};">
+<body class="page" style="margin:0;padding:0;background:${CREAM};">
   <!-- Inbox preview text, hidden in the body itself. -->
   <div style="display:none;max-height:0;overflow:hidden;opacity:0;mso-hide:all;">${esc(preheader)}</div>
-  <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background:${CREAM};">
+  <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" class="page" style="background:${CREAM};">
     <tr>
-      <td align="center" style="padding:32px 16px;">
-        <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="560" style="width:560px;max-width:100%;">
-          <tr><td>
+      <td align="center" class="frame" style="padding:28px 14px;">
+        <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="${CONTAINER}" class="card"
+               style="width:${CONTAINER}px;max-width:100%;background:${CARD};border:1px solid ${BORDER};border-radius:4px;overflow:hidden;">
 
-            <div style="background:${INK};padding:30px 32px;">
-              <img src="${o.origin}/logo-email.png" width="210" alt="Visit Drakensberg"
-                   style="display:block;width:210px;height:auto;border:0;" />
-              ${o.eyebrow ? `<p style="margin:16px 0 0;font-family:${SANS};font-size:10px;letter-spacing:3px;text-transform:uppercase;color:${GOLD};">${esc(o.eyebrow)}</p>` : ''}
-              <h1 style="margin:${o.eyebrow ? '6px' : '16px'} 0 0;font-family:${SERIF};font-style:italic;font-weight:normal;font-size:26px;line-height:1.25;color:#ffffff;">${esc(o.heading)}</h1>
-            </div>
+          <tr>
+            <td class="pad" style="background:${INK};padding:38px 40px 34px;">
+              <img src="${o.origin}/logo-email.png" width="196" alt="Visit Drakensberg"
+                   style="display:block;width:196px;height:auto;border:0;" />
+              <div style="width:34px;height:1px;background:${GOLD};margin:26px 0 16px;font-size:0;line-height:0;">&nbsp;</div>
+              ${o.eyebrow ? `<p style="margin:0 0 10px;font-family:${FONT};font-weight:500;font-size:11px;letter-spacing:.22em;text-transform:uppercase;color:${GOLD};">${esc(o.eyebrow)}</p>` : ''}
+              <h1 class="h1" style="margin:0;font-family:${FONT};font-weight:500;font-size:28px;line-height:1.28;letter-spacing:-.01em;color:#ffffff;">${esc(o.heading)}</h1>
+            </td>
+          </tr>
 
-            <div style="background:#ffffff;border:1px solid ${BORDER};border-top:none;padding:28px 32px;font-family:${SERIF};font-size:14px;color:${BODY_TEXT};">
+          <tr>
+            <td class="pad body-cell" style="background:${CARD};padding:36px 40px 40px;font-family:${FONT};font-weight:400;font-size:15px;line-height:1.75;color:${BODY_TEXT};">
               ${o.bodyHtml}
-            </div>
+            </td>
+          </tr>
 
-            ${featuredBlock(o.featured ?? [])}
-            ${footerBlock(o.origin)}
+          ${footerBlock(o.origin)}
 
-          </td></tr>
         </table>
       </td>
     </tr>
@@ -186,22 +178,88 @@ export function emailShell(o: EmailShell): string {
 </html>`
 }
 
-/** Primary call-to-action button. */
-export function ctaButton(href: string, label: string): string {
-  return `<p style="margin:24px 0 0;">
-    <a href="${esc(href)}" style="display:inline-block;background:${GREEN};color:#ffffff;text-decoration:none;padding:13px 26px;font-family:${SANS};font-size:13px;">${esc(label)}</a>
-  </p>`
+function footerBlock(origin: string): string {
+  const links = [
+    ['Packages', '/packages'],
+    ['Hikes', '/hikes'],
+    ['Stays', '/stays'],
+    ['Experiences', '/experiences'],
+  ] as const
+
+  const nav = links
+    .map(([label, path]) =>
+      `<a href="${origin}${path}" style="color:#ffffff;font-family:${FONT};font-weight:500;font-size:12px;letter-spacing:.04em;">${label}</a>`)
+    .join(`<span style="color:${FOOT_SEP};padding:0 9px;">&middot;</span>`)
+
+  return `
+  <tr>
+    <td class="pad" style="background:${INK};padding:30px 40px;">
+      <p style="margin:0 0 2px;font-family:${FONT};font-weight:400;font-size:13px;color:#ffffff;">Warm regards,</p>
+      <p style="margin:0 0 20px;font-family:${FONT};font-weight:500;font-size:13px;color:${GOLD};">The Visit Drakensberg Team</p>
+      <p style="margin:0 0 18px;">${nav}</p>
+      <p style="margin:0;font-family:${FONT};font-weight:400;font-size:11.5px;line-height:1.7;color:${FOOT_TEXT};">
+        Visit Drakensberg &middot; <a href="${origin}" style="color:${FOOT_TEXT};">visitdrakensberg.com</a><br/>
+        This is an automated message — please do not reply directly to this email.
+      </p>
+    </td>
+  </tr>`
 }
 
-/** Label/value table used for invoice, receipt and quote summaries. */
-export function detailTable(rows: [string, string][]): string {
+/**
+ * Primary call-to-action button.
+ *
+ * The padding sits on the <td> rather than the <a> because Outlook's Word
+ * engine ignores padding on an inline-block anchor, which collapses the
+ * button to a tight box of text.
+ */
+export function ctaButton(href: string, label: string): string {
+  return `<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:32px 0 0;">
+    <tr>
+      <td style="background:${SAGE};border-radius:3px;padding:15px 32px;">
+        <a href="${esc(href)}" style="display:inline-block;font-family:${FONT};font-weight:500;font-size:13.5px;letter-spacing:.06em;color:#ffffff;">${esc(label)}</a>
+      </td>
+    </tr>
+  </table>`
+}
+
+/**
+ * Label/value table used for invoice, receipt, quote and waiver summaries.
+ * Pass the headline figure as `total` to have it set larger below the rule —
+ * the balance due on an invoice or receipt, the total on a quote.
+ */
+export function detailTable(rows: [string, string][], total?: [string, string]): string {
   const body = rows.map(([k, v]) =>
     `<tr>
-      <td style="padding:7px 0;font-family:${SANS};font-size:12px;color:${MUTED};">${esc(k)}</td>
-      <td style="padding:7px 0;text-align:right;font-family:${SANS};font-size:12px;color:${INK};">${esc(v)}</td>
+      <td class="lbl rule" style="padding:11px 0;border-bottom:1px solid ${BORDER};font-family:${FONT};font-weight:400;font-size:12px;letter-spacing:.03em;color:${MUTED};">${esc(k)}</td>
+      <td class="val rule" align="right" style="padding:11px 0;border-bottom:1px solid ${BORDER};font-family:${FONT};font-weight:500;font-size:13px;color:${INK_TEXT};">${esc(v)}</td>
     </tr>`).join('')
+
+  const totalRow = total
+    ? `<tr>
+        <td class="lbl" style="padding:16px 0 0;font-family:${FONT};font-weight:500;font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:${MUTED};">${esc(total[0])}</td>
+        <td class="val" align="right" style="padding:16px 0 0;font-family:${FONT};font-weight:500;font-size:20px;color:${INK_TEXT};">${esc(total[1])}</td>
+      </tr>`
+    : ''
+
   return `<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%"
-    style="border-top:1px solid ${BORDER};border-bottom:1px solid ${BORDER};margin:4px 0 0;">${body}</table>`
+    class="rule" style="border-top:1px solid ${BORDER};margin:4px 0 0;">${body}${totalRow}</table>`
+}
+
+/**
+ * Small uppercase heading for a section inside the body — "Day-by-day
+ * itinerary" and the like. Set in ink rather than gold: gold is legible on the
+ * masthead but not on the card behind this.
+ */
+export function sectionLabel(label: string): string {
+  return `<p class="lbl" style="margin:30px 0 8px;font-family:${FONT};font-weight:500;font-size:10.5px;letter-spacing:.2em;text-transform:uppercase;color:${MUTED};">${esc(label)}</p>`
+}
+
+/**
+ * Trailing fine print — records notes, terms pointers. Kept above the 4.5:1
+ * contrast floor rather than the near-invisible grey these notes used to use.
+ */
+export function finePrint(html: string): string {
+  return `<p class="fine" style="margin:24px 0 0;font-family:${FONT};font-weight:400;font-size:11.5px;line-height:1.7;color:${MUTED};">${html}</p>`
 }
 
 export type EmailItineraryDay = {
@@ -227,7 +285,7 @@ export type EmailItineraryDay = {
  */
 function emailParagraphs(text: string): string {
   return text.split(/\n+/).map(p => p.trim()).filter(Boolean)
-    .map(p => `<p style="margin:0 0 8px;font-family:${SANS};font-size:12px;color:${BODY_TEXT};line-height:1.6;">${esc(p)}</p>`)
+    .map(p => `<p style="margin:0 0 8px;font-family:${FONT};font-weight:400;font-size:13.5px;color:${BODY_TEXT};line-height:1.7;">${esc(p)}</p>`)
     .join('')
 }
 
@@ -244,15 +302,15 @@ export function itineraryBlock(days: EmailItineraryDay[]): string {
     return `
     <tr>
       <td style="padding:0 0 12px;">
-        <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="border:1px solid ${BORDER};">
+        <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" class="day" style="border:1px solid ${BORDER};border-radius:3px;background:${CARD};">
           <tr>
-            <td style="padding:14px;">
-              <p style="margin:0 0 3px;font-family:${SANS};font-size:10px;letter-spacing:1px;text-transform:uppercase;color:${GOLD};">Day ${d.dayNumber} &middot; ${esc(d.dateLabel)}</p>
-              ${d.label ? `<p style="margin:0 0 4px;font-family:${SERIF};font-size:14px;font-style:italic;color:${INK};">${esc(d.label)}</p>` : ''}
-              ${meta ? `<p style="margin:0 0 10px;font-family:${SANS};font-size:11px;color:${MUTED};">${meta}</p>` : ''}
+            <td style="padding:16px 18px;">
+              <p class="lbl" style="margin:0 0 4px;font-family:${FONT};font-weight:500;font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;color:${MUTED};">Day ${d.dayNumber} &middot; ${esc(d.dateLabel)}</p>
+              ${d.label ? `<p class="val" style="margin:0 0 4px;font-family:${FONT};font-weight:500;font-size:15px;color:${INK_TEXT};">${esc(d.label)}</p>` : ''}
+              ${meta ? `<p class="lbl" style="margin:0 0 10px;font-family:${FONT};font-weight:400;font-size:12px;color:${MUTED};">${meta}</p>` : ''}
               ${d.description ? emailParagraphs(d.description) : ''}
-              ${facts.length > 0 ? `<div style="margin-top:8px;padding-top:8px;border-top:1px solid ${BORDER};">
-                ${facts.map(f => `<p style="margin:2px 0 0;font-family:${SANS};font-size:11px;color:${MUTED};">${esc(f)}</p>`).join('')}
+              ${facts.length > 0 ? `<div class="rule" style="margin-top:10px;padding-top:10px;border-top:1px solid ${BORDER};">
+                ${facts.map(f => `<p class="lbl" style="margin:2px 0 0;font-family:${FONT};font-weight:400;font-size:12px;color:${MUTED};">${esc(f)}</p>`).join('')}
               </div>` : ''}
             </td>
           </tr>

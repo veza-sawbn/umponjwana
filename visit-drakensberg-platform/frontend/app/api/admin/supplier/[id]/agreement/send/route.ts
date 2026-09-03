@@ -3,7 +3,7 @@ import { cookies } from 'next/headers'
 import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs'
 import { getSiteOrigin } from '@/lib/origin'
 import { sendMail } from '@/lib/mailer'
-import { emailShell, ctaButton, esc, getFeaturedExperiences } from '@/lib/email-layout'
+import { emailShell, ctaButton, esc } from '@/lib/email-layout'
 import { renderAgreementPdf } from '@/lib/agreement-pdf'
 import { loadAgreementRecord, agreementFileName, isAgreementDocument } from '@/lib/agreement-record'
 import { AGREEMENT_LABEL } from '@/lib/supplier-agreement-content'
@@ -67,13 +67,11 @@ export async function POST(req: Request, { params }: { params: { id: string } })
 
   const label = AGREEMENT_LABEL[documentParam]
   const accepted = data.acceptance
-  const featured = await getFeaturedExperiences(origin)
 
   const html = emailShell({
     origin,
     heading: `Your ${label}`,
     preheader: `A copy of the ${label} for ${data.supplierName}.`,
-    featured,
     bodyHtml: `
       <p style="margin:0 0 4px;">Dear ${esc(data.supplierName)},</p>
       <p style="margin:0 0 16px;">
