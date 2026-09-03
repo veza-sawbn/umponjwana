@@ -8,6 +8,7 @@ import { getSeasonalContent } from '@/lib/modules'
 import { SEASON_META, isSeason, type Season } from '@/lib/seasons'
 import { publicSupabase } from '@/lib/supabase-public'
 import SeasonTopicSection from '@/components/modules/SeasonTopicSection'
+import JsonLd from '@/components/seo/JsonLd'
 
 // New route — the page each tile in the region page's "When to Go" mosaic
 // links to. Pure server component, same shape as every other converted
@@ -88,8 +89,8 @@ export default async function SeasonPage({ params }: { params: { slug: string; s
 
   return (
     <main className="bg-white">
-      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(collectionJsonLd) }} />
-      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbJsonLd) }} />
+      <JsonLd data={collectionJsonLd} />
+      <JsonLd data={breadcrumbJsonLd} />
 
       {/* ── Hero ─────────────────────────────────────────────────────────── */}
       <section className="relative h-[42vh] min-h-[320px] overflow-hidden">

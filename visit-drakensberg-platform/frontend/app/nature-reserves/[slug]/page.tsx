@@ -10,6 +10,7 @@ import { getNearbyTrails, getNearbyStays } from '@/lib/modules'
 import RelatedTrailsModule from '@/components/modules/RelatedTrailsModule'
 import NearbyStaysModule from '@/components/modules/NearbyStaysModule'
 import TrackView from '@/components/analytics/TrackView'
+import JsonLd from '@/components/seo/JsonLd'
 
 // New route — Reserve already had slug + seoTitle + seoDescription + rich
 // content (peaks, permits, best time, facilities) with admin CRUD, but no
@@ -112,8 +113,8 @@ export default async function ReservePage({ params }: { params: { slug: string }
 
   return (
     <main className="bg-mist">
-      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(attractionJsonLd) }} />
-      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbJsonLd) }} />
+      <JsonLd data={attractionJsonLd} />
+      <JsonLd data={breadcrumbJsonLd} />
       <TrackView event="destination_view" properties={{ id: reserve.id, name: reserve.name, kind: 'nature_reserve', region: regionName }} />
 
       {/* ── Hero ─────────────────────────────────────────────────────────── */}

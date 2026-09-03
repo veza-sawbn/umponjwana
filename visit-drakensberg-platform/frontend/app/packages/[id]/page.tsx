@@ -3,6 +3,7 @@ import { notFound } from 'next/navigation'
 import { getPackageById, type MarketplacePackage } from '@/lib/packages'
 import { publicSupabase } from '@/lib/supabase-public'
 import PackageDetail from './PackageDetail'
+import JsonLd from '@/components/seo/JsonLd'
 
 // Server shell — same pattern as the other converted detail routes. Only a
 // genuinely missing package 404s server-side; an existing-but-unpublished
@@ -87,8 +88,8 @@ export default async function PackagePage({ params }: { params: { id: string } }
 
   return (
     <>
-      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(productJsonLd) }} />
-      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbJsonLd) }} />
+      <JsonLd data={productJsonLd} />
+      <JsonLd data={breadcrumbJsonLd} />
       <PackageDetail pkg={pkg} id={params.id} />
     </>
   )

@@ -7,6 +7,7 @@ import { getRoutes, routeDurationLabel, routePrice, routeSlug, type Route } from
 import { getMyTransportCompany } from '@/lib/transport'
 import { publicSupabase } from '@/lib/supabase-public'
 import { formatMoney } from '@/lib/allocation'
+import JsonLd from '@/components/seo/JsonLd'
 
 // New route — closes SEO audit G17: named shuttle routes were real supplier
 // data (app/supplier/routes/*) with no public detail page, so search never
@@ -97,8 +98,8 @@ export default async function TransportRoutePage({ params }: { params: { slug: s
 
   return (
     <main className="bg-mist min-h-screen pt-16">
-      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(serviceJsonLd) }} />
-      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbJsonLd) }} />
+      <JsonLd data={serviceJsonLd} />
+      <JsonLd data={breadcrumbJsonLd} />
 
       <div className="px-6 lg:px-12 pt-8">
         <nav className="flex items-center gap-2 font-sans text-[11px] text-forest/40 max-w-[1440px] mx-auto">

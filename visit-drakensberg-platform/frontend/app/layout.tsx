@@ -1,6 +1,7 @@
 import './globals.css'
 import type { Metadata, Viewport } from 'next'
 import AppShell from '@/components/layout/AppShell'
+import JsonLd from '@/components/seo/JsonLd'
 
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://visitdrakensberg.com'
 
@@ -55,10 +56,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en">
       <body>
-        <script
-          type="application/ld+json"
-          dangerouslySetInnerHTML={{ __html: JSON.stringify(ORG_JSONLD) }}
-        />
+        <JsonLd data={ORG_JSONLD} />
         <AppShell>{children}</AppShell>
       </body>
     </html>
