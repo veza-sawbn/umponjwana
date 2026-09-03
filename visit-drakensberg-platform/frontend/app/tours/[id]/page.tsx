@@ -6,6 +6,7 @@ import { publicSupabase } from '@/lib/supabase-public'
 import { getNearbyStays, type NearbyStayResult } from '@/lib/modules'
 import TourDetail from './TourDetail'
 import TrackView from '@/components/analytics/TrackView'
+import JsonLd from '@/components/seo/JsonLd'
 
 // Server shell — same pattern as the other converted detail routes. Tours
 // have no dedicated getTourById() (no such helper existed), so this
@@ -107,8 +108,8 @@ export default async function TourPage({ params }: { params: { id: string } }) {
 
   return (
     <>
-      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(productJsonLd) }} />
-      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbJsonLd) }} />
+      <JsonLd data={productJsonLd} />
+      <JsonLd data={breadcrumbJsonLd} />
       <TrackView event="tour_view" properties={{ id: tour.id, name: tour.name, region: regionName }} />
       <TourDetail tour={tour} nearbyStays={nearbyStays} />
     </>

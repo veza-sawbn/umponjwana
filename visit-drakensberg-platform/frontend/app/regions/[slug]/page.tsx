@@ -17,6 +17,7 @@ import ShuttleRoutesModule from '@/components/modules/ShuttleRoutesModule'
 import SeasonMosaic from '@/components/modules/SeasonMosaic'
 import TrackView from '@/components/analytics/TrackView'
 import { formatMoney } from '@/lib/allocation'
+import JsonLd from '@/components/seo/JsonLd'
 
 // Pure server component — same shape as app/nature-reserves/[slug]/page.tsx.
 // Previously this was a server shell (this file) handing off to
@@ -278,8 +279,8 @@ export default async function RegionPage({ params }: { params: { slug: string } 
 
   return (
     <main className="bg-[#F7F5F2]">
-      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(destinationJsonLd) }} />
-      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbJsonLd) }} />
+      <JsonLd data={destinationJsonLd} />
+      <JsonLd data={breadcrumbJsonLd} />
       <TrackView event="region_view" properties={{ id: region.id, name: region.name }} />
 
       {/* ── Hero ─────────────────────────────────────────────────────────── */}

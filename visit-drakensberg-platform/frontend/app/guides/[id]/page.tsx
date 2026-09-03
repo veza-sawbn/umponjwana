@@ -4,6 +4,7 @@ import { getGuideById, type GuideProfile } from '@/lib/operators'
 import { publicSupabase } from '@/lib/supabase-public'
 import GuideDetail from './GuideDetail'
 import TrackView from '@/components/analytics/TrackView'
+import JsonLd from '@/components/seo/JsonLd'
 
 // Server shell — same pattern as the other converted detail routes. Guide
 // profiles are always linked to their supplier (tour operator); the
@@ -77,8 +78,8 @@ export default async function GuidePage({ params }: { params: { id: string } }) 
 
   return (
     <>
-      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(personJsonLd) }} />
-      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbJsonLd) }} />
+      <JsonLd data={personJsonLd} />
+      <JsonLd data={breadcrumbJsonLd} />
       <TrackView event="guide_profile_viewed" properties={{ id: guide.id, name: guide.name }} />
       <GuideDetail guide={guide} />
     </>

@@ -5,6 +5,7 @@ import Footer from '@/components/layout/Footer'
 import { Clock, ArrowLeft, MapPin, Mountain, Bird, ChefHat, Sword, Leaf, ArrowRight } from 'lucide-react'
 import { publicSupabase } from '@/lib/supabase-public'
 import { getPostBySlug, getRelatedPosts, parseBody, estimateReadTime } from '@/lib/blog-posts'
+import JsonLd from '@/components/seo/JsonLd'
 
 export const revalidate = 3600
 
@@ -240,10 +241,7 @@ export default async function ArticleDetailPage({ params }: { params: { slug: st
 
   return (
     <div className="min-h-screen bg-[#F7F5F2]">
-      <script
-        type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
-      />
+      <JsonLd data={jsonLd} />
 
       {/* Hero */}
       <section className="bg-[#000000] text-white pt-32 pb-0">

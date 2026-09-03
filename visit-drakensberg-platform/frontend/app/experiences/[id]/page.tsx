@@ -3,6 +3,7 @@ import { notFound } from 'next/navigation'
 import { getExperienceById, type TrekkingExperience } from '@/lib/experiences'
 import { publicSupabase } from '@/lib/supabase-public'
 import ExperienceDetail from './ExperienceDetail'
+import JsonLd from '@/components/seo/JsonLd'
 
 // Server shell — same pattern as the other converted detail routes. An
 // experience is a derived/composite view (Departure + Tour + Trail +
@@ -101,8 +102,8 @@ export default async function ExperiencePage({ params }: { params: { id: string 
 
   return (
     <>
-      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(eventJsonLd) }} />
-      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbJsonLd) }} />
+      <JsonLd data={eventJsonLd} />
+      <JsonLd data={breadcrumbJsonLd} />
       <ExperienceDetail exp={exp} />
     </>
   )

@@ -3,6 +3,7 @@ import { notFound } from 'next/navigation'
 import { getOperatorById, type OperatorProfile } from '@/lib/operators'
 import { publicSupabase } from '@/lib/supabase-public'
 import OperatorDetail from './OperatorDetail'
+import JsonLd from '@/components/seo/JsonLd'
 
 // Server shell — same pattern as the other converted detail routes.
 // See docs/destination-graph/PHASE_B.md.
@@ -75,8 +76,8 @@ export default async function OperatorPage({ params }: { params: { id: string } 
 
   return (
     <>
-      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(orgJsonLd) }} />
-      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbJsonLd) }} />
+      <JsonLd data={orgJsonLd} />
+      <JsonLd data={breadcrumbJsonLd} />
       <OperatorDetail operator={operator} />
     </>
   )

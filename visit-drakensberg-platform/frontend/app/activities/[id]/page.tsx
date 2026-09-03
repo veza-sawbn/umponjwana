@@ -4,6 +4,7 @@ import { getActivityById, type Activity } from '@/lib/activities'
 import { publicSupabase } from '@/lib/supabase-public'
 import ActivityDetail from './ActivityDetail'
 import TrackView from '@/components/analytics/TrackView'
+import JsonLd from '@/components/seo/JsonLd'
 
 // Server shell — same pattern as app/regions/[slug]/page.tsx and
 // app/hikes/[id]/page.tsx. Activity has no seoTitle/seoDescription
@@ -93,8 +94,8 @@ export default async function ActivityPage({ params }: { params: { id: string } 
 
   return (
     <>
-      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(productJsonLd) }} />
-      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbJsonLd) }} />
+      <JsonLd data={productJsonLd} />
+      <JsonLd data={breadcrumbJsonLd} />
       <TrackView event="activity_view" properties={{ id: activity.id, name: activity.name, region: activity.region }} />
       <ActivityDetail activityData={activity} id={params.id} />
     </>
