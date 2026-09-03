@@ -148,6 +148,11 @@ export type CommissionTier = {
   isFloor?: boolean
 }
 
+// Trimmed to three stops — Standard, Premium, Signature — rather than the
+// six-tier ladder this used to be. Ids for the removed tiers ('enhanced',
+// 'priority', 'elite') are still handled gracefully: tierById() falls back to
+// Standard for any id it doesn't recognise, so an application already
+// recorded against one of them still renders instead of crashing.
 export const COMMISSION_TIERS: CommissionTier[] = [
   {
     id: 'standard', name: 'Standard', rate: 12, elevation: '1 200 m', tagline: 'Base camp',
@@ -158,35 +163,11 @@ export const COMMISSION_TIERS: CommissionTier[] = [
     ],
   },
   {
-    id: 'enhanced', name: 'Enhanced', rate: 15, elevation: '1 800 m', tagline: 'Tree line',
-    benefits: [
-      'Improved placement in relevant search results',
-      'Eligible for selected campaigns and newsletters',
-      'Increased promotional exposure',
-    ],
-  },
-  {
-    id: 'priority', name: 'Priority', rate: 18, elevation: '2 400 m', tagline: 'Escarpment',
-    benefits: [
-      'Priority ranking within category and region',
-      'Inclusion in featured accommodation sections',
-      'Greater access to promotional campaigns',
-    ],
-  },
-  {
     id: 'premium', name: 'Premium', rate: 22, elevation: '2 900 m', tagline: 'High plateau',
     benefits: [
       'Homepage features and seasonal campaigns',
       'Curated package inclusion',
       'Dedicated promotional opportunities',
-    ],
-  },
-  {
-    id: 'elite', name: 'Elite', rate: 26, elevation: '3 200 m', tagline: 'Alpine zone',
-    benefits: [
-      'Top-of-category placement',
-      'Cross-platform promotion (social, newsletter takeovers)',
-      'Priority tie-break against lower tiers',
     ],
   },
   {

@@ -131,18 +131,19 @@ export default function ListWithUsPage() {
   }, [form, done])
 
   /* ── Field helpers ───────────────────────────────────────────────────── */
-  function toggleType(id: string) {
+  // Exactly one operator type per application — a business that runs both a
+  // lodge and a shuttle service applies twice rather than blending two very
+  // different reviews (and two very different commission conversations) into
+  // one form.
+  function selectType(id: string) {
     setForm(f => {
-      const on = f.supplierTypes.includes(id)
-      const supplierTypes = on ? f.supplierTypes.filter(t => t !== id) : [...f.supplierTypes, id]
-      // Picking "Activities" as a core offering seeds the first activity row;
-      // the optional add-on toggle is then redundant and goes away.
-      const seedActivity = id === 'Activity' && !on && f.activities.length === 0
+      if (f.supplierTypes[0] === id) return f
+      // Picking "Activities" seeds the first activity row.
+      const seedActivity = id === 'Activity' && f.activities.length === 0
       return {
         ...f,
-        supplierTypes,
+        supplierTypes: [id],
         activities: seedActivity ? [emptyActivity()] : f.activities,
-        offersActivities: supplierTypes.includes('Activity') ? false : f.offersActivities,
       }
     })
   }
@@ -211,10 +212,11 @@ export default function ListWithUsPage() {
     }))
   }
 
-  // Activities appear either as the core offering or as an add-on a stay or
-  // tour operator switches on.
-  const activitiesShown = has('Activity') || form.offersActivities
-  const activityAddOnOffered = !has('Activity') && (has('Accommodation') || has('Guided Tours') || has('Experience'))
+  // Single-select means Activity is mutually exclusive with every other
+  // type, so there is no longer a separate "add activities alongside your
+  // main offering" path — the activities card only ever appears for an
+  // applicant whose one selected type is Activity.
+  const activitiesShown = has('Activity')
 
   /* ── Step flow ───────────────────────────────────────────────────────── */
   function validate(current: number): string {
@@ -227,7 +229,7 @@ export default function ListWithUsPage() {
         if (password.length < 8) return 'Your password must be at least 8 characters.'
         if (password !== confirmPassword) return 'Passwords do not match — please re-enter.'
       }
-      if (form.supplierTypes.length === 0) return 'Choose at least one thing you operate.'
+      if (form.supplierTypes.length === 0) return 'Choose what you operate.'
     }
     if (current === 1) {
       if (!form.region) return 'Choose the region you operate in.'
@@ -246,11 +248,7 @@ export default function ListWithUsPage() {
       }
       if (activitiesShown) {
         const named = form.activities.filter(a => a.name.trim())
-        if (named.length === 0) {
-          return has('Activity')
-            ? 'Add at least one activity.'
-            : 'Add at least one activity, or switch guided activities off.'
-        }
+        if (named.length === 0) return 'Add at least one activity.'
         const incomplete = named.find(a => !a.category || !a.pricePerPerson.trim())
         if (incomplete) return `“${incomplete.name}” still needs a category and a price per person.`
       }
@@ -336,6 +334,7 @@ export default function ListWithUsPage() {
         baseTown: form.baseTown.trim(),
         description: form.description.trim(),
         stay: { ...form.stay, propertyName: form.stay.propertyName.trim(), elevation: form.stay.elevation.trim() },
+        offersActivities: activitiesShown,
         activities: activitiesShown
           ? form.activities.filter(a => a.name.trim()).map(a => ({ ...a, name: a.name.trim() }))
           : [],
@@ -468,7 +467,7 @@ export default function ListWithUsPage() {
               <div>
                 <label className={labelCls}>Registered business name</label>
                 <input value={form.businessName} onChange={e => set('businessName', e.target.value)}
-                  placeholder="Witsieshoek Hospitality (Pty) Ltd" className={inputCls} />
+                  placeholder="Drakensberg (Pty) Ltd" className={inputCls} />
                 <p className="font-sans text-xs text-gray-400 mt-1.5">
                   The entity that will invoice and be paid out. You can give a different public-facing name next.
                 </p>
@@ -503,25 +502,26 @@ export default function ListWithUsPage() {
             <div className="bg-white border border-gray-200 p-6 lg:p-8 space-y-5">
               <CardHead
                 title="What do you operate?"
-                sub="Pick everything that applies — plenty of operators do more than one, and we'll ask about each."
+                sub="Choose the one that best describes your business — we'll ask for the details next."
               />
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5" role="radiogroup" aria-label="What do you operate?">
                 {APPLICANT_TYPES.map(t => {
                   const on = has(t.id)
                   return (
                     <button
                       key={t.id}
                       type="button"
-                      onClick={() => toggleType(t.id)}
-                      aria-pressed={on}
+                      onClick={() => selectType(t.id)}
+                      role="radio"
+                      aria-checked={on}
                       className={`text-left border px-4 py-3.5 flex items-start gap-3 transition-colors ${
                         on ? 'border-[#C9A96E] bg-[#C9A96E]/5' : 'border-gray-200 hover:border-[#2d6a4f]'
                       }`}
                     >
-                      <span className={`w-4 h-4 mt-0.5 shrink-0 border flex items-center justify-center ${
+                      <span className={`w-4 h-4 mt-0.5 shrink-0 rounded-full border flex items-center justify-center ${
                         on ? 'border-[#C9A96E] bg-[#C9A96E]' : 'border-gray-300'
                       }`}>
-                        {on && <Check size={11} className="text-white" />}
+                        {on && <span className="w-1.5 h-1.5 rounded-full bg-white" />}
                       </span>
                       <span>
                         <span className="block font-sans text-sm font-medium text-black">{t.label}</span>
@@ -748,45 +748,13 @@ export default function ListWithUsPage() {
               </div>
             )}
 
-            {/* Activities — core offering, or an add-on for the other types */}
-            <div className="bg-white border border-gray-200 p-6 lg:p-8 space-y-5">
-              <CardHead
-                title={has('Activity') ? 'Your activities' : 'Activities alongside your main offering'}
-                sub={has('Activity')
-                  ? 'Add each activity you run. You can add more later from your supplier portal.'
-                  : 'Optional — guests see a “Stay + Adventure” option when you run your own guided activities.'}
-              />
-
-              {activityAddOnOffered && (
-                <div className="flex items-start justify-between gap-4 border border-gray-200 px-4 py-3.5">
-                  <div>
-                    <p className="font-sans text-sm font-medium text-black">We run our own guided activities</p>
-                    <p className="font-sans text-xs text-gray-400 mt-0.5">
-                      Turn this on to list them alongside your main offering.
-                    </p>
-                  </div>
-                  <button
-                    type="button" role="switch" aria-checked={form.offersActivities}
-                    onClick={() => {
-                      const on = !form.offersActivities
-                      setForm(f => ({
-                        ...f,
-                        offersActivities: on,
-                        activities: on && f.activities.length === 0 ? [emptyActivity()] : f.activities,
-                      }))
-                    }}
-                    className={`relative w-10 h-[22px] rounded-full shrink-0 mt-0.5 transition-colors ${
-                      form.offersActivities ? 'bg-[#2d6a4f]' : 'bg-gray-300'
-                    }`}
-                  >
-                    <span className={`absolute top-[3px] w-4 h-4 bg-white rounded-full transition-all ${
-                      form.offersActivities ? 'left-[21px]' : 'left-[3px]'
-                    }`} />
-                  </button>
-                </div>
-              )}
-
-              {activitiesShown && (
+            {/* Activities — the Activity type's own offering */}
+            {activitiesShown && (
+              <div className="bg-white border border-gray-200 p-6 lg:p-8 space-y-5">
+                <CardHead
+                  title="Your activities"
+                  sub="Add each activity you run. You can add more later from your supplier portal."
+                />
                 <div className="space-y-3">
                   {form.activities.map((activity, i) => (
                     <div key={i} className="border border-gray-200">
@@ -878,8 +846,8 @@ export default function ListWithUsPage() {
                     <Plus size={13} /> Add another activity
                   </button>
                 </div>
-              )}
-            </div>
+              </div>
+            )}
           </>
         )}
 
