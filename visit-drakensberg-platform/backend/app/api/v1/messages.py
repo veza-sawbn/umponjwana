@@ -7,10 +7,19 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, and_
 from pydantic import BaseModel
 
+from app.core.config import settings
 from app.core.database import get_db
 from app.core.security import get_current_user
 from app.models.user import User
 from app.services.email_service import send_email
+from app.services.email_layout import (
+    cta_button,
+    email_shell,
+    esc,
+    greeting,
+    paragraph,
+    quote_block,
+)
 
 router = APIRouter(prefix="/messages", tags=["messages"])
 
@@ -164,12 +173,17 @@ async def _notify_supplier_email(supplier_id: str, guest_name: str, body: str, d
             await send_email(
                 to_email=supplier.email,
                 subject=f"New message from {guest_name} — Visit Drakensberg",
-                html_content=f"""
-                <p>Hi,</p>
-                <p>You have a new message from <strong>{guest_name}</strong>:</p>
-                <blockquote style="border-left:3px solid #C9A96E;padding-left:12px;color:#555">{body}</blockquote>
-                <p><a href="https://visitdrakensberg.com/supplier" style="color:#4A7251">Reply in your dashboard →</a></p>
-                """,
+                html_content=email_shell(
+                    origin=settings.FRONTEND_URL,
+                    eyebrow="Enquiry",
+                    heading=f"New message from {guest_name}",
+                    preheader=f"{guest_name} sent you a message about one of your listings.",
+                    body_html=f"""
+                    {greeting(supplier.full_name)}
+                    {paragraph(f"You have a new message from <strong>{esc(guest_name)}</strong>:")}
+                    {quote_block(body)}
+                    {cta_button(f"{settings.FRONTEND_URL}/supplier", "Reply in your dashboard")}""",
+                ),
             )
         except Exception:
             pass
@@ -183,12 +197,17 @@ async def _notify_guest_email(guest_id: str, supplier_name: str, body: str, db: 
             await send_email(
                 to_email=guest.email,
                 subject=f"Reply from {supplier_name} — Visit Drakensberg",
-                html_content=f"""
-                <p>Hi,</p>
-                <p><strong>{supplier_name}</strong> replied to your enquiry:</p>
-                <blockquote style="border-left:3px solid #C9A96E;padding-left:12px;color:#555">{body}</blockquote>
-                <p><a href="https://visitdrakensberg.com/dashboard" style="color:#4A7251">View in your dashboard →</a></p>
-                """,
+                html_content=email_shell(
+                    origin=settings.FRONTEND_URL,
+                    eyebrow="Enquiry",
+                    heading=f"{supplier_name} replied",
+                    preheader=f"{supplier_name} replied to your enquiry.",
+                    body_html=f"""
+                    {greeting(guest.full_name)}
+                    {paragraph(f"<strong>{esc(supplier_name)}</strong> replied to your enquiry:")}
+                    {quote_block(body)}
+                    {cta_button(f"{settings.FRONTEND_URL}/dashboard", "View in your dashboard")}""",
+                ),
             )
         except Exception:
             pass
