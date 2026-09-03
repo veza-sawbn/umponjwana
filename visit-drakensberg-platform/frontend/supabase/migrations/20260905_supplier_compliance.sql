@@ -448,6 +448,30 @@ begin
 end;
 $$;
 
+-- ────────────────────────────────────────────────────────────────────────────
+-- 9. Execute privileges
+--
+--    REVOKE first, and from `public` specifically. Postgres grants EXECUTE to
+--    PUBLIC on every new function, so a bare GRANT here would ADD to that
+--    default rather than replace it, leaving `anon` able to invoke all three
+--    over /rest/v1/rpc/. Caught by the Supabase security advisor after the
+--    first apply, not by the local test harness — which had the Supabase roles
+--    created by hand and so never carried the default PUBLIC grant.
+--
+--    Not exploitable as it stood: the two privileged functions raise on their
+--    own is_ops()/is_admin() guard before touching a row, which is why they
+--    are SECURITY DEFINER at all. But that guard should be the second line of
+--    defence rather than the only one.
+--
+--    vd_accreditation_ok gets no anon grant either. Nothing public calls it —
+--    the form uses the TypeScript twin in lib/compliance.ts and the approval
+--    route reads the table directly — and exposing it would let anyone
+--    enumerate application references to learn which businesses are accredited.
+-- ────────────────────────────────────────────────────────────────────────────
+revoke execute on function public.vd_review_compliance_document(text, text, text) from public, anon;
+revoke execute on function public.vd_link_application_to_supplier(text, uuid)      from public, anon;
+revoke execute on function public.vd_accreditation_ok(uuid, text)                  from public, anon;
+
 grant execute on function public.vd_review_compliance_document(text, text, text) to authenticated;
-grant execute on function public.vd_link_application_to_supplier(text, uuid) to authenticated;
-grant execute on function public.vd_accreditation_ok(uuid, text) to authenticated, anon;
+grant execute on function public.vd_link_application_to_supplier(text, uuid)      to authenticated;
+grant execute on function public.vd_accreditation_ok(uuid, text)                  to authenticated;
