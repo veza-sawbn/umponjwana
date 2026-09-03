@@ -130,8 +130,10 @@ export async function POST(req: Request) {
     }),
   })
 
-  // In-app notification for account holders, so the invoice is surfaced even
-  // when SMTP is down — same pattern as the receipts route.
+  // In-app only, on purpose: this route has ALREADY emailed the customer the
+  // invoice above. Do NOT convert this to notifyServer() — it would
+  // send a second, near-identical email. The row is the fallback for when
+  // SMTP is down, not a missing notification.
   if (order.user_id) {
     await supabase.from('vd_notifications').insert({
       user_id: order.user_id,

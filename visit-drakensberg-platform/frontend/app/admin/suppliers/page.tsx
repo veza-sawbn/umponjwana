@@ -4,10 +4,11 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import {
   Search, RefreshCw, Building2, Check, X, AlertCircle, Mail,
-  ChevronRight, ExternalLink, Save, ArrowUpRight,
+  ChevronRight, ExternalLink, Save, ArrowUpRight, Download,
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { supabase } from '@/lib/auth'
+import type { AgreementDocument } from '@/lib/supplier-agreement'
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
 
@@ -69,6 +70,10 @@ function SupplierDetailPanel({
   const [isApproved, setIsApproved] = useState(supplier.isApproved)
   const [saving, setSaving] = useState(false)
 
+  // Supplier documents
+  const [agreementDoc, setAgreementDoc] = useState<AgreementDocument>('supplier_terms')
+  const [emailingAgreement, setEmailingAgreement] = useState(false)
+
   // Transfer state
   const [transferEmail, setTransferEmail] = useState(supplier.ownerContactEmail ?? '')
   const [transferring, setTransferring] = useState(false)
@@ -97,6 +102,24 @@ function SupplierDetailPanel({
       toast.error(e instanceof Error ? e.message : 'Could not save')
     } finally {
       setSaving(false)
+    }
+  }
+
+  async function emailAgreement() {
+    setEmailingAgreement(true)
+    try {
+      const res = await fetch(`/api/admin/supplier/${supplier.id}/agreement/send`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ document: agreementDoc }),
+      })
+      const json = await res.json()
+      if (!res.ok || !json.sent) throw new Error(json.error || 'Could not send the document.')
+      toast.success(`Sent to ${json.to}.`)
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Could not send the document.')
+    } finally {
+      setEmailingAgreement(false)
     }
   }
 
@@ -220,6 +243,47 @@ function SupplierDetailPanel({
               className={inputCls}
               placeholder="owner@property.co.za"
             />
+          </div>
+
+          {/* Accepted supplier documents */}
+          <div className="border border-gray-100 px-4 py-3 space-y-3">
+            <div>
+              <p className="font-sans text-xs font-medium text-gray-700">Supplier documents</p>
+              <p className="font-sans text-[11px] text-gray-400 mt-0.5 leading-relaxed">
+                A PDF of the document as accepted — the acceptance record (who, when, on what commission) followed by
+                the full text at the version they accepted.
+              </p>
+            </div>
+
+            <select
+              value={agreementDoc}
+              onChange={e => setAgreementDoc(e.target.value as AgreementDocument)}
+              className="w-full border border-gray-200 px-3 py-2 font-sans text-xs focus:outline-none focus:border-[#2d6a4f] bg-white"
+            >
+              <option value="supplier_terms">Supplier Agreement</option>
+              <option value="code_of_conduct">Supplier Code of Conduct</option>
+            </select>
+
+            <div className="flex gap-2 flex-wrap">
+              <a
+                href={`/api/admin/supplier/${supplier.id}/agreement?document=${agreementDoc}`}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex items-center gap-1.5 px-3 py-2 font-sans text-xs border border-gray-300 text-gray-600 hover:border-[#2d6a4f] hover:text-[#2d6a4f] transition-colors"
+              >
+                <Download size={12} /> Download PDF
+              </a>
+              <button
+                onClick={emailAgreement}
+                disabled={emailingAgreement}
+                className="inline-flex items-center gap-1.5 px-3 py-2 font-sans text-xs bg-[#2d6a4f] text-white hover:bg-[#235a3f] disabled:opacity-50 transition-colors"
+              >
+                <Mail size={12} /> {emailingAgreement ? 'Sending…' : 'Email to supplier'}
+              </button>
+            </div>
+            <p className="font-sans text-[11px] text-gray-400">
+              Sends to {supplier.email || 'the address on file'}.
+            </p>
           </div>
 
           {/* Ops assignments link */}

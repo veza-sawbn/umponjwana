@@ -348,8 +348,13 @@ export default function AdminListingApplicationsPage() {
                   <>
                     <ApplicationDetail app={app} />
                     <div className="px-6 pb-5 bg-[#F7F5F2]/40">
+                      {/* supplierId matters once approved: approval moves the
+                          certificates onto the account, so without it the panel
+                          would show an approved operator as having no
+                          accreditation at all. */}
                       <CompliancePanel
                         applicationRef={app.reference}
+                        supplierId={app.supplierId}
                         onAccreditationChange={ok => setAccreditation(a => (a[app.reference] === ok ? a : { ...a, [app.reference]: ok }))}
                       />
                     </div>
