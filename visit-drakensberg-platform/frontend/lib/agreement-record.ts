@@ -1,5 +1,6 @@
 import { supabaseAdmin } from './supabase-admin'
 import { AGREEMENT_VERSION, type AgreementDocument } from './supplier-agreement-content'
+import { BUSINESS_DETAILS_DEFAULTS, type BusinessDetails } from './pdf-letterhead'
 import type { AgreementPdfData, AgreementPdfAcceptance } from './agreement-pdf'
 
 // SERVER ONLY.
@@ -23,11 +24,17 @@ export async function loadAgreementRecord(
 ): Promise<AgreementLoad> {
   const admin = supabaseAdmin()
 
-  const { data: profile, error: profileError } = await admin
-    .from('profiles')
-    .select('id, full_name, email')
-    .eq('id', supplierId)
-    .maybeSingle()
+  // Registered company details for the letterhead. Merged over the defaults so
+  // a missing key renders as an omitted line rather than "undefined" on a legal
+  // document; edited at /admin/settings.
+  const [{ data: profile, error: profileError }, { data: businessRow }] = await Promise.all([
+    admin.from('profiles').select('id, full_name, email').eq('id', supplierId).maybeSingle(),
+    admin.from('site_content').select('value').eq('key', 'business_details').maybeSingle(),
+  ])
+  const business: BusinessDetails = {
+    ...BUSINESS_DETAILS_DEFAULTS,
+    ...((businessRow?.value as Partial<BusinessDetails> | undefined) ?? {}),
+  }
 
   if (profileError) return { ok: false, status: 500, error: 'Could not load that supplier.' }
   if (!profile) return { ok: false, status: 404, error: 'Supplier not found.' }
@@ -66,6 +73,7 @@ export async function loadAgreementRecord(
       document,
       supplierName: profile.full_name || profile.email || 'Supplier',
       supplierEmail: profile.email ?? '',
+      business,
       acceptance,
       // Render the version they accepted, not today's — a PDF headed with a
       // version nobody agreed to is worse than no PDF. Falls back to current
