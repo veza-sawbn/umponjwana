@@ -101,11 +101,27 @@ export type Receipt = {
   created_at: string
 }
 
-export async function getInvoices(): Promise<Invoice[]> {
+/** An invoice with its parent order's customer and trip name flattened on —
+ *  what the admin invoice list shows/searches by so staff never have to
+ *  open an invoice just to see who it belongs to. */
+export type InvoiceWithOrder = Invoice & {
+  customer_name: string | null
+  trip_name: string | null
+}
+
+export async function getInvoices(): Promise<InvoiceWithOrder[]> {
   try {
     const { data } = await supabase
-      .from('vd_invoices').select('*').order('issued_at', { ascending: false })
-    if (Array.isArray(data)) return data as Invoice[]
+      .from('vd_invoices')
+      .select('*, vd_orders(customer_name, trip_name)')
+      .order('issued_at', { ascending: false })
+    if (Array.isArray(data)) {
+      return data.map(({ vd_orders, ...invoice }: any) => ({
+        ...invoice,
+        customer_name: vd_orders?.customer_name ?? null,
+        trip_name: vd_orders?.trip_name ?? null,
+      })) as InvoiceWithOrder[]
+    }
   } catch {}
   return []
 }

@@ -225,32 +225,33 @@ export default function BookingBar() {
 
       {/* Main bar */}
       <div className="bg-[#1a1a1a] text-white">
-        <div className="max-w-[1440px] mx-auto px-6 lg:px-12 py-3.5 flex items-center justify-between gap-4 flex-wrap">
-          {/* Left: summary */}
+        <div className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-12 py-3 sm:py-3.5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2.5 sm:gap-4">
+          {/* Left: summary — scrolls sideways in its own lane on narrow
+              screens instead of wrapping into a jumbled multi-line block. */}
           <motion.button
             onClick={() => setOpen(v => !v)}
-            className="flex items-center gap-4 flex-wrap"
+            className="flex items-center gap-3 sm:gap-4 overflow-x-auto scrollbar-none -mx-1 px-1 min-w-0"
             whileTap={{ opacity: 0.7 }}
             transition={{ duration: 0.1 }}
           >
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 shrink-0">
               <ShoppingBag size={15} className="text-[#C9A96E]" />
               {itemCount > 0 ? (
-                <span className="font-sans text-sm">{itemCount} item{itemCount !== 1 ? 's' : ''}</span>
+                <span className="font-sans text-sm whitespace-nowrap">{itemCount} item{itemCount !== 1 ? 's' : ''}</span>
               ) : (
-                <span className="font-sans text-sm text-white/50">No items yet</span>
+                <span className="font-sans text-sm text-white/50 whitespace-nowrap">No items yet</span>
               )}
             </div>
-            <div className="text-white/30 text-xs">|</div>
-            <div className="flex items-center gap-1.5 font-sans text-sm text-white/70">
+            <div className="text-white/30 text-xs shrink-0">|</div>
+            <div className="flex items-center gap-1.5 font-sans text-sm text-white/70 shrink-0 whitespace-nowrap">
               <Calendar size={12} className="text-[#C9A96E]" />
               {fmt(booking.checkIn)} → {fmt(booking.checkOut)}
               {booking.nights > 0 && <span className="text-white/40 ml-1">· {booking.nights}n</span>}
             </div>
             {booking.region && (
               <>
-                <div className="text-white/30 text-xs">|</div>
-                <div className="flex items-center gap-1.5 font-sans text-sm text-white/70">
+                <div className="text-white/30 text-xs shrink-0">|</div>
+                <div className="hidden sm:flex items-center gap-1.5 font-sans text-sm text-white/70 shrink-0 whitespace-nowrap">
                   <MapPin size={12} className="text-[#C9A96E]" />
                   {booking.region}
                 </div>
@@ -258,14 +259,14 @@ export default function BookingBar() {
             )}
             {booking.totalPrice > 0 && (
               <>
-                <div className="text-white/30 text-xs">|</div>
-                <div className="font-display italic text-lg text-[#C9A96E]">
+                <div className="text-white/30 text-xs shrink-0">|</div>
+                <div className="font-display italic text-lg text-[#C9A96E] shrink-0 whitespace-nowrap">
                   {formatMoney(booking.totalPrice)}
                 </div>
               </>
             )}
             <motion.span
-              className="text-white/40"
+              className="text-white/40 shrink-0"
               animate={{ rotate: open ? 180 : 0 }}
               transition={{ duration: 0.2, ease: [0, 0, 0.2, 1] }}
             >
@@ -274,17 +275,17 @@ export default function BookingBar() {
           </motion.button>
 
           {/* Right: actions */}
-          <div className="flex items-center gap-3">
+          <div className="flex items-center justify-between sm:justify-end gap-3 shrink-0">
             <motion.button
               onClick={() => booking.clearBooking()}
-              className="font-sans text-xs text-white/30 hover:text-white/60 transition-colors flex items-center gap-1"
+              className="font-sans text-xs text-white/30 hover:text-white/60 transition-colors flex items-center gap-1 shrink-0"
               whileTap={{ scale: 0.95 }}
             >
               <X size={12} /> Clear
             </motion.button>
             <motion.button
               onClick={handleCheckout}
-              className="bg-[#C9A96E] hover:bg-[#b8935e] text-[#1a1a1a] font-sans text-sm font-medium px-6 py-2.5 transition-colors"
+              className="flex-1 sm:flex-none bg-[#C9A96E] hover:bg-[#b8935e] text-[#1a1a1a] font-sans text-sm font-medium px-6 py-2.5 transition-colors whitespace-nowrap"
               whileTap={{ scale: 0.97 }}
               transition={{ duration: 0.1 }}
             >

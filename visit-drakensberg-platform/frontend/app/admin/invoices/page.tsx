@@ -7,7 +7,7 @@ import { Search, RefreshCw, Plus, Printer, Trash2, X, FileText, Send, Pencil, Wa
 import {
   getInvoices, getFinanceSettings, sendInvoice, invoiceShareUrl, invoiceViewedLabel,
   revokeInvoiceLink, reissueInvoiceLink, voidInvoice, reissueInvoice,
-  type Invoice,
+  type Invoice, type InvoiceWithOrder,
 } from '@/lib/invoices'
 import { createOrder, updateOrder, getOrderLines, type OrderLineInput, type OrderLine } from '@/lib/orders'
 import {
@@ -821,7 +821,7 @@ function VoidModal({ invoice, onClose, onDone }: {
 }
 
 export default function AdminInvoicesPage() {
-  const [invoices, setInvoices] = useState<Invoice[]>([])
+  const [invoices, setInvoices] = useState<InvoiceWithOrder[]>([])
   const [drafts, setDrafts] = useState<InvoiceDraft[]>([])
   const [people, setPeople] = useState<Person[]>([])
   const [search, setSearch] = useState('')
@@ -901,7 +901,7 @@ export default function AdminInvoicesPage() {
   const suppliers = useMemo(() => people.filter(p => p.role === 'supplier'), [people])
 
   const filtered = useMemo(() => invoices.filter(i => {
-    const hay = `${i.invoice_number} ${i.order_id}`.toLowerCase()
+    const hay = `${i.invoice_number} ${i.order_id} ${i.customer_name ?? ''} ${i.trip_name ?? ''}`.toLowerCase()
     return hay.includes(search.toLowerCase()) && (filter === 'all' || i.status === filter)
   }), [invoices, search, filter])
 
@@ -1004,7 +1004,7 @@ export default function AdminInvoicesPage() {
       <div className="flex flex-col sm:flex-row sm:flex-wrap gap-3 mb-6">
         <div className="flex items-center gap-2 border border-gray-200 bg-white px-3 py-2.5 sm:py-2 flex-1 sm:min-w-[220px]">
           <Search size={14} className="text-gray-400 shrink-0" />
-          <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search invoice number…" className="flex-1 min-w-0 font-sans text-base sm:text-sm focus:outline-none" />
+          <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search invoice number, customer or trip…" className="flex-1 min-w-0 font-sans text-base sm:text-sm focus:outline-none" />
         </div>
         {/* Filters scroll sideways on a phone instead of wrapping into three rows. */}
         <div className="-mx-4 px-4 sm:mx-0 sm:px-0 overflow-x-auto">
@@ -1028,8 +1028,9 @@ export default function AdminInvoicesPage() {
             <div key={i.id} className="p-4">
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
-                  <p className="font-mono text-xs text-gray-500">{i.invoice_number}</p>
-                  <p className="font-sans text-xs text-gray-400 mt-0.5">Issued {fmt(i.issued_at)}</p>
+                  <p className="font-sans text-sm font-medium text-black truncate">{i.customer_name || 'Unknown customer'}</p>
+                  <p className="font-sans text-xs text-gray-500 truncate">{i.trip_name || '—'}</p>
+                  <p className="font-mono text-xs text-gray-400 mt-1">{i.invoice_number} · Issued {fmt(i.issued_at)}</p>
                   <ViewedBadge invoice={i} className="mt-1" />
                 </div>
                 <span className={`font-sans text-[10px] tracking-[0.1em] uppercase px-2.5 py-1 shrink-0 ${STATUS_BADGE[i.status] ?? STATUS_BADGE.unpaid}`}>{i.status}</span>
@@ -1094,9 +1095,9 @@ export default function AdminInvoicesPage() {
       </div>
 
       <div className="hidden md:block bg-white border border-gray-200 overflow-x-auto">
-        <table className="w-full min-w-[980px]">
+        <table className="w-full min-w-[1220px]">
           <thead><tr className="border-b border-gray-100">
-            {['Invoice', 'Issued', 'Subtotal', 'VAT', 'Total', 'Paid', 'Balance', 'Status', 'Opened', ''].map(h =>
+            {['Invoice', 'Customer', 'Trip', 'Issued', 'Subtotal', 'VAT', 'Total', 'Paid', 'Balance', 'Status', 'Opened', ''].map(h =>
               <th key={h} className="text-left px-5 py-3 font-sans text-[10px] tracking-[0.12em] uppercase text-gray-400">{h}</th>)}
           </tr></thead>
           <tbody className="divide-y divide-gray-100">
@@ -1108,6 +1109,8 @@ export default function AdminInvoicesPage() {
               return (
                 <tr key={i.id} className="hover:bg-[#F7F5F2] transition-colors">
                   <td className="px-5 py-4 font-mono text-xs text-gray-500">{i.invoice_number}</td>
+                  <td className="px-5 py-4 font-sans text-sm text-black max-w-[180px] truncate">{i.customer_name || '—'}</td>
+                  <td className="px-5 py-4 font-sans text-sm text-gray-500 max-w-[180px] truncate">{i.trip_name || '—'}</td>
                   <td className="px-5 py-4 font-sans text-xs text-gray-500">{fmt(i.issued_at)}</td>
                   <td className="px-5 py-4 font-sans text-sm">{formatMoney(Number(i.subtotal), i.currency)}</td>
                   <td className="px-5 py-4 font-sans text-sm text-gray-500">{formatMoney(Number(i.tax_amount), i.currency)}</td>
@@ -1174,8 +1177,8 @@ export default function AdminInvoicesPage() {
                 </tr>
               )
             })}
-            {!loading && filtered.length === 0 && <tr><td colSpan={10} className="px-5 py-12 text-center font-sans text-sm text-gray-400">No invoices found.</td></tr>}
-            {loading && <tr><td colSpan={10} className="px-5 py-12 text-center font-sans text-sm text-gray-400">Loading invoices…</td></tr>}
+            {!loading && filtered.length === 0 && <tr><td colSpan={12} className="px-5 py-12 text-center font-sans text-sm text-gray-400">No invoices found.</td></tr>}
+            {loading && <tr><td colSpan={12} className="px-5 py-12 text-center font-sans text-sm text-gray-400">Loading invoices…</td></tr>}
           </tbody>
         </table>
       </div>
