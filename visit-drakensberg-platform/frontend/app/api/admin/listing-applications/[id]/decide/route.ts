@@ -64,7 +64,7 @@ export async function POST(req: Request, { params }: { params: { id: string } })
 
   const { data: row, error: fetchError } = await admin
     .from('vd_listing_applications')
-    .select('value')
+    .select('value, reference')
     .eq('id', params.id)
     .maybeSingle()
   if (fetchError || !row) {
@@ -129,6 +129,50 @@ export async function POST(req: Request, { params }: { params: { id: string } })
   // decision === 'approved'
   if (!contactEmail) {
     return NextResponse.json({ error: 'Application has no contact email to approve against.' }, { status: 400 })
+  }
+
+  // Accreditation gate. The review UI disables Approve on the same verdict,
+  // but that is a signpost — this is the rule. An operator reaches the public
+  // catalog only once the verification office has verified either an EDTEA
+  // registration or CTO membership that has not expired.
+  //
+  // Read directly rather than through vd_accreditation_ok(): the service-role
+  // client carries no user JWT, and the point here is the data, not the
+  // caller's permissions (which were already checked above).
+  const applicationRef = String((row as { reference?: string }).reference ?? application.reference ?? '')
+  const { data: accreditationDocs, error: accreditationError } = await admin
+    .from('vd_compliance_documents')
+    .select('doc_type, review_status, expires_on')
+    .eq('application_ref', applicationRef)
+    .in('doc_type', ['edtea_registration', 'cto_membership'])
+    .eq('review_status', 'verified')
+
+  if (accreditationError) {
+    // The table is missing only when 20260905 has not been run. Refuse rather
+    // than approving: silently skipping the gate on a migration lag is how an
+    // unverified operator reaches the catalog.
+    return NextResponse.json(
+      {
+        error: /relation .* does not exist|could not find the table/i.test(String(accreditationError.message || ''))
+          ? 'Compliance checks are not set up yet. Run supabase/migrations/20260905_supplier_compliance.sql before approving suppliers.'
+          : 'Could not check this applicant’s accreditation. Try again.',
+      },
+      { status: 503 },
+    )
+  }
+
+  const today = new Date().toISOString().slice(0, 10)
+  const hasCurrentAccreditation = (accreditationDocs ?? []).some(
+    d => !d.expires_on || String(d.expires_on) >= today,
+  )
+  if (!hasCurrentAccreditation) {
+    return NextResponse.json(
+      {
+        error:
+          'This applicant has no verified, unexpired EDTEA registration or CTO membership on file. Verify their certificate in the compliance panel first.',
+      },
+      { status: 409 },
+    )
   }
 
   const warnings: string[] = []
@@ -204,6 +248,30 @@ export async function POST(req: Request, { params }: { params: { id: string } })
     user_metadata: { supplier_type: supplierTypes.join(',') },
   })
   if (metaSyncError) warnings.push('Approved, but the portal metadata sync failed — it will catch up on next login.')
+
+  // Re-home the certificates and acceptances onto the account. Without this
+  // they stay keyed to an application reference nobody looks at again, and the
+  // renewal queue — which watches expiry per supplier — would never see the
+  // certificate that is about to lapse.
+  //
+  // Through the RPC on the caller's own session, not the service-role client:
+  // vd_supplier_agreements has no update policy for anybody, and the function
+  // is the narrow exception that can only fill in a null supplier_id. Going
+  // around it with the service role would make "append-only" a comment rather
+  // than a property.
+  //
+  // The storage objects stay under compliance/applications/<ref>/…: the
+  // verification office reads the whole bucket, so nothing is lost, and moving
+  // objects between prefixes would break the path recorded on the row.
+  if (applicationRef) {
+    const { error: linkError } = await supabase.rpc('vd_link_application_to_supplier', {
+      p_application_ref: applicationRef,
+      p_supplier_id: supplierId,
+    })
+    if (linkError) {
+      warnings.push('Approved, but their compliance documents stayed attached to the application rather than the account.')
+    }
+  }
 
   // Starting commercial terms, from what the applicant asked for. Editable
   // afterwards from /admin/finance like any other supplier's terms.

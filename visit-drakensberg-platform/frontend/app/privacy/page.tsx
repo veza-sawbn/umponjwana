@@ -5,7 +5,6 @@ export const metadata: Metadata = {
   title: 'Privacy Policy',
   description: 'How Visit Drakensberg collects, uses and protects your personal information.',
   alternates: { canonical: '/privacy' },
-  robots: { index: false },
 }
 
 const SECTIONS: { heading: string; body: string[] }[] = [
@@ -36,9 +35,18 @@ const SECTIONS: { heading: string; body: string[] }[] = [
     ],
   },
   {
-    heading: '5. Cookies',
+    heading: '5. Cookies and browser storage',
     body: [
-      'We use essential cookies to keep you signed in and to remember your trip planning selections. We do not use third-party advertising cookies.',
+      'We set one kind of cookie: the session cookie that keeps you signed in. It is strictly necessary — without it you cannot stay logged in or reach your account. We set no advertising, tracking or analytics cookies of our own, and we run no third-party advertising or analytics tags.',
+      'Your trip planning selections, cart and browsing measurements are kept in your browser’s local storage rather than in cookies. They stay on your device and you can clear them at any time through your browser settings.',
+      'We use Google Maps for address search and for driving distances. Google may set its own cookies when it loads, and that is governed by Google’s privacy policy rather than ours. It loads when you type in an address field, and on pages that show you the driving distance from a stay you have selected. It does not load on pages that use neither.',
+    ],
+  },
+  {
+    heading: '6. Suppliers and your booking details',
+    body: [
+      'The supplier you book with receives the details needed to deliver your booking. Under our Supplier Agreement they act as an operator for us within the meaning of POPIA: they may use your information only to deliver the booking, may not market to you without your own consent, must keep it secure, and must report any breach to us within 72 hours.',
+      'If you believe a supplier has misused your information, tell us at hello@visitdrakensberg.com or through our concern channel at /report-a-concern.',
     ],
   },
 ]
@@ -54,7 +62,7 @@ export default function PrivacyPage() {
       </section>
 
       <section className="max-w-3xl mx-auto px-6 py-16">
-        <p className="font-sans text-sm text-forest/50 mb-10">Last updated: July 2026</p>
+        <p className="font-sans text-sm text-forest/50 mb-10">Last updated: September 2026</p>
         <div className="space-y-10">
           {SECTIONS.map(s => (
             <div key={s.heading}>

@@ -102,6 +102,65 @@ export type ExperienceDetails = {
   setting: string
 }
 
+/* ── Accreditation and compliance ─────────────────────────────────────────
+ *
+ * The verification office cannot validate a listing on the applicant's word,
+ * so the application carries evidence: either an EDTEA tourism operator
+ * registration or CTO membership (one of the two is mandatory — see
+ * ACCREDITATION_DOC_TYPES in lib/compliance.ts), plus public liability cover
+ * and the registration details that let a reviewer confirm the entity is real.
+ *
+ * The certificates themselves are NOT stored here. They go into the private
+ * `compliance` bucket and are registered in vd_compliance_documents; what the
+ * application keeps is the id of that row, so the review queue can find the
+ * document without the application blob ever holding a readable path to
+ * somebody's registration papers.
+ */
+
+export type AccreditationKind = 'edtea' | 'cto'
+
+export const ACCREDITATION_OPTIONS: { id: AccreditationKind; label: string; blurb: string }[] = [
+  {
+    id: 'edtea',
+    label: 'EDTEA operator registration',
+    blurb: 'Registered as a tourism operator with KZN Economic Development, Tourism & Environmental Affairs',
+  },
+  {
+    id: 'cto',
+    label: 'CTO membership',
+    blurb: 'A current member of your local Community Tourism Organisation',
+  },
+]
+
+export type ComplianceDetails = {
+  accreditationKind: AccreditationKind | ''
+  accreditationIssuer: string
+  accreditationNumber: string
+  accreditationExpiry: string
+  /** vd_compliance_documents.id — not a storage path. */
+  accreditationDocId: string
+  accreditationFileName: string
+
+  insurer: string
+  insurancePolicyNumber: string
+  insuranceExpiry: string
+  insuranceDocId: string
+  insuranceFileName: string
+
+  companyRegistrationNumber: string
+  vatNumber: string
+}
+
+export function emptyCompliance(): ComplianceDetails {
+  return {
+    accreditationKind: '', accreditationIssuer: '', accreditationNumber: '',
+    accreditationExpiry: '', accreditationDocId: '', accreditationFileName: '',
+    insurer: '', insurancePolicyNumber: '', insuranceExpiry: '',
+    insuranceDocId: '', insuranceFileName: '',
+    companyRegistrationNumber: '', vatNumber: '',
+  }
+}
+
 export const STAY_ROOM_BANDS = ['1–5', '6–15', '16–40', '40+']
 export const TOUR_STYLES = ['Day hikes', 'Multi-day trekking', 'Summit attempts', 'Cultural & heritage', 'Wildlife & birding']
 export const VEHICLE_TYPES = ['Sedan', 'Minibus (≤14)', 'Coach (15+)', '4×4', 'Trailer / luggage']
@@ -219,6 +278,8 @@ export type ListingApplication = {
   // operator adds when they run guided activities alongside the main offering.
   offersActivities: boolean
   activities: ApplicationActivity[]
+  // Accreditation and supporting evidence (see ComplianceDetails)
+  compliance: ComplianceDetails
   // Commercial terms the applicant asked for (see COMMISSION_TIERS — a
   // preference, not a binding rate)
   commissionTier: string
@@ -297,14 +358,26 @@ export function normalizeListingApplication(raw: Record<string, unknown>): Omit<
     experience: r.experience ?? emptyExperience(),
     offersActivities: r.offersActivities ?? activities.length > 0,
     activities,
+    // Applications lodged before accreditation was required carry no
+    // compliance block. They read back as an empty one — which the review
+    // queue renders as "no accreditation on file", the right answer for a
+    // row that genuinely has none.
+    compliance: { ...emptyCompliance(), ...(r.compliance ?? {}) },
     commissionTier: r.commissionTier ?? COMMISSION_TIERS[0].id,
     commissionAcknowledged: r.commissionAcknowledged ?? false,
     createdAt: r.createdAt ?? '',
   }
 }
 
-/** Short, sayable handle for the applicant to quote when they follow up. */
-function newReference(): string {
+/**
+ * Short, sayable handle for the applicant to quote when they follow up.
+ *
+ * Exported because the reference is now needed *before* the application is
+ * submitted: accreditation certificates upload into
+ * compliance/applications/<reference>/… while the applicant is still filling
+ * the form, so the form mints the reference up front and hands it back here.
+ */
+export function newApplicationReference(): string {
   const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789' // no I/O/0/1
   let tail = ''
   for (let i = 0; i < 6; i++) tail += alphabet[Math.floor(Math.random() * alphabet.length)]
@@ -322,11 +395,15 @@ function newId(): string {
  * show the reference; throws with a readable message if the write is refused
  * (most often because the migration has not been run yet).
  */
-export async function submitListingApplication(draft: ListingApplicationDraft): Promise<ListingApplication> {
+export async function submitListingApplication(
+  draft: ListingApplicationDraft,
+  /** The reference the form already uploaded compliance documents against. */
+  reference?: string,
+): Promise<ListingApplication> {
   const application: ListingApplication = {
     ...draft,
     id: newId(),
-    reference: newReference(),
+    reference: reference || newApplicationReference(),
     status: 'new',
     createdAt: new Date().toISOString(),
   }
@@ -344,15 +421,22 @@ export async function submitListingApplication(draft: ListingApplicationDraft): 
     value: application,
   }
 
-  // commission_tier is a mirror of value->>'commissionTier', added by a later
-  // migration than the table itself. Deploys and migrations do not land in
-  // lockstep, so a build carrying the tier can reach a database that has not
-  // run 20260808 yet — and this form is live with real applicants. Mirror it
-  // when the column is there, and fall back to the JSON-only row when it is
-  // not, rather than losing the application over a column that only helps the
-  // review queue sort.
-  let { error } = await supabase.from(TABLE).insert({ ...row, commission_tier: application.commissionTier })
-  if (error && isMissingColumn(error.message, 'commission_tier')) {
+  // Mirror columns added by migrations later than the table itself:
+  // commission_tier (20260808), accreditation_type / accreditation_ref
+  // (20260905). Deploys and migrations do not land in lockstep, so a build
+  // carrying these can reach a database that has not run those migrations —
+  // and this form is live with real applicants. Every one of them only helps
+  // the review queue sort and filter; the authoritative copy is inside
+  // `value`. So mirror them when the columns are there, and fall back to the
+  // JSON-only row when any is missing, rather than losing an application over
+  // a column nothing depends on.
+  const mirrors = {
+    commission_tier: application.commissionTier,
+    accreditation_type: application.compliance.accreditationKind || null,
+    accreditation_ref: application.compliance.accreditationNumber || null,
+  }
+  let { error } = await supabase.from(TABLE).insert({ ...row, ...mirrors })
+  if (error && Object.keys(mirrors).some(col => isMissingColumn(error!.message, col))) {
     ({ error } = await supabase.from(TABLE).insert(row))
   }
 

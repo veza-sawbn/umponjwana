@@ -11,6 +11,7 @@ import {
   getListingApplications, tierById, APPLICANT_TYPES,
   type ListingApplication, type ListingApplicationStatus, type ApplicationActivity,
 } from '@/lib/listing-applications'
+import CompliancePanel from '@/components/admin/CompliancePanel'
 
 // Review queue for the public "list with us" journey (app/list-with-us).
 // Every submission lands in vd_listing_applications, invisible to visitors
@@ -175,9 +176,11 @@ function ApplicationDetail({ app }: { app: ListingApplication }) {
   )
 }
 
-function DecisionButtons({ status, busy, onDecide }: {
+function DecisionButtons({ status, busy, accreditationOk, onDecide }: {
   status: ListingApplicationStatus
   busy: boolean
+  /** From CompliancePanel. Approval is blocked until this is true. */
+  accreditationOk: boolean
   onDecide: (d: 'in_review' | 'approved' | 'declined') => void
 }) {
   return (
@@ -189,8 +192,15 @@ function DecisionButtons({ status, busy, onDecide }: {
         </button>
       )}
       {status !== 'approved' && (
-        <button disabled={busy} onClick={() => onDecide('approved')}
-          className="px-2.5 py-1 bg-[#2d6a4f] text-white font-sans text-xs hover:bg-[#235a3f] transition-colors flex items-center gap-1 disabled:opacity-50">
+        // Disabled rather than hidden, with the reason on hover: a reviewer
+        // who cannot find the Approve button files a bug; one who can see why
+        // it is greyed out goes and verifies the certificate. The API route
+        // enforces the same rule, so this is a signpost, not the gate.
+        <button
+          disabled={busy || !accreditationOk}
+          onClick={() => onDecide('approved')}
+          title={accreditationOk ? undefined : 'Verify an EDTEA registration or CTO membership first'}
+          className="px-2.5 py-1 bg-[#2d6a4f] text-white font-sans text-xs hover:bg-[#235a3f] transition-colors flex items-center gap-1 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-[#2d6a4f]">
           <ShieldCheck size={11} /> Approve
         </button>
       )}
@@ -211,6 +221,11 @@ export default function AdminListingApplicationsPage() {
   const [search, setSearch] = useState('')
   const [expanded, setExpanded] = useState<string | null>(null)
   const [busyId, setBusyId] = useState<string | null>(null)
+  // Accreditation verdict per application reference, reported up by the
+  // CompliancePanel of whichever row is open. Keyed rather than a single
+  // value so collapsing and reopening a row doesn't briefly re-enable
+  // Approve against a stale verdict.
+  const [accreditation, setAccreditation] = useState<Record<string, boolean>>({})
 
   async function load() {
     setLoading(true)
@@ -332,11 +347,22 @@ export default function AdminListingApplicationsPage() {
                 {isOpen && (
                   <>
                     <ApplicationDetail app={app} />
+                    <div className="px-6 pb-5 bg-[#F7F5F2]/40">
+                      <CompliancePanel
+                        applicationRef={app.reference}
+                        onAccreditationChange={ok => setAccreditation(a => (a[app.reference] === ok ? a : { ...a, [app.reference]: ok }))}
+                      />
+                    </div>
                     <div className="px-6 py-3 border-t border-gray-100 flex items-center justify-between flex-wrap gap-3">
                       <a href={`mailto:${app.contactEmail}`} className="font-sans text-xs text-gray-400 hover:text-gray-600 flex items-center gap-1.5">
                         <ExternalLink size={11} /> Email applicant
                       </a>
-                      <DecisionButtons status={app.status} busy={busy} onDecide={d => decide(app, d)} />
+                      <DecisionButtons
+                        status={app.status}
+                        busy={busy}
+                        accreditationOk={accreditation[app.reference] ?? false}
+                        onDecide={d => decide(app, d)}
+                      />
                     </div>
                   </>
                 )}
