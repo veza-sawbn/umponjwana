@@ -344,24 +344,77 @@ function fromRow(r: Record<string, unknown>): ComplianceDocument {
   }
 }
 
+/** Shared error handling — a read that fails must not read as "none on file". */
+function readError(error: { message?: string } | null): Error | null {
+  if (!error) return null
+  const message = String(error.message || '')
+  if (/relation .* does not exist|could not find the table/i.test(message)) {
+    return new Error(
+      'Compliance tracking is not set up yet. Run supabase/migrations/20260905_supplier_compliance.sql in the Supabase SQL editor.',
+    )
+  }
+  return new Error(message || 'Could not load compliance documents.')
+}
+
 /** Verification office: documents lodged against one application. */
 export async function getApplicationDocuments(applicationRef: string): Promise<ComplianceDocument[]> {
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from('vd_compliance_documents')
     .select('*')
     .eq('application_ref', applicationRef)
     .order('created_at', { ascending: true })
+  const failure = readError(error)
+  if (failure) throw failure
   return (data ?? []).map(d => fromRow(d as Record<string, unknown>))
 }
 
 /** Documents held against a supplier account. */
 export async function getSupplierDocuments(supplierId: string): Promise<ComplianceDocument[]> {
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from('vd_compliance_documents')
     .select('*')
     .eq('supplier_id', supplierId)
     .order('created_at', { ascending: true })
+  const failure = readError(error)
+  if (failure) throw failure
   return (data ?? []).map(d => fromRow(d as Record<string, unknown>))
+}
+
+/**
+ * Every document belonging to an application, including after approval.
+ *
+ * Approving an application re-homes its certificates onto the new supplier
+ * account (vd_link_application_to_supplier): supplier_id is set and
+ * application_ref is cleared, because the renewal queue tracks expiry per
+ * supplier and would otherwise never see a certificate about to lapse.
+ *
+ * The consequence, which cost a real bug: an approved application queried by
+ * application_ref alone comes back empty, so its own panel showed no documents
+ * and declared accreditation unsatisfied for an operator who had just been
+ * verified and approved. The evidence had moved, not vanished.
+ *
+ * So look in both places. The storage path still begins applications/<ref>/…,
+ * which is what preserves provenance once the row's application_ref is gone.
+ */
+export async function getDocumentsForApplication(
+  applicationRef: string,
+  approvedSupplierId?: string | null,
+): Promise<ComplianceDocument[]> {
+  const [byApplication, bySupplier] = await Promise.all([
+    getApplicationDocuments(applicationRef),
+    approvedSupplierId ? getSupplierDocuments(approvedSupplierId) : Promise.resolve([]),
+  ])
+
+  // A supplier can hold documents from more than one application, and from
+  // their own later uploads. Keep only what this application actually sent —
+  // the storage prefix is the surviving link once application_ref is cleared.
+  const fromThisApplication = bySupplier.filter(d =>
+    d.storagePath.startsWith(`applications/${applicationRef}/`),
+  )
+
+  const seen = new Set(byApplication.map(d => d.id))
+  return [...byApplication, ...fromThisApplication.filter(d => !seen.has(d.id))]
+    .sort((a, b) => a.createdAt.localeCompare(b.createdAt))
 }
 
 /**
@@ -392,6 +445,73 @@ export async function getComplianceQueue(): Promise<ComplianceDocument[]> {
     if (d.reviewStatus !== 'verified') return false
     const state = expiryState(d.expiresOn)
     return state === 'expired' || state === 'expiring'
+  })
+}
+
+/**
+ * Every compliance document on file, newest first, with the owner resolved to
+ * a readable name.
+ *
+ * getComplianceQueue() answers "what needs doing?"; this answers "what do we
+ * hold?". Both are needed: a queue-only page is empty whenever the estate is
+ * healthy, which is most of the time, and gives no way to check whether a
+ * particular operator is accredited.
+ *
+ * Owner names come from two tables because a document is owned by either a
+ * supplier account or a not-yet-approved application. Both lookups are
+ * admin/ops-gated by RLS and return nothing to anyone else, so a non-staff
+ * caller gets documents with blank labels rather than a leak.
+ */
+export type ComplianceDocumentWithOwner = ComplianceDocument & {
+  ownerLabel: string
+  ownerHref: string | null
+}
+
+export async function getAllComplianceDocuments(): Promise<ComplianceDocumentWithOwner[]> {
+  const { data, error } = await supabase
+    .from('vd_compliance_documents')
+    .select('*')
+    .order('created_at', { ascending: false })
+  const failure = readError(error)
+  if (failure) throw failure
+
+  const docs = (data ?? []).map(d => fromRow(d as Record<string, unknown>))
+  if (docs.length === 0) return []
+
+  const supplierIds = [...new Set(docs.map(d => d.supplierId).filter((v): v is string => Boolean(v)))]
+  const applicationRefs = [...new Set(docs.map(d => d.applicationRef).filter((v): v is string => Boolean(v)))]
+
+  const [profiles, applications] = await Promise.all([
+    supplierIds.length
+      ? supabase.from('profiles').select('id, full_name, email').in('id', supplierIds)
+      : Promise.resolve({ data: [] as { id: string; full_name: string | null; email: string | null }[] }),
+    applicationRefs.length
+      ? supabase.from('vd_listing_applications').select('reference, property_name, contact_email').in('reference', applicationRefs)
+      : Promise.resolve({ data: [] as { reference: string; property_name: string | null; contact_email: string | null }[] }),
+  ])
+
+  const supplierName = new Map(
+    (profiles.data ?? []).map(p => [p.id, p.full_name || p.email || 'Unnamed supplier']),
+  )
+  const applicationName = new Map(
+    (applications.data ?? []).map(a => [a.reference, a.property_name || a.contact_email || a.reference]),
+  )
+
+  return docs.map(d => {
+    if (d.supplierId) {
+      return {
+        ...d,
+        ownerLabel: supplierName.get(d.supplierId) ?? 'Supplier account',
+        ownerHref: '/admin/suppliers',
+      }
+    }
+    return {
+      ...d,
+      ownerLabel: d.applicationRef
+        ? `${applicationName.get(d.applicationRef) ?? d.applicationRef} · application`
+        : 'Unknown owner',
+      ownerHref: '/admin/listing-applications',
+    }
   })
 }
 

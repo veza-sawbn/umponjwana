@@ -6,7 +6,7 @@ import {
   AlertTriangle, Check, ExternalLink, FileText, Loader2, ShieldCheck, ShieldAlert, Upload, X,
 } from 'lucide-react'
 import {
-  getApplicationDocuments, getSupplierDocuments, complianceDocumentUrl,
+  getDocumentsForApplication, getSupplierDocuments, complianceDocumentUrl,
   reviewComplianceDocument, uploadComplianceDocument, accreditationOk,
   expiryState, daysUntilExpiry,
   isAccreditation, DOC_TYPES, REVIEW_STATUS_LABEL,
@@ -185,8 +185,12 @@ function AddDocument({
   async function submit(file: File) {
     setBusy(true)
     try {
+      // A document belongs to exactly one owner. Once an application has been
+      // approved the panel carries both ids, and the account is the right
+      // home — that is where the renewal queue looks.
       await uploadComplianceDocument({
-        file, docType, applicationRef, supplierId,
+        file, docType,
+        ...(supplierId ? { supplierId } : { applicationRef }),
         issuer: issuer.trim(),
         referenceNumber: reference.trim(),
         expiresOn: expiresOn || null,
@@ -259,6 +263,12 @@ export default function CompliancePanel({
   onAccreditationChange,
 }: {
   applicationRef?: string
+  /**
+   * The supplier account. On an application panel, pass the account it was
+   * approved into — approval moves the certificates off the application
+   * reference and onto the account, so without this an approved application
+   * shows an empty panel and reports accreditation unsatisfied.
+   */
   supplierId?: string
   /** Lets the parent gate an Approve button on the accreditation verdict. */
   onAccreditationChange?: (ok: boolean) => void
@@ -266,16 +276,31 @@ export default function CompliancePanel({
   const [docs, setDocs] = useState<ComplianceDocument[]>([])
   const [acceptances, setAcceptances] = useState<AgreementAcceptance[]>([])
   const [loading, setLoading] = useState(true)
+  const [failed, setFailed] = useState('')
 
   const load = useCallback(async () => {
     setLoading(true)
+    setFailed('')
     try {
+      // An application panel looks in both places (see
+      // getDocumentsForApplication); a supplier panel only needs the account.
       const [d, a] = await Promise.all([
-        supplierId ? getSupplierDocuments(supplierId) : getApplicationDocuments(applicationRef ?? ''),
-        supplierId ? getSupplierAcceptances(supplierId) : getApplicationAcceptances(applicationRef ?? ''),
+        applicationRef
+          ? getDocumentsForApplication(applicationRef, supplierId)
+          : getSupplierDocuments(supplierId ?? ''),
+        applicationRef
+          ? getApplicationAcceptances(applicationRef, supplierId)
+          : getSupplierAcceptances(supplierId ?? ''),
       ])
       setDocs(d)
       setAcceptances(a)
+    } catch (e) {
+      // Never fall through to an empty list: "no documents on file" and
+      // "could not load them" look identical on screen and mean opposite
+      // things to a reviewer deciding whether to approve.
+      setFailed(e instanceof Error ? e.message : 'Could not load compliance documents.')
+      setDocs([])
+      setAcceptances([])
     } finally {
       setLoading(false)
     }
@@ -312,6 +337,15 @@ export default function CompliancePanel({
           Refresh
         </button>
       </div>
+
+      {failed && (
+        <div className="border border-red-200 bg-red-50 px-4 py-3 flex items-start gap-2.5">
+          <AlertTriangle size={14} className="text-red-500 mt-0.5 shrink-0" />
+          <p className="font-sans text-xs text-red-700 leading-relaxed">
+            {failed} Nothing below is a reliable picture of this operator — do not approve on it.
+          </p>
+        </div>
+      )}
 
       {/* The gate, stated plainly. Everything below is evidence for it. */}
       <div className={`border px-4 py-3 flex items-start gap-2.5 ${

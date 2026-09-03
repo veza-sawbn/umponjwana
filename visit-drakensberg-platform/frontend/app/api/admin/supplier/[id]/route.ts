@@ -73,6 +73,7 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
     website?: string
     ownerContactEmail?: string | null
     isApproved?: boolean
+    approvalStatus?: 'approved' | 'suspended' | 'rejected' | 'pending'
   }
   try { body = await req.json() } catch {
     return NextResponse.json({ error: 'invalid body' }, { status: 400 })
@@ -113,11 +114,22 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
     // is_admin() and auth.uid() is null under the service role — so we write
     // both columns here instead. The caller was already proven to be an admin
     // by requireAdmin() above.
-    if (body.isApproved !== undefined) {
-      const approved = body.isApproved
+    //
+    // approvalStatus is the full control (approved / suspended / rejected /
+    // pending); isApproved is the older boolean the toggle used to send, kept
+    // working so nothing that still posts it breaks. Only 'approved' sets
+    // is_approved — and since 20260906 that boolean is what the public read
+    // policy on vd_entities consults through vd_owner_is_listable(), so
+    // suspending here genuinely takes the supplier's listings off the site
+    // rather than only relabelling them in the console.
+    const nextStatus = body.approvalStatus ?? (
+      body.isApproved === undefined ? undefined : body.isApproved ? 'approved' : 'pending'
+    )
+    if (nextStatus !== undefined) {
+      const approved = nextStatus === 'approved'
       const { error } = await admin
         .from('profiles')
-        .update({ is_approved: approved, approval_status: approved ? 'approved' : 'pending' })
+        .update({ is_approved: approved, approval_status: nextStatus })
         .eq('id', params.id)
 
       // 42703 = column does not exist: the supplier-moderation migration

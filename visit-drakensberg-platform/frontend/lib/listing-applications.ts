@@ -285,6 +285,13 @@ export type ListingApplication = {
   commissionTier: string
   commissionAcknowledged: boolean
   createdAt: string
+  /**
+   * The supplier account this application was approved into, written by the
+   * approval route. Absent until approved — and the reason the review queue
+   * can still find the applicant's certificates afterwards, since approval
+   * moves them off the application reference and onto the account.
+   */
+  supplierId?: string
 }
 
 export type ListingApplicationDraft = Omit<
@@ -366,6 +373,7 @@ export function normalizeListingApplication(raw: Record<string, unknown>): Omit<
     commissionTier: r.commissionTier ?? COMMISSION_TIERS[0].id,
     commissionAcknowledged: r.commissionAcknowledged ?? false,
     createdAt: r.createdAt ?? '',
+    supplierId: typeof r.supplierId === 'string' ? r.supplierId : undefined,
   }
 }
 

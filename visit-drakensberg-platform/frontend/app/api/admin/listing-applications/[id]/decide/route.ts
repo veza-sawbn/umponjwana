@@ -3,6 +3,7 @@ import { cookies } from 'next/headers'
 import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 import { getSiteOrigin } from '@/lib/origin'
+import { notifyServer } from '@/lib/notify-server'
 import { tierById, normalizeListingApplication } from '@/lib/listing-applications'
 
 export const dynamic = 'force-dynamic'
@@ -114,13 +115,12 @@ export async function POST(req: Request, { params }: { params: { id: string } })
     if (contactEmail) {
       const { data: existing } = await admin.from('profiles').select('id').ilike('email', contactEmail).maybeSingle()
       if (existing?.id) {
-        await admin.from('vd_notifications').insert({
-          user_id: existing.id,
+        await notifyServer({
+          userId: existing.id,
           type: 'info',
           title: 'Update on your application',
           body: `We're unable to list ${businessName || 'your business'} on Visit Drakensberg at this time.`,
-          link: null,
-        })
+        }, getSiteOrigin(req))
       }
     }
     return NextResponse.json({ ok: true })
@@ -139,11 +139,21 @@ export async function POST(req: Request, { params }: { params: { id: string } })
   // Read directly rather than through vd_accreditation_ok(): the service-role
   // client carries no user JWT, and the point here is the data, not the
   // caller's permissions (which were already checked above).
+  //
+  // Look under both owners. Approving moves the certificates off the
+  // application reference and onto the account, so re-approving an already
+  // approved application — or approving one whose evidence was lodged against
+  // the account directly — would otherwise find nothing and refuse an operator
+  // who is demonstrably accredited.
   const applicationRef = String((row as { reference?: string }).reference ?? application.reference ?? '')
+  const linkedSupplierId = application.supplierId ?? null
+  const ownerFilter = linkedSupplierId
+    ? `application_ref.eq.${applicationRef},supplier_id.eq.${linkedSupplierId}`
+    : `application_ref.eq.${applicationRef}`
   const { data: accreditationDocs, error: accreditationError } = await admin
     .from('vd_compliance_documents')
     .select('doc_type, review_status, expires_on')
-    .eq('application_ref', applicationRef)
+    .or(ownerFilter)
     .in('doc_type', ['edtea_registration', 'cto_membership'])
     .eq('review_status', 'verified')
 
@@ -181,12 +191,45 @@ export async function POST(req: Request, { params }: { params: { id: string } })
 
   const { data: existingProfile } = await admin
     .from('profiles')
-    .select('id, full_name')
+    .select('id, full_name, role, staff_role')
     .ilike('email', contactEmail)
     .maybeSingle()
 
   if (existingProfile?.id) {
     supplierId = existingProfile.id
+
+    // Grant the supplier role to an account that already existed.
+    //
+    // This branch used to do nothing but assign supplierId. The approval then
+    // set is_approved/approval_status/supplier_type but left role untouched —
+    // so an applicant who already had an account (a visitor who once booked, a
+    // staff member applying with their work address) stayed role='visitor' and
+    // never appeared in /admin/suppliers, which lists on role='supplier'. They
+    // were approved everywhere except the one place anyone looks.
+    //
+    // Never downgrade an admin: role is a single column, so writing 'supplier'
+    // over 'admin' would strip the console from whoever approved with their own
+    // address. Admins already reach supplier routes via the middleware's
+    // role === 'admin' check, so there is nothing to grant them.
+    if (existingProfile.role !== 'admin') {
+      // staff_role has to travel with role. The middleware reads role from
+      // app_metadata and only falls back to profiles when role is ABSENT — so
+      // writing role alone here would make it stop consulting the profile, and
+      // a finance or operations collaborator who applies to list would silently
+      // lose their console on the next request. Carry their staff_role across.
+      const appMetadata: Record<string, string> = { role: 'supplier' }
+      if (existingProfile.staff_role) appMetadata.staff_role = existingProfile.staff_role
+
+      const { error: metaError } = await admin.auth.admin.updateUserById(existingProfile.id, {
+        app_metadata: appMetadata,
+      })
+      if (metaError) warnings.push('Approved, but the app-level role grant failed — sign-in may briefly show reduced access.')
+
+      const { error: roleError } = await supabase.rpc('admin_set_role', { p_user: existingProfile.id, p_role: 'supplier' })
+      if (roleError) {
+        warnings.push('Approved, but their profile role could not be set to supplier — they will not appear in Suppliers.')
+      }
+    }
   } else {
     const origin = getSiteOrigin(req)
     const { data: invited, error: inviteError } = await admin.auth.admin.inviteUserByEmail(contactEmail, {
@@ -287,15 +330,25 @@ export async function POST(req: Request, { params }: { params: { id: string } })
     warnings.push('Supplier approved, but the application record could not be marked approved.')
   }
 
-  await admin.from('vd_notifications').insert({
-    user_id: supplierId,
+  // Records the row AND emails it. This used to be a bare insert, which is why
+  // approvals showed up on the bell and never reached the applicant's inbox —
+  // the one place someone who has just been approved is actually looking.
+  const notified = await notifyServer({
+    userId: supplierId,
     type: 'approval',
     title: 'Your application is approved',
     body: created
       ? 'Welcome to Visit Drakensberg — check your email to set a password, then sign in to set up your listing.'
       : 'You can now sign in and set up your listing.',
     link: '/supplier',
-  })
+  }, getSiteOrigin(req))
+  if (!notified.emailed) {
+    warnings.push(
+      notified.error
+        ? `Approved, but the confirmation email did not send (${notified.error}).`
+        : 'Approved, but the confirmation email did not send.',
+    )
+  }
 
   return NextResponse.json({ ok: true, supplierId, created, warnings })
 }

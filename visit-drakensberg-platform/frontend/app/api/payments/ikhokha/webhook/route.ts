@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server'
 import { getPaymentLinkStatus } from '@/lib/ikhokha'
 import { supabaseAdmin } from '@/lib/supabase-admin'
+import { getSiteOrigin } from '@/lib/origin'
+import { notifyServer, notifyServerMany } from '@/lib/notify-server'
 
 export const dynamic = 'force-dynamic'
 
@@ -71,24 +73,27 @@ export async function POST(req: Request) {
     const invoiceUrl = `/invoices/${link.invoice_id ?? link.order_id}`
 
     if (link.user_id) {
-      await admin.from('vd_notifications').insert({
-        user_id: link.user_id,
+      await notifyServer({
+        userId: link.user_id,
         type: 'payment',
         title: `Payment declined — ${declinedOrder?.order_number ?? link.order_id}`,
         body: 'Your card payment was declined and no charge was made. You can try again from your invoice.',
         link: invoiceUrl,
-      })
+      }, getSiteOrigin(req))
     }
     const { data: financeStaff } = await admin
       .from('profiles').select('id').or('role.eq.admin,staff_role.eq.finance')
     if (financeStaff && financeStaff.length > 0) {
-      await admin.from('vd_notifications').insert(financeStaff.map(f => ({
-        user_id: (f as { id: string }).id,
-        type: 'payment',
-        title: `Payment declined — ${declinedOrder?.order_number ?? link.order_id}`,
-        body: `${declinedOrder?.customer_name || 'A customer'}'s online payment attempt of ${link.amount} ${link.currency} was declined.`,
-        link: '/admin/orders',
-      })))
+      await notifyServerMany(
+        financeStaff.map(f => (f as { id: string }).id),
+        {
+          type: 'payment',
+          title: `Payment declined — ${declinedOrder?.order_number ?? link.order_id}`,
+          body: `${declinedOrder?.customer_name || 'A customer'}'s online payment attempt of ${link.amount} ${link.currency} was declined.`,
+          link: '/admin/orders',
+        },
+        getSiteOrigin(req),
+      )
     }
 
     return NextResponse.json({ ok: true })
@@ -179,14 +184,15 @@ export async function POST(req: Request) {
               .eq('id', tripReq.id)
           }
         }
-        const rows = (confirmedBooking.supplier_ids ?? []).map((sid: string) => ({
-          user_id: sid,
-          type: 'booking',
-          title: `New booking ${confirmedBooking.reference}`,
-          body: `${value?.customerName ?? 'A guest'} booked with you (${guests} guest${guests !== 1 ? 's' : ''}). Open your bookings for details.`,
-          link: '/supplier/bookings',
-        }))
-        if (rows.length > 0) await admin.from('vd_notifications').insert(rows)
+        const supplierIds: string[] = confirmedBooking.supplier_ids ?? []
+        if (supplierIds.length > 0) {
+          await notifyServerMany(supplierIds, {
+            type: 'booking',
+            title: `New booking ${confirmedBooking.reference}`,
+            body: `${value?.customerName ?? 'A guest'} booked with you (${guests} guest${guests !== 1 ? 's' : ''}). Open your bookings for details.`,
+            link: '/supplier/bookings',
+          }, getSiteOrigin(req))
+        }
 
         // Booking funnel completion (§3/§5) — fires here, on actual payment
         // confirmation, not at checkout submission (which only creates a
