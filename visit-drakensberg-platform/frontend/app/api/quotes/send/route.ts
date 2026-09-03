@@ -3,7 +3,7 @@ import { cookies } from 'next/headers'
 import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs'
 import { sendMail } from '@/lib/mailer'
 import { formatMoney as money } from '@/lib/allocation'
-import { emailShell, ctaButton, detailTable, esc, getFeaturedExperiences } from '@/lib/email-layout'
+import { emailShell, ctaButton, detailTable, esc } from '@/lib/email-layout'
 
 export const dynamic = 'force-dynamic'
 
@@ -32,7 +32,6 @@ export async function POST(req: Request) {
 
   const origin = process.env.NEXT_PUBLIC_SITE_URL || new URL(req.url).origin
   const quoteUrl = `${origin}/quotes/${quote.id}`
-  const featured = await getFeaturedExperiences(origin)
 
   const validUntil = quote.valid_until
     ? new Date(quote.valid_until).toLocaleDateString('en-ZA', { day: 'numeric', month: 'long', year: 'numeric' })
@@ -46,7 +45,6 @@ export async function POST(req: Request) {
       eyebrow: `Quote ${quote.quote_number}`,
       heading: 'Your quote is ready',
       preheader: `${money(Number(quote.total), quote.currency)} total${validUntil ? ` — valid until ${validUntil}` : ''}.`,
-      featured,
       bodyHtml: `
         <p style="margin:0 0 4px;">Dear ${esc(quote.customer_name || 'traveller')},</p>
         <p style="margin:0 0 20px;">
@@ -58,8 +56,7 @@ export async function POST(req: Request) {
           ['Quote', quote.quote_number],
           ...(quote.trip_name ? [['Trip', quote.trip_name] as [string, string]] : []),
           ...(validUntil ? [['Valid until', validUntil] as [string, string]] : []),
-          ['Total', money(Number(quote.total), quote.currency)],
-        ])}
+        ], ['Total', money(Number(quote.total), quote.currency)])}
         ${ctaButton(quoteUrl, 'View & Accept Quote')}`,
     }),
   })

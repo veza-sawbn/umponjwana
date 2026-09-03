@@ -3,7 +3,7 @@ import { cookies } from 'next/headers'
 import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs'
 import { sendMail } from '@/lib/mailer'
 import { formatMoney as money } from '@/lib/allocation'
-import { emailShell, ctaButton, detailTable, esc, getFeaturedExperiences, type FeaturedExperience } from '@/lib/email-layout'
+import { emailShell, ctaButton, detailTable, esc, finePrint } from '@/lib/email-layout'
 
 export const dynamic = 'force-dynamic'
 
@@ -31,7 +31,6 @@ function invoiceHtml(o: {
   issuedAt: string
   invoiceUrl: string
   origin: string
-  featured: FeaturedExperience[]
 }) {
   const settled = o.balance <= 0
   const trip = o.tripName ? ` for ${esc(o.tripName)}` : ''
@@ -43,7 +42,6 @@ function invoiceHtml(o: {
     preheader: settled
       ? `Invoice ${o.invoiceNumber} — fully paid, no payment due.`
       : `Invoice ${o.invoiceNumber} — ${money(o.balance, o.currency)} outstanding.`,
-    featured: o.featured,
     bodyHtml: `
       <p style="margin:0 0 4px;">Dear ${esc(o.customerName || 'traveller')},</p>
       <p style="margin:0 0 20px;">
@@ -58,13 +56,10 @@ function invoiceHtml(o: {
         ['Issued', fmtDate(o.issuedAt)],
         ['Invoice total', money(o.total, o.currency)],
         ['Paid to date', money(o.amountPaid, o.currency)],
-        ['Balance due', money(o.balance, o.currency)],
-      ])}
+      ], ['Balance due', money(o.balance, o.currency)])}
       ${ctaButton(o.invoiceUrl, settled ? 'View your invoice' : 'View & pay your invoice')}
-      <p style="margin:24px 0 0;font-family:Arial,Helvetica,sans-serif;font-size:11px;color:#aaaaaa;line-height:1.6;">
-        This invoice covers your single trip with Visit Drakensberg — all accommodation,
-        activities, transfers and extras appear on one document.
-      </p>`,
+      ${finePrint(`This invoice covers your single trip with Visit Drakensberg — all accommodation,
+        activities, transfers and extras appear on one document.`)}`,
   })
 }
 
@@ -104,7 +99,6 @@ export async function POST(req: Request) {
   }
 
   const origin = process.env.NEXT_PUBLIC_SITE_URL || new URL(req.url).origin
-  const featured = await getFeaturedExperiences(origin)
 
   // Just the invoice's address. The id in it is 'inv-' + a v4 UUID, which is
   // credential enough to open and pay without signing in — so there is no
@@ -126,7 +120,6 @@ export async function POST(req: Request) {
       issuedAt: invoice.issued_at,
       invoiceUrl,
       origin,
-      featured,
     }),
   })
 
