@@ -42,6 +42,11 @@ const COLUMNS = [
     heading: 'Company',
     links: [
       { label: 'List With Us', href: '/list-with-us' },
+      { label: 'Supplier Agreement', href: '/supplier-terms' },
+      { label: 'Code of Conduct', href: '/supplier-code-of-conduct' },
+      // The Code promises a reachable grievance channel; a promise that only
+      // appears inside the Code is not reachable.
+      { label: 'Report a Concern', href: '/report-a-concern' },
       { label: 'Privacy Policy', href: '/privacy' },
       { label: 'Terms of Use', href: '/terms' },
     ],

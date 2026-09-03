@@ -5,7 +5,6 @@ export const metadata: Metadata = {
   title: 'Terms of Use',
   description: 'Terms and conditions for using the Visit Drakensberg platform and making bookings.',
   alternates: { canonical: '/terms' },
-  robots: { index: false },
 }
 
 const SECTIONS: { heading: string; body: string[] }[] = [
@@ -38,7 +37,9 @@ const SECTIONS: { heading: string; body: string[] }[] = [
   {
     heading: '5. Supplier obligations',
     body: [
-      'Suppliers warrant that their listings are accurate, that they hold the licences and insurance required to operate, and that they will honour confirmed bookings at the listed price.',
+      'Every business listed here is bound by our Supplier Agreement and Supplier Code of Conduct. Among other things, they warrant that their listings are accurate, that they will honour confirmed bookings at the listed price, and that they hold the licences and insurance their operation requires.',
+      'Before a listing goes live our verification office checks that the operator holds either a current EDTEA tourism operator registration or membership of a Community Tourism Organisation. A supplier whose accreditation lapses may be suspended from public view.',
+      'If you believe a supplier has breached the Code — on safety, on how you or their staff were treated, or on how your information was used — report it at /report-a-concern. You may do so anonymously.',
     ],
   },
   {
@@ -60,7 +61,7 @@ export default function TermsPage() {
       </section>
 
       <section className="max-w-3xl mx-auto px-6 py-16">
-        <p className="font-sans text-sm text-forest/50 mb-10">Last updated: July 2026</p>
+        <p className="font-sans text-sm text-forest/50 mb-10">Last updated: September 2026</p>
         <div className="space-y-10">
           {SECTIONS.map(s => (
             <div key={s.heading}>
