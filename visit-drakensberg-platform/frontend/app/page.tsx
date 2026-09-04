@@ -282,43 +282,71 @@ function JourneysCarousel({ journeys }: { journeys: MarketplacePackage[] }) {
   )
 }
 
-/* ─── Events & Experiences columns ──────────────────────────────────────────── */
+/* ─── What's on — offer-style cards ──────────────────────────────────────────
+   A single scrolling reel of "current offers" (scheduled hikes, events &
+   specials, experiences all mixed together) — image, a dark corner ribbon
+   for the category, and a clean card footer, the same anatomy as the
+   Curated Journeys cards below, just reusable across three source types. */
 
-function MiniListItem({ item }: { item: MiniListItemData }) {
+function OfferCardBody({ item }: { item: MiniListItemData }) {
   return (
-    <Link href={item.href} className="group flex items-center gap-4 py-4 border-b border-black/6 last:border-0">
-      <div className="w-16 h-16 shrink-0 overflow-hidden bg-mist">
+    <Link href={item.href} className="group block bg-white border border-black/8 hover:border-forest/30 transition-colors h-full">
+      <div className="relative overflow-hidden aspect-[4/3] bg-mist">
         {item.img ? (
           <img loading="lazy" decoding="async" src={item.img} alt={item.title}
-            className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" />
+            className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+            style={{ willChange: 'transform' }} />
         ) : (
           <div className="w-full h-full" style={{ background: item.badgeColor }} />
         )}
+        <span className="absolute top-3 left-3 font-sans text-[10px] tracking-[0.15em] uppercase bg-black/55 text-white px-2.5 py-1">
+          {item.badgeLabel}
+        </span>
       </div>
-      <div className="min-w-0 flex-1">
-        <p className="font-sans text-[10px] tracking-[0.12em] uppercase mb-0.5" style={{ color: item.badgeColor }}>{item.badgeLabel}</p>
-        <h4 className="font-display text-lg text-forest leading-snug truncate group-hover:text-sage transition-colors">{item.title}</h4>
-        <p className="font-sans text-xs text-forest/40 mt-0.5">{item.meta}</p>
+      <div className="p-5">
+        <h3 className="font-display text-xl text-forest mb-2 leading-snug line-clamp-2 group-hover:text-sage transition-colors">{item.title}</h3>
+        <div className="flex items-center justify-between pt-3 border-t border-black/6">
+          <span className="font-sans text-xs text-forest/50 truncate">{item.meta}</span>
+          <span className="font-sans text-xs text-forest group-hover:text-gold transition-colors inline-flex items-center gap-1 shrink-0 ml-3">
+            View <ArrowRight className="w-3 h-3" />
+          </span>
+        </div>
       </div>
     </Link>
   )
 }
 
-function ExperienceColumn({ title, viewAllHref, items, emptyText }: { title: string; viewAllHref: string; items: MiniListItemData[]; emptyText: string }) {
+/**
+ * "What's on" carousel — same Swiper treatment as Curated Journeys below
+ * (peek-next-card, grab-to-drag, gentle autoplay) so the two reels feel
+ * like one design language rather than two different components.
+ */
+function OffersCarousel({ items }: { items: MiniListItemData[] }) {
+  const editMode = useEditMode()
+  const inEditor = Boolean(editMode)
+  const canLoop = items.length > 3
+
   return (
-    <div>
-      <div className="flex items-center justify-between mb-2">
-        <h3 className="font-display text-xl text-forest">{title}</h3>
-        <Link href={viewAllHref} className="font-sans text-xs text-forest/40 hover:text-forest transition-colors flex items-center gap-1 whitespace-nowrap">
-          View all <ArrowRight className="w-3 h-3" />
-        </Link>
-      </div>
-      {items.length === 0 ? (
-        <p className="font-sans text-sm text-forest/35 py-6">{emptyText}</p>
-      ) : (
-        <div>{items.map(item => <MiniListItem key={item.id} item={item} />)}</div>
-      )}
-    </div>
+    <Swiper
+      modules={[Autoplay]}
+      loop={canLoop}
+      speed={700}
+      autoplay={inEditor || items.length < 2 ? false : { delay: 6000, disableOnInteraction: false, pauseOnMouseEnter: true }}
+      spaceBetween={20}
+      grabCursor
+      slidesPerView={1.15}
+      breakpoints={{
+        640: { slidesPerView: 2.15 },
+        1024: { slidesPerView: 3.2 },
+      }}
+      className="!pb-1"
+    >
+      {items.map(item => (
+        <SwiperSlide key={item.id} className="h-auto self-stretch">
+          <OfferCardBody item={item} />
+        </SwiperSlide>
+      ))}
+    </Swiper>
   )
 }
 
@@ -642,50 +670,36 @@ export default function HomePage() {
     img: a.photos?.[0],
   }))
 
+  // One mixed reel — hikes, events/specials and experiences together — in
+  // whichever order each list already comes in (soonest-first per source).
+  const offerItems: MiniListItemData[] = [...scheduledHikeItems, ...eventItems, ...activityItems]
+
   const experiencesSection = (
     <EditableSection key="experiences" id="experiences" label="Events & Experiences" className="bg-white">
       <div className="max-w-[1440px] mx-auto px-6 lg:px-12 py-20">
-        <div className="mb-10">
-          <Editable section="home_sections" fieldKey="experiences_eyebrow" value={hs.experiences_eyebrow} label="Experiences Eyebrow" type="text">
-            <p className="font-sans text-xs tracking-[0.2em] uppercase text-forest/40 mb-2">{hs.experiences_eyebrow}</p>
-          </Editable>
-          <Editable section="home_sections" fieldKey="experiences_heading" value={hs.experiences_heading} label="Experiences Heading" type="text">
-            <h2 className="font-display text-4xl text-forest">{hs.experiences_heading}</h2>
-          </Editable>
+        <div className="flex items-end justify-between gap-6 mb-10">
+          <div>
+            <Editable section="home_sections" fieldKey="experiences_eyebrow" value={hs.experiences_eyebrow} label="Experiences Eyebrow" type="text">
+              <p className="font-sans text-xs tracking-[0.2em] uppercase text-forest/40 mb-2">{hs.experiences_eyebrow}</p>
+            </Editable>
+            <Editable section="home_sections" fieldKey="experiences_heading" value={hs.experiences_heading} label="Experiences Heading" type="text">
+              <h2 className="font-display text-4xl text-forest">{hs.experiences_heading}</h2>
+            </Editable>
+          </div>
+          <div className="hidden sm:flex items-center gap-5 font-sans text-sm text-forest/50 shrink-0 mb-1">
+            <Link href="/hikes" className="hover:text-forest transition-colors">Hikes</Link>
+            <Link href="/events" className="hover:text-forest transition-colors">Events</Link>
+            <Link href="/activities" className="hover:text-forest transition-colors flex items-center gap-1.5">
+              Experiences <ArrowRight className="w-3.5 h-3.5" />
+            </Link>
+          </div>
         </div>
 
-        <motion.div
-          className="grid md:grid-cols-3 gap-10"
-          variants={staggerContainer(0.08)}
-          initial="hidden"
-          whileInView="show"
-          viewport={{ once: true, margin: '-80px' }}
-        >
-          <motion.div variants={staggerChild}>
-            <ExperienceColumn
-              title="Scheduled Hikes"
-              viewAllHref="/hikes"
-              items={scheduledHikeItems}
-              emptyText="New guided departures will appear here once suppliers schedule them."
-            />
-          </motion.div>
-          <motion.div variants={staggerChild}>
-            <ExperienceColumn
-              title="Events & Specials"
-              viewAllHref="/events"
-              items={eventItems}
-              emptyText="No upcoming events right now — check back soon."
-            />
-          </motion.div>
-          <motion.div variants={staggerChild}>
-            <ExperienceColumn
-              title="Experiences"
-              viewAllHref="/activities"
-              items={activityItems}
-              emptyText="Guided activities and adventures will appear here soon."
-            />
-          </motion.div>
-        </motion.div>
+        {offerItems.length === 0 ? (
+          <p className="font-sans text-sm text-forest/35 py-6">New hikes, events and experiences will appear here once they're scheduled.</p>
+        ) : (
+          <OffersCarousel items={offerItems} />
+        )}
       </div>
     </EditableSection>
   )
@@ -759,9 +773,9 @@ export default function HomePage() {
     stats: statsSection,
     categories: categoriesSection,
     regions: regionsSection,
+    experiences: experiencesSection,
     stories: storiesSection,
     trails: trailsSection,
-    experiences: experiencesSection,
     journeys: journeysSection,
     newsletter: newsletterSection,
   }
