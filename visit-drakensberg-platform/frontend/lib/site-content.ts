@@ -88,7 +88,7 @@ export const SITE_CONTENT_DEFAULTS = {
   // Section layout for the homepage: render order, hidden sections, and
   // per-section style overrides (keyed by section id, shared by all pages).
   home_layout: {
-    section_order: ['stats', 'categories', 'regions', 'stories', 'trails', 'experiences', 'journeys', 'newsletter'] as string[],
+    section_order: ['stats', 'categories', 'regions', 'experiences', 'stories', 'trails', 'journeys', 'newsletter'] as string[],
     hidden: [] as string[],
     styles: {} as Record<string, SectionStyle>,
   },
