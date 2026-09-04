@@ -6,6 +6,7 @@ import Link from 'next/link'
 import Footer from '@/components/layout/Footer'
 import { MapPin, Star, Users, Wifi, Flame, Utensils, Car, ArrowLeft, Calendar, Waves, TreePine, ShieldCheck, BedDouble } from 'lucide-react'
 import SmartRecommendations from '@/components/booking/SmartRecommendations'
+import HeroCarousel from '@/components/media/HeroCarousel'
 import RoomDetailModal, { type RoomDetail } from '@/components/listings/RoomDetailModal'
 import { useBooking } from '@/lib/booking-context'
 import { Check, Clock } from 'lucide-react'
@@ -78,6 +79,7 @@ export default function StayDetail({ property, rooms: roomsData, id }: { propert
   // before the guest builds a whole trip around it.
   const requestOnly = isRequestMode(property)
 
+  const [heroSlide, setHeroSlide] = useState(0)
   const [selectedRoom, setSelectedRoom] = useState<any>(null)
   const [showRooms, setShowRooms] = useState(false)
   const [roomImage, setRoomImage] = useState<string | null>(null)
@@ -120,8 +122,42 @@ export default function StayDetail({ property, rooms: roomsData, id }: { propert
   return (
     <div className="min-h-screen bg-[#F7F5F2]">
 
-      {/* Hero header */}
-      <section className={`${stay.hero} text-white py-20 px-6 lg:px-12 mt-16`}>
+      {/* Mobile hero — the property photos themselves are the hero, sitting
+          right under the site header and auto-transitioning the same way
+          the homepage hero carousel does, with the title overlaid like it
+          is there. From sm up this gives way to the plain colour header +
+          4-up photo collage below. */}
+      <section className="relative h-[60vh] min-h-[420px] sm:hidden overflow-hidden mt-16">
+        <HeroCarousel images={stay.images} alt={stay.title} onIndexChange={setHeroSlide} />
+        <div className="absolute inset-0 bg-gradient-to-b from-black/45 via-black/10 to-black/65" />
+        <div className="relative h-full flex flex-col justify-between px-6 py-6">
+          <Link href="/stays" className="inline-flex items-center gap-2 text-white/80 hover:text-white text-sm w-fit transition-colors">
+            <ArrowLeft size={16} /> All Stays
+          </Link>
+          <div>
+            <span className="inline-block font-sans text-[10px] tracking-[0.14em] uppercase bg-[#C9A96E]/20 text-[#C9A96E] px-3 py-1.5 mb-3">{stay.category}</span>
+            <h1 className="font-display italic text-4xl text-white leading-[1.05] mb-3">{stay.title}</h1>
+            <div className="flex flex-wrap items-center gap-4 font-sans text-sm text-white/70">
+              <span className="flex items-center gap-1.5"><MapPin size={14} />{stay.location}</span>
+              {stay.rating && (
+                <span className="flex items-center gap-1.5">
+                  <Star size={14} className="text-[#C9A96E] fill-[#C9A96E]" />
+                  <span className="text-white">{stay.rating}</span>
+                  <span>({stay.review_count} reviews)</span>
+                </span>
+              )}
+            </div>
+          </div>
+        </div>
+        {stay.images.length > 1 && (
+          <span className="absolute top-6 right-6 font-sans text-[11px] tracking-wide bg-black/50 text-white px-2.5 py-1 rounded-full">
+            {heroSlide + 1} / {stay.images.length}
+          </span>
+        )}
+      </section>
+
+      {/* Hero header — sm and up (mobile uses the photo hero above instead). */}
+      <section className={`${stay.hero} text-white py-20 px-6 lg:px-12 mt-16 hidden sm:block`}>
         <div className="max-w-[1440px] mx-auto">
           <Link href="/stays" className="inline-flex items-center gap-2 text-white/60 hover:text-white text-sm mb-8 transition-colors">
             <ArrowLeft size={16} /> All Stays
@@ -141,17 +177,7 @@ export default function StayDetail({ property, rooms: roomsData, id }: { propert
         </div>
       </section>
 
-      {/* Photo gallery — a single full-width hero on mobile (the 4-up collage
-          reads as a strip of thumbnails on a narrow screen), the full collage
-          from sm up. */}
-      <div className="relative h-[42vh] min-h-[240px] sm:hidden overflow-hidden">
-        <img src={stay.images[0]} alt={stay.title} className="w-full h-full object-cover" />
-        {stay.images.length > 1 && (
-          <span className="absolute bottom-3 right-3 font-sans text-[11px] tracking-wide bg-black/60 text-white px-2.5 py-1 rounded-full">
-            1 / {stay.images.length}
-          </span>
-        )}
-      </div>
+      {/* Desktop/tablet 4-up photo collage. */}
       <div className="hidden sm:grid grid-cols-4 grid-rows-2 h-[52vh] min-h-[340px] gap-px">
         <div className="col-span-2 row-span-2 overflow-hidden">
           <img src={stay.images[0]} alt={stay.title} className="w-full h-full object-cover" />
