@@ -4,8 +4,8 @@ import { useEffect, useMemo, useState } from 'react'
 import { Check, Clock, Star, Truck, Users } from 'lucide-react'
 import {
   companyAvgResponseMinutes, companyRating, companyTransferPrice,
-  SUPPLIER_CATEGORIES, vehicleAvailableOn, vehicleSeats,
-  type GeoPoint, type TransportVehicle,
+  SUPPLIER_CATEGORIES, vehicleAvailableOn, vehicleSeats, vehicleTransferPrice,
+  type GeoPoint, type TransportCompany, type TransportVehicle,
 } from '@/lib/transport'
 import { rankSuppliers, type ScoredCandidate } from '@/lib/transport-dispatch'
 import type { ShuttleSupplierChoice } from '@/lib/shuttle-service'
@@ -13,7 +13,9 @@ import { formatMoney } from '@/lib/allocation'
 
 // The supplier step of the booking journey: once the route is known, the
 // customer picks which registered transport company — and which of its
-// available vehicles — will run the transfer, at that company's own price.
+// available vehicles — will run the transfer. Each vehicle is quoted at the
+// rate its operator set for it, so a 14-seater and a sedan from the same
+// company carry different prices; the company row shows the cheapest of them.
 // Suppliers are listed in suitability order (the dispatch engine's ranking).
 
 export function TransportSupplierPicker({
@@ -21,7 +23,6 @@ export function TransportSupplierPicker({
   dropoff,
   date,
   passengers,
-  shuttleType,
   distanceKm,
   selected,
   onSelect,
@@ -32,7 +33,6 @@ export function TransportSupplierPicker({
   dropoff: GeoPoint
   date: string
   passengers: number
-  shuttleType: string
   distanceKm: number
   selected: ShuttleSupplierChoice | null
   onSelect: (choice: ShuttleSupplierChoice | null) => void
@@ -63,7 +63,7 @@ export function TransportSupplierPicker({
         setCandidates(eligible)
         onCandidates?.(eligible.length)
         onLowestPrice?.(eligible.length
-          ? Math.min(...eligible.map(c => companyTransferPrice(c.company, distanceKm, passengers, shuttleType)))
+          ? Math.min(...eligible.map(c => fromPrice(c, date, passengers, distanceKm)))
           : null)
         // A previous selection that no longer applies is cleared.
         if (selected && !eligible.some(c => c.company.id === selected.companyId)) onSelect(null)
@@ -79,8 +79,8 @@ export function TransportSupplierPicker({
       companyId: candidate.company.id,
       companyName: candidate.company.companyName,
       vehicleId: vehicle.id,
-      vehicleName: vehicle.name ?? ([vehicle.make, vehicle.model].filter(Boolean).join(' ') || vehicle.type || 'Vehicle'),
-      price: companyTransferPrice(candidate.company, distanceKm, passengers, shuttleType),
+      vehicleName: vehicleLabel(vehicle),
+      price: vehicleTransferPrice(candidate.company, vehicle, distanceKm, passengers),
     })
   }
 
@@ -101,10 +101,12 @@ export function TransportSupplierPicker({
         const company = candidate.company
         const isSelectedCompany = selected?.companyId === company.id
         const expanded = expandedCompanyId === company.id || isSelectedCompany
-        const price = companyTransferPrice(company, distanceKm, passengers, shuttleType)
         const rating = companyRating(company)
         const response = companyAvgResponseMinutes(company)
         const vehicles = getUsableVehicles(candidate, date, passengers)
+        // The headline is the cheapest vehicle this company can put on the
+        // route — the exact fare only settles once a vehicle is chosen.
+        const price = fromPrice(candidate, date, passengers, distanceKm)
         return (
           <div key={company.id} className={isSelectedCompany ? 'bg-forest/[0.04]' : ''}>
             <button
@@ -126,7 +128,10 @@ export function TransportSupplierPicker({
                   <span>{vehicles.length} vehicle{vehicles.length !== 1 ? 's' : ''} available</span>
                 </p>
               </div>
-              <p className="font-display text-xl text-forest shrink-0">{formatMoney(price)}</p>
+              <p className="font-display text-xl text-forest shrink-0 text-right">
+                {vehicles.length > 1 && <span className="font-sans text-[10px] uppercase tracking-wide text-forest/40 block">From</span>}
+                {formatMoney(price)}
+              </p>
             </button>
 
             {expanded && (
@@ -134,20 +139,23 @@ export function TransportSupplierPicker({
                 <p className="font-sans text-[10px] tracking-[0.16em] uppercase text-forest/30">Choose your vehicle</p>
                 {vehicles.map(vehicle => {
                   const isSelectedVehicle = isSelectedCompany && selected?.vehicleId === vehicle.id
-                  const name = vehicle.name ?? ([vehicle.make, vehicle.model].filter(Boolean).join(' ') || vehicle.type || 'Vehicle')
+                  const vehiclePrice = vehicleTransferPrice(company, vehicle, distanceKm, passengers)
                   return (
                     <button
                       type="button"
                       key={vehicle.id}
                       onClick={() => pickVehicle(candidate, vehicle)}
-                      className={`w-full flex items-center gap-3 border px-4 py-3 text-left transition-colors ${
+                      className={`w-full flex flex-wrap items-center gap-x-3 gap-y-1 border px-4 py-3 text-left transition-colors ${
                         isSelectedVehicle ? 'border-forest bg-forest text-white' : 'border-gray-200 bg-white hover:border-forest/50'
                       }`}
                     >
                       <Truck size={16} className={isSelectedVehicle ? 'text-gold' : 'text-forest/50'} />
-                      <span className="flex-1 font-sans text-sm">{name}</span>
+                      <span className="flex-1 min-w-0 font-sans text-sm">{vehicleLabel(vehicle)}</span>
                       <span className={`font-sans text-xs flex items-center gap-1 ${isSelectedVehicle ? 'text-white/70' : 'text-forest/40'}`}>
                         <Users size={11} /> {vehicleSeats(vehicle)} seats · {vehicle.type ?? 'Shuttle'}
+                      </span>
+                      <span className={`font-display text-base ${isSelectedVehicle ? 'text-gold' : 'text-forest'}`}>
+                        {formatMoney(vehiclePrice)}
                       </span>
                       {isSelectedVehicle && <Check size={14} className="text-gold" />}
                     </button>
@@ -166,4 +174,17 @@ function getUsableVehicles(candidate: ScoredCandidate, date: string, passengers:
   return candidate.vehicles
     .filter(v => vehicleAvailableOn(v, date) && vehicleSeats(v) >= passengers)
     .sort((a, b) => vehicleSeats(a) - vehicleSeats(b))
+}
+
+export function vehicleLabel(vehicle: TransportVehicle): string {
+  return vehicle.name ?? ([vehicle.make, vehicle.model].filter(Boolean).join(' ') || vehicle.type || 'Vehicle')
+}
+
+/** The cheapest fare this company can actually put on the route. Falls back
+ *  to the company rate card when it has no vehicle free for the date. */
+function fromPrice(candidate: ScoredCandidate, date: string, passengers: number, distanceKm: number): number {
+  const company: TransportCompany = candidate.company
+  const vehicles = getUsableVehicles(candidate, date, passengers)
+  if (!vehicles.length) return companyTransferPrice(company, distanceKm, passengers)
+  return Math.min(...vehicles.map(v => vehicleTransferPrice(company, v, distanceKm, passengers)))
 }

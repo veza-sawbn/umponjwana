@@ -12,8 +12,12 @@ import type { BookingState, ShuttleOption } from './booking-context'
 // suppliers for every request.
 // ============================================================================
 
-export type ShuttleType = 'Shared Shuttle' | 'Private Shuttle'
-export const SHUTTLE_TYPES: ShuttleType[] = ['Shared Shuttle', 'Private Shuttle']
+// Every transfer on the marketplace is a private vehicle hire. Registered
+// operators run their own vehicles on their own rates — none of them pool
+// strangers into a shared seat-by-seat service — so 'Private Shuttle' is the
+// only shuttle type the platform quotes.
+export type ShuttleType = 'Private Shuttle'
+export const SHUTTLE_TYPES: ShuttleType[] = ['Private Shuttle']
 
 // Marketplace guide rates used for the customer-facing estimate. Long
 // transfers price at a lower per-km rate than short local hops.
@@ -26,10 +30,9 @@ const LOCAL_MIN_FARE = 350
 const LOCAL_PER_PASSENGER_KM = 1.2
 
 const LOCAL_TRIP_THRESHOLD_KM = 80
-const SHARED_SHUTTLE_FACTOR = 0.45 // per-vehicle → per-seat-pool discount
 
 /** Estimate a private-transfer fare from live driving distance. */
-export function estimateTransferPrice(distanceKm: number, passengers: number, shuttleType: ShuttleType = 'Private Shuttle'): number {
+export function estimateTransferPrice(distanceKm: number, passengers: number): number {
   const local = distanceKm <= LOCAL_TRIP_THRESHOLD_KM
   const ratePerKm = local ? LOCAL_RATE_PER_KM : LONG_HAUL_RATE_PER_KM
   const minFare = local ? LOCAL_MIN_FARE : LONG_HAUL_MIN_FARE
@@ -37,11 +40,7 @@ export function estimateTransferPrice(distanceKm: number, passengers: number, sh
 
   const basePrice = Math.max(minFare, Math.round(distanceKm * ratePerKm))
   const extraPassengerFee = Math.round(distanceKm * perPassengerKm) * Math.max(0, passengers - 1)
-  const privateFare = basePrice + extraPassengerFee
-  if (shuttleType === 'Shared Shuttle') {
-    return Math.max(Math.round(minFare * 0.4), Math.round(privateFare * SHARED_SHUTTLE_FACTOR))
-  }
-  return privateFare
+  return basePrice + extraPassengerFee
 }
 
 export function suggestedVehicleType(passengers: number): string {
@@ -68,12 +67,13 @@ export function buildShuttleOption(params: {
   destination: DistancePlace
   date: string
   passengers: number
-  shuttleType: ShuttleType
+  shuttleType?: ShuttleType
   result: DistanceResult
   supplier?: ShuttleSupplierChoice
 }): ShuttleOption {
-  const { id, pickup, destination, date, passengers, shuttleType, result, supplier } = params
-  const price = supplier?.price ?? estimateTransferPrice(result.distanceKm, passengers, shuttleType)
+  const { id, pickup, destination, date, passengers, result, supplier } = params
+  const shuttleType: ShuttleType = params.shuttleType ?? 'Private Shuttle'
+  const price = supplier?.price ?? estimateTransferPrice(result.distanceKm, passengers)
   const operatedBy = supplier
     ? `Operated by ${supplier.companyName} (${supplier.vehicleName}).`
     : 'Operated by a matched local transport partner.'

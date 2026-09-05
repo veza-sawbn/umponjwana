@@ -1,12 +1,12 @@
 'use client'
 import { useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
-import { CalendarOff, MapPin, Plus, Truck, Users, Wrench } from 'lucide-react'
+import { CalendarOff, Coins, MapPin, Plus, Truck, Users, Wrench } from 'lucide-react'
 import { supabase } from '@/lib/auth'
 import { effectiveSupplierId } from '@/lib/effective-supplier'
 import {
   addVehicleBlock, getSupplierVehicles, removeVehicleBlock, setVehicleFleetStatus,
-  vehicleFleetStatus, vehicleSeats, type FleetStatus, type TransportVehicle,
+  vehicleFleetStatus, vehicleHasOwnRate, vehicleSeats, type FleetStatus, type TransportVehicle,
 } from '@/lib/transport'
 
 // Vehicle availability is driven by the trip lifecycle (reserved → on trip →
@@ -70,8 +70,10 @@ export default function VehiclesPage() {
       </div>
 
       <p className="font-sans text-xs text-black/40 max-w-2xl">
-        Availability updates automatically as trips are accepted, started and completed — a completed trip parks the
-        vehicle at its drop-off location, ready for follow-on work. Use maintenance and date blocks for the exceptions.
+        Each vehicle carries its own rate — set it when you add or edit the vehicle, and guests are quoted that price
+        when they pick it. Availability updates automatically as trips are accepted, started and completed — a
+        completed trip parks the vehicle at its drop-off location, ready for follow-on work. Use maintenance and date
+        blocks for the exceptions.
       </p>
 
       {loading ? (
@@ -95,6 +97,12 @@ export default function VehiclesPage() {
                       <span className="font-sans text-xs text-black/40">{v.type ?? 'Shuttle'}</span>
                       <span className="font-sans text-xs text-black/40 flex items-center gap-1"><Users size={11} /> {vehicleSeats(v)} seats</span>
                       <span className="font-sans text-xs text-black/40">{v.reg ?? v.registration}</span>
+                      <span className="font-sans text-xs text-black/40 flex items-center gap-1">
+                        <Coins size={11} className={vehicleHasOwnRate(v) ? 'text-[#C9A96E]' : 'text-black/25'} />
+                        {vehicleHasOwnRate(v)
+                          ? [v.ratePerKm ? `R${v.ratePerKm}/km` : null, v.minimumFare ? `min R${v.minimumFare}` : null].filter(Boolean).join(' · ')
+                          : 'Company rate'}
+                      </span>
                       {v.currentLocation?.address && (
                         <span className="font-sans text-xs text-black/40 flex items-center gap-1">
                           <MapPin size={11} className="text-[#C9A96E]" /> {v.currentLocation.address}

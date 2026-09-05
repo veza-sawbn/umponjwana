@@ -103,7 +103,6 @@ export function ShuttleTripCard({ shuttle }: { shuttle: ShuttleOption }) {
                 dropoff={{ address: shuttle.destination ?? '', lat: shuttle.destinationLat, lng: shuttle.destinationLng }}
                 date={shuttle.date ?? ''}
                 passengers={shuttle.passengers ?? booking.guests}
-                shuttleType={shuttle.shuttleType ?? 'Private Shuttle'}
                 distanceKm={shuttle.distanceKm ?? 0}
                 selected={hasPartner ? {
                   supplierId: shuttle.supplierId!,

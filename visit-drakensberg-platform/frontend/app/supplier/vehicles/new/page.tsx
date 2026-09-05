@@ -17,7 +17,7 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 export default function NewVehiclePage() {
   const router = useRouter()
   const [saving, setSaving] = useState(false)
-  const [form, setForm] = useState({ name: '', make: '', model: '', type: 'Shuttle', seats: '8', registration: '' })
+  const [form, setForm] = useState({ name: '', make: '', model: '', type: 'Shuttle', seats: '8', registration: '', ratePerKm: '', minimumFare: '' })
   const [location, setLocation] = useState<GooglePlaceSelection>({ address: '' })
 
   function setField(key: string, value: string) { setForm(current => ({ ...current, [key]: value })) }
@@ -33,6 +33,10 @@ export default function NewVehiclePage() {
         supplierId: effectiveSupplierId(user.id),
         seats: Number(form.seats) || 0,
         capacity: Number(form.seats) || 0,
+        // Blank means "use the company rate card" — stored as 0 so the
+        // pricing helpers fall back rather than quoting R0.
+        ratePerKm: Number(form.ratePerKm) || 0,
+        minimumFare: Number(form.minimumFare) || 0,
         status: 'active',
         fleetStatus: 'available',
         currentLocation: location.address ? location : undefined,
@@ -63,6 +67,26 @@ export default function NewVehiclePage() {
           <Field label="Seats"><input className={input} type="number" min={1} value={form.seats} onChange={e => setField('seats', e.target.value)} /></Field>
           <Field label="Registration"><input className={input} value={form.registration} onChange={e => setField('registration', e.target.value)} placeholder="ND 123-456" /></Field>
         </div>
+        <div className="rounded-lg border border-black/8 bg-[#F7F5F2] p-4 space-y-4">
+          <div>
+            <p className="font-sans text-sm font-medium text-black/70">Rate for this vehicle</p>
+            <p className="font-sans text-xs text-black/40 mt-1">
+              Price this vehicle in its own right — a 14-seater should not quote what a sedan quotes. Leave either
+              field blank to fall back to your company rate card.
+            </p>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <Field label="Rate per km (R)">
+              <input className={input} type="number" min={0} step="0.5" value={form.ratePerKm}
+                onChange={e => setField('ratePerKm', e.target.value)} placeholder="Company rate" />
+            </Field>
+            <Field label="Minimum fare (R)">
+              <input className={input} type="number" min={0} step="50" value={form.minimumFare}
+                onChange={e => setField('minimumFare', e.target.value)} placeholder="Company minimum" />
+            </Field>
+          </div>
+        </div>
+
         <GoogleAddressField
           label="Current location (where the vehicle is stationed)"
           value={location.address}

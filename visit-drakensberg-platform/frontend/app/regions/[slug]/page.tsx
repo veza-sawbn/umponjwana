@@ -441,7 +441,7 @@ export default async function RegionPage({ params }: { params: { slug: string } 
                   <p className="font-sans text-[10px] tracking-[0.15em] uppercase text-gray-400 mb-1.5">Need a Ride?</p>
                   <h3 className="font-display italic text-2xl text-[#000000] mb-3">Plan Your Shuttle</h3>
                   <p className="font-sans text-sm text-gray-500 mb-5">
-                    Get an instant quote for a private or shared shuttle into {region.name}.
+                    Get an instant quote for a private transfer into {region.name}.
                   </p>
                   <Link
                     href={shuttleHref}
