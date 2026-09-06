@@ -28,6 +28,59 @@ function todayIso() {
   return new Date().toISOString().slice(0, 10)
 }
 
+/**
+ * A date or time field that reads as a real field before it is filled in.
+ *
+ * An empty native date/time input draws nothing at all in iOS Safari — the
+ * visitor is left staring at a blank box with no hint of what it wants or
+ * that it opens a picker — while desktop Chrome draws a locale-specific mask
+ * (mm/dd/yyyy) instead. Neither is a prompt. So while the field is empty its
+ * own text is made transparent and our placeholder is drawn over it, which
+ * gives every browser the same readable prompt; once a value is chosen the
+ * native text takes over again.
+ */
+function WhenField({
+  label,
+  icon: Icon,
+  type,
+  value,
+  min,
+  placeholder,
+  onChange,
+}: {
+  label: string
+  icon: typeof Calendar
+  type: 'date' | 'time'
+  value: string
+  min?: string
+  placeholder: string
+  onChange: (value: string) => void
+}) {
+  const empty = !value
+  return (
+    <label className="block min-w-0">
+      <span className={legend}><Icon size={11} className="text-gold" /> {label}</span>
+      <span className="relative block">
+        <input
+          type={type}
+          min={min}
+          value={value}
+          onChange={e => onChange(e.target.value)}
+          className={`${field} ${empty ? 'text-transparent' : ''}`}
+        />
+        {empty && (
+          <span
+            aria-hidden="true"
+            className="pointer-events-none absolute inset-y-0 left-3 right-9 flex items-center font-sans text-sm text-forest/35"
+          >
+            {placeholder}
+          </span>
+        )}
+      </span>
+    </label>
+  )
+}
+
 export function ShuttleSearchForm({
   value,
   onChange,
@@ -125,47 +178,43 @@ export function ShuttleSearchForm({
         <div className={`grid grid-cols-1 sm:grid-cols-2 gap-3 ${isReturn ? 'lg:grid-cols-5' : 'lg:grid-cols-3'}`}>
           {/* Each input is nested in its own label, so the legend above it is
               the field's real accessible name rather than loose text. */}
-          <label className="block min-w-0">
-            <span className={legend}><Calendar size={11} className="text-gold" /> {isReturn ? 'Outbound' : 'Date'}</span>
-            <input
-              type="date"
-              min={todayIso()}
-              value={value.date}
-              onChange={e => onChange({ date: e.target.value })}
-              className={field}
-            />
-          </label>
-          <label className="block min-w-0">
-            <span className={legend}><Clock size={11} className="text-gold" /> Pickup time</span>
-            <input
-              type="time"
-              value={value.time}
-              onChange={e => onChange({ time: e.target.value })}
-              className={field}
-            />
-          </label>
+          <WhenField
+            label={isReturn ? 'Outbound' : 'Date'}
+            icon={Calendar}
+            type="date"
+            min={todayIso()}
+            value={value.date}
+            placeholder="Select a date"
+            onChange={date => onChange({ date })}
+          />
+          <WhenField
+            label="Pickup time"
+            icon={Clock}
+            type="time"
+            value={value.time}
+            placeholder="Select a time"
+            onChange={time => onChange({ time })}
+          />
 
           {isReturn && (
             <>
-              <label className="block min-w-0">
-                <span className={legend}><Calendar size={11} className="text-gold" /> Return</span>
-                <input
-                  type="date"
-                  min={value.date || todayIso()}
-                  value={value.returnDate}
-                  onChange={e => onChange({ returnDate: e.target.value })}
-                  className={field}
-                />
-              </label>
-              <label className="block min-w-0">
-                <span className={legend}><Clock size={11} className="text-gold" /> Return time</span>
-                <input
-                  type="time"
-                  value={value.returnTime}
-                  onChange={e => onChange({ returnTime: e.target.value })}
-                  className={field}
-                />
-              </label>
+              <WhenField
+                label="Return"
+                icon={Calendar}
+                type="date"
+                min={value.date || todayIso()}
+                value={value.returnDate}
+                placeholder="Select a date"
+                onChange={returnDate => onChange({ returnDate })}
+              />
+              <WhenField
+                label="Return time"
+                icon={Clock}
+                type="time"
+                value={value.returnTime}
+                placeholder="Select a time"
+                onChange={returnTime => onChange({ returnTime })}
+              />
             </>
           )}
 
