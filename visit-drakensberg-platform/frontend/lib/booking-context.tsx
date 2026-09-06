@@ -87,8 +87,14 @@ export type ShuttleOption = {
   /** Flight / arrival details for the partner's meet & greet. */
   meetAndGreet?: MeetAndGreetDetails
   date?: string
+  /** Pickup time (HH:MM), as given on the transfer search form. Carried to
+   *  the operator on the transport request so they know when to be there. */
+  time?: string
   passengers?: number
   shuttleType?: string
+  /** Set on the second leg of a return trip, pointing at the outbound leg's
+   *  id, so the cart and trip page can show them as one journey. */
+  returnOfId?: string
   durationMinutes?: number
   vehicleType?: string
   distanceKm?: number

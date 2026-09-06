@@ -1,39 +1,45 @@
 'use client'
 
-import { Suspense, useState } from 'react'
+import { Suspense, useCallback, useEffect, useRef, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { ArrowRight, Bus, Calendar, Check, MapPin, Mountain, Plane, Route, Users } from 'lucide-react'
+import { ArrowRight, Bus, Calendar, Check, Clock, MapPin, Plus, Trash2, Users } from 'lucide-react'
 import Footer from '@/components/layout/Footer'
-import { useBooking } from '@/lib/booking-context'
-import { GoogleAddressField, useAutoDrivingDistance, type GooglePlaceSelection } from '@/components/maps/GoogleAddressField'
-import { buildShuttleOption, estimateTransferPrice, suggestedVehicleType, type ShuttleSupplierChoice } from '@/lib/shuttle-service'
-import { SUPPLIER_CATEGORIES, type SupplierCategory } from '@/lib/transport'
+import { useBooking, type ShuttleOption } from '@/lib/booking-context'
+import { useAutoDrivingDistance, type GooglePlaceSelection } from '@/components/maps/GoogleAddressField'
+import { buildShuttleOption, estimateTransferPrice, type ShuttleSupplierChoice } from '@/lib/shuttle-service'
 import { TransportSupplierPicker } from '@/components/booking/TransportSupplierPicker'
+import { ShuttleSearchForm, type ShuttleSearchValue } from '@/components/shuttles/ShuttleSearchForm'
+import { HowShuttlesWork } from '@/components/shuttles/HowShuttlesWork'
+import { OperatorTypeCarousel } from '@/components/shuttles/OperatorTypeCarousel'
+import { ShuttleFaq } from '@/components/shuttles/ShuttleFaq'
 import { formatMoney } from '@/lib/allocation'
 
 const EMPTY_PLACE: GooglePlaceSelection = { address: '' }
-
-const fieldInput = 'w-full border border-gray-200 px-4 py-3 font-sans text-sm focus:outline-none focus:border-forest transition-colors'
-const fieldLabel = 'font-sans text-[10px] tracking-[0.16em] uppercase text-gold mb-3 block'
-
-// On mobile every step stands on its own card with breathing room around it;
-// from md up they collapse back into the single bordered panel, so the desktop
-// form still reads as one continuous sheet.
-const stepCard = 'bg-white border border-black/8 p-5 md:border-0 md:p-0'
-
-// Illustration per operator category — the picture carries the distinction
-// (city → mountains, around the region, inside one valley) before the words do.
-const CATEGORY_ART: Record<SupplierCategory, { icon: typeof Plane; art: string; scale: string }> = {
-  gateway: { icon: Plane, art: 'City & airport', scale: 'Long haul' },
-  regional: { icon: Route, art: 'Across the region', scale: 'Mid range' },
-  local: { icon: Mountain, art: 'Inside the valley', scale: 'Short hops' },
-}
 
 function fmtMinutes(minutes: number) {
   const h = Math.floor(minutes / 60)
   const m = minutes % 60
   if (!h) return `${m}m`
   return m ? `${h}h ${m}m` : `${h}h`
+}
+
+function fmtDate(iso: string) {
+  if (!iso) return '—'
+  return new Date(`${iso}T00:00:00`).toLocaleDateString('en-ZA', { day: 'numeric', month: 'short', year: 'numeric' })
+}
+
+/** The journey the visitor searched for, frozen at the moment they searched —
+ *  editing the form afterwards doesn't disturb the results they are working
+ *  through until they search again. */
+type SearchedTrip = {
+  pickup: GooglePlaceSelection
+  destination: GooglePlaceSelection
+  date: string
+  time: string
+  returnDate: string
+  returnTime: string
+  passengers: number
+  wantsReturn: boolean
 }
 
 // useSearchParams() requires a Suspense boundary around any client
@@ -58,59 +64,168 @@ function ShuttlesPageContent() {
   // over the booking-context stay prefill since it's an explicit link the
   // visitor just followed.
   const prefillTo = searchParams.get('to')
-  const [pickup, setPickup] = useState<GooglePlaceSelection>(EMPTY_PLACE)
-  const [destination, setDestination] = useState<GooglePlaceSelection>(
-    prefillTo
+
+  const [search, setSearch] = useState<ShuttleSearchValue>({
+    tripType: 'one-way',
+    pickup: EMPTY_PLACE,
+    destination: prefillTo
       ? { address: prefillTo }
       : booking.stay?.address || booking.stay?.lat
         ? { address: booking.stay.address || booking.stay.title, lat: booking.stay.lat, lng: booking.stay.lng }
-        : EMPTY_PLACE
-  )
-  const [date, setDate] = useState(booking.checkIn || '')
-  const [passengers, setPassengers] = useState(booking.guests || 2)
-  const [added, setAdded] = useState(false)
-  const [supplierChoice, setSupplierChoice] = useState<ShuttleSupplierChoice | null>(null)
+        : EMPTY_PLACE,
+    date: booking.checkIn || '',
+    time: '',
+    returnDate: booking.checkOut || '',
+    returnTime: '',
+    passengers: booking.guests || 2,
+  })
+
+  const [trip, setTrip] = useState<SearchedTrip | null>(null)
+  const [outboundChoice, setOutboundChoice] = useState<ShuttleSupplierChoice | null>(null)
+  const [returnChoice, setReturnChoice] = useState<ShuttleSupplierChoice | null>(null)
+  // Availability is per leg: the return runs on its own date, so a company
+  // with its only vehicle booked that day can cover one leg and not the other.
   const [eligibleCount, setEligibleCount] = useState<number | null>(null)
-  // Cheapest fare among this route's listed transport partners — shown in
-  // the "Live route estimate" below instead of the generic distance-based
-  // formula, so the upfront number reflects real market pricing rather than
-  // a synthetic guess. Null until the partner list has loaded (or none cover
-  // the route), in which case the formula estimate is still the fallback.
-  const [lowestSupplierPrice, setLowestSupplierPrice] = useState<number | null>(null)
+  const [returnEligibleCount, setReturnEligibleCount] = useState<number | null>(null)
+  // Cheapest fare among each leg's listed partners — a real market price for
+  // the summary rail before the visitor has picked a company, instead of the
+  // generic distance formula. Null until the partner list loads, or when no
+  // partner covers the leg.
+  const [lowestOutbound, setLowestOutbound] = useState<number | null>(null)
+  const [lowestReturn, setLowestReturn] = useState<number | null>(null)
+  const resultsRef = useRef<HTMLDivElement>(null)
+  // Cart ids for the legs this page put in the trip, so re-searching updates
+  // them in place instead of stacking up duplicate transfers.
+  const legIdsRef = useRef<{ outbound: string; inbound: string } | null>(null)
+
+  function patchSearch(patch: Partial<ShuttleSearchValue>) {
+    setSearch(current => ({ ...current, ...patch }))
+  }
 
   // Live driving distance & duration straight from the Google Distance
-  // Matrix — the only source of route data on this page.
+  // Matrix — the only source of route data on this page. Measured on the
+  // searched trip, so it doesn't re-run while the visitor edits the form.
   const { result, status } = useAutoDrivingDistance(
-    { address: pickup.address, lat: pickup.lat, lng: pickup.lng },
-    { address: destination.address, lat: destination.lat, lng: destination.lng },
+    { address: trip?.pickup.address ?? '', lat: trip?.pickup.lat, lng: trip?.pickup.lng },
+    { address: trip?.destination.address ?? '', lat: trip?.destination.lat, lng: trip?.destination.lng },
   )
 
-  const price = supplierChoice
-    ? supplierChoice.price
-    : lowestSupplierPrice !== null
-      ? lowestSupplierPrice
-      : result ? estimateTransferPrice(result.distanceKm, passengers) : null
-  // A transport partner + vehicle must be chosen before booking; only when no
-  // registered partner covers the route does the platform estimate stand in.
-  const ready = Boolean(result && date && pickup.address && destination.address && (supplierChoice || eligibleCount === 0))
+  // A leg prices at the chosen vehicle's fare, else the cheapest partner
+  // covering it, else the platform's own distance estimate.
+  const outboundPrice = outboundChoice?.price
+    ?? lowestOutbound
+    ?? (result ? estimateTransferPrice(result.distanceKm, trip?.passengers ?? 2) : null)
+  const returnPrice = trip?.wantsReturn
+    ? returnChoice?.price
+      ?? lowestReturn
+      ?? (result ? estimateTransferPrice(result.distanceKm, trip.passengers) : null)
+    : null
+  const total = (outboundPrice ?? 0) + (returnPrice ?? 0)
 
-  function addToTrip() {
-    if (!result || !date) return
-    booking.addShuttle(buildShuttleOption({
-      id: `shuttle-${Date.now()}`,
-      pickup: { address: pickup.address, lat: pickup.lat, lng: pickup.lng },
-      destination: { address: destination.address, lat: destination.lat, lng: destination.lng },
-      date,
-      passengers,
+  /** Build the cart entry for one leg of the searched journey. */
+  const legOption = useCallback((
+    leg: 'outbound' | 'inbound',
+    ids: { outbound: string; inbound: string },
+  ): ShuttleOption | null => {
+    if (!trip || !result) return null
+    const outbound = leg === 'outbound'
+    return buildShuttleOption({
+      id: outbound ? ids.outbound : ids.inbound,
+      pickup: outbound
+        ? { address: trip.pickup.address, lat: trip.pickup.lat, lng: trip.pickup.lng }
+        : { address: trip.destination.address, lat: trip.destination.lat, lng: trip.destination.lng },
+      destination: outbound
+        ? { address: trip.destination.address, lat: trip.destination.lat, lng: trip.destination.lng }
+        : { address: trip.pickup.address, lat: trip.pickup.lat, lng: trip.pickup.lng },
+      date: outbound ? trip.date : trip.returnDate,
+      time: outbound ? trip.time : trip.returnTime,
+      passengers: trip.passengers,
       result,
-      supplier: supplierChoice ?? undefined,
-    }))
-    setAdded(true)
+      supplier: (outbound ? outboundChoice : returnChoice) ?? undefined,
+      returnOfId: outbound ? undefined : ids.outbound,
+    })
+  }, [trip, result, outboundChoice, returnChoice])
+
+  // The searched journey goes into the trip cart as soon as it can be priced —
+  // the visitor sees it in the booking bar straight away, and choosing an
+  // operator below updates that same entry rather than adding another.
+  useEffect(() => {
+    if (!trip || !result) return
+    const ids = legIdsRef.current
+    if (!ids) return
+
+    const outbound = legOption('outbound', ids)
+    if (outbound) {
+      if (booking.shuttles.some(s => s.id === ids.outbound)) booking.updateShuttle(ids.outbound, outbound)
+      else booking.addShuttle(outbound)
+    }
+
+    const inbound = trip.wantsReturn ? legOption('inbound', ids) : null
+    if (inbound) {
+      if (booking.shuttles.some(s => s.id === ids.inbound)) booking.updateShuttle(ids.inbound, inbound)
+      else booking.addShuttle(inbound)
+    } else if (booking.shuttles.some(s => s.id === ids.inbound)) {
+      booking.removeShuttle(ids.inbound)
+    }
+    // booking is a context value that changes identity on every cart write —
+    // depending on it here would loop. The leg content is what matters.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [trip, result, outboundChoice, returnChoice, legOption])
+
+  function runSearch() {
+    const wantsReturn = search.tripType === 'return'
+    legIdsRef.current = legIdsRef.current ?? {
+      outbound: `shuttle-${Date.now()}`,
+      inbound: `shuttle-return-${Date.now()}`,
+    }
+    setOutboundChoice(null)
+    setReturnChoice(null)
+    setEligibleCount(null)
+    setReturnEligibleCount(null)
+    setLowestOutbound(null)
+    setLowestReturn(null)
+    setTrip({
+      pickup: search.pickup,
+      destination: search.destination,
+      date: search.date,
+      time: search.time,
+      returnDate: wantsReturn ? search.returnDate : '',
+      returnTime: wantsReturn ? search.returnTime : '',
+      passengers: search.passengers,
+      wantsReturn,
+    })
+    // The answer lands right under the form — no hunting down the page.
+    requestAnimationFrame(() => {
+      resultsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    })
   }
+
+  /** Add the return leg after the fact, from the results. */
+  function addReturnLeg() {
+    if (!trip) return
+    const returnDate = trip.returnDate || search.returnDate || trip.date
+    patchSearch({ tripType: 'return', returnDate })
+    setTrip({ ...trip, wantsReturn: true, returnDate, returnTime: trip.returnTime || search.returnTime })
+  }
+
+  function dropReturnLeg() {
+    if (!trip) return
+    patchSearch({ tripType: 'one-way' })
+    setReturnChoice(null)
+    setTrip({ ...trip, wantsReturn: false })
+  }
+
+  const inCart = Boolean(legIdsRef.current && booking.shuttles.some(s => s.id === legIdsRef.current!.outbound))
+  const ready = Boolean(
+    result && trip
+    && (outboundChoice || eligibleCount === 0)
+    && (!trip.wantsReturn || returnChoice || returnEligibleCount === 0),
+  )
 
   return (
     <main className="bg-mist min-h-screen pt-16">
-      <section className="bg-forest text-white py-12 md:py-16 px-5 sm:px-6 lg:px-12">
+      {/* Hero + the whole search in one screenful */}
+      <section className="bg-forest text-white pt-12 md:pt-16 pb-28 md:pb-32 px-5 sm:px-6 lg:px-12">
         <div className="max-w-[1440px] mx-auto">
           <p className="font-sans text-xs tracking-[0.2em] uppercase text-white/30 mb-3">Door-to-door transfers</p>
           <h1 className="font-display text-4xl sm:text-5xl lg:text-6xl text-white leading-none mb-4">Shuttles &amp; Transfers</h1>
@@ -121,185 +236,213 @@ function ShuttlesPageContent() {
         </div>
       </section>
 
-      <div className="max-w-[1440px] mx-auto px-5 sm:px-6 lg:px-12 py-8 md:py-12 grid grid-cols-1 lg:grid-cols-3 gap-5 md:gap-8">
-        {/* Mobile: each step is its own card, spaced apart, so nothing is
-            squeezed against a shared container edge. md and up: one panel. */}
-        <div className="lg:col-span-2 space-y-5 md:space-y-8 md:bg-white md:border md:border-black/8 md:p-6">
-          <section className={stepCard}>
-            <p className={fieldLabel}>Step 1 · Pickup location</p>
-            <GoogleAddressField
-              label="Search any address, airport, lodge, trailhead or town"
-              value={pickup.address}
-              lat={pickup.lat}
-              lng={pickup.lng}
-              placeholder="e.g. OR Tambo International Airport"
-              inputClassName={fieldInput}
-              labelClassName="font-sans text-xs text-forest/50 mb-2 block"
-              onChange={setPickup}
-            />
-          </section>
+      <div className="max-w-[1440px] mx-auto px-5 sm:px-6 lg:px-12 -mt-20 md:-mt-24 relative z-10">
+        <ShuttleSearchForm
+          value={search}
+          onChange={patchSearch}
+          onSubmit={runSearch}
+          submitLabel={trip ? 'Update search' : 'Search transfers'}
+        />
+      </div>
 
-          <section className={stepCard}>
-            <p className={fieldLabel}>Step 2 · Destination</p>
-            <GoogleAddressField
-              label="Where are we taking you?"
-              value={destination.address}
-              lat={destination.lat}
-              lng={destination.lng}
-              placeholder="e.g. your lodge, a trailhead, an attraction"
-              inputClassName={fieldInput}
-              labelClassName="font-sans text-xs text-forest/50 mb-2 block"
-              onChange={setDestination}
-            />
-          </section>
-
-          <section className={stepCard}>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-              <div>
-                <p className={fieldLabel}>Step 3 · Date</p>
-                <input type="date" value={date} onChange={e => setDate(e.target.value)} className={fieldInput} />
-              </div>
-              <div>
-                <p className={fieldLabel}>Step 4 · Passengers</p>
-                <input type="number" min={1} max={20} value={passengers} onChange={e => setPassengers(Math.max(1, parseInt(e.target.value) || 1))} className={fieldInput} />
-              </div>
-            </div>
-          </section>
-
-          <section className={stepCard}>
-            <p className={fieldLabel}>Live route estimate</p>
-            <div className="border border-gray-100">
-              {status === 'idle' && <p className="p-5 font-sans text-sm text-gray-400">Choose a pickup and destination to see distance, travel time and fare.</p>}
-              {status === 'calculating' && <p className="p-5 font-sans text-sm text-gray-400">Calculating driving distance…</p>}
-              {status === 'error' && <p className="p-5 font-sans text-sm text-red-500">We could not calculate a driving route between these points. Try more specific locations.</p>}
-              {status === 'done' && result && (
-                <div className="flex items-center gap-4 p-5">
-                  <Bus className="text-forest shrink-0" size={20} />
-                  <div className="flex-1">
-                    <p className="font-display text-lg text-forest">{result.distanceKm} km · {fmtMinutes(result.durationMinutes)} drive</p>
-                    <p className="font-sans text-xs text-forest/40">{suggestedVehicleType(passengers)} · {passengers} passenger{passengers !== 1 ? 's' : ''}</p>
+      {/* Results — everything the visitor needs next, immediately below the
+          form they just submitted rather than further down the page. */}
+      <div ref={resultsRef} className="scroll-mt-20">
+        {trip && (
+          <div className="max-w-[1440px] mx-auto px-5 sm:px-6 lg:px-12 py-8 md:py-10 grid grid-cols-1 lg:grid-cols-3 gap-5 lg:gap-8">
+            <div className="lg:col-span-2 space-y-5">
+              {/* Route summary */}
+              <section className="bg-white border border-black/8 p-5">
+                {status === 'calculating' && <p className="font-sans text-sm text-gray-400">Measuring the driving route…</p>}
+                {status === 'error' && (
+                  <p className="font-sans text-sm text-red-500">
+                    We could not calculate a driving route between those points. Try more specific locations.
+                  </p>
+                )}
+                {status === 'idle' && <p className="font-sans text-sm text-gray-400">Enter a pickup and destination to quote your transfer.</p>}
+                {status === 'done' && result && (
+                  <div className="flex flex-wrap items-center gap-4">
+                    <Bus className="text-forest shrink-0" size={20} />
+                    <div className="flex-1 min-w-[200px]">
+                      <p className="font-display text-lg text-forest">
+                        {result.distanceKm} km · {fmtMinutes(result.durationMinutes)} drive
+                      </p>
+                      <p className="font-sans text-xs text-forest/40 mt-0.5">
+                        {trip.pickup.address} → {trip.destination.address}
+                      </p>
+                    </div>
+                    <p className="font-sans text-xs text-forest/50 flex flex-wrap items-center gap-x-3 gap-y-1">
+                      <span className="flex items-center gap-1"><Calendar size={11} className="text-gold" /> {fmtDate(trip.date)}</span>
+                      {trip.time && <span className="flex items-center gap-1"><Clock size={11} className="text-gold" /> {trip.time}</span>}
+                      <span className="flex items-center gap-1"><Users size={11} className="text-gold" /> {trip.passengers}</span>
+                    </p>
                   </div>
-                  {price !== null && <p className="font-display text-xl text-forest">{formatMoney(price)}</p>}
+                )}
+              </section>
+
+              {/* Outbound operators */}
+              <section className="bg-white border border-black/8">
+                <div className="px-5 pt-5">
+                  <p className="font-sans text-[10px] tracking-[0.16em] uppercase text-gold mb-1">
+                    {trip.wantsReturn ? 'Outbound · choose your operator & vehicle' : 'Choose your operator & vehicle'}
+                  </p>
+                  <p className="font-sans text-xs text-forest/40 mb-4">
+                    Each operator prices every vehicle in its fleet, so the fare you see is the one that vehicle charges.
+                  </p>
                 </div>
+                {result && trip.date ? (
+                  <TransportSupplierPicker
+                    pickup={{ address: trip.pickup.address, lat: trip.pickup.lat, lng: trip.pickup.lng }}
+                    dropoff={{ address: trip.destination.address, lat: trip.destination.lat, lng: trip.destination.lng }}
+                    date={trip.date}
+                    passengers={trip.passengers}
+                    distanceKm={result.distanceKm}
+                    selected={outboundChoice}
+                    onSelect={setOutboundChoice}
+                    onCandidates={setEligibleCount}
+                    onLowestPrice={setLowestOutbound}
+                  />
+                ) : (
+                  <p className="p-5 font-sans text-sm text-gray-400">Available operators appear once the route is measured.</p>
+                )}
+              </section>
+
+              {/* Return leg — offered right here rather than as a second search */}
+              {trip.wantsReturn ? (
+                <section className="bg-white border border-black/8">
+                  <div className="px-5 pt-5 flex items-start justify-between gap-4">
+                    <div>
+                      <p className="font-sans text-[10px] tracking-[0.16em] uppercase text-gold mb-1">Return · choose your operator & vehicle</p>
+                      <p className="font-sans text-xs text-forest/40 mb-4">
+                        {trip.destination.address} → {trip.pickup.address} · {fmtDate(trip.returnDate)}
+                        {trip.returnTime ? ` at ${trip.returnTime}` : ''}
+                      </p>
+                    </div>
+                    <button
+                      onClick={dropReturnLeg}
+                      className="font-sans text-xs text-forest/40 hover:text-red-500 flex items-center gap-1 shrink-0"
+                    >
+                      <Trash2 size={12} /> Remove
+                    </button>
+                  </div>
+                  {result && trip.returnDate ? (
+                    <TransportSupplierPicker
+                      pickup={{ address: trip.destination.address, lat: trip.destination.lat, lng: trip.destination.lng }}
+                      dropoff={{ address: trip.pickup.address, lat: trip.pickup.lat, lng: trip.pickup.lng }}
+                      date={trip.returnDate}
+                      passengers={trip.passengers}
+                      distanceKm={result.distanceKm}
+                      selected={returnChoice}
+                      onSelect={setReturnChoice}
+                      onCandidates={setReturnEligibleCount}
+                      onLowestPrice={setLowestReturn}
+                    />
+                  ) : (
+                    <p className="p-5 font-sans text-sm text-gray-400">Pick a return date above to see operators for the leg home.</p>
+                  )}
+                </section>
+              ) : (
+                <button
+                  onClick={addReturnLeg}
+                  className="w-full bg-white border border-dashed border-forest/25 hover:border-forest hover:bg-forest/[0.02] transition-colors p-5 flex items-center gap-3 text-left"
+                >
+                  <span className="flex h-9 w-9 items-center justify-center rounded-full bg-gold/10 text-gold shrink-0">
+                    <Plus size={16} />
+                  </span>
+                  <span>
+                    <span className="block font-display text-base text-forest">Add a return trip</span>
+                    <span className="block font-sans text-xs text-forest/45 mt-0.5">
+                      Book the leg home — {trip.destination.address || 'your destination'} back to {trip.pickup.address || 'your pickup'} — in the same trip.
+                    </span>
+                  </span>
+                </button>
               )}
             </div>
-          </section>
 
-          <section className={stepCard}>
-            <p className={fieldLabel}>Step 5 · Choose your transport partner & vehicle</p>
-            <p className="font-sans text-xs text-forest/40 -mt-2 mb-3">
-              Each operator prices every vehicle in its fleet, so the fare you see is the one that vehicle charges.
-            </p>
-            <div className="border border-gray-100">
-              {!result || !date
-                ? <p className="p-5 font-sans text-sm text-gray-400">Complete the route and date above to see available transport partners.</p>
-                : (
-                  <TransportSupplierPicker
-                    pickup={{ address: pickup.address, lat: pickup.lat, lng: pickup.lng }}
-                    dropoff={{ address: destination.address, lat: destination.lat, lng: destination.lng }}
-                    date={date}
-                    passengers={passengers}
-                    distanceKm={result.distanceKm}
-                    selected={supplierChoice}
-                    onSelect={setSupplierChoice}
-                    onCandidates={setEligibleCount}
-                    onLowestPrice={setLowestSupplierPrice}
-                  />
+            {/* Trip summary rail — the cart, mirrored where the visitor is looking */}
+            <aside className="bg-forest text-white p-6 sm:p-8 h-fit lg:sticky lg:top-24">
+              <div className="flex items-center justify-between mb-4">
+                <p className="font-sans text-[10px] tracking-[0.16em] uppercase text-white/40">Your transfer</p>
+                {inCart && (
+                  <span className="font-sans text-[10px] tracking-[0.1em] uppercase text-emerald-300 flex items-center gap-1">
+                    <Check size={11} /> In your trip
+                  </span>
                 )}
-            </div>
-          </section>
+              </div>
 
-          <section className={`${stepCard} md:border-t md:border-gray-100 md:pt-6`}>
-            <p className="font-sans text-[10px] tracking-[0.16em] uppercase text-forest/30 mb-4">Who drives you</p>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              {(Object.entries(SUPPLIER_CATEGORIES) as [SupplierCategory, typeof SUPPLIER_CATEGORIES[SupplierCategory]][]).map(([key, cat]) => {
-                const { icon: Icon, art, scale } = CATEGORY_ART[key]
-                return (
-                  <div key={key} className="border border-gray-100 flex flex-col">
-                    {/* The illustration band: the shape of the journey at a
-                        glance — a plane leaving the city, a road across the
-                        region, a peak inside one valley. */}
-                    <div className="relative bg-forest/[0.04] px-4 py-5 flex items-center gap-3 overflow-hidden">
-                      <span className="absolute -right-4 -bottom-5 text-forest/[0.06]" aria-hidden="true">
-                        <Icon size={92} strokeWidth={1} />
-                      </span>
-                      <span className="absolute right-3 top-3 font-sans text-[9px] tracking-[0.12em] uppercase text-forest/30 border border-forest/10 px-1.5 py-0.5">
-                        {scale}
-                      </span>
-                      <span className="relative flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-white border border-gold/40">
-                        <Icon size={19} className="text-gold" strokeWidth={1.6} />
-                      </span>
-                      <span className="relative min-w-0">
-                        <span className="block font-display text-base text-forest leading-tight">{cat.label}s</span>
-                        <span className="block font-sans text-[10px] tracking-[0.14em] uppercase text-forest/35 mt-0.5">{art}</span>
-                      </span>
+              <div className="space-y-5">
+                <div className="space-y-2 font-sans text-sm text-white/70">
+                  <p className="flex gap-2"><MapPin size={14} className="shrink-0 mt-0.5 text-gold" />{trip.pickup.address || '—'}</p>
+                  <p className="flex gap-2"><MapPin size={14} className="shrink-0 mt-0.5 text-gold" />{trip.destination.address || '—'}</p>
+                  <p className="flex gap-2 text-white/50 text-xs pt-1">
+                    <Calendar size={12} className="shrink-0 mt-0.5" />
+                    {fmtDate(trip.date)}{trip.time ? ` · ${trip.time}` : ''} · {trip.passengers} passenger{trip.passengers !== 1 ? 's' : ''}
+                  </p>
+                </div>
+
+                <div className="border-t border-white/10 pt-4 space-y-3">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="font-sans text-xs text-white/70">Outbound</p>
+                      <p className="font-sans text-[11px] text-white/40 truncate">
+                        {outboundChoice
+                          ? `${outboundChoice.companyName} · ${outboundChoice.vehicleName}`
+                          : eligibleCount === 0 ? 'Assigned after checkout' : 'Select an operator'}
+                      </p>
                     </div>
-                    <div className="p-4 space-y-3 flex-1">
-                      <p className="font-sans text-xs text-forest/50 leading-relaxed">{cat.description}</p>
-                      <div>
-                        <p className="font-sans text-[10px] tracking-[0.14em] uppercase text-forest/25 mb-1.5">Typical trips</p>
-                        <ul className="space-y-1">
-                          {cat.typicalWork.map(work => (
-                            <li key={work} className="font-sans text-xs text-forest/60 flex items-start gap-1.5">
-                              <Check size={11} className="text-gold shrink-0 mt-[3px]" /> {work}
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
-                      <div className="flex flex-wrap gap-1.5 pt-1">
-                        {cat.exampleBases.map(base => (
-                          <span key={base} className="font-sans text-[10px] text-forest/45 border border-gray-100 bg-mist px-2 py-0.5">{base}</span>
-                        ))}
-                      </div>
-                    </div>
+                    <span className="font-sans text-sm text-white/80 shrink-0">
+                      {outboundPrice !== null ? formatMoney(outboundPrice) : '—'}
+                    </span>
                   </div>
-                )
-              })}
-            </div>
-          </section>
-        </div>
 
-        <aside className="bg-forest text-white p-6 sm:p-8 h-fit lg:sticky lg:top-24">
-          <p className="font-sans text-[10px] tracking-[0.16em] uppercase text-white/40 mb-3">Step 6 · Review & add to trip</p>
-          <div className="space-y-4 font-sans text-sm text-white/70">
-            <p className="flex gap-2"><MapPin size={14} className="shrink-0 mt-0.5" />Pickup: {pickup.address || '—'}</p>
-            <p className="flex gap-2"><MapPin size={14} className="shrink-0 mt-0.5" />Destination: {destination.address || '—'}</p>
-            <p className="flex gap-2"><Calendar size={14} />Date: {date || 'Select date'}</p>
-            <p className="flex gap-2"><Users size={14} />Passengers: {passengers}</p>
-            <p>Transport partner: {supplierChoice ? supplierChoice.companyName : eligibleCount === 0 ? 'Assigned after checkout' : 'Select below'}</p>
-            <p>Vehicle: {supplierChoice ? supplierChoice.vehicleName : suggestedVehicleType(passengers)}</p>
-            <p>Estimated duration: {result ? fmtMinutes(result.durationMinutes) : '—'}</p>
-          </div>
-          <div className="border-t border-white/10 mt-6 pt-6 flex items-end justify-between">
-            <span className="font-sans text-xs text-white/40">{supplierChoice ? `${supplierChoice.companyName} fare` : 'Estimated fare'}</span>
-            <span className="font-display text-3xl text-gold">{price !== null ? `${formatMoney(price)}` : '—'}</span>
-          </div>
+                  {trip.wantsReturn && (
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="font-sans text-xs text-white/70">Return · {fmtDate(trip.returnDate)}</p>
+                        <p className="font-sans text-[11px] text-white/40 truncate">
+                          {returnChoice
+                            ? `${returnChoice.companyName} · ${returnChoice.vehicleName}`
+                            : returnEligibleCount === 0 ? 'Assigned after checkout' : 'Select an operator'}
+                        </p>
+                      </div>
+                      <span className="font-sans text-sm text-white/80 shrink-0">
+                        {returnPrice !== null ? formatMoney(returnPrice) : '—'}
+                      </span>
+                    </div>
+                  )}
+                </div>
 
-          {added ? (
-            <div className="mt-6 space-y-3">
-              <p className="font-sans text-xs text-emerald-300 flex items-center gap-2"><Check size={14} /> Shuttle added to your trip.</p>
-              <button onClick={() => router.push('/trip')} className="w-full bg-gold text-forest font-sans text-sm py-3 flex items-center justify-center gap-2 hover:bg-white transition-colors">
-                View trip & checkout <ArrowRight size={14} />
+                <div className="border-t border-white/10 pt-4 flex items-end justify-between">
+                  <span className="font-sans text-xs text-white/40">
+                    {outboundChoice || returnChoice ? 'Fare' : 'Estimated fare'}
+                  </span>
+                  <span className="font-display text-3xl text-gold">{total > 0 ? formatMoney(total) : '—'}</span>
+                </div>
+              </div>
+
+              <button
+                onClick={() => router.push('/trip')}
+                disabled={!ready}
+                className="w-full mt-6 bg-gold text-forest font-sans text-sm py-3 flex items-center justify-center gap-2 hover:bg-white transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                View trip &amp; checkout <ArrowRight size={14} />
               </button>
-            </div>
-          ) : (
-            <button
-              onClick={addToTrip}
-              disabled={!ready}
-              className="w-full mt-6 bg-gold text-forest font-sans text-sm py-3 flex items-center justify-center gap-2 hover:bg-white transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-            >
-              Add shuttle to trip <ArrowRight size={14} />
-            </button>
-          )}
-          <p className="font-sans text-xs text-white/40 mt-4">
-            {supplierChoice
-              ? `${supplierChoice.companyName} (${supplierChoice.vehicleName}) will be booked for this transfer when you complete checkout.`
-              : eligibleCount === 0
-                ? 'No registered partner covers this route yet — our team will place the transfer with the best available operator after checkout.'
-                : 'Choose a transport partner and vehicle to continue.'}
-          </p>
-        </aside>
+
+              <p className="font-sans text-xs text-white/40 mt-4">
+                {ready
+                  ? 'Your transfer is in your trip. Nothing is charged until you complete checkout.'
+                  : eligibleCount === 0 || returnEligibleCount === 0
+                    ? 'No registered partner covers this route yet — our team will place the transfer with the best available operator after checkout.'
+                    : 'Choose an operator and vehicle for each leg to continue.'}
+              </p>
+            </aside>
+          </div>
+        )}
       </div>
+
+      <HowShuttlesWork />
+      <OperatorTypeCarousel />
+      <ShuttleFaq />
       <Footer />
     </main>
   )

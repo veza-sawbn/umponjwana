@@ -66,22 +66,28 @@ export function buildShuttleOption(params: {
   pickup: DistancePlace
   destination: DistancePlace
   date: string
+  /** Pickup time (HH:MM) — optional; legs quoted without one are placed on
+   *  the date alone and timed with the operator afterwards. */
+  time?: string
   passengers: number
   shuttleType?: ShuttleType
   result: DistanceResult
   supplier?: ShuttleSupplierChoice
+  /** Outbound leg this one returns from, when building a return journey. */
+  returnOfId?: string
 }): ShuttleOption {
-  const { id, pickup, destination, date, passengers, result, supplier } = params
+  const { id, pickup, destination, date, time, passengers, result, supplier, returnOfId } = params
   const shuttleType: ShuttleType = params.shuttleType ?? 'Private Shuttle'
   const price = supplier?.price ?? estimateTransferPrice(result.distanceKm, passengers)
   const operatedBy = supplier
     ? `Operated by ${supplier.companyName} (${supplier.vehicleName}).`
     : 'Operated by a matched local transport partner.'
+  const when = time ? `${date} at ${time}` : date
   return {
     id,
     label: `${pickup.address} → ${destination.address}`,
     price,
-    description: `${shuttleType} on ${date}. ${result.distanceKm} km · ~${result.durationText} drive · ${passengers} passenger${passengers !== 1 ? 's' : ''}. ${operatedBy}`,
+    description: `${shuttleType} on ${when}. ${result.distanceKm} km · ~${result.durationText} drive · ${passengers} passenger${passengers !== 1 ? 's' : ''}. ${operatedBy}`,
     pickup: pickup.address,
     destination: destination.address,
     pickupLat: pickup.lat,
@@ -94,6 +100,8 @@ export function buildShuttleOption(params: {
     vehicleId: supplier?.vehicleId,
     vehicleName: supplier?.vehicleName,
     date,
+    time,
+    returnOfId,
     passengers,
     shuttleType,
     durationMinutes: result.durationMinutes,
