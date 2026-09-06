@@ -22,7 +22,7 @@ export type ShuttleSearchValue = {
 }
 
 const field = 'w-full border border-gray-200 bg-white px-3 py-2.5 font-sans text-sm text-forest focus:outline-none focus:border-forest transition-colors'
-const legend = 'block font-sans text-[10px] tracking-[0.14em] uppercase text-forest/40 mb-1.5 flex items-center gap-1.5'
+const legend = 'flex font-sans text-[10px] tracking-[0.14em] uppercase text-forest/40 mb-1.5 flex items-center gap-1.5'
 
 function todayIso() {
   return new Date().toISOString().slice(0, 10)
@@ -118,10 +118,14 @@ export function ShuttleSearchForm({
           </div>
         </div>
 
-        <div className={`grid grid-cols-2 gap-3 ${isReturn ? 'lg:grid-cols-5' : 'lg:grid-cols-3'}`}>
+        {/* Native date and time inputs carry a fixed-width internal editor
+            (mm/dd/yyyy plus its picker icon) that will not shrink, so on a
+            phone they get a full row each rather than being squeezed two-up
+            and spilling past their border. */}
+        <div className={`grid grid-cols-1 sm:grid-cols-2 gap-3 ${isReturn ? 'lg:grid-cols-5' : 'lg:grid-cols-3'}`}>
           {/* Each input is nested in its own label, so the legend above it is
               the field's real accessible name rather than loose text. */}
-          <label className="block">
+          <label className="block min-w-0">
             <span className={legend}><Calendar size={11} className="text-gold" /> {isReturn ? 'Outbound' : 'Date'}</span>
             <input
               type="date"
@@ -131,7 +135,7 @@ export function ShuttleSearchForm({
               className={field}
             />
           </label>
-          <label className="block">
+          <label className="block min-w-0">
             <span className={legend}><Clock size={11} className="text-gold" /> Pickup time</span>
             <input
               type="time"
@@ -143,7 +147,7 @@ export function ShuttleSearchForm({
 
           {isReturn && (
             <>
-              <label className="block">
+              <label className="block min-w-0">
                 <span className={legend}><Calendar size={11} className="text-gold" /> Return</span>
                 <input
                   type="date"
@@ -153,7 +157,7 @@ export function ShuttleSearchForm({
                   className={field}
                 />
               </label>
-              <label className="block">
+              <label className="block min-w-0">
                 <span className={legend}><Clock size={11} className="text-gold" /> Return time</span>
                 <input
                   type="time"
@@ -165,7 +169,7 @@ export function ShuttleSearchForm({
             </>
           )}
 
-          <label className="block col-span-2 lg:col-span-1">
+          <label className="block min-w-0 sm:col-span-2 lg:col-span-1">
             <span className={legend}><Users size={11} className="text-gold" /> Passengers</span>
             <input
               type="number"
