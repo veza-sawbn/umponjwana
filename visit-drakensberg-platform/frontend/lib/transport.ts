@@ -267,6 +267,11 @@ export type TransportVehicle = SupplierEntity & {
   /** Operational lifecycle state — the entity row itself stays 'active' so the
    *  dispatch scorer can read the fleet. Legacy rows without it map from status. */
   fleetStatus?: FleetStatus
+  /** Per-vehicle rate card. A 14-seater does not cost what a sedan costs, so
+   *  the operator prices each vehicle individually; whatever is left unset
+   *  falls back to the company rate card (see vehicleTransferPrice). */
+  ratePerKm?: number
+  minimumFare?: number
   currentLocation?: GeoPoint
   blocks?: VehicleBlock[]
   activeRequestId?: string | null
@@ -653,22 +658,46 @@ export async function cancelTransportRequest(request: TransportRequest, company?
 
 // ── Derived company metrics used by scoring and dashboards ──────────────────
 
-/** What this company charges for a trip, from its own rate card. */
+/** Fare from an explicit rate card. Every transfer is a private vehicle hire,
+ *  so the passenger count only adds a per-km loading — it never splits the
+ *  fare across a seat pool. */
+function rateCardPrice(ratePerKm: number, minimumFare: number, distanceKm: number, passengers: number): number {
+  const base = Math.max(minimumFare, Math.round(distanceKm * ratePerKm))
+  const extraPassengerFee = Math.round(distanceKm) * Math.max(0, passengers - 1)
+  return base + extraPassengerFee
+}
+
+/** What this company charges for a trip, from its own rate card. Used for the
+ *  company-level "from" price and as the fallback for any vehicle the
+ *  operator has not priced individually. */
 export function companyTransferPrice(
   company: TransportCompany,
   distanceKm: number,
   passengers: number,
-  shuttleType?: string,
 ): number {
-  const ratePerKm = company.ratePerKm || 10
-  const minimumFare = company.minimumFare || 350
-  const base = Math.max(minimumFare, Math.round(distanceKm * ratePerKm))
-  const extraPassengerFee = Math.round(distanceKm) * Math.max(0, passengers - 1)
-  const privateFare = base + extraPassengerFee
-  if (shuttleType === 'Shared Shuttle') {
-    return Math.max(Math.round(minimumFare * 0.4), Math.round(privateFare * 0.45))
-  }
-  return privateFare
+  return rateCardPrice(company.ratePerKm || 10, company.minimumFare || 350, distanceKm, passengers)
+}
+
+/** What a specific vehicle costs for a trip. The operator sets a rate per
+ *  vehicle (a 14-seater is not priced like a sedan); anything they leave
+ *  unset falls back to the company rate card. */
+export function vehicleTransferPrice(
+  company: TransportCompany,
+  vehicle: TransportVehicle,
+  distanceKm: number,
+  passengers: number,
+): number {
+  return rateCardPrice(
+    Number(vehicle.ratePerKm) || company.ratePerKm || 10,
+    Number(vehicle.minimumFare) || company.minimumFare || 350,
+    distanceKm,
+    passengers,
+  )
+}
+
+/** True when the operator has priced this vehicle in its own right. */
+export function vehicleHasOwnRate(vehicle: TransportVehicle): boolean {
+  return Number(vehicle.ratePerKm) > 0 || Number(vehicle.minimumFare) > 0
 }
 
 export function companyReliability(c: TransportCompany): number {

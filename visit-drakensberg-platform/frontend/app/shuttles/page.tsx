@@ -2,12 +2,12 @@
 
 import { Suspense, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { ArrowRight, Bus, Calendar, Check, MapPin, Users } from 'lucide-react'
+import { ArrowRight, Bus, Calendar, Check, MapPin, Mountain, Plane, Route, Users } from 'lucide-react'
 import Footer from '@/components/layout/Footer'
 import { useBooking } from '@/lib/booking-context'
 import { GoogleAddressField, useAutoDrivingDistance, type GooglePlaceSelection } from '@/components/maps/GoogleAddressField'
-import { buildShuttleOption, estimateTransferPrice, suggestedVehicleType, SHUTTLE_TYPES, type ShuttleSupplierChoice, type ShuttleType } from '@/lib/shuttle-service'
-import { SUPPLIER_CATEGORIES } from '@/lib/transport'
+import { buildShuttleOption, estimateTransferPrice, suggestedVehicleType, type ShuttleSupplierChoice } from '@/lib/shuttle-service'
+import { SUPPLIER_CATEGORIES, type SupplierCategory } from '@/lib/transport'
 import { TransportSupplierPicker } from '@/components/booking/TransportSupplierPicker'
 import { formatMoney } from '@/lib/allocation'
 
@@ -15,6 +15,19 @@ const EMPTY_PLACE: GooglePlaceSelection = { address: '' }
 
 const fieldInput = 'w-full border border-gray-200 px-4 py-3 font-sans text-sm focus:outline-none focus:border-forest transition-colors'
 const fieldLabel = 'font-sans text-[10px] tracking-[0.16em] uppercase text-gold mb-3 block'
+
+// On mobile every step stands on its own card with breathing room around it;
+// from md up they collapse back into the single bordered panel, so the desktop
+// form still reads as one continuous sheet.
+const stepCard = 'bg-white border border-black/8 p-5 md:border-0 md:p-0'
+
+// Illustration per operator category — the picture carries the distinction
+// (city → mountains, around the region, inside one valley) before the words do.
+const CATEGORY_ART: Record<SupplierCategory, { icon: typeof Plane; art: string; scale: string }> = {
+  gateway: { icon: Plane, art: 'City & airport', scale: 'Long haul' },
+  regional: { icon: Route, art: 'Across the region', scale: 'Mid range' },
+  local: { icon: Mountain, art: 'Inside the valley', scale: 'Short hops' },
+}
 
 function fmtMinutes(minutes: number) {
   const h = Math.floor(minutes / 60)
@@ -55,7 +68,6 @@ function ShuttlesPageContent() {
   )
   const [date, setDate] = useState(booking.checkIn || '')
   const [passengers, setPassengers] = useState(booking.guests || 2)
-  const [shuttleType, setShuttleType] = useState<ShuttleType>('Private Shuttle')
   const [added, setAdded] = useState(false)
   const [supplierChoice, setSupplierChoice] = useState<ShuttleSupplierChoice | null>(null)
   const [eligibleCount, setEligibleCount] = useState<number | null>(null)
@@ -77,7 +89,7 @@ function ShuttlesPageContent() {
     ? supplierChoice.price
     : lowestSupplierPrice !== null
       ? lowestSupplierPrice
-      : result ? estimateTransferPrice(result.distanceKm, passengers, shuttleType) : null
+      : result ? estimateTransferPrice(result.distanceKm, passengers) : null
   // A transport partner + vehicle must be chosen before booking; only when no
   // registered partner covers the route does the platform estimate stand in.
   const ready = Boolean(result && date && pickup.address && destination.address && (supplierChoice || eligibleCount === 0))
@@ -90,7 +102,6 @@ function ShuttlesPageContent() {
       destination: { address: destination.address, lat: destination.lat, lng: destination.lng },
       date,
       passengers,
-      shuttleType,
       result,
       supplier: supplierChoice ?? undefined,
     }))
@@ -99,20 +110,22 @@ function ShuttlesPageContent() {
 
   return (
     <main className="bg-mist min-h-screen pt-16">
-      <section className="bg-forest text-white py-16 px-6 lg:px-12">
+      <section className="bg-forest text-white py-12 md:py-16 px-5 sm:px-6 lg:px-12">
         <div className="max-w-[1440px] mx-auto">
           <p className="font-sans text-xs tracking-[0.2em] uppercase text-white/30 mb-3">Door-to-door transfers</p>
-          <h1 className="font-display text-5xl lg:text-6xl text-white leading-none mb-4">Shuttles & Transfers</h1>
+          <h1 className="font-display text-4xl sm:text-5xl lg:text-6xl text-white leading-none mb-4">Shuttles &amp; Transfers</h1>
           <p className="font-sans text-sm text-white/50 max-w-xl">
-            Pick up anywhere, drop off anywhere. Your transfer is quoted from live driving distance and
-            operated by the best-matched company in our transport partner marketplace.
+            Pick up anywhere, drop off anywhere. Every transfer is a private vehicle, quoted from live driving
+            distance and driven by a registered operator you choose yourself.
           </p>
         </div>
       </section>
 
-      <div className="max-w-[1440px] mx-auto px-6 lg:px-12 py-12 grid grid-cols-1 lg:grid-cols-3 gap-8">
-        <div className="lg:col-span-2 bg-white border border-black/8 p-6 space-y-8">
-          <section>
+      <div className="max-w-[1440px] mx-auto px-5 sm:px-6 lg:px-12 py-8 md:py-12 grid grid-cols-1 lg:grid-cols-3 gap-5 md:gap-8">
+        {/* Mobile: each step is its own card, spaced apart, so nothing is
+            squeezed against a shared container edge. md and up: one panel. */}
+        <div className="lg:col-span-2 space-y-5 md:space-y-8 md:bg-white md:border md:border-black/8 md:p-6">
+          <section className={stepCard}>
             <p className={fieldLabel}>Step 1 · Pickup location</p>
             <GoogleAddressField
               label="Search any address, airport, lodge, trailhead or town"
@@ -126,7 +139,7 @@ function ShuttlesPageContent() {
             />
           </section>
 
-          <section>
+          <section className={stepCard}>
             <p className={fieldLabel}>Step 2 · Destination</p>
             <GoogleAddressField
               label="Where are we taking you?"
@@ -140,24 +153,20 @@ function ShuttlesPageContent() {
             />
           </section>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-            <section>
-              <p className={fieldLabel}>Step 3 · Date</p>
-              <input type="date" value={date} onChange={e => setDate(e.target.value)} className={fieldInput} />
-            </section>
-            <section>
-              <p className={fieldLabel}>Step 4 · Passengers</p>
-              <input type="number" min={1} max={20} value={passengers} onChange={e => setPassengers(Math.max(1, parseInt(e.target.value) || 1))} className={fieldInput} />
-            </section>
-            <section>
-              <p className={fieldLabel}>Step 5 · Shuttle type</p>
-              <select value={shuttleType} onChange={e => setShuttleType(e.target.value as ShuttleType)} className={fieldInput}>
-                {SHUTTLE_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
-              </select>
-            </section>
-          </div>
+          <section className={stepCard}>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+              <div>
+                <p className={fieldLabel}>Step 3 · Date</p>
+                <input type="date" value={date} onChange={e => setDate(e.target.value)} className={fieldInput} />
+              </div>
+              <div>
+                <p className={fieldLabel}>Step 4 · Passengers</p>
+                <input type="number" min={1} max={20} value={passengers} onChange={e => setPassengers(Math.max(1, parseInt(e.target.value) || 1))} className={fieldInput} />
+              </div>
+            </div>
+          </section>
 
-          <section>
+          <section className={stepCard}>
             <p className={fieldLabel}>Live route estimate</p>
             <div className="border border-gray-100">
               {status === 'idle' && <p className="p-5 font-sans text-sm text-gray-400">Choose a pickup and destination to see distance, travel time and fare.</p>}
@@ -168,7 +177,7 @@ function ShuttlesPageContent() {
                   <Bus className="text-forest shrink-0" size={20} />
                   <div className="flex-1">
                     <p className="font-display text-lg text-forest">{result.distanceKm} km · {fmtMinutes(result.durationMinutes)} drive</p>
-                    <p className="font-sans text-xs text-forest/40">{suggestedVehicleType(passengers)} · {passengers} passenger{passengers !== 1 ? 's' : ''} · {shuttleType}</p>
+                    <p className="font-sans text-xs text-forest/40">{suggestedVehicleType(passengers)} · {passengers} passenger{passengers !== 1 ? 's' : ''}</p>
                   </div>
                   {price !== null && <p className="font-display text-xl text-forest">{formatMoney(price)}</p>}
                 </div>
@@ -176,8 +185,11 @@ function ShuttlesPageContent() {
             </div>
           </section>
 
-          <section>
-            <p className={fieldLabel}>Step 6 · Choose your transport partner & vehicle</p>
+          <section className={stepCard}>
+            <p className={fieldLabel}>Step 5 · Choose your transport partner & vehicle</p>
+            <p className="font-sans text-xs text-forest/40 -mt-2 mb-3">
+              Each operator prices every vehicle in its fleet, so the fare you see is the one that vehicle charges.
+            </p>
             <div className="border border-gray-100">
               {!result || !date
                 ? <p className="p-5 font-sans text-sm text-gray-400">Complete the route and date above to see available transport partners.</p>
@@ -187,7 +199,6 @@ function ShuttlesPageContent() {
                     dropoff={{ address: destination.address, lat: destination.lat, lng: destination.lng }}
                     date={date}
                     passengers={passengers}
-                    shuttleType={shuttleType}
                     distanceKm={result.distanceKm}
                     selected={supplierChoice}
                     onSelect={setSupplierChoice}
@@ -198,25 +209,58 @@ function ShuttlesPageContent() {
             </div>
           </section>
 
-          <section className="border-t border-gray-100 pt-6">
+          <section className={`${stepCard} md:border-t md:border-gray-100 md:pt-6`}>
             <p className="font-sans text-[10px] tracking-[0.16em] uppercase text-forest/30 mb-4">Who drives you</p>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              {Object.entries(SUPPLIER_CATEGORIES).map(([key, cat]) => (
-                <div key={key} className="border border-gray-100 p-4">
-                  <p className="font-display text-base text-forest mb-1">{cat.label}s</p>
-                  <p className="font-sans text-xs text-forest/50 leading-relaxed">{cat.description}</p>
-                </div>
-              ))}
+              {(Object.entries(SUPPLIER_CATEGORIES) as [SupplierCategory, typeof SUPPLIER_CATEGORIES[SupplierCategory]][]).map(([key, cat]) => {
+                const { icon: Icon, art, scale } = CATEGORY_ART[key]
+                return (
+                  <div key={key} className="border border-gray-100 flex flex-col">
+                    {/* The illustration band: the shape of the journey at a
+                        glance — a plane leaving the city, a road across the
+                        region, a peak inside one valley. */}
+                    <div className="relative bg-forest/[0.04] px-4 py-5 flex items-center gap-3 overflow-hidden">
+                      <span className="absolute -right-4 -bottom-5 text-forest/[0.06]" aria-hidden="true">
+                        <Icon size={92} strokeWidth={1} />
+                      </span>
+                      <span className="absolute right-3 top-3 font-sans text-[9px] tracking-[0.12em] uppercase text-forest/30 border border-forest/10 px-1.5 py-0.5">
+                        {scale}
+                      </span>
+                      <span className="relative flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-white border border-gold/40">
+                        <Icon size={19} className="text-gold" strokeWidth={1.6} />
+                      </span>
+                      <span className="relative min-w-0">
+                        <span className="block font-display text-base text-forest leading-tight">{cat.label}s</span>
+                        <span className="block font-sans text-[10px] tracking-[0.14em] uppercase text-forest/35 mt-0.5">{art}</span>
+                      </span>
+                    </div>
+                    <div className="p-4 space-y-3 flex-1">
+                      <p className="font-sans text-xs text-forest/50 leading-relaxed">{cat.description}</p>
+                      <div>
+                        <p className="font-sans text-[10px] tracking-[0.14em] uppercase text-forest/25 mb-1.5">Typical trips</p>
+                        <ul className="space-y-1">
+                          {cat.typicalWork.map(work => (
+                            <li key={work} className="font-sans text-xs text-forest/60 flex items-start gap-1.5">
+                              <Check size={11} className="text-gold shrink-0 mt-[3px]" /> {work}
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                      <div className="flex flex-wrap gap-1.5 pt-1">
+                        {cat.exampleBases.map(base => (
+                          <span key={base} className="font-sans text-[10px] text-forest/45 border border-gray-100 bg-mist px-2 py-0.5">{base}</span>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                )
+              })}
             </div>
-            <p className="font-sans text-xs text-forest/40 mt-4">
-              Every transfer is matched to the most suitable registered operator — by region, vehicle,
-              availability, reliability and price — the moment your booking is confirmed.
-            </p>
           </section>
         </div>
 
-        <aside className="bg-forest text-white p-8 h-fit sticky top-24">
-          <p className="font-sans text-[10px] tracking-[0.16em] uppercase text-white/40 mb-3">Step 7 · Review & add to trip</p>
+        <aside className="bg-forest text-white p-6 sm:p-8 h-fit lg:sticky lg:top-24">
+          <p className="font-sans text-[10px] tracking-[0.16em] uppercase text-white/40 mb-3">Step 6 · Review & add to trip</p>
           <div className="space-y-4 font-sans text-sm text-white/70">
             <p className="flex gap-2"><MapPin size={14} className="shrink-0 mt-0.5" />Pickup: {pickup.address || '—'}</p>
             <p className="flex gap-2"><MapPin size={14} className="shrink-0 mt-0.5" />Destination: {destination.address || '—'}</p>

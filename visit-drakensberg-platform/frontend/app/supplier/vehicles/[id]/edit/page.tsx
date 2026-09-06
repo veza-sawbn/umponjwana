@@ -24,7 +24,7 @@ export default function EditVehiclePage() {
   const router = useRouter()
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
-  const [form, setForm] = useState({ name: '', make: '', model: '', type: 'Shuttle', seats: '8', registration: '' })
+  const [form, setForm] = useState({ name: '', make: '', model: '', type: 'Shuttle', seats: '8', registration: '', ratePerKm: '', minimumFare: '' })
   const [location, setLocation] = useState<GooglePlaceSelection>({ address: '' })
 
   useEffect(() => {
@@ -38,6 +38,10 @@ export default function EditVehiclePage() {
           type: vehicle.type ?? 'Shuttle',
           seats: String(vehicle.seats ?? vehicle.capacity ?? 8),
           registration: vehicle.registration ?? vehicle.reg ?? '',
+          // 0 / unset means the company rate card applies — show it as blank
+          // rather than a literal zero the operator would have to clear.
+          ratePerKm: vehicle.ratePerKm ? String(vehicle.ratePerKm) : '',
+          minimumFare: vehicle.minimumFare ? String(vehicle.minimumFare) : '',
         })
         if (vehicle.currentLocation) setLocation(vehicle.currentLocation)
       }
@@ -55,6 +59,8 @@ export default function EditVehiclePage() {
         ...form,
         seats: Number(form.seats) || 0,
         capacity: Number(form.seats) || 0,
+        ratePerKm: Number(form.ratePerKm) || 0,
+        minimumFare: Number(form.minimumFare) || 0,
         currentLocation: location.address ? location : undefined,
       })
       router.push('/supplier/vehicles')
@@ -85,6 +91,25 @@ export default function EditVehiclePage() {
           <F label="Seats"><input type="number" min={1} value={form.seats} onChange={e => set('seats', e.target.value)} className={inp} /></F>
           <F label="Registration"><input value={form.registration} onChange={e => set('registration', e.target.value)} className={inp} /></F>
         </div>
+        <div className="rounded-lg border border-black/8 bg-[#F7F5F2] p-4 space-y-4">
+          <div>
+            <p className="font-sans text-sm font-medium text-black/70">Rate for this vehicle</p>
+            <p className="font-sans text-xs text-black/40 mt-1">
+              What this specific vehicle charges. Leave a field blank to fall back to your company rate card.
+            </p>
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <F label="Rate per km (R)">
+              <input type="number" min={0} step="0.5" value={form.ratePerKm}
+                onChange={e => set('ratePerKm', e.target.value)} placeholder="Company rate" className={inp} />
+            </F>
+            <F label="Minimum fare (R)">
+              <input type="number" min={0} step="50" value={form.minimumFare}
+                onChange={e => set('minimumFare', e.target.value)} placeholder="Company minimum" className={inp} />
+            </F>
+          </div>
+        </div>
+
         <GoogleAddressField
           label="Current location"
           value={location.address}

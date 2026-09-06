@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import { ArrowLeft, Car, Bus, Check, Clock, ChevronRight, MapPin } from 'lucide-react'
 import { useBooking, type ShuttleOption } from '@/lib/booking-context'
 import { GoogleAddressField, useAutoDrivingDistance, type GooglePlaceSelection } from '@/components/maps/GoogleAddressField'
-import { buildShuttleOption, estimateTransferPrice, suggestedVehicleType, SHUTTLE_TYPES, type ShuttleSupplierChoice, type ShuttleType } from '@/lib/shuttle-service'
+import { buildShuttleOption, estimateTransferPrice, suggestedVehicleType, type ShuttleSupplierChoice } from '@/lib/shuttle-service'
 import { TransportSupplierPicker } from '@/components/booking/TransportSupplierPicker'
 import { MeetAndGreetForm } from '@/components/booking/MeetAndGreetForm'
 import type { MeetAndGreetDetails } from '@/lib/transport'
@@ -21,7 +21,6 @@ export default function ShuttlePage() {
   const booking = useBooking()
   const [needsShuttle, setNeedsShuttle] = useState<boolean | null>(null)
   const [pickup, setPickup] = useState<GooglePlaceSelection>({ address: '' })
-  const [shuttleType, setShuttleType] = useState<ShuttleType>('Private Shuttle')
   const [date, setDate] = useState(booking.checkIn || '')
   const [supplierChoice, setSupplierChoice] = useState<ShuttleSupplierChoice | null>(null)
   const [eligibleCount, setEligibleCount] = useState<number | null>(null)
@@ -45,7 +44,6 @@ export default function ShuttlePage() {
     setNeedsShuttle(true)
     setPickup({ address: existing.pickup ?? '', lat: existing.pickupLat, lng: existing.pickupLng })
     if (existing.date) setDate(existing.date)
-    if (existing.shuttleType === 'Shared Shuttle' || existing.shuttleType === 'Private Shuttle') setShuttleType(existing.shuttleType)
     if (existing.meetAndGreet) setMeetAndGreet(existing.meetAndGreet)
     if (existing.supplierId && existing.companyId && existing.companyName && existing.vehicleId && existing.vehicleName) {
       setSupplierChoice({
@@ -73,7 +71,7 @@ export default function ShuttlePage() {
   )
 
   const shuttlePrice = needsShuttle && result
-    ? (supplierChoice?.price ?? estimateTransferPrice(result.distanceKm, passengers, shuttleType))
+    ? (supplierChoice?.price ?? estimateTransferPrice(result.distanceKm, passengers))
     : 0
   // The transfer needs a chosen transport partner + vehicle unless no
   // registered partner covers the route (then dispatch places it later).
@@ -93,7 +91,6 @@ export default function ShuttlePage() {
         destination: { address: destination.address, lat: destination.lat, lng: destination.lng },
         date,
         passengers,
-        shuttleType,
         result,
         supplier: supplierChoice ?? undefined,
       }),
@@ -202,19 +199,10 @@ export default function ShuttlePage() {
                       <span>Drop-off: {destination.address || 'your accommodation'}</span>
                     </div>
 
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      <div>
-                        <label className="font-sans text-xs text-gray-500 mb-2 block">Transfer date</label>
-                        <input type="date" value={date} onChange={e => setDate(e.target.value)}
-                          className="w-full border border-gray-200 px-4 py-3 font-sans text-sm focus:outline-none focus:border-[#2d6a4f]" />
-                      </div>
-                      <div>
-                        <label className="font-sans text-xs text-gray-500 mb-2 block">Shuttle type</label>
-                        <select value={shuttleType} onChange={e => setShuttleType(e.target.value as ShuttleType)}
-                          className="w-full border border-gray-200 px-4 py-3 font-sans text-sm focus:outline-none focus:border-[#2d6a4f]">
-                          {SHUTTLE_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
-                        </select>
-                      </div>
+                    <div>
+                      <label className="font-sans text-xs text-gray-500 mb-2 block">Transfer date</label>
+                      <input type="date" value={date} onChange={e => setDate(e.target.value)}
+                        className="w-full border border-gray-200 px-4 py-3 font-sans text-sm focus:outline-none focus:border-[#2d6a4f] sm:max-w-xs" />
                     </div>
 
                     <div className="border-t border-gray-100 pt-4">
@@ -251,7 +239,6 @@ export default function ShuttlePage() {
                         dropoff={{ address: destination.address, lat: destination.lat, lng: destination.lng }}
                         date={date}
                         passengers={passengers}
-                        shuttleType={shuttleType}
                         distanceKm={result.distanceKm}
                         selected={supplierChoice}
                         onSelect={setSupplierChoice}
