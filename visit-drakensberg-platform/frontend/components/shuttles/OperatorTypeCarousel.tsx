@@ -63,13 +63,13 @@ export function OperatorTypeCarousel() {
   }, [])
 
   return (
-    <section className="bg-white border-y border-black/8">
+    <section className="bg-black">
       <div className="max-w-[1440px] mx-auto px-5 sm:px-6 lg:px-12 py-12 md:py-16">
         <div className="flex items-end justify-between gap-4 mb-8">
           <div>
             <p className="font-sans text-[10px] tracking-[0.2em] uppercase text-gold mb-3">Who drives you</p>
-            <h2 className="font-display text-3xl sm:text-4xl text-forest mb-3">Three kinds of operator</h2>
-            <p className="font-sans text-sm text-forest/50 max-w-2xl">
+            <h2 className="font-display text-3xl sm:text-4xl text-white mb-3">Three kinds of operator</h2>
+            <p className="font-sans text-sm text-white/45 max-w-2xl">
               The Drakensberg is served by very different transport businesses. Which ones you see depends on the
               trip you asked for — a long haul from the airport calls for a different operator than a drop at a
               trailhead ten minutes up the valley.
@@ -81,7 +81,7 @@ export function OperatorTypeCarousel() {
               onClick={() => goTo(active - 1)}
               disabled={active === 0}
               aria-label="Previous operator type"
-              className="flex h-10 w-10 items-center justify-center border border-black/10 text-forest/60 hover:border-forest hover:text-forest transition-colors disabled:opacity-30 disabled:hover:border-black/10 disabled:hover:text-forest/60"
+              className="flex h-10 w-10 items-center justify-center border border-white/20 text-white/60 hover:border-gold hover:text-gold transition-colors disabled:opacity-25 disabled:hover:border-white/20 disabled:hover:text-white/60"
             >
               <ChevronLeft size={17} />
             </button>
@@ -90,23 +90,28 @@ export function OperatorTypeCarousel() {
               onClick={() => goTo(active + 1)}
               disabled={active === CATEGORIES.length - 1}
               aria-label="Next operator type"
-              className="flex h-10 w-10 items-center justify-center border border-black/10 text-forest/60 hover:border-forest hover:text-forest transition-colors disabled:opacity-30 disabled:hover:border-black/10 disabled:hover:text-forest/60"
+              className="flex h-10 w-10 items-center justify-center border border-white/20 text-white/60 hover:border-gold hover:text-gold transition-colors disabled:opacity-25 disabled:hover:border-white/20 disabled:hover:text-white/60"
             >
               <ChevronRight size={17} />
             </button>
           </div>
         </div>
 
+        {/* The track bleeds to the screen edge on a phone so the next card
+            peeks past it, but scroll-padding keeps the snap position on the
+            section's gutter — without it snapping swallows the padding and
+            the first card sits flush against the edge, out of line with the
+            heading above it. */}
         <div
           ref={trackRef}
-          className="flex gap-4 overflow-x-auto snap-x snap-mandatory scroll-smooth pb-2 -mx-5 px-5 sm:mx-0 sm:px-0 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+          className="flex gap-4 overflow-x-auto snap-x snap-mandatory scroll-smooth pb-2 -mx-5 px-5 scroll-pl-5 sm:mx-0 sm:px-0 sm:scroll-pl-0 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
         >
           {CATEGORIES.map(([key, cat]) => {
             const { icon: Icon, art, scale } = CATEGORY_ART[key]
             return (
               <article
                 key={key}
-                className="snap-start shrink-0 w-[86%] sm:w-[60%] lg:w-[calc((100%-2rem)/3)] border border-gray-100 flex flex-col bg-white"
+                className="snap-start shrink-0 w-[86%] sm:w-[60%] lg:w-[calc((100%-2rem)/3)] flex flex-col bg-white"
               >
                 {/* The illustration band: the shape of the journey at a
                     glance — a plane leaving the city, a road across the
@@ -157,7 +162,7 @@ export function OperatorTypeCarousel() {
               onClick={() => goTo(i)}
               aria-label={`Show ${SUPPLIER_CATEGORIES[key].label}s`}
               aria-current={i === active}
-              className={`h-1.5 transition-all ${i === active ? 'w-6 bg-gold' : 'w-1.5 bg-forest/20'}`}
+              className={`h-1.5 transition-all ${i === active ? 'w-6 bg-gold' : 'w-1.5 bg-white/25'}`}
             />
           ))}
         </div>
