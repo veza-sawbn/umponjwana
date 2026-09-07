@@ -21,7 +21,13 @@ export type ShuttleSearchValue = {
   passengers: number
 }
 
-const field = 'w-full border border-gray-200 bg-white px-3 py-2.5 font-sans text-sm text-forest focus:outline-none focus:border-forest transition-colors'
+// 16px on a touch device, 14px with a mouse: iOS Safari zooms the whole page
+// in when a form control smaller than 16px takes focus, which threw the
+// visitor out of the layout every time they tapped a field here. Keyed off
+// the pointer rather than the viewport so an iPad, or a phone held sideways,
+// is covered too — both are wide enough to miss a width breakpoint and both
+// still zoom. The desktop scale is untouched.
+const field = 'w-full border border-gray-200 bg-white px-3 py-2.5 font-sans text-sm [@media(pointer:coarse)]:text-base text-forest focus:outline-none focus:border-forest transition-colors'
 const legend = 'flex font-sans text-[10px] tracking-[0.14em] uppercase text-forest/40 mb-1.5 flex items-center gap-1.5'
 
 function todayIso() {
@@ -71,7 +77,7 @@ function WhenField({
         {empty && (
           <span
             aria-hidden="true"
-            className="pointer-events-none absolute inset-y-0 left-3 right-9 flex items-center font-sans text-sm text-forest/35"
+            className="pointer-events-none absolute inset-y-0 left-3 right-9 flex items-center font-sans text-sm [@media(pointer:coarse)]:text-base text-forest/35"
           >
             {placeholder}
           </span>
