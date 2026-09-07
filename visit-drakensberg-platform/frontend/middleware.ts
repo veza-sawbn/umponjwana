@@ -15,7 +15,17 @@ const OPERATIONS_ROUTES = ['/operations']
 // page itself (avoid rewriting it into a loop), and customer-facing
 // invoices/quotes (RLS-gated per document, not part of the public site the
 // toggle is meant to hide).
-const MAINTENANCE_EXEMPT_ROUTES = ['/admin', '/supplier', '/operations', '/auth', '/maintenance', '/invoices', '/quotes']
+//
+// Operator onboarding stays open too: we want suppliers signing up while the
+// public site is closed, so /list-with-us and the documents its applicants
+// must be able to read before accepting them are exempt. The '/supplier'
+// prefix already covers /supplier-terms and /supplier-code-of-conduct; the
+// commission step also links out to /privacy. None of these expose the
+// browse-and-book site the toggle is hiding.
+const MAINTENANCE_EXEMPT_ROUTES = [
+  '/admin', '/supplier', '/operations', '/auth', '/maintenance', '/invoices', '/quotes',
+  '/list-with-us', '/privacy',
+]
 
 export async function middleware(req: NextRequest) {
   // `res` must be passed through so auth-helpers can refresh the session cookie.

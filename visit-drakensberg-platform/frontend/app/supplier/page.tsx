@@ -1,69 +1,81 @@
 'use client'
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { ArrowRight, AlertCircle } from 'lucide-react'
 import { useSupplier } from '@/lib/supplier-context'
-import { SUPPLIER_CONFIG } from '@/lib/supplier-config'
 import { getMyOrders, type SupplierOrder } from '@/lib/booking-orders'
 import { supabase } from '@/lib/auth'
 import { formatMoney } from '@/lib/allocation'
 
-/* ── per-type stat cards ─────────────────────────────────────────── */
-const TYPE_STATS: Record<string, { label: string; value: string }[]> = {
-  Accommodation: [
-    { label: 'Active Properties', value: '2' },
-    { label: 'Room Types', value: '5' },
-    { label: 'Occupancy This Month', value: '78%' },
-    { label: 'Revenue This Month', value: 'R 24 680' },
-  ],
-  Activity: [
-    { label: 'Active Activities', value: '4' },
-    { label: 'Bookings This Month', value: '31' },
-    { label: 'Avg Rating', value: '4.8' },
-    { label: 'Revenue This Month', value: 'R 18 200' },
-  ],
-  'Guided Tours': [
-    { label: 'Active Tours', value: '3' },
-    { label: 'Departures Scheduled', value: '8' },
-    { label: 'Guides Available', value: '4' },
-    { label: 'Revenue This Month', value: 'R 31 500' },
-  ],
-  Shuttle: [
-    { label: 'Fleet Size', value: '3' },
-    { label: 'Trips This Month', value: '47' },
-    { label: 'Active Routes', value: '6' },
-    { label: 'Revenue This Month', value: 'R 14 100' },
-  ],
-  Experience: [
-    { label: 'Active Experiences', value: '5' },
-    { label: 'Bookings This Month', value: '22' },
-    { label: 'Avg Group Size', value: '8' },
-    { label: 'Revenue This Month', value: 'R 27 400' },
-  ],
+const STATUS_STYLES: Record<SupplierOrder['status'], string> = {
+  requested:  'bg-blue-100 text-blue-700',
+  pending:    'bg-amber-100 text-amber-700',
+  confirmed:  'bg-emerald-100 text-emerald-700',
+  cancelled:  'bg-red-100 text-red-600',
+  declined:   'bg-red-100 text-red-600',
+  expired:    'bg-slate-100 text-slate-600',
 }
 
-const STATUS_STYLES: Record<string, string> = {
-  confirmed:  'bg-emerald-100 text-emerald-700',
-  completed:  'bg-slate-100 text-slate-600',
-  pending:    'bg-amber-100 text-amber-700',
-  cancelled:  'bg-red-100 text-red-600',
+// An order counts towards the supplier's numbers until it is cancelled,
+// declined, or left to expire.
+const LIVE_STATUSES: SupplierOrder['status'][] = ['requested', 'pending', 'confirmed']
+
+/** Travel date an order is anchored to — check-in for a stay, else its first dated item. */
+function travelDate(o: SupplierOrder): string | undefined {
+  return o.checkIn || o.items.find(i => i.date)?.date
+}
+
+/**
+ * Overview stats, derived from the supplier's own orders — the same rows the
+ * Recent Bookings table below is built from, so the cards can never disagree
+ * with it and no second query is needed.
+ *
+ * Money here is booking value: what this supplier's items were sold for,
+ * gross, before commission and platform fees. What actually pays out lives on
+ * /supplier/earnings, which reads the settled order lines — labelling this
+ * "revenue" would overstate it.
+ */
+function buildStats(orders: SupplierOrder[]): { label: string; value: string }[] {
+  const now = new Date()
+  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1)
+  const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+
+  const live = orders.filter(o => LIVE_STATUSES.includes(o.status))
+  const thisMonth = live.filter(o => new Date(o.createdAt) >= monthStart)
+  const upcoming = live.filter(o => {
+    const date = travelDate(o)
+    return Boolean(date) && new Date(date as string) >= todayStart
+  })
+  const awaiting = orders.filter(o => o.status === 'requested')
+
+  return [
+    { label: 'Bookings This Month', value: String(thisMonth.length) },
+    {
+      label: 'Booking Value This Month',
+      value: formatMoney(thisMonth.reduce((sum, o) => sum + (o.orderTotal || 0), 0)),
+    },
+    { label: 'Upcoming Bookings', value: String(upcoming.length) },
+    { label: 'Awaiting Your Response', value: String(awaiting.length) },
+  ]
 }
 
 export default function SupplierOverview() {
-  const { config, supplierType, supplierTypes, nav, isApproved, loading } = useSupplier()
-  const [recentBookings, setRecentBookings] = useState<SupplierOrder[]>([])
-  const [bookingsLoading, setBookingsLoading] = useState(true)
+  const { config, supplierTypes, nav, isApproved, loading } = useSupplier()
+  const [orders, setOrders] = useState<SupplierOrder[]>([])
+  const [ordersLoading, setOrdersLoading] = useState(true)
 
   useEffect(() => {
     supabase.auth.getUser().then(async ({ data: { user } }) => {
-      if (!user) { setBookingsLoading(false); return }
+      if (!user) { setOrdersLoading(false); return }
       // RLS scopes this to orders that actually belong to the signed-in
       // supplier — never another supplier's bookings.
-      const orders = await getMyOrders()
-      setRecentBookings(orders.slice(0, 5))
-      setBookingsLoading(false)
+      setOrders(await getMyOrders())
+      setOrdersLoading(false)
     })
   }, [])
+
+  const stats = useMemo(() => buildStats(orders), [orders])
+  const recentBookings = useMemo(() => orders.slice(0, 5), [orders])
 
   if (loading) {
     return (
@@ -90,8 +102,6 @@ export default function SupplierOverview() {
     )
   }
 
-  const stats = supplierType ? (TYPE_STATS[supplierType] ?? []) : []
-
   // Quick-links: first type-specific nav items (skip Overview and shared tail)
   const typeSpecificLinks = nav.filter(item =>
     item.href !== '/supplier' &&
@@ -112,17 +122,22 @@ export default function SupplierOverview() {
         <h1 className="font-display italic text-3xl text-black/90">Dashboard Overview</h1>
       </div>
 
-      {/* Stats */}
-      {stats.length > 0 && (
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-          {stats.map(s => (
-            <div key={s.label} className="bg-white rounded-xl border border-black/8 p-5">
-              <p className="font-sans text-xs text-black/40 uppercase tracking-wider mb-1">{s.label}</p>
-              <p className="font-display italic text-2xl text-black/90">{s.value}</p>
-            </div>
-          ))}
-        </div>
-      )}
+      {/* Stats — derived from this supplier's own orders, see buildStats */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        {ordersLoading
+          ? [0, 1, 2, 3].map(i => (
+              <div key={i} className="bg-white rounded-xl border border-black/8 p-5">
+                <div className="h-3 w-28 bg-black/5 rounded animate-skeleton mb-2.5" />
+                <div className="h-6 w-20 bg-black/5 rounded animate-skeleton" />
+              </div>
+            ))
+          : stats.map(s => (
+              <div key={s.label} className="bg-white rounded-xl border border-black/8 p-5">
+                <p className="font-sans text-xs text-black/40 uppercase tracking-wider mb-1">{s.label}</p>
+                <p className="font-display italic text-2xl text-black/90">{s.value}</p>
+              </div>
+            ))}
+      </div>
 
       {/* Quick links */}
       {typeSpecificLinks.length > 0 && (
@@ -155,7 +170,7 @@ export default function SupplierOverview() {
           <h2 className="font-sans text-sm font-semibold text-black/60 uppercase tracking-wider">Recent Bookings</h2>
           <Link href="/supplier/bookings" className="font-sans text-xs text-[#C9A96E] hover:underline">View all</Link>
         </div>
-        {bookingsLoading ? (
+        {ordersLoading ? (
           <div className="bg-white rounded-xl border border-black/8 flex items-center justify-center py-12">
             <div className="w-5 h-5 border-2 border-[#C9A96E] border-t-transparent rounded-full animate-spin" />
           </div>
@@ -189,7 +204,7 @@ export default function SupplierOverview() {
                       <td className="px-4 py-3 font-sans text-sm text-black/60">{date ? new Date(date).toLocaleDateString('en-ZA', { day: 'numeric', month: 'short', year: 'numeric' }) : '—'}</td>
                       <td className="px-4 py-3 font-sans text-sm text-black/80">{formatMoney(b.orderTotal)}</td>
                       <td className="px-4 py-3">
-                        <span className={`font-sans text-xs px-2 py-0.5 rounded-full capitalize ${STATUS_STYLES[b.status]}`}>{b.status}</span>
+                        <span className={`font-sans text-xs px-2 py-0.5 rounded-full capitalize ${STATUS_STYLES[b.status] ?? 'bg-slate-100 text-slate-600'}`}>{b.status}</span>
                       </td>
                     </tr>
                   )
