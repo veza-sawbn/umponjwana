@@ -7,7 +7,7 @@ import {
   CheckCircle, Star, ArrowLeft, Mountain, Award, Globe, Building2,
   CalendarDays, Flag,
 } from 'lucide-react'
-import { getOperatorForGuide, type GuideProfile, type OperatorProfile } from '@/lib/operators'
+import { getOperatorForGuide, GUIDE_TYPE_LABEL, guideTypeOf, type GuideProfile, type OperatorProfile } from '@/lib/operators'
 import { getUpcomingExperiences, type TrekkingExperience } from '@/lib/experiences'
 import { formatMoney } from '@/lib/allocation'
 
@@ -34,6 +34,7 @@ export default function GuideDetail({ guide }: { guide: GuideProfile }) {
     getUpcomingExperiences().then(exps => setDepartures(exps.filter(e => e.leadGuide === guide.name)))
   }, [guide])
 
+  const guideType = guideTypeOf(guide)
   const initials = guide.name.split(' ').map(n => n[0]).join('')
   const languages = csv(guide.languages)
   const specialisations = csv(guide.specialisations || guide.speciality)
@@ -134,15 +135,21 @@ export default function GuideDetail({ guide }: { guide: GuideProfile }) {
                   </div>
                 )}
                 <div>
-                  <p className="font-sans text-[10px] tracking-[0.12em] uppercase text-gray-400 mb-1">Certification</p>
-                  <p className="font-sans text-sm font-medium">{guide.certs || '—'}</p>
+                  <p className="font-sans text-[10px] tracking-[0.12em] uppercase text-gray-400 mb-1">Guide Type</p>
+                  <p className="font-sans text-sm font-medium">{GUIDE_TYPE_LABEL[guideType]}</p>
                 </div>
                 <div>
-                  <p className="font-sans text-[10px] tracking-[0.12em] uppercase text-gray-400 mb-1">TBCSA Guide Number</p>
-                  <p className="font-sans text-sm font-medium">{guide.guideNo || 'On file'}</p>
+                  <p className="font-sans text-[10px] tracking-[0.12em] uppercase text-gray-400 mb-1">SA Tourism Guide Number</p>
+                  <p className="font-sans text-sm font-medium">
+                    {guide.guideNo || (guideType === 'trainee' ? 'In training — not yet registered' : 'On file')}
+                  </p>
                 </div>
               </div>
-              <p className="font-sans text-xs text-gray-500 mt-3">Certificate details are verified by Visit Drakensberg before a guide is listed publicly.</p>
+              <p className="font-sans text-xs text-gray-500 mt-3">
+                {guideType === 'trainee'
+                  ? 'Trainees lead under the supervision of a registered guide. Their operator confirms their training before they are listed publicly.'
+                  : 'Registration details are verified by Visit Drakensberg before a guide is listed publicly.'}
+              </p>
             </div>
 
             {/* Upcoming availability: scheduled departures this guide leads */}

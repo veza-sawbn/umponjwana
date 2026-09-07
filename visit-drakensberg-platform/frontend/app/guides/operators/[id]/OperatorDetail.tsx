@@ -7,7 +7,7 @@ import {
   ArrowLeft, Building2, MapPin, Star, Award, Globe, Shield, Siren,
   Backpack, UserCircle, Calendar, CheckCircle,
 } from 'lucide-react'
-import { getGuidesByOperator, type OperatorProfile, type GuideProfile } from '@/lib/operators'
+import { getGuidesByOperator, GUIDE_TYPE_LABEL, guideTypeOf, type OperatorProfile, type GuideProfile } from '@/lib/operators'
 import { getUpcomingExperiences, type TrekkingExperience } from '@/lib/experiences'
 import { formatMoney } from '@/lib/allocation'
 
@@ -93,7 +93,7 @@ export default function OperatorDetail({ operator }: { operator: OperatorProfile
                         </div>
                         <div className="min-w-0">
                           <p className="font-display italic text-lg leading-tight">{g.name}</p>
-                          <p className="font-sans text-xs text-gray-400 mt-0.5">{g.certs}</p>
+                          <p className="font-sans text-xs text-gray-400 mt-0.5">{GUIDE_TYPE_LABEL[guideTypeOf(g)]}</p>
                           <div className="flex items-center gap-3 mt-1 font-sans text-xs text-gray-500 flex-wrap">
                             {g.yearsExperience ? <span>{g.yearsExperience} yrs experience</span> : null}
                             {g.rating > 0 && (

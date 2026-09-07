@@ -9,12 +9,21 @@ import { getMyDepartures, updateDeparture, type Departure } from '@/lib/departur
 import {
   getSupplierEntities, updateSupplierEntity, type SupplierEntity,
 } from '@/lib/supplier-entities'
+import { GUIDE_TYPE_LABEL, guideTypeOf, type GuideType } from '@/lib/operators'
 
 interface BlockedRange { id: string; from: string; to: string; reason: string }
-type Guide = SupplierEntity & { name: string; status: string; blocked?: BlockedRange[] }
+type Guide = SupplierEntity & { name: string; status: string; guideType?: GuideType; blocked?: BlockedRange[] }
 type Dep = Departure & { guideNotified?: boolean }
 
 const GUIDE_ENTITY = 'guides'
+
+// Who is being sent out matters when briefing a departure — a trainee does not
+// lead one alone, and an expedition leader is who a multi-day trek needs.
+const TYPE_CHIP: Record<GuideType, string> = {
+  certified: 'bg-emerald-50 text-emerald-700',
+  trainee: 'bg-blue-50 text-blue-600',
+  expedition_leader: 'bg-[#C9A96E]/15 text-[#8B6914]',
+}
 
 const STATUS_STYLE: Record<string, string> = {
   active:    'bg-emerald-100 text-emerald-700',
@@ -139,7 +148,10 @@ export default function StaffPage() {
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="font-sans text-sm font-semibold text-black/80 truncate">{g.name}</p>
-                    <span className={`font-sans text-[10px] px-2 py-0.5 rounded-full capitalize ${STATUS_STYLE[g.status] ?? STATUS_STYLE.pending}`}>{g.status}</span>
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      <span className={`font-sans text-[10px] px-2 py-0.5 rounded-full capitalize ${STATUS_STYLE[g.status] ?? STATUS_STYLE.pending}`}>{g.status}</span>
+                      <span className={`font-sans text-[10px] px-2 py-0.5 rounded-full ${TYPE_CHIP[guideTypeOf(g)]}`}>{GUIDE_TYPE_LABEL[guideTypeOf(g)]}</span>
+                    </div>
                   </div>
                 </div>
 

@@ -12,7 +12,8 @@ import { supabase } from '@/lib/auth'
 import { getTrails, type Trail } from '@/lib/trails'
 import { getTours, type Tour } from '@/lib/tours'
 import {
-  getOperators, getGuidesByOperator, type OperatorProfile, type GuideProfile,
+  getOperators, getGuidesByOperator, GUIDE_TYPE_LABEL, guideTypeOf,
+  type OperatorProfile, type GuideProfile,
 } from '@/lib/operators'
 import { createTripRequest, TRIP_STATUS_LABELS } from '@/lib/custom-trips'
 
@@ -363,7 +364,7 @@ function RequestContent() {
                                 <UserCircle size={13} className="text-[#2d6a4f]" /> {g.name}
                                 {gSelected && <CheckCircle size={12} className="text-[#2d6a4f]" />}
                               </p>
-                              <p className="font-sans text-xs text-gray-400 mt-0.5">{g.certs}{g.speciality ? ` · ${g.speciality}` : ''}</p>
+                              <p className="font-sans text-xs text-gray-400 mt-0.5">{GUIDE_TYPE_LABEL[guideTypeOf(g)]}{g.speciality ? ` · ${g.speciality}` : ''}</p>
                               {!free && <p className="font-sans text-[10px] text-red-400 mt-1">Unavailable on these dates</p>}
                             </button>
                           )
