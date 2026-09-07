@@ -16,12 +16,14 @@ type FormState = {
   meetingPoint: string; gpsLat: string; gpsLng: string; description: string;
   included: string[]; fitnessNotes: string; cancellation: string;
   pricingTiers: PackageForm[]; status: 'active' | 'draft'
+  childMaxAge: string; childPrice: string
 }
 
 const EMPTY: Omit<FormState, 'pricingTiers'> = {
   name: '', difficulty: 'Moderate', days: 1, minAge: 0, maxGroup: 10,
   meetingPoint: '', gpsLat: '', gpsLng: '', description: '',
   included: [], fitnessNotes: '', cancellation: '48h',
+  childMaxAge: '', childPrice: '',
   status: 'active',
 }
 
@@ -55,6 +57,8 @@ export default function EditTourPage() {
           description: tour.description, included: tour.included,
           fitnessNotes: tour.fitnessNotes, cancellation: tour.cancellation,
           pricingTiers: tiersToForm(tour.pricingTiers, tour.pricePerPerson),
+          childMaxAge: tour.childMaxAge ? String(tour.childMaxAge) : '',
+          childPrice: tour.childPrice ? String(tour.childPrice) : '',
           status: tour.status,
         })
         const trails = await getTrails()
@@ -82,7 +86,13 @@ export default function EditTourPage() {
     setError('')
     setSaving(true)
     try {
-      await updateTour(id, { ...form, pricingTiers, pricePerPerson: cheapest(pricingTiers) })
+      await updateTour(id, {
+        ...form,
+        pricingTiers,
+        pricePerPerson: cheapest(pricingTiers),
+        childPrice: form.childMaxAge ? (+form.childPrice || 0) : undefined,
+        childMaxAge: form.childMaxAge ? +form.childMaxAge : undefined,
+      })
       router.push('/supplier/tours')
     } catch {
       setError('Failed to save changes. Please try again.')
@@ -198,6 +208,20 @@ export default function EditTourPage() {
               : ' Add a day-by-day plan to this trail at Admin → Trails to let tiers customize their itinerary.'}
           </p>
         </F>
+
+        <div className="grid grid-cols-2 gap-4">
+          <F label="Child Age Cutoff (optional)">
+            <input type="number" min="0" value={form.childMaxAge} onChange={e => set('childMaxAge', e.target.value)} placeholder="e.g. 12" className={inp} />
+          </F>
+          <F label="Child Price per Person (ZAR)">
+            <input type="number" min="0" value={form.childPrice} onChange={e => set('childPrice', e.target.value)} disabled={!form.childMaxAge} placeholder="Leave blank to charge adult rate" className={`${inp} disabled:opacity-40`} />
+          </F>
+        </div>
+        {form.childMaxAge && (
+          <p className="font-sans text-xs text-black/35 -mt-2">
+            Applies across every pricing tier and departure of this tour.
+          </p>
+        )}
 
         <F label="Status">
           <div className="flex gap-2">

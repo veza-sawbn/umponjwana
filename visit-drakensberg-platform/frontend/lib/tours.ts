@@ -101,6 +101,13 @@ export type Tour = {
   // unchanged. Only a true stored value when pricingTiers is empty.
   pricePerPerson: number
   pricingTiers?: PricingTier[]
+  /** Per-child rate, applied across every pricing tier/departure of this
+   *  tour. Only applied when childMaxAge is also set — tours created before
+   *  this existed have neither, so everyone pays the tier's adult rate as
+   *  before. */
+  childPrice?: number
+  /** Age in years, inclusive, at or under which the child rate applies. */
+  childMaxAge?: number
   /** @deprecated Superseded by PricingTier's itinerary fields, which build on the linked Trail's `days` instead of a separate tour-level plan. Retained so tours saved by the earlier version of this feature still parse; no longer read anywhere. */
   itinerary?: unknown
   /** @deprecated Removed from the supplier forms; retained so stored tours still parse. */

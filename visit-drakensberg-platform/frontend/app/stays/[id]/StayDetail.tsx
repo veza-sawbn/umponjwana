@@ -55,6 +55,10 @@ function propToStay(prop: Property, rooms: Room[]) {
       units: r.units,
       minNights: r.minNights,
       cleaningFee: r.cleaningFee,
+      // A child rate only applies once the supplier set an age cutoff — an
+      // extra per-night charge on top of price_per_night, not a discount off it.
+      childPrice: r.childMaxAge ? (r.childPrice || 0) : undefined,
+      childMaxAge: r.childMaxAge || undefined,
     })),
     reviews_list: [] as any[],
   }
@@ -85,6 +89,9 @@ export default function StayDetail({ property, rooms: roomsData, id }: { propert
   const [checkIn, setCheckIn] = useState(booking.checkIn || '')
   const [checkOut, setCheckOut] = useState(booking.checkOut || '')
   const [guests, setGuests] = useState(booking.guests || 2)
+  // Only used when the selected room has a configured child rate — an extra
+  // per-night charge for children sharing the room, on top of its flat price.
+  const [children, setChildren] = useState(0)
   // roomId -> units still free for the chosen dates (null = unknown)
   const [unitsLeft, setUnitsLeft] = useState<Record<string, number | null>>({})
 
@@ -115,7 +122,12 @@ export default function StayDetail({ property, rooms: roomsData, id }: { propert
   const nights = checkIn && checkOut
     ? Math.max(1, Math.round((new Date(checkOut).getTime() - new Date(checkIn).getTime()) / 86400000))
     : 1
-  const total = selectedRoom ? selectedRoom.price_per_night * nights : null
+  const hasChildRate = selectedRoom?.childMaxAge !== undefined
+  const effectiveChildren = hasChildRate ? Math.min(children, guests) : 0
+  // The room's flat nightly price stays flat regardless of adult count — a
+  // child rate only adds a per-child, per-night surcharge on top of it.
+  const pricePerNight = selectedRoom ? selectedRoom.price_per_night + effectiveChildren * (selectedRoom.childPrice ?? 0) : 0
+  const total = selectedRoom ? pricePerNight * nights : null
 
   return (
     <div className="min-h-screen bg-[#F7F5F2]">
@@ -421,11 +433,26 @@ export default function StayDetail({ property, rooms: roomsData, id }: { propert
                     <input type="date" value={checkOut} onChange={e => setCheckOut(e.target.value)} className="flex-1 font-sans text-sm focus:outline-none bg-transparent" />
                   </div>
                 </div>
-                <div>
-                  <label className="block font-sans text-[10px] tracking-[0.1em] uppercase text-gray-400 mb-1.5">Guests</label>
-                  <select value={guests} onChange={e => setGuests(parseInt(e.target.value))} className="w-full border border-gray-300 px-3 py-2.5 font-sans text-sm focus:outline-none bg-white">
-                    {[1, 2, 3, 4, 5, 6].map(n => <option key={n} value={n}>{n} guest{n !== 1 ? 's' : ''}</option>)}
-                  </select>
+                <div className={hasChildRate ? 'grid grid-cols-2 gap-3' : ''}>
+                  <div>
+                    <label className="block font-sans text-[10px] tracking-[0.1em] uppercase text-gray-400 mb-1.5">Guests</label>
+                    <select value={guests} onChange={e => setGuests(parseInt(e.target.value))} className="w-full border border-gray-300 px-3 py-2.5 font-sans text-sm focus:outline-none bg-white">
+                      {[1, 2, 3, 4, 5, 6].map(n => <option key={n} value={n}>{n} guest{n !== 1 ? 's' : ''}</option>)}
+                    </select>
+                  </div>
+                  {hasChildRate && (
+                    <div>
+                      <label className="block font-sans text-[10px] tracking-[0.1em] uppercase text-gray-400 mb-1.5">Children ({selectedRoom.childMaxAge} & under)</label>
+                      <input
+                        type="number"
+                        min={0}
+                        max={guests}
+                        value={effectiveChildren}
+                        onChange={e => setChildren(Math.max(0, Math.min(guests, parseInt(e.target.value) || 0)))}
+                        className="w-full border border-gray-300 px-3 py-2.5 font-sans text-sm focus:outline-none"
+                      />
+                    </div>
+                  )}
                 </div>
                 {stay.rooms.length > 0 && (
                   <>
@@ -452,8 +479,14 @@ export default function StayDetail({ property, rooms: roomsData, id }: { propert
                 <div className="border-t border-gray-100 pt-4 mb-5">
                   <div className="flex justify-between font-sans text-sm mb-1 text-gray-600">
                     <span>{formatMoney(selectedRoom.price_per_night)} × {nights} night{nights !== 1 ? 's' : ''}</span>
-                    <span>{formatMoney(total)}</span>
+                    <span>{formatMoney(selectedRoom.price_per_night * nights)}</span>
                   </div>
+                  {effectiveChildren > 0 && (
+                    <div className="flex justify-between font-sans text-sm mb-1 text-gray-600">
+                      <span>{formatMoney(selectedRoom.childPrice ?? 0)} × {effectiveChildren} child{effectiveChildren === 1 ? '' : 'ren'} × {nights} night{nights !== 1 ? 's' : ''}</span>
+                      <span>{formatMoney((selectedRoom.childPrice ?? 0) * effectiveChildren * nights)}</span>
+                    </div>
+                  )}
                   <div className="flex justify-between font-sans text-sm font-medium pt-3 mt-2 border-t border-gray-100">
                     <span>Total</span>
                     <span className="text-[#2d6a4f]">{formatMoney(total)}</span>
@@ -465,7 +498,16 @@ export default function StayDetail({ property, rooms: roomsData, id }: { propert
                 onClick={() => {
                   if (!selectedRoom) return
                   booking.setSearch(stay.region, checkIn, checkOut, guests)
-                  booking.setStay({ id, title: stay.title, region: stay.region, price_per_night: selectedRoom.price_per_night, roomId: selectedRoom.id, roomName: selectedRoom.name, img: stay.images?.[0], address: stay.address, lat: stay.gpsLat, lng: stay.gpsLng })
+                  booking.setStay({
+                    id, title: stay.title, region: stay.region,
+                    // Effective nightly price — the room's flat rate plus
+                    // any per-child surcharge — so checkout's existing
+                    // price_per_night * nights math stays correct unchanged.
+                    price_per_night: pricePerNight,
+                    roomId: selectedRoom.id, roomName: selectedRoom.name,
+                    img: stay.images?.[0], address: stay.address, lat: stay.gpsLat, lng: stay.gpsLng,
+                    ...(hasChildRate ? { adults: guests - effectiveChildren, children: effectiveChildren } : {}),
+                  })
                   router.push(`/search?region=${encodeURIComponent(stay.region)}&check_in=${checkIn}&check_out=${checkOut}&guests=${guests}`)
                 }}
                 className={`w-full py-3.5 font-sans text-sm font-medium transition-colors ${selectedRoom ? 'bg-[#2d6a4f] text-white hover:bg-[#235a3f]' : 'bg-gray-100 text-gray-400 cursor-not-allowed'}`}

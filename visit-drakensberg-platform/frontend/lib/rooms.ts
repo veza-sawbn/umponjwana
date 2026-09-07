@@ -24,6 +24,13 @@ export type Room = {
   seasons: Season[]
   minNights: number
   cleaningFee: number
+  /** Extra charge per child per night, on top of the room's flat nightly
+   *  price. Only applied when childMaxAge is also set — rooms created before
+   *  this existed have neither, so a booking's nightly price is unaffected
+   *  regardless of who's staying, same as before. */
+  childPrice?: number
+  /** Age in years, inclusive, at or under which the child rate applies. */
+  childMaxAge?: number
   status: 'active' | 'draft'
   createdAt: string
 }
