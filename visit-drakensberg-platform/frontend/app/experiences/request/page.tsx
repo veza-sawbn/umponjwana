@@ -12,7 +12,8 @@ import { supabase } from '@/lib/auth'
 import { getTrails, type Trail } from '@/lib/trails'
 import { getTours, type Tour } from '@/lib/tours'
 import {
-  getOperators, getGuidesByOperator, GUIDE_TYPE_LABEL, guideTypeOf,
+  getOperators, getGuidesByOperator, getGuideById, getOperatorForGuide,
+  GUIDE_TYPE_LABEL, guideTypeOf,
   type OperatorProfile, type GuideProfile,
 } from '@/lib/operators'
 import { createTripRequest, TRIP_STATUS_LABELS } from '@/lib/custom-trips'
@@ -45,6 +46,7 @@ function RequestContent() {
   const router = useRouter()
   const trailParam = params.get('trail') ?? ''
   const guideParam = params.get('guide') ?? ''
+  const operatorParam = params.get('operator') ?? ''
 
   const [trails, setTrails] = useState<Trail[]>([])
   const [matches, setMatches] = useState<OperatorMatch[]>([])
@@ -52,14 +54,20 @@ function RequestContent() {
   const [step, setStep] = useState<1 | 2 | 3>(1)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
-  const [done, setDone] = useState<{ reference: string } | null>(null)
+  const [done, setDone] = useState<{ reference: string; guideName: string } | null>(null)
+  // The guide the visitor arrived on — resolved directly by id rather than
+  // waiting for the trail match to produce them, so their name and face are
+  // on the page from step 1 instead of appearing only once an operator is
+  // picked on step 2.
+  const [requestedGuide, setRequestedGuide] = useState<GuideProfile | null>(null)
+  const [requestedGuideOperator, setRequestedGuideOperator] = useState<OperatorProfile | null>(null)
 
   const [form, setForm] = useState({
     trailId: trailParam,
     startDate: '',
     endDate: '',
     groupSize: 2,
-    operatorId: '',      // selected operator profile id
+    operatorId: operatorParam,   // selected operator profile id
     guideId: guideParam,
     specialRequests: '',
     customerName: '',
@@ -80,6 +88,18 @@ function RequestContent() {
       }))
     })
   }, [])
+
+  useEffect(() => {
+    if (!guideParam) { setRequestedGuide(null); setRequestedGuideOperator(null); return }
+    let cancelled = false
+    getGuideById(guideParam).then(async g => {
+      if (cancelled || !g) return
+      setRequestedGuide(g)
+      const op = await getOperatorForGuide(g)
+      if (!cancelled) setRequestedGuideOperator(op)
+    })
+    return () => { cancelled = true }
+  }, [guideParam])
 
   const trail = trails.find(t => t.id === form.trailId) ?? null
 
@@ -129,12 +149,32 @@ function RequestContent() {
 
   const selectedMatch = matches.find(m => m.operator.id === form.operatorId) ?? null
   const selectedGuide = useMemo(() => {
-    for (const m of matches) {
-      const g = m.guides.find(x => x.id === form.guideId)
-      if (g) return g
-    }
+    // Only ever a guide on the chosen operator's own roster: the request
+    // carries operator and guide together, so a guide from some other
+    // operator must never ride along on it.
+    const inRoster = selectedMatch?.guides.find(x => x.id === form.guideId)
+    if (inRoster) return inRoster
+    // On step 1, and before the trail matches have loaded, there is no roster
+    // to check against yet — the guide arrived on is still the selected one.
+    if (!selectedMatch && requestedGuide && requestedGuide.id === form.guideId) return requestedGuide
     return null
-  }, [matches, form.guideId])
+  }, [selectedMatch, form.guideId, requestedGuide])
+
+  // Whether the guide the visitor arrived on can actually take this trip.
+  const requestedGuideStillSelected = Boolean(requestedGuide && form.guideId === requestedGuide.id)
+  const requestedGuideOffTrail =
+    Boolean(requestedGuide) && matches.length > 0 &&
+    !matches.some(m => m.guides.some(g => g.id === requestedGuide!.id))
+  const requestedGuideBusy =
+    Boolean(requestedGuide) && !guideFreeOnDates(requestedGuide!, form.startDate, form.endDate)
+
+  // Their operator is preselected once it turns up in the matches, so the
+  // visitor never has to re-find the pair they arrived with.
+  useEffect(() => {
+    if (!requestedGuide || form.operatorId) return
+    const owning = matches.find(m => m.guides.some(g => g.id === requestedGuide.id))
+    if (owning) setForm(f => ({ ...f, operatorId: owning.operator.id }))
+  }, [matches, requestedGuide, form.operatorId])
 
   function next() {
     setError('')
@@ -145,7 +185,10 @@ function RequestContent() {
       if (form.groupSize < 1) { setError('Group size must be at least 1.'); return }
       setStep(2)
     } else if (step === 2) {
-      if (!form.operatorId) { setError('Select a tour operator for your private trip.'); return }
+      // Not form.operatorId: that can come from the URL and name an operator
+      // this trail has no match for, which would advance to a step 3 that
+      // renders nothing.
+      if (!selectedMatch) { setError('Select a tour operator for your private trip.'); return }
       setStep(3)
     }
   }
@@ -157,7 +200,12 @@ function RequestContent() {
       return
     }
     if (!userId) {
-      router.push(`/auth/login?redirect=${encodeURIComponent(`/experiences/request?trail=${form.trailId}`)}`)
+      // Carry the guide (and their operator) back through sign-in — losing
+      // them here would drop the visitor into a blank request form.
+      const back = new URLSearchParams({ trail: form.trailId })
+      if (form.guideId) back.set('guide', form.guideId)
+      if (form.operatorId) back.set('operator', form.operatorId)
+      router.push(`/auth/login?redirect=${encodeURIComponent(`/experiences/request?${back}`)}`)
       return
     }
     if (!trail || !selectedMatch) return
@@ -181,7 +229,7 @@ function RequestContent() {
         operatorId: UUID_RE.test(op.supplierId) ? op.supplierId : null,
         operatorName: op.companyName,
       })
-      setDone({ reference: request.reference })
+      setDone({ reference: request.reference, guideName: selectedGuide?.name ?? '' })
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Could not submit your request. Please try again.')
     } finally {
@@ -190,6 +238,7 @@ function RequestContent() {
   }
 
   if (done) {
+    const guideFirstName = done.guideName ? done.guideName.split(' ')[0] : ''
     return (
       <div className="min-h-screen bg-[#F7F5F2]">
         <main className="max-w-2xl mx-auto px-6 pt-40 pb-24 text-center">
@@ -199,7 +248,10 @@ function RequestContent() {
           <h1 className="font-display italic text-4xl text-[#000000] mb-3">Request submitted</h1>
           <p className="font-sans text-sm text-gray-500 mb-2">Reference <span className="text-[#2d6a4f] font-medium">{done.reference}</span></p>
           <p className="font-sans text-sm text-gray-500 max-w-md mx-auto mb-8 leading-relaxed">
-            Your request is now <span className="text-[#2d6a4f]">{TRIP_STATUS_LABELS.pending_guide}</span>. The guide confirms availability first,
+            Your request is now <span className="text-[#2d6a4f]">{TRIP_STATUS_LABELS.pending_guide}</span>.{' '}
+            {done.guideName
+              ? <>Your request names <span className="text-[#2d6a4f]">{done.guideName}</span>, and {guideFirstName} confirms availability first,</>
+              : <>The guide confirms availability first,</>}{' '}
             then the tour operator reviews the operation and sends you a quote. You'll be notified at every step — this is never an instant booking.
           </p>
           <div className="flex items-center justify-center gap-3 flex-wrap">
@@ -252,6 +304,55 @@ function RequestContent() {
           ))}
         </div>
       </div>
+
+      {/* The guide the visitor came here to book, held in view for the whole
+          request rather than living only as a hidden form value. */}
+      {requestedGuide && (
+        <div className="bg-white border-b border-gray-200">
+          <div className="max-w-[900px] mx-auto px-6 lg:px-12 py-4 flex items-center gap-4 flex-wrap">
+            <div className="w-12 h-12 bg-[#2d6a4f]/10 flex items-center justify-center shrink-0 overflow-hidden">
+              {requestedGuide.portrait
+                ? <img src={requestedGuide.portrait} alt="" className="w-full h-full object-cover" />
+                : <UserCircle size={20} className="text-[#2d6a4f]" />}
+            </div>
+            <div className="flex-1 min-w-[200px]">
+              <p className="font-sans text-[10px] tracking-[0.12em] uppercase text-gray-400">
+                {requestedGuideStillSelected ? 'Requesting' : 'You started with'}
+              </p>
+              <p className="font-display italic text-lg leading-tight">{requestedGuide.name}</p>
+              <p className="font-sans text-xs text-gray-500">
+                {GUIDE_TYPE_LABEL[guideTypeOf(requestedGuide)]}
+                {requestedGuideOperator ? ` · ${requestedGuideOperator.companyName}` : ''}
+              </p>
+            </div>
+            {requestedGuideStillSelected ? (
+              <span className="font-sans text-xs text-[#2d6a4f] flex items-center gap-1.5 shrink-0">
+                <CheckCircle size={13} /> Kept through this request
+              </span>
+            ) : (
+              <button
+                onClick={() => setForm(f => ({
+                  ...f,
+                  guideId: requestedGuide.id,
+                  operatorId: matches.find(m => m.guides.some(g => g.id === requestedGuide.id))?.operator.id ?? f.operatorId,
+                }))}
+                className="font-sans text-xs text-[#2d6a4f] underline underline-offset-2 shrink-0"
+              >
+                Put {requestedGuide.name.split(' ')[0]} back
+              </button>
+            )}
+          </div>
+          {requestedGuideStillSelected && (requestedGuideBusy || requestedGuideOffTrail) && (
+            <div className="max-w-[900px] mx-auto px-6 lg:px-12 pb-4">
+              <p className="font-sans text-xs text-[#8B6914] bg-[#C9A96E]/10 border border-[#C9A96E]/30 px-3 py-2">
+                {requestedGuideBusy
+                  ? `${requestedGuide.name.split(' ')[0]} has blocked out these dates. Pick different dates, or continue and the operator will propose an alternative guide.`
+                  : `${requestedGuide.name.split(' ')[0]}'s operator doesn't run this trail. Choose another trail, or select a different operator below.`}
+              </p>
+            </div>
+          )}
+        </div>
+      )}
 
       <main className="max-w-[900px] mx-auto px-6 lg:px-12 py-12">
         {step === 1 && (
@@ -323,6 +424,11 @@ function RequestContent() {
                         <div className="flex items-center gap-2 flex-wrap">
                           <p className="font-display italic text-lg">{m.operator.companyName}</p>
                           {m.runsTrail && <span className="font-sans text-[10px] tracking-[0.08em] uppercase px-2 py-0.5 bg-[#2d6a4f]/10 text-[#2d6a4f]">Runs this trail</span>}
+                          {requestedGuide && m.guides.some(g => g.id === requestedGuide.id) && (
+                            <span className="font-sans text-[10px] tracking-[0.08em] uppercase px-2 py-0.5 bg-[#C9A96E]/20 text-[#8B6914]">
+                              {requestedGuide.name.split(' ')[0]}&apos;s operator
+                            </span>
+                          )}
                         </div>
                         <p className="font-sans text-xs text-gray-500 mt-0.5">
                           {[m.operator.location, m.operator.yearsOperating > 0 ? `${m.operator.yearsOperating} years operating` : '']
@@ -431,7 +537,22 @@ function RequestContent() {
                 <div className="flex justify-between gap-4"><span className="text-gray-400">Dates</span><span className="text-right">{form.startDate} → {form.endDate}</span></div>
                 <div className="flex justify-between gap-4"><span className="text-gray-400"><Users size={12} className="inline mr-1 -mt-0.5" />Group</span><span>{form.groupSize}</span></div>
                 <div className="flex justify-between gap-4"><span className="text-gray-400">Operator</span><span className="text-right">{selectedMatch.operator.companyName}</span></div>
-                {selectedGuide && <div className="flex justify-between gap-4"><span className="text-gray-400">Preferred Guide</span><span className="text-right">{selectedGuide.name}</span></div>}
+                {selectedGuide && (
+                  <div className="border-t border-gray-100 pt-3">
+                    <span className="text-gray-400 block mb-2">Preferred Guide</span>
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 bg-[#2d6a4f]/10 flex items-center justify-center shrink-0 overflow-hidden">
+                        {selectedGuide.portrait
+                          ? <img src={selectedGuide.portrait} alt="" className="w-full h-full object-cover" />
+                          : <UserCircle size={18} className="text-[#2d6a4f]" />}
+                      </div>
+                      <div className="min-w-0">
+                        <p className="font-display italic text-base leading-tight">{selectedGuide.name}</p>
+                        <p className="font-sans text-xs text-gray-400">{GUIDE_TYPE_LABEL[guideTypeOf(selectedGuide)]}</p>
+                      </div>
+                    </div>
+                  </div>
+                )}
                 {form.specialRequests && <div><span className="text-gray-400 block mb-1">Special Requests</span><span className="text-xs text-gray-600">{form.specialRequests}</span></div>}
               </div>
               <div className="border-t border-gray-100 mt-4 pt-4">
