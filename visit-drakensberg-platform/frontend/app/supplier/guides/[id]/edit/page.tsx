@@ -4,12 +4,19 @@ import { useParams, useRouter } from 'next/navigation'
 import toast from 'react-hot-toast'
 import { ChevronLeft, CheckCircle, Clock, XCircle } from 'lucide-react'
 import { getSupplierEntity, updateSupplierEntity } from '@/lib/supplier-entities'
-import { GUIDE_TYPE_LABEL, type GuideProfile } from '@/lib/operators'
+import {
+  GUIDE_TYPES, GUIDE_TYPE_LABEL, GUIDE_TYPE_HINT, guideTypeOf, type GuideProfile, type GuideType,
+} from '@/lib/operators'
 import { supplierMediaSource } from '@/lib/supplier-media'
 import { MediaPicker } from '@/components/media/MediaPicker'
 
 const ENTITY = 'guides'
-const GUIDE_TYPES = ['certified', 'trainee'] as const
+
+// A trainee is not yet registered, so they are the one type that may be saved
+// without a guide number.
+const GUIDE_NO_LABEL = 'SA Tourism Guide Number'
+const guideNoLabel = (t: GuideType) =>
+  t === 'trainee' ? `${GUIDE_NO_LABEL} (optional)` : GUIDE_NO_LABEL
 
 const STATUS_BADGE: Record<string, { label: string; Icon: typeof CheckCircle; cls: string }> = {
   verified: { label: 'Verified',       Icon: CheckCircle, cls: 'bg-emerald-100 text-emerald-700' },
@@ -18,14 +25,14 @@ const STATUS_BADGE: Record<string, { label: string; Icon: typeof CheckCircle; cl
 }
 
 type FormState = {
-  name: string; email: string; certs: string; guideNo: string; speciality: string; languages: string
+  name: string; email: string; guideNo: string; speciality: string; languages: string
   qualifications: string; yearsExperience: string; highestSummit: string
   completedExpeditions: string; portrait: string; bio: string
-  guideType: 'certified' | 'trainee'
+  guideType: GuideType
 }
 
 const EMPTY: FormState = {
-  name: '', email: '', certs: '', guideNo: '', speciality: '', languages: '',
+  name: '', email: '', guideNo: '', speciality: '', languages: '',
   qualifications: '', yearsExperience: '', highestSummit: '', completedExpeditions: '',
   portrait: '', bio: '', guideType: 'certified',
 }
@@ -39,6 +46,7 @@ export default function EditGuidePage() {
   const [saving, setSaving] = useState(false)
   const [notFound, setNotFound] = useState(false)
   const set = (k: keyof FormState, v: string) => setForm(f => ({ ...f, [k]: v }))
+  const setType = (t: GuideType) => setForm(f => ({ ...f, guideType: t }))
 
   useEffect(() => {
     getSupplierEntity<GuideProfile>(ENTITY, id).then(guide => {
@@ -47,7 +55,6 @@ export default function EditGuidePage() {
       setForm({
         name: guide.name ?? '',
         email: guide.email ?? '',
-        certs: guide.certs ?? '',
         guideNo: guide.guideNo ?? '',
         speciality: guide.speciality ?? '',
         languages: guide.languages ?? '',
@@ -57,8 +64,7 @@ export default function EditGuidePage() {
         completedExpeditions: guide.completedExpeditions ? String(guide.completedExpeditions) : '',
         portrait: guide.portrait ?? '',
         bio: guide.bio ?? '',
-        // Rows saved before guideType existed default to certified.
-        guideType: guide.guideType ?? 'certified',
+        guideType: guideTypeOf(guide),
       })
       setLoading(false)
     })
@@ -71,7 +77,6 @@ export default function EditGuidePage() {
       await updateSupplierEntity<GuideProfile>(ENTITY, id, {
         name: form.name.trim(),
         email: form.email.trim(),
-        certs: form.certs.trim(),
         guideNo: form.guideNo.trim(),
         speciality: form.speciality.trim(),
         languages: form.languages.trim(),
@@ -126,12 +131,12 @@ export default function EditGuidePage() {
 
       <div className="bg-white rounded-xl border border-black/8 p-6 space-y-5">
         <F label="Guide Type">
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             {GUIDE_TYPES.map(t => (
               <button
                 key={t}
                 type="button"
-                onClick={() => set('guideType', t)}
+                onClick={() => setType(t)}
                 className={`font-sans text-xs px-3 py-1.5 rounded-full border transition-colors ${
                   form.guideType === t ? 'bg-[#C9A96E] text-white border-[#C9A96E]' : 'border-black/15 text-black/60 hover:border-[#C9A96E]/40'
                 }`}
@@ -140,32 +145,23 @@ export default function EditGuidePage() {
               </button>
             ))}
           </div>
-          {form.guideType === 'trainee' && (
-            <p className="font-sans text-xs text-black/40 mt-1.5">
-              Internally trained staff without a formal FGASA/TBCSA certification yet — cert fields below are optional.
-            </p>
-          )}
+          <p className="font-sans text-xs text-black/40 mt-1.5">{GUIDE_TYPE_HINT[form.guideType]}</p>
         </F>
 
         <F label="Full Name" required><input value={form.name} onChange={e => set('name', e.target.value)} className={inp} /></F>
 
         <F label="Email"><input type="email" value={form.email} onChange={e => set('email', e.target.value)} placeholder="guide@example.com" className={inp} /></F>
 
-        <div className="grid grid-cols-2 gap-4">
-          <F label={form.guideType === 'trainee' ? 'FGASA / Cert Number (optional)' : 'FGASA / Cert Number'}>
-            <input value={form.certs} onChange={e => set('certs', e.target.value)} className={inp} />
-          </F>
-          <F label={form.guideType === 'trainee' ? 'TBCSA Guide Number (optional)' : 'TBCSA Guide Number'}>
-            <input value={form.guideNo} onChange={e => set('guideNo', e.target.value)} className={inp} />
-          </F>
-        </div>
+        <F label={guideNoLabel(form.guideType)}>
+          <input value={form.guideNo} onChange={e => set('guideNo', e.target.value)} className={inp} />
+        </F>
 
         <div className="grid grid-cols-2 gap-4">
           <F label="Speciality"><input value={form.speciality} onChange={e => set('speciality', e.target.value)} className={inp} /></F>
           <F label="Languages"><input value={form.languages} onChange={e => set('languages', e.target.value)} placeholder="English, Zulu" className={inp} /></F>
         </div>
 
-        <F label="Qualifications"><input value={form.qualifications} onChange={e => set('qualifications', e.target.value)} placeholder="FGASA Level 3, Wilderness First Responder" className={inp} /></F>
+        <F label="Qualifications"><input value={form.qualifications} onChange={e => set('qualifications', e.target.value)} placeholder="Wilderness First Responder, Advanced Mountain Skills" className={inp} /></F>
 
         <div className="grid grid-cols-2 gap-4">
           <F label="Years of Experience"><input type="number" min="0" value={form.yearsExperience} onChange={e => set('yearsExperience', e.target.value)} className={inp} /></F>

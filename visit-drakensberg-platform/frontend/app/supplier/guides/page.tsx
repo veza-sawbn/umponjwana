@@ -2,10 +2,12 @@
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import toast from 'react-hot-toast'
-import { Users, Plus, Mountain, Star, CheckCircle, Clock, XCircle, User, Pencil, GraduationCap } from 'lucide-react'
+import { Users, Plus, Mountain, Star, CheckCircle, Clock, XCircle, User, Pencil } from 'lucide-react'
 import { supabase } from '@/lib/auth'
 import { effectiveSupplierId } from '@/lib/effective-supplier'
-import { GUIDE_TYPE_LABEL, type GuideProfile } from '@/lib/operators'
+import {
+  GUIDE_TYPES, GUIDE_TYPE_LABEL, GUIDE_TYPE_HINT, guideTypeOf, type GuideProfile, type GuideType,
+} from '@/lib/operators'
 import {
   getSupplierEntities, addSupplierEntity, deleteSupplierEntity, type SupplierEntity,
 } from '@/lib/supplier-entities'
@@ -17,7 +19,18 @@ type Guide = SupplierEntity & GuideProfile & {
 }
 
 const ENTITY = 'guides'
-const GUIDE_TYPES = ['certified', 'trainee'] as const
+
+// A trainee is not yet registered, so they are the one type that may be saved
+// without a guide number.
+const GUIDE_NO_LABEL = 'SA Tourism Guide Number'
+const guideNoLabel = (t: GuideType) =>
+  t === 'trainee' ? `${GUIDE_NO_LABEL} (optional)` : GUIDE_NO_LABEL
+
+const TYPE_CHIP: Record<GuideType, string> = {
+  certified: 'bg-emerald-50 text-emerald-700',
+  trainee: 'bg-blue-50 text-blue-600',
+  expedition_leader: 'bg-[#C9A96E]/15 text-[#8B6914]',
+}
 
 const STATUS: Record<Guide['status'], { label: string; Icon: typeof CheckCircle; cls: string }> = {
   verified: { label: 'Verified',        Icon: CheckCircle, cls: 'bg-emerald-100 text-emerald-700' },
@@ -30,9 +43,9 @@ export default function GuidesPage() {
   const [loading, setLoading] = useState(true)
   const [adding, setAdding] = useState(false)
   const [form, setForm] = useState({
-    name: '', email: '', certs: '', guideNo: '', speciality: '', languages: '',
+    name: '', email: '', guideNo: '', speciality: '', languages: '',
     qualifications: '', yearsExperience: '', highestSummit: '', completedExpeditions: '', portrait: '', bio: '',
-    guideType: 'certified' as 'certified' | 'trainee',
+    guideType: 'certified' as GuideType,
   })
   const set = (k: string, v: string) => setForm(f => ({ ...f, [k]: v }))
 
@@ -50,7 +63,7 @@ export default function GuidesPage() {
       if (!user) throw new Error('no session')
       const saved = await addSupplierEntity<Guide>(ENTITY, {
         supplierId: effectiveSupplierId(user.id),
-        name: form.name, email: form.email, certs: form.certs, guideNo: form.guideNo,
+        name: form.name, email: form.email, guideNo: form.guideNo,
         speciality: form.speciality, languages: form.languages,
         qualifications: form.qualifications,
         yearsExperience: Number(form.yearsExperience) || 0,
@@ -61,7 +74,7 @@ export default function GuidesPage() {
         rating: 0, tours: 0, status: 'pending', blocked: [],
       } as unknown as Omit<Guide, 'id' | 'createdAt'>)
       setGuides(g => [...g, saved])
-      setForm({ name: '', email: '', certs: '', guideNo: '', speciality: '', languages: '', qualifications: '', yearsExperience: '', highestSummit: '', completedExpeditions: '', portrait: '', bio: '', guideType: 'certified' })
+      setForm({ name: '', email: '', guideNo: '', speciality: '', languages: '', qualifications: '', yearsExperience: '', highestSummit: '', completedExpeditions: '', portrait: '', bio: '', guideType: 'certified' })
       setAdding(false)
       toast.success('Guide registered.')
     } catch {
@@ -97,7 +110,7 @@ export default function GuidesPage() {
           <p className="font-sans font-semibold text-black/80">Register New Guide</p>
 
           <F label="Guide Type">
-            <div className="flex gap-2">
+            <div className="flex flex-wrap gap-2">
               {GUIDE_TYPES.map(t => (
                 <button
                   key={t}
@@ -111,25 +124,18 @@ export default function GuidesPage() {
                 </button>
               ))}
             </div>
-            {form.guideType === 'trainee' && (
-              <p className="font-sans text-xs text-black/40 mt-1.5">
-                Internally trained staff without a formal FGASA/TBCSA certification yet — cert fields below are optional.
-              </p>
-            )}
+            <p className="font-sans text-xs text-black/40 mt-1.5">{GUIDE_TYPE_HINT[form.guideType]}</p>
           </F>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <F label="Full Name" required><input value={form.name} onChange={e => set('name', e.target.value)} className={inp} /></F>
             <F label="Email"><input type="email" value={form.email} onChange={e => set('email', e.target.value)} placeholder="guide@example.com" className={inp} /></F>
-            <F label={form.guideType === 'trainee' ? 'FGASA / Cert Number (optional)' : 'FGASA / Cert Number'}>
-              <input value={form.certs} onChange={e => set('certs', e.target.value)} className={inp} />
-            </F>
-            <F label={form.guideType === 'trainee' ? 'TBCSA Guide Number (optional)' : 'TBCSA Guide Number'}>
+            <F label={guideNoLabel(form.guideType)}>
               <input value={form.guideNo} onChange={e => set('guideNo', e.target.value)} className={inp} />
             </F>
             <F label="Speciality"><input value={form.speciality} onChange={e => set('speciality', e.target.value)} className={inp} /></F>
             <F label="Languages"><input value={form.languages} onChange={e => set('languages', e.target.value)} placeholder="English, Zulu" className={inp} /></F>
-            <F label="Qualifications"><input value={form.qualifications} onChange={e => set('qualifications', e.target.value)} placeholder="FGASA Level 3, Wilderness First Responder" className={inp} /></F>
+            <F label="Qualifications"><input value={form.qualifications} onChange={e => set('qualifications', e.target.value)} placeholder="Wilderness First Responder, Advanced Mountain Skills" className={inp} /></F>
             <F label="Years of Experience"><input type="number" min="0" value={form.yearsExperience} onChange={e => set('yearsExperience', e.target.value)} className={inp} /></F>
             <F label="Highest Summit"><input value={form.highestSummit} onChange={e => set('highestSummit', e.target.value)} placeholder="e.g. Mafadi (3,450m)" className={inp} /></F>
             <F label="Completed Expeditions"><input type="number" min="0" value={form.completedExpeditions} onChange={e => set('completedExpeditions', e.target.value)} className={inp} /></F>
@@ -148,6 +154,7 @@ export default function GuidesPage() {
         {guides.map(g => {
           const s = STATUS[g.status as Guide['status']] ?? STATUS.pending
           const Icon = s.Icon
+          const type = guideTypeOf(g)
           return (
             <div key={g.id} className="bg-white rounded-xl border border-black/8 p-5 flex flex-wrap items-center gap-4">
               <div className="w-10 h-10 rounded-full bg-[#C9A96E]/10 flex items-center justify-center shrink-0">
@@ -156,13 +163,15 @@ export default function GuidesPage() {
               <div className="flex-1 min-w-0">
                 <p className="font-sans font-semibold text-black/90 flex items-center gap-2">
                   {g.name}
-                  {g.guideType === 'trainee' && (
-                    <span className="font-sans text-[10px] px-1.5 py-0.5 rounded-full bg-blue-50 text-blue-600 flex items-center gap-1 shrink-0">
-                      <GraduationCap size={10} /> Trainee
-                    </span>
-                  )}
+                  <span className={`font-sans text-[10px] px-1.5 py-0.5 rounded-full shrink-0 ${TYPE_CHIP[type]}`}>
+                    {GUIDE_TYPE_LABEL[type]}
+                  </span>
                 </p>
-                <p className="font-sans text-xs text-black/40 mt-0.5">{g.certs || (g.guideType === 'trainee' ? 'In training — no formal certification yet' : '—')}</p>
+                <p className="font-sans text-xs text-black/40 mt-0.5">
+                  {g.guideNo
+                    ? `${GUIDE_NO_LABEL} ${g.guideNo}`
+                    : type === 'trainee' ? 'In training — not yet registered' : 'No guide number on file'}
+                </p>
                 <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-1">
                   {g.speciality && <span className="font-sans text-xs text-black/40 flex items-center gap-1"><Mountain size={11} /> {g.speciality}</span>}
                   {g.tours > 0 && <span className="font-sans text-xs text-black/40 flex items-center gap-1"><Star size={11} /> {g.rating} · {g.tours} tours</span>}

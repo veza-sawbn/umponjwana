@@ -12,7 +12,7 @@ import { getDepartures, type Departure } from '@/lib/departures'
 import { getPackages, PACKAGE_STATUS_LABELS, type MarketplacePackage } from '@/lib/packages'
 import { getTripRequests, TRIP_STATUS_LABELS, type TripRequest } from '@/lib/custom-trips'
 import { getSupplierEntities } from '@/lib/supplier-entities'
-import type { OperatorProfile, GuideProfile } from '@/lib/operators'
+import { GUIDE_TYPE_LABEL, guideTypeOf, type OperatorProfile, type GuideProfile } from '@/lib/operators'
 import { getTrails, type Trail } from '@/lib/trails'
 import { formatMoney } from '@/lib/allocation'
 
@@ -158,7 +158,7 @@ export default function AdminMarketplacePage() {
                 <Row key={g.id}>
                   <div>
                     <p className="font-sans text-sm font-medium">{g.name}</p>
-                    <p className="font-sans text-xs text-gray-400">{g.certs || 'no certs'} · {g.guideNo || 'no reg no.'}{g.yearsExperience ? ` · ${g.yearsExperience} yrs` : ''}</p>
+                    <p className="font-sans text-xs text-gray-400">{GUIDE_TYPE_LABEL[guideTypeOf(g)]} · {g.guideNo || 'no guide no.'}{g.yearsExperience ? ` · ${g.yearsExperience} yrs` : ''}</p>
                   </div>
                   <Chip className={g.status === 'verified' ? 'bg-emerald-50 text-emerald-700' : g.status === 'rejected' ? 'bg-red-50 text-red-600' : 'bg-amber-50 text-amber-700'}>
                     {g.status}

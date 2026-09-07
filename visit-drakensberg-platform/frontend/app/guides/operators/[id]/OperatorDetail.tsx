@@ -4,10 +4,11 @@ import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import Footer from '@/components/layout/Footer'
 import {
-  ArrowLeft, Building2, MapPin, Star, Award, Globe, Shield, Siren,
+  ArrowLeft, Building2, MapPin, Award, Globe, Shield, Siren,
   Backpack, UserCircle, Calendar, CheckCircle,
 } from 'lucide-react'
 import { getGuidesByOperator, type OperatorProfile, type GuideProfile } from '@/lib/operators'
+import GuideTeamCarousel from '@/components/guides/GuideTeamCarousel'
 import { getUpcomingExperiences, type TrekkingExperience } from '@/lib/experiences'
 import { formatMoney } from '@/lib/allocation'
 
@@ -82,30 +83,7 @@ export default function OperatorDetail({ operator }: { operator: OperatorProfile
               {guides.length === 0 ? (
                 <p className="font-sans text-sm text-gray-400 bg-white border border-gray-200 p-5">No verified guides listed yet.</p>
               ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  {guides.map(g => (
-                    <Link key={g.id} href={`/guides/${g.id}`} className="bg-white border border-gray-200 p-5 hover:border-[#2d6a4f] transition-colors block">
-                      <div className="flex items-start gap-3">
-                        <div className="w-12 h-12 bg-[#2d6a4f] text-white flex items-center justify-center font-display italic shrink-0 overflow-hidden">
-                          {g.portrait
-                            ? <img src={g.portrait} alt={g.name} className="w-full h-full object-cover" />
-                            : g.name.split(' ').map(n => n[0]).join('')}
-                        </div>
-                        <div className="min-w-0">
-                          <p className="font-display italic text-lg leading-tight">{g.name}</p>
-                          <p className="font-sans text-xs text-gray-400 mt-0.5">{g.certs}</p>
-                          <div className="flex items-center gap-3 mt-1 font-sans text-xs text-gray-500 flex-wrap">
-                            {g.yearsExperience ? <span>{g.yearsExperience} yrs experience</span> : null}
-                            {g.rating > 0 && (
-                              <span className="flex items-center gap-1 text-[#C9A96E]"><Star size={10} className="fill-[#C9A96E]" /> {g.rating}</span>
-                            )}
-                          </div>
-                          <span className="font-sans text-xs text-[#2d6a4f] mt-1.5 inline-block">View Profile →</span>
-                        </div>
-                      </div>
-                    </Link>
-                  ))}
-                </div>
+                <GuideTeamCarousel guides={guides} />
               )}
             </div>
 

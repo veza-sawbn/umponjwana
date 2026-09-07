@@ -33,7 +33,7 @@ export type OperatorProfile = {
 
 export type GuideProfile = SupplierEntity & {
   name: string
-  certs: string
+  /** SA Tourism guide registration number. */
   guideNo: string
   speciality: string
   languages: string
@@ -51,16 +51,44 @@ export type GuideProfile = SupplierEntity & {
   specialisations?: string
   highestSummit?: string
   completedExpeditions?: number
-  // 'certified' (FGASA/TBCSA or equivalent — the default, including for rows
-  // saved before this field existed) or 'trainee' — internally trained staff
-  // a supplier wants listed while they work toward formal certification.
-  // Neither certs nor guideNo is required for a trainee.
-  guideType?: 'certified' | 'trainee'
+  // Optional so rows saved before this field existed still read as
+  // 'certified' — see GUIDE_TYPE_LABEL and guideTypeOf() below.
+  guideType?: GuideType
 } & GraphFields
 
-export const GUIDE_TYPE_LABEL: Record<'certified' | 'trainee', string> = {
+/**
+ * What a supplier is putting forward when they register someone.
+ *
+ * 'certified' and 'expedition_leader' both carry an SA Tourism guide number;
+ * they differ in what the person is deployed on, which is why a tour operator
+ * needs to distinguish them on a departure. 'trainee' is internally trained
+ * staff a supplier wants listed while they work toward registration, so the
+ * guide number is optional for them and only for them.
+ */
+export type GuideType = 'certified' | 'trainee' | 'expedition_leader'
+
+/** Declaration order — drives the chips on the supplier's register/edit forms. */
+export const GUIDE_TYPES: readonly GuideType[] = ['certified', 'trainee', 'expedition_leader'] as const
+
+export const GUIDE_TYPE_LABEL: Record<GuideType, string> = {
   certified: 'Certified',
   trainee: 'Trainee',
+  expedition_leader: 'Expedition Leader',
+}
+
+/** Shown under the type chips so a supplier picks the right one. */
+export const GUIDE_TYPE_HINT: Record<GuideType, string> = {
+  certified: 'Registered guide leading day walks, tours and activities.',
+  trainee:
+    'Internally trained staff not yet registered — the SA Tourism guide number is optional for a trainee.',
+  expedition_leader:
+    'Registered guide who leads multi-day and summit expeditions. The summit and expedition fields below carry the most weight for this type.',
+}
+
+/** A guide's type, defaulting rows saved before the field existed to certified. */
+export function guideTypeOf(guide: { guideType?: string }): GuideType {
+  const t = guide.guideType
+  return t === 'trainee' || t === 'expedition_leader' ? t : 'certified'
 }
 
 const KIND = 'operator_profile'

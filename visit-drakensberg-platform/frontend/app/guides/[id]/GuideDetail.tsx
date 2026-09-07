@@ -7,7 +7,7 @@ import {
   CheckCircle, Star, ArrowLeft, Mountain, Award, Globe, Building2,
   CalendarDays, Flag,
 } from 'lucide-react'
-import { getOperatorForGuide, type GuideProfile, type OperatorProfile } from '@/lib/operators'
+import { getOperatorForGuide, GUIDE_TYPE_LABEL, guideTypeOf, type GuideProfile, type OperatorProfile } from '@/lib/operators'
 import { getUpcomingExperiences, type TrekkingExperience } from '@/lib/experiences'
 import { formatMoney } from '@/lib/allocation'
 
@@ -34,6 +34,8 @@ export default function GuideDetail({ guide }: { guide: GuideProfile }) {
     getUpcomingExperiences().then(exps => setDepartures(exps.filter(e => e.leadGuide === guide.name)))
   }, [guide])
 
+  const guideType = guideTypeOf(guide)
+  const hasPortrait = Boolean(guide.portrait)
   const initials = guide.name.split(' ').map(n => n[0]).join('')
   const languages = csv(guide.languages)
   const specialisations = csv(guide.specialisations || guide.speciality)
@@ -43,17 +45,35 @@ export default function GuideDetail({ guide }: { guide: GuideProfile }) {
   return (
     <div className="min-h-screen bg-[#F7F5F2]">
 
-      <section className="bg-[#2d6a4f] text-white py-20 px-6 lg:px-12 mt-16">
-        <div className="max-w-[1440px] mx-auto">
+      {/* The guide's own portrait is the hero when they have uploaded one. It is
+          a photograph of a person rather than a designed banner, so it carries
+          a scrim of its own: the gradient keeps the name and credentials
+          legible over whatever was uploaded, and the object-position bias
+          keeps a head near the top of the frame from being cropped out on a
+          wide viewport. Guides without a portrait keep the flat brand band. */}
+      <section className={`relative text-white px-6 lg:px-12 mt-16 overflow-hidden ${hasPortrait ? 'py-24 lg:py-32' : 'bg-[#2d6a4f] py-20'}`}>
+        {hasPortrait && (
+          <>
+            <img
+              src={guide.portrait}
+              alt=""
+              aria-hidden
+              className="absolute inset-0 w-full h-full object-cover object-[50%_25%]"
+            />
+            <div className="absolute inset-0 bg-gradient-to-r from-[#1b3f2e]/95 via-[#2d6a4f]/80 to-[#2d6a4f]/35" />
+            <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent" />
+          </>
+        )}
+        <div className="relative max-w-[1440px] mx-auto">
           <Link href={operator ? `/guides/operators/${operator.id}` : '/guides'} className="inline-flex items-center gap-2 text-white/60 hover:text-white text-sm mb-8 transition-colors">
             <ArrowLeft size={16} /> {operator ? operator.companyName : 'All Guides'}
           </Link>
           <div className="flex items-end gap-8 flex-wrap">
-            <div className="w-24 h-24 bg-white/10 flex items-center justify-center shrink-0 overflow-hidden">
-              {guide.portrait
-                ? <img src={guide.portrait} alt={guide.name} className="w-full h-full object-cover" />
-                : <span className="font-display italic text-4xl text-white/50">{initials}</span>}
-            </div>
+            {!hasPortrait && (
+              <div className="w-24 h-24 bg-white/10 flex items-center justify-center shrink-0 overflow-hidden">
+                <span className="font-display italic text-4xl text-white/50">{initials}</span>
+              </div>
+            )}
             <div>
               <div className="flex items-center gap-3 mb-2 flex-wrap">
                 <h1 className="font-display italic text-4xl lg:text-5xl">{guide.name}</h1>
@@ -134,15 +154,21 @@ export default function GuideDetail({ guide }: { guide: GuideProfile }) {
                   </div>
                 )}
                 <div>
-                  <p className="font-sans text-[10px] tracking-[0.12em] uppercase text-gray-400 mb-1">Certification</p>
-                  <p className="font-sans text-sm font-medium">{guide.certs || '—'}</p>
+                  <p className="font-sans text-[10px] tracking-[0.12em] uppercase text-gray-400 mb-1">Guide Type</p>
+                  <p className="font-sans text-sm font-medium">{GUIDE_TYPE_LABEL[guideType]}</p>
                 </div>
                 <div>
-                  <p className="font-sans text-[10px] tracking-[0.12em] uppercase text-gray-400 mb-1">TBCSA Guide Number</p>
-                  <p className="font-sans text-sm font-medium">{guide.guideNo || 'On file'}</p>
+                  <p className="font-sans text-[10px] tracking-[0.12em] uppercase text-gray-400 mb-1">SA Tourism Guide Number</p>
+                  <p className="font-sans text-sm font-medium">
+                    {guide.guideNo || (guideType === 'trainee' ? 'In training — not yet registered' : 'On file')}
+                  </p>
                 </div>
               </div>
-              <p className="font-sans text-xs text-gray-500 mt-3">Certificate details are verified by Visit Drakensberg before a guide is listed publicly.</p>
+              <p className="font-sans text-xs text-gray-500 mt-3">
+                {guideType === 'trainee'
+                  ? 'Trainees lead under the supervision of a registered guide. Their operator confirms their training before they are listed publicly.'
+                  : 'Registration details are verified by Visit Drakensberg before a guide is listed publicly.'}
+              </p>
             </div>
 
             {/* Upcoming availability: scheduled departures this guide leads */}
@@ -202,12 +228,19 @@ export default function GuideDetail({ guide }: { guide: GuideProfile }) {
               <p className="font-sans text-sm text-white/70 mb-6">
                 Request custom dates on any trail — {operator ? operator.companyName : 'the operator'} confirms {firstName}'s availability before you pay.
               </p>
+              {/* The operator rides along with the guide: /experiences/request
+                  can only offer a guide once their operator is selected, so
+                  handing it both means the visitor arrives with the pair
+                  already chosen instead of having to find them again. */}
               <Link
-                href={`/experiences/request?guide=${encodeURIComponent(guide.id)}`}
+                href={`/experiences/request?guide=${encodeURIComponent(guide.id)}${operator ? `&operator=${encodeURIComponent(operator.id)}` : ''}`}
                 className="block text-center bg-[#C9A96E] text-[#2d2d2d] py-3 font-sans text-sm font-medium hover:bg-[#b8935e] transition-colors"
               >
-                Book this Guide →
+                Book {firstName} →
               </Link>
+              <p className="font-sans text-xs text-white/50 mt-3 text-center">
+                {firstName} stays selected through every step of the request.
+              </p>
             </div>
 
             {/* Associated tour operator — guides always stay linked to their supplier */}
