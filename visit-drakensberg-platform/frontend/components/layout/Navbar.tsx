@@ -262,6 +262,18 @@ export default function Navbar() {
   const transparent = !scrolled && !menuOpen
   const activeItem  = NAV_ITEMS.find(i => i.href === hoveredItem) ?? NAV_ITEMS[0]
 
+  // Responsive header/logo sizing — mobile 72px, tablet (md, ≥768px) 92px,
+  // desktop (xl, ≥1280px) 120px at rest; a scrolled header shrinks smoothly
+  // but never below 76px on desktop. Logo height scales in step, always
+  // rendered at its native aspect ratio (w-auto) so it's never cropped or
+  // distorted.
+  const headerHeight = scrolled
+    ? 'h-[64px] md:h-[76px] xl:h-[84px]'
+    : 'h-[72px] md:h-[92px] xl:h-[120px]'
+  const logoHeight = scrolled
+    ? 'h-8 md:h-12 xl:h-16'
+    : 'h-9 md:h-14 xl:h-20'
+
   // Resolve image: admin override → NAV_ITEMS default
   function resolveImage(item: NavItem) {
     const key = NAV_IMAGE_KEYS[item.href]
@@ -290,14 +302,14 @@ export default function Navbar() {
         }`}
       >
         {/* Three-column grid:  [☰ MENU]  [Logo]  [Search · Auth] */}
-        <div className="max-w-[1440px] mx-auto px-6 lg:px-12 h-16 grid grid-cols-[1fr_auto_1fr] items-center">
+        <div className={`max-w-[1440px] mx-auto px-6 md:px-12 xl:px-16 ${headerHeight} grid grid-cols-[1fr_auto_1fr] items-center transition-[height] duration-300 ease-out`}>
 
           {/* ── Col 1: Menu trigger ── */}
           <div>
             <button
               onClick={() => setMenuOpen(true)}
               aria-label="Open navigation menu"
-              className={`flex items-center gap-3 group transition-colors ${
+              className={`min-h-[44px] flex items-center gap-3 group transition-colors ${
                 transparent ? 'text-gold' : 'text-black'
               } hover:text-gold`}
             >
@@ -307,29 +319,29 @@ export default function Navbar() {
                 <span className="block h-px bg-current transition-all duration-200 w-[20px]" />
                 <span className="block h-px bg-current transition-all duration-200 w-[13px] group-hover:w-[20px]" />
               </div>
-              <span className="hidden lg:block font-sans text-[11px] tracking-[0.2em] uppercase font-semibold">
+              <span className="hidden lg:block font-sans text-[11px] xl:text-[16px] tracking-[0.2em] xl:tracking-[0.12em] uppercase font-semibold xl:font-medium">
                 Menu
               </span>
             </button>
           </div>
 
           {/* ── Col 2: Centred logo ── */}
-          <Link href="/" aria-label="Visit Drakensberg — Home">
-            <Logo className={`h-8 w-auto transition-colors duration-300 ${
+          <Link href="/" aria-label="Visit Drakensberg — Home" className="min-h-[44px] flex items-center">
+            <Logo className={`${logoHeight} w-auto transition-all duration-300 ${
               transparent ? 'text-gold' : 'text-forest'
             }`} />
           </Link>
 
           {/* ── Col 3: Search · Auth ── */}
-          <div className="flex items-center justify-end gap-4">
+          <div className="flex items-center justify-end gap-4 md:gap-8 xl:gap-10">
 
             {/* Search */}
             <Link
               href="/search"
               aria-label="Search"
-              className={`p-1 transition-colors ${transparent ? 'text-gold' : 'text-black'} hover:text-gold`}
+              className={`min-h-[44px] flex items-center p-1 transition-colors ${transparent ? 'text-gold' : 'text-black'} hover:text-gold`}
             >
-              <Search className="w-5 h-5" />
+              <Search className="w-5 h-5 xl:w-6 xl:h-6 transition-all duration-300" />
             </Link>
 
             {/* Auth — shown on all screen sizes */}
@@ -337,11 +349,11 @@ export default function Navbar() {
               <div className="relative" ref={dropdownRef}>
                 <button
                   onClick={() => setDropdownOpen(v => !v)}
-                  className={`flex items-center gap-2 font-sans text-sm transition-colors ${
+                  className={`min-h-[44px] flex items-center gap-2 font-sans text-sm xl:text-[16px] xl:font-medium transition-colors ${
                     transparent ? 'text-gold' : 'text-black'
                   }`}
                 >
-                  <span className="w-7 h-7 rounded-full bg-gold flex items-center justify-center text-white text-xs font-bold shrink-0">
+                  <span className="w-7 h-7 xl:w-8 xl:h-8 rounded-full bg-gold flex items-center justify-center text-white text-xs font-bold shrink-0 transition-all duration-300">
                     {initials(userName)}
                   </span>
                   <ChevronDown className={`w-3.5 h-3.5 transition-transform hidden sm:block ${dropdownOpen ? 'rotate-180' : ''}`} />
@@ -420,7 +432,7 @@ export default function Navbar() {
             ) : (
               <Link
                 href="/auth/login"
-                className={`font-sans text-sm transition-colors ${
+                className={`min-h-[44px] flex items-center font-sans text-sm xl:text-[16px] xl:font-medium transition-colors ${
                   transparent ? 'text-gold/80 hover:text-gold' : 'text-black hover:text-gold'
                 }`}
               >
