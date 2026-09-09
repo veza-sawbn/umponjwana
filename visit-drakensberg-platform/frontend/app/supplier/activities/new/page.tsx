@@ -5,6 +5,7 @@ import { ChevronLeft, ChevronRight, Plus, Trash2 } from 'lucide-react'
 import { supabase } from '@/lib/auth'
 import { effectiveSupplierId } from '@/lib/effective-supplier'
 import { addActivity, ACTIVITY_CATEGORIES, ACTIVITY_DIFFICULTIES, ACTIVITY_INCLUSIONS, type ActivityTimeslot } from '@/lib/activities'
+import { addSupplierType } from '@/lib/supplier-types'
 import { getRegionNames } from '@/lib/regions'
 import { SEASONS, SEASON_META, SEASON_TOPICS, SEASON_TOPIC_META, type Season, type SeasonTopic } from '@/lib/seasons'
 import { GoogleAddressField } from '@/components/maps/GoogleAddressField'
@@ -12,6 +13,7 @@ import { formatMoney } from '@/lib/allocation'
 import { supplierMediaSource } from '@/lib/supplier-media'
 import { MediaGalleryPicker } from '@/components/media/MediaPicker'
 import { TimeslotEditor } from '@/components/activities/TimeslotEditor'
+import { VehicleToggle } from '@/components/activities/VehicleToggle'
 
 const STEPS = ['Activity Details', 'Logistics', 'Inclusions & Safety', 'Pricing & Timeslots', 'Review']
 
@@ -33,7 +35,7 @@ export default function NewActivityPage() {
   const [form, setForm] = useState({
     name: '', category: '', region: '', description: '', difficulty: '',
     durationH: '', minAge: '', maxGroupSize: '',
-    meetingPoint: '', gpsLat: '', gpsLng: '', whatToWear: '', photos: [] as string[],
+    meetingPoint: '', gpsLat: '', gpsLng: '', usesOwnVehicles: false, whatToWear: '', photos: [] as string[],
     included: [] as string[], safetyNotes: '',
     pricePerPerson: '', priceGroup: '', childPrice: '', childMaxAge: '',
     depositRequired: false, depositPercent: '30',
@@ -62,8 +64,9 @@ export default function NewActivityPage() {
     try {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) { setError('Not signed in'); return }
+      const supplierId = effectiveSupplierId(user.id)
       await addActivity({
-        supplierId: effectiveSupplierId(user.id),
+        supplierId,
         supplierName: user.user_metadata?.full_name || user.email || '',
         name: form.name,
         category: form.category,
@@ -88,10 +91,25 @@ export default function NewActivityPage() {
         timeslots: form.timeslots,
         depositRequired: form.depositRequired,
         depositPercent: form.depositPercent,
+        usesOwnVehicles: form.usesOwnVehicles,
         seasons: form.seasons,
         topics: form.topics,
         status: 'active',
       })
+      // Best-effort, like the revalidate in lib/activities.ts: the activity is
+      // already saved, so a failure here costs the supplier the fleet tools,
+      // never their listing.
+      let unlockedTools = false
+      if (form.usesOwnVehicles) {
+        try {
+          unlockedTools = await addSupplierType(supplierId, 'Shuttle')
+        } catch (e) {
+          console.error('[activities] could not add the Shuttle supplier type:', e)
+        }
+      }
+      // SupplierProvider reads the profile once on mount, so the tools we just
+      // unlocked only appear after a full page load — see lib/supplier-types.ts.
+      if (unlockedTools) { window.location.href = '/supplier/activities'; return }
       router.push('/supplier/activities')
     } catch (e) {
       console.error('[activities] save failed:', e)
@@ -176,6 +194,7 @@ export default function NewActivityPage() {
               <F label="GPS Latitude"><input value={form.gpsLat} onChange={e => set('gpsLat', e.target.value)} placeholder="-29.123456" className={inp} /></F>
               <F label="GPS Longitude"><input value={form.gpsLng} onChange={e => set('gpsLng', e.target.value)} placeholder="29.123456" className={inp} /></F>
             </div>
+            <VehicleToggle checked={form.usesOwnVehicles} onChange={v => set('usesOwnVehicles', v)} />
             <F label="What to Wear / Bring"><textarea value={form.whatToWear} onChange={e => set('whatToWear', e.target.value)} rows={3} className={`${inp} resize-none`} /></F>
             <ImageList images={form.photos} onChange={v => set('photos', v)} />
           </>
@@ -230,7 +249,7 @@ export default function NewActivityPage() {
           <div className="space-y-3">
             <p className="font-sans text-sm text-black/60">Review your activity before submitting.</p>
             <div className="rounded-lg bg-black/3 p-4 space-y-2">
-              {[['Name', form.name], ['Category', form.category], ['Region', form.region], ['Difficulty', form.difficulty], ['Duration', form.durationH ? `${form.durationH}h` : ''], ['Max Group', form.maxGroupSize], ['Meeting Point', form.meetingPoint], ['Adult Price', form.pricePerPerson ? formatMoney(Number(form.pricePerPerson)) : ''], ['Child Price', form.childMaxAge ? `${formatMoney(Number(form.childPrice || form.pricePerPerson))} (${form.childMaxAge} & under)` : ''], ['Timeslots', form.timeslots.length ? form.timeslots.map(t => t.time).join(', ') : '']].map(([k, v]) => v ? (
+              {[['Name', form.name], ['Category', form.category], ['Region', form.region], ['Difficulty', form.difficulty], ['Duration', form.durationH ? `${form.durationH}h` : ''], ['Max Group', form.maxGroupSize], ['Meeting Point', form.meetingPoint], ['Own Vehicles', form.usesOwnVehicles ? 'Yes — adds the transport tools' : ''], ['Adult Price', form.pricePerPerson ? formatMoney(Number(form.pricePerPerson)) : ''], ['Child Price', form.childMaxAge ? `${formatMoney(Number(form.childPrice || form.pricePerPerson))} (${form.childMaxAge} & under)` : ''], ['Timeslots', form.timeslots.length ? form.timeslots.map(t => t.time).join(', ') : '']].map(([k, v]) => v ? (
                 <div key={k} className="flex gap-3 font-sans text-sm">
                   <span className="text-black/40 w-32 shrink-0">{k}</span>
                   <span className="text-black/80">{v}</span>

@@ -85,6 +85,12 @@ export type Activity = {
   slotBookings?: Record<string, number>
   depositRequired: boolean
   depositPercent: string
+  /** The supplier drives guests themselves on this activity — a Sani Pass 4x4
+   *  run, a game drive, a guided tour by minibus. Ticking it on the supplier
+   *  form adds the 'Shuttle' supplier type (lib/supplier-types.ts), which is
+   *  what reveals the fleet tools: Transport Company, Vehicles, Drivers and
+   *  Transport Jobs. Absent on every activity saved before this existed. */
+  usesOwnVehicles?: boolean
   status: 'active' | 'draft'
   createdAt: string
   /** Which seasons this activity suits — powers the region "When to Go"
