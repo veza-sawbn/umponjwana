@@ -72,3 +72,10 @@ end;
 $$;
 
 grant execute on function public.vd_add_supplier_type(uuid, text) to authenticated;
+
+-- Postgres grants EXECUTE to PUBLIC by default, so the grant above is not what
+-- limits who can reach this — the revoke is, same as 20260904/20260905. The
+-- guard inside would refuse an anonymous caller anyway (auth.uid() is null, so
+-- the coalesce falls to false), but the door is closed here rather than left
+-- to the function body alone.
+revoke execute on function public.vd_add_supplier_type(uuid, text) from public, anon;
