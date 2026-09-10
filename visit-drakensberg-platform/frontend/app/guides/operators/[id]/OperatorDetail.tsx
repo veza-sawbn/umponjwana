@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
+import Image from 'next/image'
 import Footer from '@/components/layout/Footer'
 import {
   ArrowLeft, Building2, MapPin, Award, Globe, Shield, Siren,
@@ -42,9 +43,9 @@ export default function OperatorDetail({ operator }: { operator: OperatorProfile
             <ArrowLeft size={16} /> Guides & Tour Operators
           </Link>
           <div className="flex items-end gap-8 flex-wrap">
-            <div className="w-24 h-24 bg-white/10 flex items-center justify-center shrink-0 overflow-hidden">
+            <div className="relative w-24 h-24 bg-white/10 flex items-center justify-center shrink-0 overflow-hidden">
               {operator.logo
-                ? <img src={operator.logo} alt={operator.companyName} className="w-full h-full object-cover" />
+                ? <Image src={operator.logo} alt={operator.companyName} fill sizes="96px" className="object-cover" />
                 : <Building2 size={32} className="text-white/50" />}
             </div>
             <div>

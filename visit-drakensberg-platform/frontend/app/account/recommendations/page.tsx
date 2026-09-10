@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
+import Image from 'next/image'
 import { MapPin, Clock, Mountain, CalendarDays } from 'lucide-react'
 import { supabase } from '@/lib/auth'
 import { useBooking } from '@/lib/booking-context'
@@ -110,9 +111,9 @@ export default function RecommendationsPage() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {recs.map(item => (
               <Link key={item.id} href={item.href} className="group bg-white border border-gray-200 overflow-hidden flex hover:border-[#2d6a4f] transition-colors">
-                <div className="w-28 h-28 shrink-0 overflow-hidden bg-[#2d6a4f]/10">
+                <div className="relative w-28 h-28 shrink-0 overflow-hidden bg-[#2d6a4f]/10">
                   {item.image ? (
-                    <img src={item.image} alt={item.title} loading="lazy" decoding="async" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+                    <Image src={item.image} alt={item.title} fill loading="lazy" sizes="112px" className="object-cover group-hover:scale-105 transition-transform duration-500" />
                   ) : (
                     <div className="w-full h-full flex items-center justify-center">
                       <Mountain size={20} className="text-[#2d6a4f]/40" />

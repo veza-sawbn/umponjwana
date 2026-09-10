@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
+import Image from 'next/image'
 import Footer from '@/components/layout/Footer'
 import { Clock, ArrowLeft, MapPin, Mountain, Bird, ChefHat, Sword, Leaf, ArrowRight } from 'lucide-react'
 import { publicSupabase } from '@/lib/supabase-public'
@@ -272,8 +273,8 @@ export default async function ArticleDetailPage({ params }: { params: { slug: st
 
         {/* Hero image */}
         {article.image && (
-          <div className="w-full h-[50vh] lg:h-[60vh] overflow-hidden">
-            <img src={article.image} alt={article.title} className="w-full h-full object-cover opacity-80" />
+          <div className="relative w-full h-[50vh] lg:h-[60vh] overflow-hidden">
+            <Image src={article.image} alt={article.title} fill priority sizes="100vw" className="object-cover opacity-80" />
           </div>
         )}
       </section>
@@ -303,8 +304,8 @@ export default async function ArticleDetailPage({ params }: { params: { slug: st
                   {article.relatedArticles.map(rel => (
                     <Link key={rel.slug} href={`/mydrakensberg/${rel.slug}`} className="group bg-white border border-gray-200 overflow-hidden hover:border-[#2d6a4f] transition-colors">
                       {rel.image && (
-                        <div className="h-36 overflow-hidden">
-                          <img src={rel.image} alt={rel.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+                        <div className="relative h-36 overflow-hidden">
+                          <Image src={rel.image} alt={rel.title} fill loading="lazy" sizes="(max-width: 768px) 100vw, 33vw" className="object-cover group-hover:scale-105 transition-transform duration-500" />
                         </div>
                       )}
                       <div className="p-4">
@@ -339,8 +340,8 @@ export default async function ArticleDetailPage({ params }: { params: { slug: st
                 <div className="space-y-3">
                   {article.relatedListings.map(listing => (
                     <Link key={listing.href + listing.title} href={listing.href} className="group flex gap-3 border border-white/10 hover:border-[#C9A96E] transition-colors p-3">
-                      <div className="w-16 h-16 shrink-0 overflow-hidden">
-                        <img src={listing.image} alt={listing.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+                      <div className="relative w-16 h-16 shrink-0 overflow-hidden">
+                        <Image src={listing.image} alt={listing.title} fill loading="lazy" sizes="64px" className="object-cover group-hover:scale-105 transition-transform duration-500" />
                       </div>
                       <div className="min-w-0">
                         <span className="font-sans text-[10px] tracking-[0.12em] uppercase text-[#C9A96E]">{listing.type}</span>

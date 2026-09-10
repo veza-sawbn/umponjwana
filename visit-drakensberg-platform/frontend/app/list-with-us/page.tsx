@@ -2,6 +2,7 @@
 
 import { Fragment, useCallback, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
+import Image from 'next/image'
 import {
   ArrowLeft, ArrowRight, Check, CheckCircle, ChevronRight, ImageIcon, Info, Loader2,
   Lock, Plus, Shield, Trash2, Upload, X,
@@ -1577,7 +1578,7 @@ function PhotoUploader({ photos, onChange }: { photos: string[]; onChange: (phot
       <div className="grid grid-cols-4 gap-2">
         {photos.map((url, i) => (
           <div key={url} className="relative aspect-square border border-gray-200 bg-gray-50 group">
-            <img src={url} alt="" className="w-full h-full object-cover"
+            <Image src={url} alt="" fill loading="lazy" sizes="25vw" className="object-cover"
               onError={e => { (e.target as HTMLImageElement).style.display = 'none' }} />
             <button
               type="button"

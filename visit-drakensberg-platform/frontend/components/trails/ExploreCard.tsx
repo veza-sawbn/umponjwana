@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import Image from 'next/image'
 import { Mountain } from 'lucide-react'
 import type { Trail } from '@/lib/trails'
 import RouteArtwork from '@/components/trails/RouteArtwork'
@@ -37,8 +38,9 @@ export default function ExploreCard({
     <Link href={href} className="group block">
       <div className="relative overflow-hidden aspect-[4/3] mb-4 bg-forest/10">
         {image ? (
-          <img loading="lazy" decoding="async" src={image} alt={imageAlt}
-            className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" />
+          <Image src={image} alt={imageAlt} fill loading="lazy"
+            sizes="(max-width: 640px) 88vw, (max-width: 1024px) 45vw, 30vw"
+            className="object-cover transition-transform duration-700 group-hover:scale-105" />
         ) : (
           <div className="w-full h-full flex items-center justify-center">
             <Mountain className="w-10 h-10 text-forest/20" />

@@ -1,6 +1,7 @@
 'use client'
 import { useState, useEffect, useMemo } from 'react'
 import Link from 'next/link'
+import Image from 'next/image'
 import toast from 'react-hot-toast'
 import { ArrowRight, ChevronDown, X } from 'lucide-react'
 import { supabase } from '@/lib/auth'
@@ -133,13 +134,13 @@ function HeroSection({ hero }: { hero: typeof SITE_CONTENT_DEFAULTS.hero }) {
           <HeroCarousel images={carouselImages} />
         ) : (
           <Editable section="hero" fieldKey="image_url" value={imageUrl} label="Background Image" type="image">
-            <img
+            <Image
               src={imageUrl}
               alt="Drakensberg mountains"
-              className="w-full h-full object-cover"
-              fetchPriority="high"
-              loading="eager"
-              decoding="async"
+              fill
+              priority
+              sizes="100vw"
+              className="object-cover"
             />
           </Editable>
         )}
@@ -190,10 +191,13 @@ function RegionCardBody({ region: r }: { region: HomeCard }) {
   return (
     <Link href={String(r.href || '/regions')} className="group block">
       <div className="relative overflow-hidden aspect-[4/3] mb-4">
-        <img loading="lazy" decoding="async"
+        <Image
           src={String(r.img)}
           alt={String(r.name)}
-          className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+          fill
+          loading="lazy"
+          sizes="(max-width: 640px) 90vw, 31vw"
+          className="object-cover transition-transform duration-500 group-hover:scale-105"
           style={{ willChange: 'transform' }}
         />
       </div>
@@ -211,10 +215,13 @@ function JourneyCardBody({ pkg }: { pkg: MarketplacePackage }) {
   return (
     <Link href={`/packages/${pkg.id}`} className="group block bg-white border border-black/8 hover:border-forest/30 transition-colors h-full">
       <div className="relative overflow-hidden aspect-[4/3]">
-        <img loading="lazy" decoding="async"
+        <Image
           src={pkg.image || 'https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?w=900&q=80'}
           alt={pkg.title}
-          className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+          fill
+          loading="lazy"
+          sizes="(max-width: 640px) 88vw, (max-width: 1024px) 45vw, 30vw"
+          className="object-cover transition-transform duration-500 group-hover:scale-105"
           style={{ willChange: 'transform' }}
         />
         {pkg.tag && (
@@ -293,8 +300,9 @@ function OfferCardBody({ item }: { item: MiniListItemData }) {
     <Link href={item.href} className="group block bg-white border border-black/8 hover:border-forest/30 transition-colors h-full">
       <div className="relative overflow-hidden aspect-[4/3] bg-mist">
         {item.img ? (
-          <img loading="lazy" decoding="async" src={item.img} alt={item.title}
-            className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+          <Image src={item.img} alt={item.title} fill loading="lazy"
+            sizes="(max-width: 640px) 88vw, (max-width: 1024px) 45vw, 30vw"
+            className="object-cover transition-transform duration-500 group-hover:scale-105"
             style={{ willChange: 'transform' }} />
         ) : (
           <div className="w-full h-full" style={{ background: item.badgeColor }} />
@@ -485,10 +493,13 @@ export default function HomePage() {
             <motion.div key={cat.id} variants={staggerChild} whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }} transition={{ duration: 0.2, ease: [0, 0, 0.2, 1] }} className={cardDimClass(cat, inEditor)}>
               <EditableCard contentKey="home_cards" fieldKey="categories" index={index} label={String(cat.label ?? 'Category Card')}>
                 <Link href={String(cat.href || '/')} className="group relative overflow-hidden aspect-[3/4] block">
-                  <img loading="lazy" decoding="async"
+                  <Image
                     src={String(cat.img)}
                     alt={String(cat.label)}
-                    className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                    fill
+                    loading="lazy"
+                    sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 20vw"
+                    className="object-cover transition-transform duration-500 group-hover:scale-105"
                     style={{ willChange: 'transform' }}
                   />
                   <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/10 to-transparent" />
@@ -578,7 +589,7 @@ export default function HomePage() {
                 <Link href={`/mydrakensberg/${s.slug}`} className="group block">
                   <div className="relative overflow-hidden aspect-[3/2] mb-4 bg-forest/5">
                     {s.featured_image && (
-                      <img loading="lazy" decoding="async" src={s.featured_image} alt={s.title} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" style={{ willChange: 'transform' }} />
+                      <Image src={s.featured_image} alt={s.title} fill loading="lazy" sizes="(max-width: 768px) 100vw, 33vw" className="object-cover transition-transform duration-500 group-hover:scale-105" style={{ willChange: 'transform' }} />
                     )}
                   </div>
                   <p className="font-sans text-[10px] tracking-[0.15em] uppercase text-gold mb-2">

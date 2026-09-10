@@ -1,6 +1,7 @@
 'use client'
 import { useRef } from 'react'
 import Link from 'next/link'
+import Image from 'next/image'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { formatMoney } from '@/lib/allocation'
 
@@ -76,8 +77,8 @@ function StayTile({ stay }: { stay: StayCard }) {
     >
       <div className="relative overflow-hidden aspect-[4/3] mb-4 bg-[#2d6a4f]/10">
         {stay.img ? (
-          <img src={stay.img} alt={stay.title}
-            className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" />
+          <Image src={stay.img} alt={stay.title} fill loading="lazy" sizes="280px"
+            className="object-cover transition-transform duration-700 group-hover:scale-105" />
         ) : (
           <div className="w-full h-full flex items-center justify-center bg-[#C9A96E]/10">
             <span className="font-display italic text-2xl text-[#C9A96E]/40">{stay.category}</span>

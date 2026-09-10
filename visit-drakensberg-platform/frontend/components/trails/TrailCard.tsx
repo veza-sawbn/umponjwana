@@ -2,6 +2,7 @@
 import { useState } from 'react'
 import { Mountain, ArrowUp, Clock, Star, Heart } from 'lucide-react'
 import Link from 'next/link'
+import Image from 'next/image'
 import { motion } from 'framer-motion'
 
 /* ─── Types ──────────────────────────────────────────────────────────────── */
@@ -79,10 +80,13 @@ export default function TrailCard({ trail }: TrailCardProps) {
     >
       {/* Image */}
       <div className="relative aspect-[4/3] overflow-hidden">
-        <img
+        <Image
           src={trail.image}
           alt={trail.name}
-          className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+          fill
+          loading="lazy"
+          sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
+          className="object-cover transition-transform duration-500 group-hover:scale-105"
         />
         {/* Gradient for badge legibility */}
         <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent pointer-events-none" />

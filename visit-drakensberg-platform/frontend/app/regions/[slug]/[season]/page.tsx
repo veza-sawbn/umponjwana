@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
+import Image from 'next/image'
 import { ChevronRight } from 'lucide-react'
 import Footer from '@/components/layout/Footer'
 import { getRegions, type Region } from '@/lib/regions'
@@ -94,7 +95,7 @@ export default async function SeasonPage({ params }: { params: { slug: string; s
 
       {/* ── Hero ─────────────────────────────────────────────────────────── */}
       <section className="relative h-[42vh] min-h-[320px] overflow-hidden">
-        <img src={heroImg} alt="" className="absolute inset-0 w-full h-full object-cover" />
+        <Image src={heroImg} alt="" fill priority sizes="100vw" className="object-cover" />
         <div
           className="absolute inset-0"
           style={{ background: `linear-gradient(to top, rgba(${meta.tint},0.82) 0%, rgba(${meta.tint},0.28) 60%, rgba(${meta.tint},0.08) 100%)` }}

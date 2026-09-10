@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
+import Image from 'next/image'
 import { Heart, MapPin, Star, X } from 'lucide-react'
 import { formatMoney } from '@/lib/allocation'
 
@@ -49,7 +50,7 @@ export default function SavedListingsPage() {
           {saved.map(item => (
             <div key={item.id} className="bg-white border border-gray-200 overflow-hidden group">
               <div className="relative h-44 overflow-hidden">
-                <img src={item.image} alt={item.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+                <Image src={item.image} alt={item.title} fill loading="lazy" sizes="(max-width: 768px) 100vw, 50vw" className="object-cover group-hover:scale-105 transition-transform duration-500" />
                 <span className="absolute top-3 left-3 bg-white/90 font-sans text-[10px] tracking-[0.12em] uppercase px-2.5 py-1 text-gray-600">
                   {TYPE_LABEL[item.type]}
                 </span>

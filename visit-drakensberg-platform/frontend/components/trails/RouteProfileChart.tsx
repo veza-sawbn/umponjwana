@@ -1,9 +1,24 @@
 'use client'
 import { useCallback, useMemo, useRef, useState } from 'react'
+import dynamic from 'next/dynamic'
 import { Home } from 'lucide-react'
 import type { Trail } from '@/lib/trails'
 import type { GpxPoint, TrailWaypoint } from '@/lib/gpx'
-import MapboxRouteMap from './MapboxRouteMap'
+
+// Code-split: mapbox-gl's own JS is already lazy-loaded inside
+// MapboxRouteMap (a dynamic import in a useEffect), but the module itself
+// still pulls in mapbox-gl's CSS as a static import. Loading MapboxRouteMap
+// this way means that CSS — and the small wrapper component — only ships
+// once someone actually switches to "Map View", not on every hike page
+// load (elevation profile, the default view, never needs it).
+const MapboxRouteMap = dynamic(() => import('./MapboxRouteMap'), {
+  ssr: false,
+  loading: () => (
+    <div style={{ height: 400 }} className="flex items-center justify-center bg-[#e9e5dc] font-sans text-xs text-gray-400">
+      Loading map…
+    </div>
+  ),
+})
 
 // Clean, GPX-driven height profile: elevation over distance, x-axis in km,
 // y-axis in metres with gridlines, and named waypoints marked along the
