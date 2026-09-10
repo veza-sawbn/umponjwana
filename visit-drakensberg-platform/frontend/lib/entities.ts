@@ -46,10 +46,23 @@ export function newEntityId(prefix: string): string {
  * Supplier-facing screens must use listEntitiesByOwner() instead — RLS will
  * not scope the rows for you.
  *
- * Accepts an optional Supabase client so Server Components can pass a
- * session-less client (lib/supabase-public.ts) instead of the browser
- * client-component client this module defaults to — every existing caller
- * (every domain lib wrapping this module) is unaffected.
+ * PUBLIC PAGES MUST PASS publicSupabase (lib/supabase-public.ts).
+ *
+ * Not merely so Server Components have a session-less client — for
+ * correctness. The policies that decide what is public are permissive and
+ * OR-combined, and two of them key on the *reader*: "Admins read all
+ * entities" and "Owners read own entities", plus the ops-agent policies.
+ * Suspension is enforced in the third one ("Public entities are readable"
+ * → vd_owner_is_listable, 20260906_suspension_hides_listings.sql), so
+ * reading the catalog through the visitor's own session means an admin, an
+ * ops agent or the owning supplier is served rows no visitor can see — a
+ * suspended supplier's listings among them. The page then reports the site
+ * as live to exactly the people who check it.
+ *
+ * A public catalog read has to return the same rows for everyone, which
+ * means it must not carry a session. The default below is the browser
+ * client-component client, which is right for the supplier portal and
+ * admin console and wrong for /activities, /stays, /tours and friends.
  */
 export async function listEntities<T>(kind: string, client: SupabaseClient = supabase): Promise<T[]> {
   try {

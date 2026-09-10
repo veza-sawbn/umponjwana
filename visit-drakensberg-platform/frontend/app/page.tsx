@@ -433,7 +433,7 @@ export default function HomePage() {
     getPublishedPosts()
       .then(posts => setStories(posts.slice(0, 3)))
       .catch(() => setStories([]))
-    getPublishedPackages()
+    getPublishedPackages(publicSupabase)
       .then(all => setJourneys([...all].sort((a, b) => Number(b.featured) - Number(a.featured)).slice(0, 8)))
       .catch(() => setJourneys([]))
   }, [])

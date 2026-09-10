@@ -7,6 +7,7 @@ import { ArrowRight, Bus, Clock, MapPin } from 'lucide-react'
 import { getPublishedRoutes, routeDurationLabel, routePrice, routeSlug, type Route } from '@/lib/transport-routes'
 import { getTransportCompanies, type TransportCompany } from '@/lib/transport'
 import { formatMoney } from '@/lib/allocation'
+import { publicSupabase } from '@/lib/supabase-public'
 
 // Named shuttle routes are real supplier-authored data (see
 // lib/transport-routes.ts) that previously had nowhere public to render —
@@ -19,7 +20,12 @@ export default function TransportPage() {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    Promise.all([getPublishedRoutes(), getTransportCompanies()])
+    // Session-independent read — see the note in app/activities/page.tsx and
+    // the contract on listEntities(): the public catalog must not be read
+    // through the visitor's own session, or a privileged reader (admin, ops
+    // agent, or the owning supplier) sees suspended and pending suppliers'
+    // rows that RLS hides from everyone else.
+    Promise.all([getPublishedRoutes(publicSupabase), getTransportCompanies(publicSupabase)])
       .then(([r, c]) => { setRoutes(r); setCompanies(c) })
       .finally(() => setLoading(false))
   }, [])

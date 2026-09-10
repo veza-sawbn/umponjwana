@@ -16,6 +16,7 @@ import { getSupplierEntities } from '@/lib/supplier-entities'
 import { StayDistance, useStayCoords, haversineKm } from '@/lib/stay-distance'
 import { trackEvent, AnalyticsEvent } from '@/lib/analytics'
 import { formatMoney } from '@/lib/allocation'
+import { publicSupabase } from '@/lib/supabase-public'
 
 type LiveStay = {
   id: string
@@ -223,22 +224,25 @@ function SearchResults() {
   }, [])
 
   useEffect(() => {
-    getProperties().then(async props => {
+    // Session-independent reads — see app/activities/page.tsx: read through
+    // the visitor's own session and a privileged reader gets suspended and
+    // pending suppliers' rows that RLS hides from the public.
+    getProperties(publicSupabase).then(async props => {
       const active = props.filter(p => p.status === 'active')
       const cards = await Promise.all(active.map(async p => {
-        const rooms = await getRoomsByProperty(p.id)
+        const rooms = await getRoomsByProperty(p.id, publicSupabase)
         const minPrice = rooms.length > 0 ? Math.min(...rooms.map(r => r.basePrice)) : 0
         return propertyToLiveStay(p, minPrice)
       }))
       setLiveStays(cards)
     })
-    getActivities().then(items => {
+    getActivities(publicSupabase).then(items => {
       setLiveActivities(items.filter(a => a.status === 'active').map(activityToLiveActivity))
     })
-    getTrails().then(trails => {
+    getTrails(publicSupabase).then(trails => {
       setLiveHikes(trails.filter(t => t.status === 'published').map(trailToLiveHike))
     })
-    getSupplierEntities<any>('events').then((all: LiveEvent[]) => {
+    getSupplierEntities<any>('events', undefined, publicSupabase).then((all: LiveEvent[]) => {
       const now = new Date().toISOString()
       // RLS already hides drafts from the public; filtering defensively in
       // case a signed-in supplier is browsing and sees their own drafts too.

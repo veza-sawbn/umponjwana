@@ -98,8 +98,9 @@ export function operatorProfileId(supplierId: string): string {
 }
 
 /** Published operator profiles. */
-export async function getOperators(): Promise<OperatorProfile[]> {
-  return (await listEntities<OperatorProfile>(KIND)).filter(o => o.status === 'active')
+export async function getOperators(client?: SupabaseClient): Promise<OperatorProfile[]> {
+  const all = client ? await listEntities<OperatorProfile>(KIND, client) : await listEntities<OperatorProfile>(KIND)
+  return all.filter(o => o.status === 'active')
 }
 
 export async function getOperatorById(id: string, client?: SupabaseClient): Promise<OperatorProfile | null> {
@@ -126,15 +127,15 @@ export async function saveOperatorProfile(
 }
 
 /** Verified guides for one operator. */
-export async function getGuidesByOperator(operator: OperatorProfile): Promise<GuideProfile[]> {
+export async function getGuidesByOperator(operator: OperatorProfile, client?: SupabaseClient): Promise<GuideProfile[]> {
   if (!operator.supplierId) return []
-  const guides = await getSupplierEntities<GuideProfile>('guides', operator.supplierId)
+  const guides = await getSupplierEntities<GuideProfile>('guides', operator.supplierId, client)
   return guides.filter(g => g.status === 'verified')
 }
 
 /** All publicly listed guides (live verified). */
-export async function getDirectoryGuides(): Promise<GuideProfile[]> {
-  return (await getSupplierEntities<GuideProfile>('guides')).filter(g => g.status === 'verified')
+export async function getDirectoryGuides(client?: SupabaseClient): Promise<GuideProfile[]> {
+  return (await getSupplierEntities<GuideProfile>('guides', undefined, client)).filter(g => g.status === 'verified')
 }
 
 export async function getGuideById(id: string, client?: SupabaseClient): Promise<GuideProfile | null> {

@@ -12,6 +12,7 @@ import HikesRegionExplorer from '@/components/trails/HikesRegionExplorer'
 import TrailExperiencesCarousel from '@/components/experiences/TrailExperiencesCarousel'
 import HikesHero from '@/components/trails/HikesHero'
 import { ROUTE_TYPES } from '@/lib/gpx'
+import { publicSupabase } from '@/lib/supabase-public'
 
 const DIFF_COLOR: Record<string, string> = { Easy: '#4A7251', Moderate: '#C9A96E', Strenuous: '#c0392b', Extreme: '#7f1d1d' }
 const DIFF_OPTS = ['All', 'Easy', 'Moderate', 'Strenuous', 'Extreme']
@@ -50,7 +51,8 @@ export default function HikesPage() {
 
   useEffect(() => {
     getTrails().then(all => setTrails(all.filter(t => t.status === 'published')))
-    getUpcomingExperiences().then(setExperiences)
+    // Session-independent read — see app/activities/page.tsx.
+    getUpcomingExperiences(publicSupabase).then(setExperiences)
     const params = new URLSearchParams(window.location.search)
     const regionParam = params.get('region')
     if (regionParam) setRegion(regionParam)

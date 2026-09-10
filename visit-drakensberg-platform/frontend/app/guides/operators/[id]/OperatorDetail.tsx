@@ -11,6 +11,7 @@ import { getGuidesByOperator, type OperatorProfile, type GuideProfile } from '@/
 import GuideTeamCarousel from '@/components/guides/GuideTeamCarousel'
 import { getUpcomingExperiences, type TrekkingExperience } from '@/lib/experiences'
 import { formatMoney } from '@/lib/allocation'
+import { publicSupabase } from '@/lib/supabase-public'
 
 function formatDate(iso: string) {
   return new Date(iso).toLocaleDateString('en-ZA', { day: 'numeric', month: 'short', year: 'numeric' })
@@ -28,8 +29,9 @@ export default function OperatorDetail({ operator }: { operator: OperatorProfile
   const [departures, setDepartures] = useState<TrekkingExperience[]>([])
 
   useEffect(() => {
-    getGuidesByOperator(operator).then(setGuides)
-    getUpcomingExperiences().then(exps =>
+    // Session-independent reads — see app/activities/page.tsx.
+    getGuidesByOperator(operator, publicSupabase).then(setGuides)
+    getUpcomingExperiences(publicSupabase).then(exps =>
       setDepartures(operator.supplierId ? exps.filter(e => e.operatorId === operator.supplierId) : [])
     )
   }, [operator])

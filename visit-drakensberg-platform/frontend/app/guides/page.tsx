@@ -5,6 +5,7 @@ import Footer from '@/components/layout/Footer'
 import { Filter, UserCheck, Building2, MapPin, Star, Users, Award, Globe } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { getOperators, getGuidesByOperator, type OperatorProfile, type GuideProfile } from '@/lib/operators'
+import { publicSupabase } from '@/lib/supabase-public'
 
 // Supplier directory organised by tourism businesses:
 // Tour Operator → Guide Team → Guide Profile.
@@ -16,9 +17,14 @@ export default function GuidesPage() {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    getOperators().then(async ops => {
+    // Session-independent read — see the note in app/activities/page.tsx and
+    // the contract on listEntities(): the public catalog must not be read
+    // through the visitor's own session, or a privileged reader (admin, ops
+    // agent, or the owning supplier) sees suspended and pending suppliers'
+    // rows that RLS hides from everyone else.
+    getOperators(publicSupabase).then(async ops => {
       setOperators(ops)
-      const entries = await Promise.all(ops.map(async o => [o.id, await getGuidesByOperator(o)] as const))
+      const entries = await Promise.all(ops.map(async o => [o.id, await getGuidesByOperator(o, publicSupabase)] as const))
       setTeams(Object.fromEntries(entries))
       setLoading(false)
     })

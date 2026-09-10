@@ -5,6 +5,7 @@ import { ArrowRight } from 'lucide-react'
 import Footer from '@/components/layout/Footer'
 import { getPublishedPackages, PACKAGE_CATEGORIES, PACKAGE_CATEGORY_LABELS, type PackageCategory } from '@/lib/packages'
 import { formatMoney } from '@/lib/allocation'
+import { publicSupabase } from '@/lib/supabase-public'
 
 // Filter tabs mirror the vocabulary curated in the Package Builder
 // (/admin/packages) — see lib/packages.ts PACKAGE_CATEGORIES.
@@ -34,7 +35,12 @@ export default function PackagesPage() {
   const [category, setCategory] = useState<PackageCategory | ''>('')
 
   useEffect(() => {
-    getPublishedPackages().then(live => {
+    // Session-independent read — see the note in app/activities/page.tsx and
+    // the contract on listEntities(): the public catalog must not be read
+    // through the visitor's own session, or a privileged reader (admin, ops
+    // agent, or the owning supplier) sees suspended and pending suppliers'
+    // rows that RLS hides from everyone else.
+    getPublishedPackages(publicSupabase).then(live => {
       setCards(live.map(p => ({
         id: p.id,
         title: p.title,

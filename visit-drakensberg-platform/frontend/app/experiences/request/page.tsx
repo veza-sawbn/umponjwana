@@ -17,6 +17,7 @@ import {
   type OperatorProfile, type GuideProfile,
 } from '@/lib/operators'
 import { createTripRequest, TRIP_STATUS_LABELS } from '@/lib/custom-trips'
+import { publicSupabase } from '@/lib/supabase-public'
 
 // "Book on Custom Dates" journey: instead of joining a scheduled departure the
 // visitor requests a private trip. The platform matches available guides and
@@ -111,7 +112,13 @@ function RequestContent() {
     if (!trail) { setMatches([]); return }
     let cancelled = false
     async function match(selected: Trail) {
-      const [operators, tours] = await Promise.all([getOperators(), getTours()])
+      // publicSupabase: this is the visitor's operator picker, so it must
+      // offer exactly the operators the public can see. Read through the
+      // signed-in session it would offer suspended ones — and take a booking
+      // request against them. See app/activities/page.tsx.
+      const [operators, tours] = await Promise.all([
+        getOperators(publicSupabase), getTours(publicSupabase),
+      ])
       const trailTours = tours.filter(t => t.trailId === selected.id && t.status === 'active')
       const operatorIdsOnTrail = new Set(trailTours.map(t => t.supplierId).filter(Boolean))
       const profiledSupplierIds = new Set(operators.map(o => o.supplierId))

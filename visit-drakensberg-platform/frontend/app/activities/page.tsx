@@ -4,6 +4,7 @@ import Link from 'next/link'
 import Footer from '@/components/layout/Footer'
 import EditablePageHeader from '@/components/editor/EditablePageHeader'
 import { getActivities, ACTIVITY_CATEGORIES, type Activity } from '@/lib/activities'
+import { publicSupabase } from '@/lib/supabase-public'
 import { StayDistance } from '@/lib/stay-distance'
 import { regionsMatch } from '@/lib/regions'
 import { formatMoney } from '@/lib/allocation'
@@ -26,7 +27,15 @@ export default function ActivitiesPage() {
   useEffect(() => {
     const regionParam = new URLSearchParams(window.location.search).get('region')
     if (regionParam) setRegionFilter(regionParam)
-    getActivities()
+    // publicSupabase, not the session-bound browser client: RLS is what hides
+    // a suspended supplier's listings (vd_owner_is_listable, see
+    // 20260906_suspension_hides_listings.sql), and it is permissive — an
+    // admin, an ops agent, or the supplier themselves reads rows the public
+    // cannot. Reading the public catalog through the visitor's own session
+    // therefore showed suspended providers' activities to exactly the people
+    // most likely to be checking the site. This read is now the same for
+    // everyone, which is what a public catalog page means.
+    getActivities(publicSupabase)
       .then(items => setActivities(items.filter(a => a.status === 'active')))
       .finally(() => setLoading(false))
   }, [])

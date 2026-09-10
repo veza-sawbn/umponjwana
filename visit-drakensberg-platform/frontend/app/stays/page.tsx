@@ -7,6 +7,7 @@ import { getProperties, type Property, PROPERTY_TYPES, propertyTypeFromSlug } fr
 import { getRoomsByProperty } from '@/lib/rooms'
 import { DEFAULT_REGIONS, getRegions, regionsMatch, type Region } from '@/lib/regions'
 import { formatMoney } from '@/lib/allocation'
+import { publicSupabase } from '@/lib/supabase-public'
 import StayCarousel, { type StayCard } from '@/components/stays/StayCarousel'
 
 function propToCard(p: Property, minPrice = 0): StayCard {
@@ -78,16 +79,21 @@ export default function StaysPage() {
       if (resolved) setTypeFilter(resolved)
     }
 
-    getProperties().then(async props => {
+    // Session-independent read — see the note in app/activities/page.tsx and
+    // the contract on listEntities(): the public catalog must not be read
+    // through the visitor's own session, or a privileged reader (admin, ops
+    // agent, or the owning supplier) sees suspended and pending suppliers'
+    // rows that RLS hides from everyone else.
+    getProperties(publicSupabase).then(async props => {
       const active = props.filter(p => p.status === 'active')
       const cards = await Promise.all(active.map(async p => {
-        const rooms = await getRoomsByProperty(p.id)
+        const rooms = await getRoomsByProperty(p.id, publicSupabase)
         const minPrice = rooms.length > 0 ? Math.min(...rooms.map(r => r.basePrice)) : 0
         return propToCard(p, minPrice)
       }))
       setLiveProperties(cards)
     })
-    getRegions().then(setRegions).catch(() => {})
+    getRegions(publicSupabase).then(setRegions).catch(() => {})
   }, [])
 
   const toggleAmenity = (a: string) =>

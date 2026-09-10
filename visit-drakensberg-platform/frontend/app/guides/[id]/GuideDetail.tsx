@@ -10,6 +10,7 @@ import {
 import { getOperatorForGuide, GUIDE_TYPE_LABEL, guideTypeOf, type GuideProfile, type OperatorProfile } from '@/lib/operators'
 import { getUpcomingExperiences, type TrekkingExperience } from '@/lib/experiences'
 import { formatMoney } from '@/lib/allocation'
+import { publicSupabase } from '@/lib/supabase-public'
 
 const csv = (s?: string) => (s ?? '').split(',').map(x => x.trim()).filter(Boolean)
 
@@ -31,7 +32,8 @@ export default function GuideDetail({ guide }: { guide: GuideProfile }) {
 
   useEffect(() => {
     getOperatorForGuide(guide).then(setOperator)
-    getUpcomingExperiences().then(exps => setDepartures(exps.filter(e => e.leadGuide === guide.name)))
+    // Session-independent read — see app/activities/page.tsx.
+    getUpcomingExperiences(publicSupabase).then(exps => setDepartures(exps.filter(e => e.leadGuide === guide.name)))
   }, [guide])
 
   const guideType = guideTypeOf(guide)

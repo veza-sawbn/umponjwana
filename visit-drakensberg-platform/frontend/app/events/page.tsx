@@ -6,6 +6,7 @@ import { CalendarDays, MapPin, Ticket, Star, Filter, Check, Loader2 } from 'luci
 import { useBooking } from '@/lib/booking-context'
 import { getSupplierEntities } from '@/lib/supplier-entities'
 import { formatMoney } from '@/lib/allocation'
+import { publicSupabase } from '@/lib/supabase-public'
 
 interface PublicEvent {
   id: string
@@ -40,7 +41,10 @@ export default function EventsPage() {
   const [filter, setFilter] = useState<Filter>('all')
 
   useEffect(() => {
-    getSupplierEntities<any>(ENTITY)
+    // Session-independent read — see app/activities/page.tsx. The defensive
+    // is_published filter below stays: it guards against a supplier's own
+    // drafts, this guards against a privileged reader seeing rows RLS hides.
+    getSupplierEntities<any>(ENTITY, undefined, publicSupabase)
       .then((all: PublicEvent[]) => {
         const now = new Date().toISOString()
         setEvents(

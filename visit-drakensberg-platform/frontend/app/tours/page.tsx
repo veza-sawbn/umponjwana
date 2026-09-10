@@ -9,6 +9,7 @@ import { getTrails, type Trail } from '@/lib/trails'
 import { getOperators, type OperatorProfile } from '@/lib/operators'
 import { regionsMatch } from '@/lib/regions'
 import { formatMoney } from '@/lib/allocation'
+import { publicSupabase } from '@/lib/supabase-public'
 import ExploreCard from '@/components/trails/ExploreCard'
 import SupplierCarousel from '@/components/tours/SupplierCarousel'
 
@@ -32,14 +33,19 @@ export default function ToursPage() {
   const [region, setRegion] = useState('All')
 
   useEffect(() => {
-    getTours()
+    // Session-independent read — see the note in app/activities/page.tsx and
+    // the contract on listEntities(): the public catalog must not be read
+    // through the visitor's own session, or a privileged reader (admin, ops
+    // agent, or the owning supplier) sees suspended and pending suppliers'
+    // rows that RLS hides from everyone else.
+    getTours(publicSupabase)
       .then(all => setTours(all.filter(t => t.status === 'active')))
       .finally(() => setLoading(false))
     // Each tour is built on a Trail (lib/trails.ts) — fetched here so its
     // card can show the trail's real photo and route artwork, the same
     // image and design /hikes' trail cards show for that trail.
-    getTrails().then(all => setTrails(all)).catch(() => setTrails([]))
-    getOperators().then(all => setOperators(all)).catch(() => setOperators([]))
+    getTrails(publicSupabase).then(all => setTrails(all)).catch(() => setTrails([]))
+    getOperators(publicSupabase).then(all => setOperators(all)).catch(() => setOperators([]))
   }, [])
 
   const trailById = new Map(trails.map(t => [t.id, t]))

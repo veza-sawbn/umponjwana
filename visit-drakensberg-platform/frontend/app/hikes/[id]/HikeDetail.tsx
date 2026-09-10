@@ -18,6 +18,7 @@ import RouteStats from '@/components/trails/RouteStats'
 import type { Property } from '@/lib/properties'
 import type { Activity } from '@/lib/activities'
 import { formatMoney } from '@/lib/allocation'
+import { publicSupabase } from '@/lib/supabase-public'
 import ReadMoreText from '@/components/ui/ReadMoreText'
 
 const DIFF_COLOR: Record<string, string> = { Easy: '#4A7251', Moderate: '#C9A96E', Hard: '#c0392b', Strenuous: '#c0392b', Extreme: '#7f1d1d' }
@@ -62,7 +63,8 @@ export default function HikeDetail({
 
   useEffect(() => {
     getTrails().then(setAllTrails)
-    Promise.all([getDepartures(), getTours()]).then(([all, tours]) => {
+    // Session-independent read — see app/activities/page.tsx.
+    Promise.all([getDepartures(publicSupabase), getTours(publicSupabase)]).then(([all, tours]) => {
       const activeTourIds = new Set(tours.filter(t => t.status === 'active').map(t => t.id))
       const today = new Date().toISOString().slice(0, 10)
       const tourDates: TourDate[] = all

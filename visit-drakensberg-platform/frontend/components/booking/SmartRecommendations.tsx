@@ -12,6 +12,7 @@ import { getActivities, type Activity } from '@/lib/activities'
 import { getUpcomingExperiences, type TrekkingExperience } from '@/lib/experiences'
 import { regionsMatch } from '@/lib/regions'
 import { formatMoney } from '@/lib/allocation'
+import { publicSupabase } from '@/lib/supabase-public'
 
 interface SmartRecommendation {
   title: string
@@ -79,8 +80,8 @@ export default function SmartRecommendations({ region, excludeListingId, originL
 
     Promise.all([
       getTrails().catch(() => [] as Trail[]),
-      getActivities().catch(() => [] as Activity[]),
-      getUpcomingExperiences().catch(() => [] as TrekkingExperience[]),
+      getActivities(publicSupabase).catch(() => [] as Activity[]),
+      getUpcomingExperiences(publicSupabase).catch(() => [] as TrekkingExperience[]),
     ]).then(([trails, activities, experiences]) => {
       if (cancelled) return
 
