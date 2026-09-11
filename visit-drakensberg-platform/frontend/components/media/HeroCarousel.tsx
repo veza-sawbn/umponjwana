@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
+import { optimizedImageUrl, viewportImageWidth } from '@/lib/image-url'
 
 // Shared with the homepage hero — a slow cross-fading, gently panning
 // full-bleed image carousel. Renders absolutely positioned by default, so
@@ -27,6 +28,11 @@ export default function HeroCarousel({
   const [index, setIndex] = useState(0)
   const [loaded, setLoaded] = useState<Record<number, boolean>>({})
   const hasCycledRef = useRef(false)
+  // Computed once per mount rather than tracked live: good enough to size
+  // requests for this device, and stable so the preload effect below and
+  // the rendered <img> below always agree on the same URL (same browser
+  // cache entry) instead of racing a resize into a second fetch.
+  const [targetWidth] = useState(() => viewportImageWidth())
 
   useEffect(() => {
     setIndex(0)
@@ -47,10 +53,10 @@ export default function HeroCarousel({
       if (loaded[i]) return
       const img = new window.Image()
       img.onload = () => setLoaded(prev => (prev[i] ? prev : { ...prev, [i]: true }))
-      img.src = images[i]
+      img.src = optimizedImageUrl(images[i], { width: targetWidth })
     })
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [index, images])
+  }, [index, images, targetWidth])
 
   useEffect(() => {
     if (images.length < 2) return
@@ -84,7 +90,7 @@ export default function HeroCarousel({
           <div className="absolute inset-0 animate-pulse bg-gradient-to-br from-slate-700/60 to-slate-900/80" />
         )}
         <motion.img
-          src={images[index]}
+          src={optimizedImageUrl(images[index], { width: targetWidth })}
           alt={alt}
           className="w-full h-full object-cover"
           fetchPriority={isFirstSlide ? 'high' : 'auto'}

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
+import Image from 'next/image'
 import Footer from '@/components/layout/Footer'
 import {
   CheckCircle, Star, ArrowLeft, Mountain, Award, Globe, Building2,
@@ -248,9 +249,9 @@ export default function GuideDetail({ guide }: { guide: GuideProfile }) {
               <div className="bg-white border border-gray-200 p-5">
                 <p className="font-sans text-[10px] tracking-[0.12em] uppercase text-gray-400 mb-3">Associated Tour Operator</p>
                 <div className="flex items-center gap-3 mb-3">
-                  <div className="w-12 h-12 bg-[#2d6a4f]/10 flex items-center justify-center shrink-0 overflow-hidden">
+                  <div className="relative w-12 h-12 bg-[#2d6a4f]/10 flex items-center justify-center shrink-0 overflow-hidden">
                     {operator.logo
-                      ? <img src={operator.logo} alt={operator.companyName} className="w-full h-full object-cover" />
+                      ? <Image src={operator.logo} alt={operator.companyName} fill loading="lazy" sizes="48px" className="object-cover" />
                       : <Building2 size={18} className="text-[#2d6a4f]" />}
                   </div>
                   <div>

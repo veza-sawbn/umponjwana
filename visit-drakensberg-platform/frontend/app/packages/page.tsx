@@ -1,5 +1,6 @@
 'use client'
 import Link from 'next/link'
+import Image from 'next/image'
 import { useEffect, useState } from 'react'
 import { ArrowRight } from 'lucide-react'
 import Footer from '@/components/layout/Footer'
@@ -93,8 +94,8 @@ export default function PackagesPage() {
           {filtered.map((p) => (
             <Link key={p.id} href={`/packages/${p.id}`} className="group bg-white border border-black/8 block hover:border-forest/30 transition-colors">
               <div className="relative overflow-hidden aspect-[16/9]">
-                <img src={p.img} alt={p.title}
-                  className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-104" />
+                <Image src={p.img} alt={p.title} fill loading="lazy" sizes="(max-width: 1024px) 100vw, 50vw"
+                  className="object-cover transition-transform duration-700 group-hover:scale-104" />
                 {p.tag && (
                   <span className="absolute top-4 left-4 font-sans text-[10px] tracking-[0.15em] uppercase bg-gold text-forest px-3 py-1">
                     {p.tag}

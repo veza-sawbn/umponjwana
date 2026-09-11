@@ -3,6 +3,7 @@
 import { useState, useEffect, Suspense } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
+import Image from 'next/image'
 import Footer from '@/components/layout/Footer'
 import { Calendar, Users, MapPin, ArrowRight, Search, SlidersHorizontal, X, Check, Bed, ChevronDown } from 'lucide-react'
 import { useBooking } from '@/lib/booking-context'
@@ -452,7 +453,7 @@ function SearchResults() {
                     <Link href={`/stays/${stay.id}?check_in=${checkIn}&check_out=${checkOut}&guests=${guests}`}>
                       <div className="aspect-[4/3] overflow-hidden relative bg-[#2d6a4f]/10">
                         {stay.img ? (
-                          <img src={stay.img} alt={stay.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" />
+                          <Image src={stay.img} alt={stay.title} fill loading="lazy" sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw" className="object-cover group-hover:scale-105 transition-transform duration-700" />
                         ) : (
                           <div className="w-full h-full flex items-center justify-center">
                             <span className="font-display italic text-lg text-[#2d6a4f]/40">{stay.title}</span>
@@ -530,7 +531,7 @@ function SearchResults() {
                 <Link key={h.id} href={`/hikes/${h.id}`} className="group bg-white">
                   <div className="aspect-[4/3] overflow-hidden relative bg-[#2d6a4f]/10">
                     {h.img ? (
-                      <img loading="lazy" decoding="async" src={h.img} alt={h.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" />
+                      <Image src={h.img} alt={h.title} fill loading="lazy" sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw" className="object-cover group-hover:scale-105 transition-transform duration-700" />
                     ) : (
                       <div className="w-full h-full flex items-center justify-center">
                         <span className="font-display italic text-lg text-[#2d6a4f]/40">{h.title}</span>
@@ -562,7 +563,7 @@ function SearchResults() {
                 <Link key={a.id} href={`/activities/${a.id}`} className="group bg-white">
                   <div className="aspect-[4/3] overflow-hidden relative bg-[#C9A96E]/10">
                     {a.img ? (
-                      <img loading="lazy" decoding="async" src={a.img} alt={a.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" />
+                      <Image src={a.img} alt={a.title} fill loading="lazy" sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw" className="object-cover group-hover:scale-105 transition-transform duration-700" />
                     ) : (
                       <div className="w-full h-full flex items-center justify-center">
                         <span className="font-display italic text-lg text-[#C9A96E]/50">{a.title}</span>

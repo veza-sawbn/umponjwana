@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
+import Image from 'next/image'
 import { ArrowRight, ChevronRight, MapPin } from 'lucide-react'
 import Footer from '@/components/layout/Footer'
 import { getTowns, DEFAULT_TOWNS, type Town } from '@/lib/towns'
@@ -120,8 +121,8 @@ export default async function TownPage({ params }: { params: { slug: string } })
           <div className="grid lg:grid-cols-[2fr_1fr] gap-12 items-start">
             <div>
               {town.image && (
-                <div className="aspect-[16/9] overflow-hidden bg-forest/10 mb-8">
-                  <img src={town.image} alt={town.name} className="w-full h-full object-cover" />
+                <div className="relative aspect-[16/9] overflow-hidden bg-forest/10 mb-8">
+                  <Image src={town.image} alt={town.name} fill priority sizes="(max-width: 1024px) 100vw, 66vw" className="object-cover" />
                 </div>
               )}
               {town.gateway && <p className="font-sans text-[10px] tracking-[0.2em] uppercase text-gold mb-2">{town.gateway}</p>}

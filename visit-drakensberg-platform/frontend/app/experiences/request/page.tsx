@@ -3,6 +3,7 @@
 import { Suspense, useEffect, useMemo, useState } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
+import Image from 'next/image'
 import Footer from '@/components/layout/Footer'
 import {
   ArrowLeft, CalendarPlus, Users, UserCircle, CheckCircle, Building2,
@@ -310,9 +311,9 @@ function RequestContent() {
       {requestedGuide && (
         <div className="bg-white border-b border-gray-200">
           <div className="max-w-[900px] mx-auto px-6 lg:px-12 py-4 flex items-center gap-4 flex-wrap">
-            <div className="w-12 h-12 bg-[#2d6a4f]/10 flex items-center justify-center shrink-0 overflow-hidden">
+            <div className="relative w-12 h-12 bg-[#2d6a4f]/10 flex items-center justify-center shrink-0 overflow-hidden">
               {requestedGuide.portrait
-                ? <img src={requestedGuide.portrait} alt="" className="w-full h-full object-cover" />
+                ? <Image src={requestedGuide.portrait} alt="" fill sizes="48px" className="object-cover" />
                 : <UserCircle size={20} className="text-[#2d6a4f]" />}
             </div>
             <div className="flex-1 min-w-[200px]">
@@ -415,9 +416,9 @@ function RequestContent() {
                 <div key={m.operator.id} className={`bg-white border p-5 ${opSelected ? 'border-[#2d6a4f]' : 'border-gray-200'}`}>
                   <div className="flex items-start justify-between gap-4 flex-wrap">
                     <div className="flex items-start gap-4">
-                      <div className="w-12 h-12 bg-[#2d6a4f]/10 flex items-center justify-center shrink-0 overflow-hidden">
+                      <div className="relative w-12 h-12 bg-[#2d6a4f]/10 flex items-center justify-center shrink-0 overflow-hidden">
                         {m.operator.logo
-                          ? <img src={m.operator.logo} alt="" className="w-full h-full object-cover" />
+                          ? <Image src={m.operator.logo} alt="" fill loading="lazy" sizes="48px" className="object-cover" />
                           : <Building2 size={18} className="text-[#2d6a4f]" />}
                       </div>
                       <div>
@@ -541,9 +542,9 @@ function RequestContent() {
                   <div className="border-t border-gray-100 pt-3">
                     <span className="text-gray-400 block mb-2">Preferred Guide</span>
                     <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 bg-[#2d6a4f]/10 flex items-center justify-center shrink-0 overflow-hidden">
+                      <div className="relative w-10 h-10 bg-[#2d6a4f]/10 flex items-center justify-center shrink-0 overflow-hidden">
                         {selectedGuide.portrait
-                          ? <img src={selectedGuide.portrait} alt="" className="w-full h-full object-cover" />
+                          ? <Image src={selectedGuide.portrait} alt="" fill sizes="40px" className="object-cover" />
                           : <UserCircle size={18} className="text-[#2d6a4f]" />}
                       </div>
                       <div className="min-w-0">

@@ -1,6 +1,7 @@
 'use client'
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
+import Image from 'next/image'
 import { ArrowRight } from 'lucide-react'
 import { Swiper, SwiperSlide } from 'swiper/react'
 import { Autoplay } from 'swiper/modules'
@@ -36,10 +37,13 @@ function RegionCard({ region: r, index, onSelect }: { region: Region; index: num
   return (
     <Link href={`/hikes?region=${encodeURIComponent(r.name)}`} onClick={handleClick} className="group block">
       <div className="relative overflow-hidden aspect-[4/3] mb-4">
-        <img loading="lazy" decoding="async"
+        <Image
           src={regionImage(r, index)}
           alt={r.name}
-          className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+          fill
+          loading="lazy"
+          sizes="(max-width: 640px) 90vw, 31vw"
+          className="object-cover transition-transform duration-500 group-hover:scale-105"
           style={{ willChange: 'transform' }}
         />
       </div>

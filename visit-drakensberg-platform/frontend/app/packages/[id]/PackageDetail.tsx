@@ -3,6 +3,7 @@
 import { useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
+import Image from 'next/image'
 import Footer from '@/components/layout/Footer'
 import {
   ArrowLeft, Users, CheckCircle, Package as PackageIcon, MapPin, Star,
@@ -115,7 +116,7 @@ export default function PackageDetail({ pkg, id }: { pkg: MarketplacePackage; id
   return (
     <div className="min-h-screen bg-[#F7F5F2]">
       <section className="relative h-[45vh] min-h-[360px] overflow-hidden mt-16">
-        <img src={pkg.image || 'https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?w=1200&q=80'} alt={pkg.title} className="w-full h-full object-cover" />
+        <Image src={pkg.image || 'https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?w=1200&q=80'} alt={pkg.title} fill priority sizes="100vw" className="object-cover" />
         <div className="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent" />
         <div className="absolute bottom-0 left-0 right-0 px-6 lg:px-12 pb-10">
           <div className="max-w-[1440px] mx-auto">
@@ -166,7 +167,7 @@ export default function PackageDetail({ pkg, id }: { pkg: MarketplacePackage; id
                       {(c.gallery ?? []).length > 0 && (
                         <div className="flex gap-2 mt-3 overflow-x-auto">
                           {(c.gallery ?? []).map((url, i) => (
-                            <img key={i} src={url} alt={`${c.title} photo ${i + 1}`}
+                            <Image key={i} src={url} alt={`${c.title} photo ${i + 1}`} width={96} height={80} loading="lazy"
                               className="w-24 h-20 object-cover shrink-0 border border-gray-100" />
                           ))}
                         </div>

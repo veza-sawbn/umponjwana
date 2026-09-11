@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import Image from 'next/image'
 import { X, ChevronLeft, ChevronRight, Users, BedDouble, Sparkles, Moon, Check } from 'lucide-react'
 import { formatMoney } from '@/lib/allocation'
 
@@ -57,8 +58,8 @@ export default function RoomDetailModal({
         {/* Gallery */}
         <div className="relative bg-[#1C2B1E]">
           {current ? (
-            <button type="button" onClick={() => onZoom(current)} className="block w-full">
-              <img src={current} alt={room.name} className="w-full aspect-[16/9] object-cover" />
+            <button type="button" onClick={() => onZoom(current)} className="relative block w-full aspect-[16/9]">
+              <Image src={current} alt={room.name} fill sizes="(max-width: 768px) 100vw, 768px" className="object-cover" priority={imageIndex === 0} />
             </button>
           ) : (
             <div className="w-full aspect-[16/9] flex flex-col items-center justify-center gap-2 text-white/40">
@@ -103,9 +104,9 @@ export default function RoomDetailModal({
               <button
                 key={`${url}-${i}`}
                 onClick={() => setImageIndex(i)}
-                className={`shrink-0 w-20 aspect-[4/3] overflow-hidden border-2 transition-colors ${i === imageIndex ? 'border-[#C9A96E]' : 'border-transparent opacity-70 hover:opacity-100'}`}
+                className={`relative shrink-0 w-20 aspect-[4/3] overflow-hidden border-2 transition-colors ${i === imageIndex ? 'border-[#C9A96E]' : 'border-transparent opacity-70 hover:opacity-100'}`}
               >
-                <img src={url} alt="" className="w-full h-full object-cover" />
+                <Image src={url} alt="" fill loading="lazy" sizes="80px" className="object-cover" />
               </button>
             ))}
           </div>

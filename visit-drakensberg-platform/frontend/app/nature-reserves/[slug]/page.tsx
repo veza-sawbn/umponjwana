@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
+import Image from 'next/image'
 import { ArrowRight, ChevronRight, Info, Mountain, ShieldCheck, Sunrise } from 'lucide-react'
 import Footer from '@/components/layout/Footer'
 import { getReserves, DEFAULT_RESERVES, type Reserve } from '@/lib/reserves'
@@ -120,7 +121,7 @@ export default async function ReservePage({ params }: { params: { slug: string }
       {/* ── Hero ─────────────────────────────────────────────────────────── */}
       <section className="relative h-[60vh] min-h-[420px] overflow-hidden">
         {reserve.image ? (
-          <img src={reserve.image} alt={reserve.name} className="absolute inset-0 w-full h-full object-cover" />
+          <Image src={reserve.image} alt={reserve.name} fill priority sizes="100vw" className="object-cover" />
         ) : (
           <div className="absolute inset-0 bg-forest/20 flex items-center justify-center">
             <Mountain className="w-16 h-16 text-forest/20" />

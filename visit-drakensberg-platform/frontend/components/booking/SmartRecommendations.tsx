@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
+import Image from 'next/image'
 import { MapPin, Star, Mountain, Zap, Compass, Bus, Plus, Navigation, ChevronDown } from 'lucide-react'
 import { useBooking } from '@/lib/booking-context'
 import { useShuttleRecommendations } from '@/lib/shuttle-service'
@@ -227,8 +228,8 @@ export default function SmartRecommendations({ region, excludeListingId, originL
                 href={item.href}
                 className="group flex gap-3 bg-white border border-gray-200 hover:border-[#2d6a4f] transition-colors p-3"
               >
-                <div className="w-14 h-14 shrink-0 overflow-hidden">
-                  <img src={item.image} alt={item.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+                <div className="relative w-14 h-14 shrink-0 overflow-hidden">
+                  <Image src={item.image} alt={item.title} fill loading="lazy" sizes="56px" className="object-cover group-hover:scale-105 transition-transform duration-500" />
                 </div>
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2 mb-0.5">
