@@ -1,3 +1,15 @@
+// Supabase project host, so a project fronted by a custom domain (rather
+// than the default *.supabase.co) still gets picked up by the remotePattern
+// below — otherwise every trail/region/property photo uploaded to Storage
+// would hit next/image's "hostname not configured" error, which crashes
+// the whole page it's on, not just that one photo.
+let supabaseHostname
+try {
+  supabaseHostname = new URL(process.env.NEXT_PUBLIC_SUPABASE_URL || '').hostname
+} catch {
+  supabaseHostname = null
+}
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   // @react-pdf/renderer (invoice PDF generation) pulls in yoga-layout, which
@@ -13,6 +25,9 @@ const nextConfig = {
   images: {
     remotePatterns: [
       { protocol: 'https', hostname: '*.supabase.co' },
+      ...(supabaseHostname && !supabaseHostname.endsWith('.supabase.co')
+        ? [{ protocol: 'https', hostname: supabaseHostname }]
+        : []),
       { protocol: 'https', hostname: 'images.unsplash.com' },
       { protocol: 'https', hostname: 'plus.unsplash.com' },
     ],

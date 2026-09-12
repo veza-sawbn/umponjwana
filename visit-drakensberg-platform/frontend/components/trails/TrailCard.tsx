@@ -4,6 +4,7 @@ import { Mountain, ArrowUp, Clock, Star, Heart } from 'lucide-react'
 import Link from 'next/link'
 import Image from 'next/image'
 import { motion } from 'framer-motion'
+import { isOptimizableImageHost } from '@/lib/image-url'
 
 /* ─── Types ──────────────────────────────────────────────────────────────── */
 export interface Trail {
@@ -80,14 +81,26 @@ export default function TrailCard({ trail }: TrailCardProps) {
     >
       {/* Image */}
       <div className="relative aspect-[4/3] overflow-hidden">
-        <Image
-          src={trail.image}
-          alt={trail.name}
-          fill
-          loading="lazy"
-          sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
-          className="object-cover transition-transform duration-500 group-hover:scale-105"
-        />
+        {isOptimizableImageHost(trail.image) ? (
+          <Image
+            src={trail.image}
+            alt={trail.name}
+            fill
+            loading="lazy"
+            sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
+            className="object-cover transition-transform duration-500 group-hover:scale-105"
+          />
+        ) : (
+          // Host next/image isn't configured for (see next.config.mjs) —
+          // fall back to a plain <img> instead of crashing the whole page.
+          <img
+            src={trail.image}
+            alt={trail.name}
+            loading="lazy"
+            decoding="async"
+            className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+          />
+        )}
         {/* Gradient for badge legibility */}
         <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent pointer-events-none" />
 

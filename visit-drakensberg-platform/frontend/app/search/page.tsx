@@ -14,6 +14,7 @@ import { getRoomsByProperty } from '@/lib/rooms'
 import { getActivities, type Activity } from '@/lib/activities'
 import { getTrails, trailStartPoint, type Trail } from '@/lib/trails'
 import { getSupplierEntities } from '@/lib/supplier-entities'
+import { publicSupabase } from '@/lib/supabase-public'
 import { StayDistance, useStayCoords, haversineKm } from '@/lib/stay-distance'
 import { trackEvent, AnalyticsEvent } from '@/lib/analytics'
 import { formatMoney } from '@/lib/allocation'
@@ -224,22 +225,26 @@ function SearchResults() {
   }, [])
 
   useEffect(() => {
-    getProperties().then(async props => {
+    // publicSupabase (session-less) throughout — a signed-in admin or ops
+    // session would otherwise read past the public RLS gate and return
+    // suspended suppliers' listings in search results. See
+    // lib/supabase-public.ts.
+    getProperties(publicSupabase).then(async props => {
       const active = props.filter(p => p.status === 'active')
       const cards = await Promise.all(active.map(async p => {
-        const rooms = await getRoomsByProperty(p.id)
+        const rooms = await getRoomsByProperty(p.id, publicSupabase)
         const minPrice = rooms.length > 0 ? Math.min(...rooms.map(r => r.basePrice)) : 0
         return propertyToLiveStay(p, minPrice)
       }))
       setLiveStays(cards)
     })
-    getActivities().then(items => {
+    getActivities(publicSupabase).then(items => {
       setLiveActivities(items.filter(a => a.status === 'active').map(activityToLiveActivity))
     })
-    getTrails().then(trails => {
+    getTrails(publicSupabase).then(trails => {
       setLiveHikes(trails.filter(t => t.status === 'published').map(trailToLiveHike))
     })
-    getSupplierEntities<any>('events').then((all: LiveEvent[]) => {
+    getSupplierEntities<any>('events', undefined, publicSupabase).then((all: LiveEvent[]) => {
       const now = new Date().toISOString()
       // RLS already hides drafts from the public; filtering defensively in
       // case a signed-in supplier is browsing and sees their own drafts too.

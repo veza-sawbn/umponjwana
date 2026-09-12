@@ -7,6 +7,7 @@ import {
   ArrowLeft, Mountain, Clock, Users, CheckCircle, Calendar, Shield, Star,
 } from 'lucide-react'
 import { getDepartures, type Departure } from '@/lib/departures'
+import { publicSupabase } from '@/lib/supabase-public'
 import type { Tour } from '@/lib/tours'
 import type { NearbyStayResult } from '@/lib/modules'
 import NearbyStaysModule from '@/components/modules/NearbyStaysModule'
@@ -36,7 +37,10 @@ export default function TourDetail({ tour, nearbyStays }: { tour: Tour; nearbySt
 
   useEffect(() => {
     const today = new Date().toISOString().slice(0, 10)
-    getDepartures().then(all =>
+    // publicSupabase (session-less) — matches the server shell's own read, so
+    // a signed-in admin or ops session sees the same bookable departures a
+    // visitor does, not a suspended supplier's. See lib/supabase-public.ts.
+    getDepartures(publicSupabase).then(all =>
       setDepartures(all.filter(d => d.tourId === tour.id && d.date >= today && d.status !== 'full').sort((a, b) => a.date.localeCompare(b.date)))
     )
   }, [tour.id])

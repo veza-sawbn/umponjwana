@@ -10,6 +10,7 @@ import {
 } from 'lucide-react'
 import { getOperatorForGuide, GUIDE_TYPE_LABEL, guideTypeOf, type GuideProfile, type OperatorProfile } from '@/lib/operators'
 import { getUpcomingExperiences, type TrekkingExperience } from '@/lib/experiences'
+import { publicSupabase } from '@/lib/supabase-public'
 import { formatMoney } from '@/lib/allocation'
 
 const csv = (s?: string) => (s ?? '').split(',').map(x => x.trim()).filter(Boolean)
@@ -31,8 +32,11 @@ export default function GuideDetail({ guide }: { guide: GuideProfile }) {
   const [departures, setDepartures] = useState<TrekkingExperience[]>([])
 
   useEffect(() => {
-    getOperatorForGuide(guide).then(setOperator)
-    getUpcomingExperiences().then(exps => setDepartures(exps.filter(e => e.leadGuide === guide.name)))
+    // publicSupabase (session-less) — matches the server shell's own read, so
+    // a signed-in admin or ops session sees the same page a visitor does
+    // rather than one including suspended suppliers. See lib/supabase-public.ts.
+    getOperatorForGuide(guide, publicSupabase).then(setOperator)
+    getUpcomingExperiences(publicSupabase).then(exps => setDepartures(exps.filter(e => e.leadGuide === guide.name)))
   }, [guide])
 
   const guideType = guideTypeOf(guide)

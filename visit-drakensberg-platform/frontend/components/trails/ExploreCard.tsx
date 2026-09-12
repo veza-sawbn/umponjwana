@@ -3,6 +3,7 @@ import Image from 'next/image'
 import { Mountain } from 'lucide-react'
 import type { Trail } from '@/lib/trails'
 import RouteArtwork from '@/components/trails/RouteArtwork'
+import { isOptimizableImageHost } from '@/lib/image-url'
 
 // Shared visual design for a "browse the Drakensberg" card — image with a
 // difficulty badge and optional route-artwork silhouette, an uppercase gold
@@ -38,9 +39,16 @@ export default function ExploreCard({
     <Link href={href} className="group block">
       <div className="relative overflow-hidden aspect-[4/3] mb-4 bg-forest/10">
         {image ? (
-          <Image src={image} alt={imageAlt} fill loading="lazy"
-            sizes="(max-width: 640px) 88vw, (max-width: 1024px) 45vw, 30vw"
-            className="object-cover transition-transform duration-700 group-hover:scale-105" />
+          isOptimizableImageHost(image) ? (
+            <Image src={image} alt={imageAlt} fill loading="lazy"
+              sizes="(max-width: 640px) 88vw, (max-width: 1024px) 45vw, 30vw"
+              className="object-cover transition-transform duration-700 group-hover:scale-105" />
+          ) : (
+            // Host next/image isn't configured for (see next.config.mjs) —
+            // fall back to a plain <img> instead of crashing the whole page.
+            <img src={image} alt={imageAlt} loading="lazy" decoding="async"
+              className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" />
+          )
         ) : (
           <div className="w-full h-full flex items-center justify-center">
             <Mountain className="w-10 h-10 text-forest/20" />

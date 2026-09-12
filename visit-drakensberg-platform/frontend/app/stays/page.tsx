@@ -5,6 +5,7 @@ import Footer from '@/components/layout/Footer'
 import EditablePageHeader from '@/components/editor/EditablePageHeader'
 import { getProperties, type Property, PROPERTY_TYPES, propertyTypeFromSlug } from '@/lib/properties'
 import { getRoomsByProperty } from '@/lib/rooms'
+import { publicSupabase } from '@/lib/supabase-public'
 import { DEFAULT_REGIONS, getRegions, regionsMatch, type Region } from '@/lib/regions'
 import { formatMoney } from '@/lib/allocation'
 import StayCarousel, { type StayCard } from '@/components/stays/StayCarousel'
@@ -78,10 +79,13 @@ export default function StaysPage() {
       if (resolved) setTypeFilter(resolved)
     }
 
-    getProperties().then(async props => {
+    // publicSupabase (session-less) — a signed-in admin or ops session would
+    // otherwise read past the public RLS gate and list suspended suppliers'
+    // properties here. See lib/supabase-public.ts.
+    getProperties(publicSupabase).then(async props => {
       const active = props.filter(p => p.status === 'active')
       const cards = await Promise.all(active.map(async p => {
-        const rooms = await getRoomsByProperty(p.id)
+        const rooms = await getRoomsByProperty(p.id, publicSupabase)
         const minPrice = rooms.length > 0 ? Math.min(...rooms.map(r => r.basePrice)) : 0
         return propToCard(p, minPrice)
       }))

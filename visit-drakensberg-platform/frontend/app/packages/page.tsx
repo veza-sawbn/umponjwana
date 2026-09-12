@@ -5,6 +5,7 @@ import { useEffect, useState } from 'react'
 import { ArrowRight } from 'lucide-react'
 import Footer from '@/components/layout/Footer'
 import { getPublishedPackages, PACKAGE_CATEGORIES, PACKAGE_CATEGORY_LABELS, type PackageCategory } from '@/lib/packages'
+import { publicSupabase } from '@/lib/supabase-public'
 import { formatMoney } from '@/lib/allocation'
 
 // Filter tabs mirror the vocabulary curated in the Package Builder
@@ -35,7 +36,10 @@ export default function PackagesPage() {
   const [category, setCategory] = useState<PackageCategory | ''>('')
 
   useEffect(() => {
-    getPublishedPackages().then(live => {
+    // publicSupabase (session-less) — a signed-in admin or ops session would
+    // otherwise read past the public RLS gate and list packages built on
+    // suspended suppliers' inventory here. See lib/supabase-public.ts.
+    getPublishedPackages(publicSupabase).then(live => {
       setCards(live.map(p => ({
         id: p.id,
         title: p.title,

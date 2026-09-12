@@ -4,6 +4,7 @@ import Link from 'next/link'
 import Footer from '@/components/layout/Footer'
 import EditablePageHeader from '@/components/editor/EditablePageHeader'
 import { getActivities, ACTIVITY_CATEGORIES, type Activity } from '@/lib/activities'
+import { publicSupabase } from '@/lib/supabase-public'
 import { StayDistance } from '@/lib/stay-distance'
 import { regionsMatch } from '@/lib/regions'
 import { formatMoney } from '@/lib/allocation'
@@ -26,7 +27,10 @@ export default function ActivitiesPage() {
   useEffect(() => {
     const regionParam = new URLSearchParams(window.location.search).get('region')
     if (regionParam) setRegionFilter(regionParam)
-    getActivities()
+    // publicSupabase (session-less) — a signed-in admin or ops session would
+    // otherwise read past the public RLS gate and list suspended suppliers'
+    // activities here. See lib/supabase-public.ts.
+    getActivities(publicSupabase)
       .then(items => setActivities(items.filter(a => a.status === 'active')))
       .finally(() => setLoading(false))
   }, [])

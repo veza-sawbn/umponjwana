@@ -39,3 +39,35 @@ export function viewportImageWidth(max = 1920): number {
   const dpr = Math.min(window.devicePixelRatio || 1, 2)
   return Math.min(max, Math.ceil(window.innerWidth * dpr))
 }
+
+/**
+ * Whether next/image's built-in optimizer is configured to fetch this URL
+ * (see next.config.mjs's `images.remotePatterns`). next/image throws a hard
+ * render error — taking down the whole page, not just the one photo — for
+ * any src whose hostname isn't allow-listed there. Content pasted or
+ * uploaded through admin/supplier tools is meant to land on Unsplash or this
+ * project's own Supabase Storage, but there's nothing stopping a stray URL
+ * (an old paste-a-URL field, a Supabase project moved to a custom domain)
+ * from pointing somewhere else. Callers should use this to fall back to a
+ * plain, unoptimized `<img>` for anything it doesn't recognize, rather than
+ * trusting every stored image URL to stay inside the configured hosts.
+ */
+export function isOptimizableImageHost(url: string): boolean {
+  if (!url) return false
+  let hostname: string
+  try {
+    hostname = new URL(url).hostname
+  } catch {
+    return false
+  }
+  if (hostname === 'images.unsplash.com' || hostname === 'plus.unsplash.com') return true
+  if (hostname.endsWith('.supabase.co')) return true
+  // Covers a Supabase project fronted by a custom domain, which wouldn't
+  // match the .supabase.co check above.
+  try {
+    if (hostname === new URL(process.env.NEXT_PUBLIC_SUPABASE_URL || '').hostname) return true
+  } catch {
+    // NEXT_PUBLIC_SUPABASE_URL unset/invalid — nothing more to check.
+  }
+  return false
+}
