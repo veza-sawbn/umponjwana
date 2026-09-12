@@ -10,6 +10,7 @@ import TrailExperiences from '@/components/experiences/TrailExperiences'
 import { getDepartures } from '@/lib/departures'
 import { getTours } from '@/lib/tours'
 import { getExperiencesByTrail, type TrekkingExperience } from '@/lib/experiences'
+import { publicSupabase } from '@/lib/supabase-public'
 import type { TourDate } from '@/components/tours/UpcomingDepartures'
 import { CalendarPlus } from 'lucide-react'
 import RouteArtwork from '@/components/trails/RouteArtwork'
@@ -61,8 +62,12 @@ export default function HikeDetail({
   const [experiences, setExperiences] = useState<TrekkingExperience[]>([])
 
   useEffect(() => {
-    getTrails().then(setAllTrails)
-    Promise.all([getDepartures(), getTours()]).then(([all, tours]) => {
+    // publicSupabase (session-less) — the departures below are bookable
+    // supplier content, and a signed-in admin or ops session would otherwise
+    // read past the public RLS gate and offer a suspended supplier's
+    // departures here. See lib/supabase-public.ts.
+    getTrails(publicSupabase).then(setAllTrails)
+    Promise.all([getDepartures(publicSupabase), getTours(publicSupabase)]).then(([all, tours]) => {
       const activeTourIds = new Set(tours.filter(t => t.status === 'active').map(t => t.id))
       const today = new Date().toISOString().slice(0, 10)
       const tourDates: TourDate[] = all
@@ -84,7 +89,7 @@ export default function HikeDetail({
         }))
       setDepartures(tourDates)
     })
-    getExperiencesByTrail(trail.id).then(setExperiences)
+    getExperiencesByTrail(trail.id, publicSupabase).then(setExperiences)
   }, [trail.id])
 
   const diff = trail.difficulty

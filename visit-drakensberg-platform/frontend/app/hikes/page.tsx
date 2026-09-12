@@ -7,6 +7,7 @@ import { getTrails, trailCategory, type Trail, type TrailCategory } from '@/lib/
 import { regionsMatch } from '@/lib/regions'
 import { getReserves, type Reserve } from '@/lib/reserves'
 import { getUpcomingExperiences, type TrekkingExperience } from '@/lib/experiences'
+import { publicSupabase } from '@/lib/supabase-public'
 import TrailCardsCarousel from '@/components/trails/TrailCardsCarousel'
 import HikesRegionExplorer from '@/components/trails/HikesRegionExplorer'
 import TrailExperiencesCarousel from '@/components/experiences/TrailExperiencesCarousel'
@@ -49,8 +50,12 @@ export default function HikesPage() {
   const [filtersOpen, setFiltersOpen] = useState(false)
 
   useEffect(() => {
-    getTrails().then(all => setTrails(all.filter(t => t.status === 'published')))
-    getUpcomingExperiences().then(setExperiences)
+    // publicSupabase (session-less) — the departures behind these experiences
+    // are supplier content, and a signed-in admin or ops session would
+    // otherwise read past the public RLS gate and list suspended suppliers'
+    // departures here. See lib/supabase-public.ts.
+    getTrails(publicSupabase).then(all => setTrails(all.filter(t => t.status === 'published')))
+    getUpcomingExperiences(publicSupabase).then(setExperiences)
     const params = new URLSearchParams(window.location.search)
     const regionParam = params.get('region')
     if (regionParam) setRegion(regionParam)

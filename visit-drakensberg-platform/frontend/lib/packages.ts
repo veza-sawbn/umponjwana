@@ -162,9 +162,9 @@ export async function getPackages(client?: SupabaseClient): Promise<MarketplaceP
 }
 
 /** Packages visible on the public site (published, inside their window). */
-export async function getPublishedPackages(): Promise<MarketplacePackage[]> {
+export async function getPublishedPackages(client?: SupabaseClient): Promise<MarketplacePackage[]> {
   const today = new Date().toISOString().slice(0, 10)
-  return (await getPackages()).filter(p =>
+  return (await getPackages(client)).filter(p =>
     p.packageStatus === 'published' &&
     (!p.publishFrom || p.publishFrom <= today) &&
     (!p.publishTo || p.publishTo >= today)

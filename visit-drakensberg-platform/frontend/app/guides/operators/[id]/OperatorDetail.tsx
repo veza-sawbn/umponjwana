@@ -11,6 +11,7 @@ import {
 import { getGuidesByOperator, type OperatorProfile, type GuideProfile } from '@/lib/operators'
 import GuideTeamCarousel from '@/components/guides/GuideTeamCarousel'
 import { getUpcomingExperiences, type TrekkingExperience } from '@/lib/experiences'
+import { publicSupabase } from '@/lib/supabase-public'
 import { formatMoney } from '@/lib/allocation'
 
 function formatDate(iso: string) {
@@ -29,8 +30,11 @@ export default function OperatorDetail({ operator }: { operator: OperatorProfile
   const [departures, setDepartures] = useState<TrekkingExperience[]>([])
 
   useEffect(() => {
-    getGuidesByOperator(operator).then(setGuides)
-    getUpcomingExperiences().then(exps =>
+    // publicSupabase (session-less) — matches the server shell's own read, so
+    // a signed-in admin or ops session sees the same page a visitor does
+    // rather than one including suspended suppliers. See lib/supabase-public.ts.
+    getGuidesByOperator(operator, publicSupabase).then(setGuides)
+    getUpcomingExperiences(publicSupabase).then(exps =>
       setDepartures(operator.supplierId ? exps.filter(e => e.operatorId === operator.supplierId) : [])
     )
   }, [operator])
