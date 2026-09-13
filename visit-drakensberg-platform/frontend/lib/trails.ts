@@ -274,6 +274,56 @@ export async function getTrailSummaries(client: SupabaseClient = supabase): Prom
   return DEFAULT_TRAILS
 }
 
+// A list-view read that still draws route artwork.
+//
+// /hikes' own listing (via ExploreCard) and its hero (HikesHero, fed the
+// same list as a prop) render a route silhouette from
+// analytics.routeArtworkSvg per trail — so, unlike getTrailSummaries(),
+// they can't drop `analytics` outright. They don't need the full-resolution
+// elevation/GPS profile behind it, though: analytics.points/sections/
+// waypoints and the raw `gpx` track are what made the row 10.2MB, and
+// nothing in this artwork just draws a pre-rendered <path>.
+//
+// vd_trail_list_with_artwork() (see
+// supabase/migrations/20260913_trail_list_artwork_and_by_id_rpc.sql) keeps
+// only analytics.routeArtworkSvg — 733KB for all 15 trails, confirmed at
+// 129ms to execute, versus the 10.2MB row that timed out.
+export async function getTrailsWithArtwork(client: SupabaseClient = supabase): Promise<Trail[]> {
+  try {
+    const { data, error } = await client.rpc('vd_trail_list_with_artwork')
+    if (!error && Array.isArray(data)) return data as Trail[]
+  } catch {
+    // fall through to defaults
+  }
+  return DEFAULT_TRAILS
+}
+
+// One trail, full fidelity, for a trail's own detail page.
+//
+// The detail page (app/hikes/[id]/page.tsx's resolveTrail(), and
+// HikeDetail.tsx's own trail-detail concerns) genuinely needs
+// analytics.points/statistics/waypoints/cruxes/slopeDistribution for its
+// elevation chart — but every existing caller got there by fetching the
+// whole 10.2MB `trails` row and finding one trail by id, the same query
+// that times out. vd_trail_by_id() does the lookup in the database instead:
+// one trail, matched by id or slug, never all fifteen. It also drops
+// `analytics.sections` and a few unused fields nothing client-side reads
+// (confirmed by grep) — over half of the worst-case trail's size for
+// nothing rendered — bringing that worst case from 2.38MB to 753KB.
+//
+// Returns null (not DEFAULT_TRAILS) on a miss or failure: a caller
+// resolving a specific id needs to know it didn't find that trail, not
+// silently receive an arbitrary sample one.
+export async function getTrailById(idOrSlug: string, client: SupabaseClient = supabase): Promise<Trail | null> {
+  try {
+    const { data, error } = await client.rpc('vd_trail_by_id', { p_id: idOrSlug })
+    if (!error && data) return data as Trail
+  } catch {
+    // fall through
+  }
+  return null
+}
+
 export async function saveTrails(trails: Trail[]): Promise<void> {
   await supabase.from('site_content').upsert(
     { key: 'trails', value: { items: trails }, updated_at: new Date().toISOString() },

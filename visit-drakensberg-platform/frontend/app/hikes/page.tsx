@@ -3,7 +3,7 @@ import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import Footer from '@/components/layout/Footer'
 import { X, SlidersHorizontal, ChevronDown } from 'lucide-react'
-import { getTrails, trailCategory, type Trail, type TrailCategory } from '@/lib/trails'
+import { getTrailsWithArtwork, trailCategory, type Trail, type TrailCategory } from '@/lib/trails'
 import { regionsMatch } from '@/lib/regions'
 import { getReserves, type Reserve } from '@/lib/reserves'
 import { getUpcomingExperiences, type TrekkingExperience } from '@/lib/experiences'
@@ -54,7 +54,10 @@ export default function HikesPage() {
     // are supplier content, and a signed-in admin or ops session would
     // otherwise read past the public RLS gate and list suspended suppliers'
     // departures here. See lib/supabase-public.ts.
-    getTrails(publicSupabase).then(all => setTrails(all.filter(t => t.status === 'published')))
+    // TrailCardsCarousel (ExploreCard) and HikesHero both draw a route-artwork
+    // silhouette per trail, so this needs analytics.routeArtworkSvg — but
+    // not the rest of `analytics`/`gpx` behind it. See getTrailsWithArtwork().
+    getTrailsWithArtwork(publicSupabase).then(all => setTrails(all.filter(t => t.status === 'published')))
     getUpcomingExperiences(publicSupabase).then(setExperiences)
     const params = new URLSearchParams(window.location.search)
     const regionParam = params.get('region')
