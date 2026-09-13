@@ -14,6 +14,7 @@ import { COMPONENT_TYPE_LABELS, PACKAGE_CATEGORY_LABELS, type MarketplacePackage
 import { bookPackage } from '@/lib/package-bookings'
 import { getTrails, type Trail } from '@/lib/trails'
 import { formatMoney } from '@/lib/allocation'
+import SaveButton from '@/components/ui/SaveButton'
 
 /**
  * Client island rendered inside the server shell (page.tsx), which already
@@ -129,9 +130,23 @@ export default function PackageDetail({ pkg, id }: { pkg: MarketplacePackage; id
               ))}
             </div>
             <h1 className="font-display italic text-4xl lg:text-6xl text-white">{pkg.title}</h1>
-            <p className="font-sans text-sm text-white/70 mt-2 flex items-center gap-2">
-              <MapPin size={13} /> {pkg.region || 'Drakensberg'} · {pkg.durationNights} night{pkg.durationNights !== 1 ? 's' : ''} · max {pkg.maxGuests} guests
-            </p>
+            <div className="flex flex-wrap items-center gap-4 mt-2">
+              <p className="font-sans text-sm text-white/70 flex items-center gap-2">
+                <MapPin size={13} /> {pkg.region || 'Drakensberg'} · {pkg.durationNights} night{pkg.durationNights !== 1 ? 's' : ''} · max {pkg.maxGuests} guests
+              </p>
+              <SaveButton
+                variant="inline"
+                tone="dark"
+                listing={{
+                  id: pkg.id,
+                  type: 'package',
+                  title: pkg.title,
+                  location: pkg.region || 'Drakensberg',
+                  price: pkg.pricePerPerson,
+                  image: pkg.image,
+                }}
+              />
+            </div>
           </div>
         </div>
       </section>

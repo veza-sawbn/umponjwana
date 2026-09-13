@@ -117,6 +117,15 @@ export default function ToursPage() {
                   difficultyColor={DIFF_COLOR[t.difficulty] || '#2d6a4f'}
                   topLeftBadge={t.featured ? 'Featured' : undefined}
                   routeArtworkTrail={trail}
+                  saveListing={{
+                    id: t.id,
+                    type: 'tour',
+                    title: t.name,
+                    location: t.trailName || 'Drakensberg',
+                    price: t.pricePerPerson,
+                    image: trail?.image,
+                    rating: t.rating,
+                  }}
                   meta={
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-3 font-sans text-xs text-forest/40">
