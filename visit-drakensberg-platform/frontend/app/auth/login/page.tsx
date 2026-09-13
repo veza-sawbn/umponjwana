@@ -7,6 +7,7 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { signIn, supabase } from '@/lib/auth'
 import { trackEvent, AnalyticsEvent } from '@/lib/analytics'
+import { safeRedirectPath } from '@/lib/safe-redirect'
 
 const schema = z.object({
   email: z.string().email('Enter a valid email'),
@@ -60,7 +61,10 @@ export default function LoginPage() {
         : role === 'admin' ? '/admin'
         : staffRole === 'operations' ? '/operations'
         : '/account'
-      const targetPath = redirect?.startsWith('/') && !redirect.startsWith('//') ? redirect : defaultPath
+      // The inline check here used to be startsWith('/') && !startsWith('//'),
+      // which misses '/\host' (browsers read it as protocol-relative too) and
+      // encoded separators. One shared validator, same as /api/auth/callback.
+      const targetPath = safeRedirectPath(redirect, defaultPath)
       // Hard navigation: guarantees the middleware sees the fresh session
       // cookie and bypasses any prefetched redirect cached by the router.
       window.location.assign(targetPath)
