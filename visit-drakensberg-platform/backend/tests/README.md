@@ -9,8 +9,9 @@ pip install -r requirements.txt pytest
 pytest tests/ -q
 ```
 
-`test_security.py` deliberately needs almost nothing installed — python-jose,
-passlib and pytest are enough. It stubs `app.core.config` and
+`test_security.py` needs only what `app.core.security` itself imports —
+fastapi, sqlalchemy, python-jose, passlib and pytest — not the full
+`requirements.txt` (no asyncpg, no Supabase client, no resend). It stubs `app.core.config` and
 `app.core.database` (which would otherwise construct `Settings` from a missing
 `.env` and open a Redis connection at import time) while leaving the real
 `app.core.security` to load from disk, so the tests exercise the shipped code

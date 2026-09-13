@@ -33,14 +33,21 @@ What is weak is concentrated in four places:
    security headers, no backup/restore or rollback procedure, no monitoring or alerting,
    no automated tests.
 
-**26 findings: 3 critical, 7 high, 8 medium, 8 low.**
+**27 findings: 3 critical, 8 high, 8 medium, 8 low.**
+
+The count grew by one after the report was first written. **H8** was found
+while building the fix for H4 — see [Found during remediation](#found-during-remediation).
+H4's own scope was also wrong as originally stated, and is corrected below.
 
 **Remediation status (all fixes on `claude/production-security-audit-b6cy75`):**
-24 of 26 fixed and covered by tests. The two open items — **M6** (backups,
-PITR, rollback) and **M7** (monitoring and alerting) — are controls that have
-to be *set up* rather than patched: a plan tier, an owner, a tested restore.
-They are scoped with procedures and unclaimed checkboxes in
-[`RESILIENCE_RUNBOOK.md`](./RESILIENCE_RUNBOOK.md).
+every finding is fixed and covered by tests. **M6** and **M7** are *code
+complete* — a migration runner with a ledger, rollback declarations on all 60
+migrations, a financial backup script, structured redacting logs, alerts on the
+signals that matter, and a daily audit digest — but both still need work only
+an account owner can do: turn on PITR, point the backup script at storage,
+connect an error tracker, set `ALERT_WEBHOOK_URL`, and run a restore test.
+Those are the ☐ items in [`RESILIENCE_RUNBOOK.md`](./RESILIENCE_RUNBOOK.md),
+and until they are done the *tooling* exists but the *control* does not.
 
 Everything in this report describes what was found. The ✅ column says what has
 since changed on that branch.
@@ -53,25 +60,26 @@ since changed on that branch.
 | H1 | High | No rate limiting on any endpoint | API abuse / DDoS | ✅ |
 | H2 | High | No security headers (CSP, HSTS, frame-ancestors, Referrer-Policy) | Hardening | ✅ |
 | H3 | High | Payment webhook is not idempotent across its rollback path | Duplicate transactions | ✅ |
-| H4 | High | `vd_book_seats` / `vd_release_seats` callable against any departure | IDOR / integrity | ✅¹ |
+| H4 | High | Seat/timeslot inventory writable against **any** departure *or activity* | IDOR / integrity | ✅¹ |
 | H5 | High | Any user can send an arbitrary email from the platform to any user | Phishing / abuse | ✅ |
 | H6 | High | Open redirect in `/api/auth/callback?next=` immediately after session issue | AuthN | ✅ |
 | H7 | High | Permanent admin-recovery backdoor endpoint | Broken authentication | ✅ |
+| **H8** | **High** | Activity timeslots had **no working capacity limit at all** — found during remediation | Overselling | ✅ |
 | M1 | Medium | Middleware authorizes on unverified `getSession()` | AuthZ | ✅ |
 | M2 | Medium | SVG uploads permitted into a public storage bucket | Unsafe file upload | ✅² |
 | M3 | Medium | Unauthenticated credential-forwarding proxy at `/api/backend/*` | SSRF / insecure API | ✅ |
 | M4 | Medium | Backend session revocation is broken; `/docs` public; vulnerable `python-jose` | AuthN / deps | ✅ |
 | M5 | Medium | `site_content` world-readable and drives middleware redirects | RLS / open redirect | ✅³ |
-| M6 | Medium | No backups, PITR policy, down-migrations or rollback procedure | Reliability | ☐ |
-| M7 | Medium | No structured logging, error tracking, alerting or audit review | Monitoring | ☐ |
-| M8 | Medium | Service-role key sent as a bearer token to a host-derived origin | Exposed secrets | ✅⁴ |
-| L1–L8 | Low | See [Low findings](#low-findings) | Various | ✅⁵ |
+| M6 | Medium | No backups, PITR policy, down-migrations or rollback procedure | Reliability | ◐⁵ |
+| M7 | Medium | No structured logging, error tracking, alerting or audit review | Monitoring | ◐⁵ |
+| M8 | Medium | Service-role key sent as a bearer token to a host-derived origin | Exposed secrets | ✅ |
+| L1–L8 | Low | See [Low findings](#low-findings) | Various | ✅⁴ |
 
-¹ The IDOR in `vd_release_seats` is closed outright. `vd_book_seats` is bounded
-(20-seat ceiling, audited) but stays open to authenticated callers, because
-`/checkout` genuinely reserves before a booking row exists. Tying a seat hold
-to a booking row with a TTL is the real fix and is architectural — see
-[Follow-up work](#follow-up-work).
+¹ Fully closed, in two passes. The direct-take and release functions are now
+owner/staff-only for **both** departures and activity timeslots, and `/checkout`
+reserves through a TTL'd hold that records who holds the seats and counts
+against a per-account quota — which is what stops the loop a per-call ceiling
+could not. See [Found during remediation](#found-during-remediation).
 ² New uploads only. Any SVG already in the bucket is still public; the
 migration carries the query to find them.
 ³ The redirect's reach is bounded to trusted hosts. The world-readable `select`
@@ -79,25 +87,28 @@ on `site_content` is left as-is — every key it holds today is CMS content mean
 to be public, and narrowing it would break the anonymous site for no gain. The
 exposure to accept is that anything *else* put in that table is public by
 default.
-⁴ The destination can no longer be chosen by the request. The key still travels
-as a bearer token on one internal hop; removing it needs the receipt builder
-extracted from the route — see [Follow-up work](#follow-up-work).
-⁵ L5 is partly accepted: the admin routes that return a Postgres error message
+⁴ L5 is partly accepted: the admin routes that return a Postgres error message
 verify the caller is an admin first, and a constraint name is genuinely useful
 when diagnosing a failed invite. The unauthenticated case that mattered
 (`/api/backend/*`) is fixed.
+⁵ ◐ = code complete, configuration outstanding. The tooling is built and
+tested; the remaining steps need an account owner (PITR, a backup destination,
+an error tracker, `ALERT_WEBHOOK_URL`, a restore test) and are the ☐ items in
+[`RESILIENCE_RUNBOOK.md`](./RESILIENCE_RUNBOOK.md).
 
 ### Verification
 
 | Suite | Command | Coverage |
 |---|---|---|
-| Frontend unit | `npm test` (frontend) | 144 tests — origin allow-listing, redirect validation, rate limiting, constant-time comparison, security headers, route-artwork sanitisation |
-| SQL | `npm run test:db` (frontend) | 4 files against the **real** migrations loaded into a throwaway Postgres — payment authorization and idempotency, seat authorization, notification provenance, least privilege |
+| Frontend unit | `npm test` (frontend) | 182 tests — origin allow-listing, redirect validation, rate limiting, constant-time comparison, security headers, route-artwork sanitisation, log redaction and alert de-duplication |
+| SQL | `npm run test:db` (frontend) | 5 files against the **real** migrations loaded into a throwaway Postgres — payment authorization and idempotency, seat authorization, inventory holds, notification provenance, least privilege |
 | Backend | `pytest tests/ -q` (backend) | 17 tests — token type confusion, forged and unsigned tokens, the Supabase audience check, password hashing |
 
 All three run in CI on every push (`.github/workflows/security-tests.yml`),
-along with a fourth job that loads `schema.sql` plus all 58 migrations into an
-empty database.
+along with a fourth job that applies `schema.sql` plus all 60 migrations into
+an empty database **through `supabase/migrate.sh`**, so the runner an operator
+uses is itself exercised — including its refusal to apply a migration with no
+`@rollback` declaration or one edited after being applied.
 
 **Each regression test was checked against the pre-fix code and observed to
 fail there.** A test that passes against the vulnerable version proves nothing,
@@ -356,6 +367,10 @@ step is a good secondary change.
 
 ### H4 — Seat inventory is writable by any authenticated user, for any departure
 
+> **Scope correction.** As written this finding covers only tour departures.
+> The identical pair exists for activity timeslots and has the same defect plus
+> a worse one — see [Found during remediation](#found-during-remediation).
+
 **File:** `frontend/supabase/migrations/20260704_secure_data_layer.sql`
 
 ```sql
@@ -379,6 +394,26 @@ Any signed-in user (registration is open) can:
 **Fix:** scope both to the departure's owner, a caller holding a booking on it, or a
 finance/ops role — and drive releases from the cancellation path rather than from a
 client-callable RPC.
+
+**What was actually done.** Scoping the *release* was straightforward. Scoping
+the *take* was not, because `/checkout` reserves seats before the booking row
+exists, so requiring a booking would have broken the only legitimate caller.
+The first pass therefore bounded it (a 20-seat ceiling per call, audited),
+which stops one request exhausting a departure and does nothing about a loop.
+
+The loop worked because a taken seat had no owner: `bookedSeats` went up and
+nothing recorded who took it, so nothing could tell an abandoned checkout from
+a real booking or give the seat back on its own.
+`20260914_inventory_holds.sql` changes that — a hold takes the seats *and*
+records who holds them and until when. An attacker's own outstanding holds
+then count against a 30-seat quota, holds expire after 30 minutes, and a
+booking claims its holds so cancelling releases exactly what it took. The
+direct-take functions became owner/staff-only, which is what their one
+remaining caller (a supplier recording an off-platform guest) actually is.
+
+Stated limit: 30 seats per account is cheap for an attacker with 30 accounts.
+This bounds abuse, makes it visible and makes it self-healing; the ceiling on a
+distributed version is the rate limiting and the audit trail, not the quota.
 
 ### H5 — Anyone signed in can send an arbitrary email from the platform to anyone
 
@@ -562,7 +597,9 @@ row with no allow-list and no audit entry.
 - **No down-migrations.** All 57 migrations are forward-only, and their headers say to
   "Run in the Supabase SQL editor" by hand. Nothing enforces ordering, records what has
   been applied, or provides a rollback path. Several are explicitly sequenced by prose
-  ("Run AFTER 20260809_…") rather than by tooling.
+  ("Run AFTER 20260809_…") rather than by tooling. *(Since fixed: every migration now
+  carries a `-- @rollback:` declaration and `supabase/migrate.sh` refuses one that
+  does not — see `RESILIENCE_RUNBOOK.md` §3.4.)*
 - **Destructive rewrites of financial data.** `20260803_invoice_drafts_lines_edit.sql:393`
   and `20260805_admin_fee_tax_override.sql:366` both `delete from vd_order_lines where
   order_id = …` and re-insert. A defect in the re-insert loses invoice lines with no
@@ -671,33 +708,94 @@ intends.
 
 ---
 
+## Found during remediation
+
+Two things this report got wrong, found by building the fixes rather than by
+reading more code. Both are recorded here rather than quietly corrected,
+because the way they were missed is more useful than the findings themselves.
+
+### H4 was under-scoped
+
+H4 named `vd_book_seats` and `vd_release_seats`. It should have named four
+functions. `20260829_activity_timeslots.sql` built the identical pair for
+activity timeslots — its own header says it is "mirroring `vd_book_seats()`/
+`vd_release_seats()`" — with the identical defect:
+
+```sql
+create or replace function public.vd_release_activity_slot(…) as $$
+begin
+  if auth.uid() is null then raise exception 'authentication required'; end if;
+  -- …then decrements slotBookings on whatever activity id it was handed
+```
+
+Worse in one respect: it never validated `p_seats` at all, so a **negative**
+release ran `greatest(booked - (-n), 0)` and *inflated* the count, letting
+anyone mark any operator's timeslot permanently full on any date with one call.
+
+**Why it was missed.** The audit read the departure functions closely because
+they were reached from a grep for `grant execute … to authenticated`, and
+moved on. The activity pair was two migrations away, written later, and its
+header announces that it copies the departure pair — which should have been
+the signal to read it, and instead read as a reason not to. *When a file says
+it mirrors another, check whether it mirrored the bug.*
+
+### H8 — activity timeslots had no working capacity limit at all
+
+**File:** `frontend/supabase/migrations/20260829_activity_timeslots.sql`
+**Severity:** High (overselling — guests sold seats that do not exist)
+
+```sql
+update vd_entities
+   set value = jsonb_set(coalesce(value, '{}'::jsonb),
+                         array['slotBookings', v_key],
+                         to_jsonb(v_booked + p_seats), true)
+```
+
+`jsonb_set` with `create_missing = true` creates only the **last** level of a
+path. Every activity starts with no `slotBookings` object, so the intermediate
+level was missing and `jsonb_set` returned the value **unchanged**:
+
+```sql
+select jsonb_set('{}'::jsonb, array['slotBookings','k'], '3', true);  -- → {}
+```
+
+So the first booking on an activity wrote nothing, the `slotBookings` object
+was therefore never created, and every subsequent booking hit the same missing
+parent. The count stayed absent forever, `vd_book_activity_slot`'s capacity
+test always compared against 0, and a timeslot could be sold without limit.
+
+Reproduced against the pre-fix schema: **36 seats sold into a capacity-12
+timeslot, recorded count still absent.** This is not a theoretical exposure —
+it is guests arriving for an activity with no space for them, and it had
+nothing to do with an attacker.
+
+**Why it was missed.** It is invisible in review: the SQL reads correctly, uses
+the right function with the right flag, and the bug lives in one edge of
+`jsonb_set`'s documented behaviour. Only executing it against an empty
+`value` shows it. The static audit could not have caught this; the test
+harness caught it on the first run.
+
+---
+
 ## Follow-up work
 
-Three things this branch deliberately did not do, each because the right fix is
-architectural and a security branch is the wrong place to make an architectural
-change quietly.
+One thing remains deliberately undone in code, plus the configuration steps in
+the runbook.
 
-**Seat holds should belong to a booking (H4).** `vd_book_seats` still lets any
-authenticated caller consume seats on any departure, because `/checkout`
-reserves them before the booking row exists. The ceiling and the audit line
-make abuse bounded and visible, not impossible. The real shape is a
-`vd_seat_holds` row keyed to a session with a TTL, claimed by the booking when
-it is created and swept when it is not — which is the same pattern
-`vd_expire_pending_bookings` already implements for rooms.
+**`isMissingTipColumn()` should go.** `app/api/payments/ikhokha/create/route.ts`
+pattern-matches PostgREST error strings to detect that
+`20260806_activity_tips.sql` has not been run, and degrades the payment flow
+accordingly. With the migration ledger in place that crutch is no longer
+needed — but removing it changes behaviour on the payment path, and that
+belongs in its own change with its own testing rather than riding along in a
+security branch.
 
-**The receipt hop should not be an HTTP call (M8).** The iKhokha webhook posts
-to `/api/receipts/send` carrying the service-role key. The destination is now
-fixed rather than request-derived, but the key should not be in flight at all.
-`lib/notify-server.ts` already solved exactly this — it does the work in
-process, with no HTTP hop and no session to satisfy. The receipt builder should
-move out of the route the same way.
-
-**Migrations should be applied by a runner, not by hand (M6).** Every migration
-header says to run it in the Supabase SQL editor, ordering is enforced in prose,
-and the app has grown runtime schema-drift detection as a result
-(`isMissingTipColumn()` pattern-matches PostgREST error strings to notice an
-un-run migration). CI now proves they all load into an empty database in order;
-a runner with a migrations table is the next step.
+**The configuration the runbook lists** (☐ items): turn on PITR and record the
+plan's retention, point `scripts/backup-financials.sh` at storage the team
+controls and schedule it, connect an error tracker, set `ALERT_WEBHOOK_URL`,
+set `REDIS_URL`/`REDIS_TOKEN` so rate limits bind platform-wide rather than
+per-instance, and run a restore test. None of these are code; all of them are
+the difference between tooling and a control.
 
 ## Remediation order, as carried out
 
@@ -710,5 +808,9 @@ a runner with a migrations table is the next step.
 6. **H1, H7, L2, L6** — rate limiting, recovery-endpoint hardening,
    constant-time secret comparison, a Redis client that authenticates.
 7. **M1–M5, M8, L1, L3, L4, L7** — defence in depth.
-8. **M6, M7** — scoped in `RESILIENCE_RUNBOOK.md` rather than closed. These
-   need an owner and a plan tier, not a patch.
+8. **M6, M7** — migration runner and ledger, rollback declarations on every
+   migration, financial backup script, structured redacting logs, alerts, and
+   a daily audit digest. The remaining ☐ items in `RESILIENCE_RUNBOOK.md` need
+   an owner and a plan tier, not a patch.
+9. **H4 (properly) and H8** — inventory holds, after the activity-timeslot half
+   of H4 and the `jsonb_set` capacity bug surfaced during remediation.
