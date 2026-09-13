@@ -21,7 +21,7 @@ import { useEditMode } from '@/lib/edit-mode-context'
 import Editable from '@/components/editor/Editable'
 import EditableSection from '@/components/editor/EditableSection'
 import EditableCard from '@/components/editor/EditableCard'
-import { getTrails, type Trail } from '@/lib/trails'
+import { getTrailSummaries, type Trail } from '@/lib/trails'
 import { getFeaturedAttractions, ATTRACTION_KIND_LABEL, type Attraction } from '@/lib/attractions'
 import { getUpcomingExperiences, type TrekkingExperience } from '@/lib/experiences'
 import { getSupplierEntities } from '@/lib/supplier-entities'
@@ -425,7 +425,10 @@ export default function HomePage() {
     // Public, session-less client for all of the below: this is anonymous
     // catalogue data every visitor sees, and it must not depend on the
     // visitor's (possibly stale/broken) auth session — see lib/supabase-public.ts.
-    getTrails(publicSupabase)
+    // Only ever read for .id/.image (trailImageById below) and .name/.region
+    // (inside getUpcomingExperiences) — the lightweight summary read is
+    // enough. See lib/trails.ts's getTrailSummaries().
+    getTrailSummaries(publicSupabase)
       .then(all => setTrails(all.filter(t => t.status === 'published')))
       .catch(() => setTrails([]))
     getFeaturedAttractions(publicSupabase)
