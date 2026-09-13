@@ -1,7 +1,8 @@
 import { NextResponse } from 'next/server'
 import { getPaymentLinkStatus } from '@/lib/ikhokha'
 import { supabaseAdmin } from '@/lib/supabase-admin'
-import { getSiteOrigin, configuredOrigin } from '@/lib/origin'
+import { getSiteOrigin } from '@/lib/origin'
+import { sendOrderReceipt } from '@/lib/receipts-server'
 import { notifyServer, notifyServerMany } from '@/lib/notify-server'
 
 export const dynamic = 'force-dynamic'
@@ -223,24 +224,28 @@ export async function POST(req: Request) {
     // Fire-and-forget the same receipt email + in-app notification a manual
     // payment gets, authenticating as a trusted internal caller since there's
     // no customer session here.
-    // configuredOrigin(), NOT `NEXT_PUBLIC_SITE_URL || new URL(req.url).origin`
-    // (audit finding M8). This request carries the service-role key — the one
-    // credential that bypasses RLS entirely — and that old fallback derived
-    // the destination from the INBOUND REQUEST, on an endpoint anyone can
-    // POST to. With NEXT_PUBLIC_SITE_URL unset, a spoofed host would have sent
-    // the key to a server of the caller's choosing. configuredOrigin() never
-    // reads the request for a host.
+    // In-process, with the admin client this handler already holds (audit
+    // finding M8). This used to be a fetch() to our own /api/receipts/send
+    // carrying SUPABASE_SERVICE_ROLE_KEY as a bearer token — the one
+    // credential that bypasses RLS entirely — over the network on every
+    // confirmed payment, to an origin derived as `NEXT_PUBLIC_SITE_URL ||
+    // new URL(req.url).origin`. That fallback read the host from the INBOUND
+    // request, on an endpoint anyone can POST to, so with the env var unset a
+    // spoofed host sent the key wherever the caller liked.
     //
-    // The key is still a shared secret in flight, which is more than this hop
-    // needs. The right shape is the one lib/notify-server.ts already uses for
-    // the same problem: do the work in-process, with no HTTP call to
-    // ourselves and no secret to carry. Extracting the receipt builder out of
-    // the route is tracked as follow-up in the audit report.
-    fetch(`${configuredOrigin()}/api/receipts/send`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${process.env.SUPABASE_SERVICE_ROLE_KEY}` },
-      body: JSON.stringify({ orderId: link.order_id, paymentId }),
-    }).catch(err => console.error('[ikhokha webhook] receipt email failed:', err))
+    // There is now no request, no token in flight and no origin to get wrong.
+    // Same move lib/notify-server.ts already made, for the same reason.
+    // Still fire-and-forget: a receipt that cannot be delivered must not fail
+    // the payment it is announcing.
+    sendOrderReceipt(admin, {
+      orderId: link.order_id,
+      paymentId: paymentId as string,
+      origin: getSiteOrigin(req),
+    }).then(result => {
+      if (result.error && result.error !== 'SMTP not configured') {
+        console.error('[ikhokha webhook] receipt email failed:', result.error)
+      }
+    }).catch(err => console.error('[ikhokha webhook] receipt email threw:', err))
   } catch (e) {
     console.error('[ikhokha webhook] failed to record order payment:', e)
     // Roll back to pending so a retried webhook (or manual reconciliation) can complete it.
