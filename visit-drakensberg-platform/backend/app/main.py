@@ -58,9 +58,31 @@ app = FastAPI(
 # ---------------------------------------------------------------------------
 # CORS
 # ---------------------------------------------------------------------------
+def _allowed_origins() -> list[str]:
+    """Normalise FRONTEND_URL into something a browser Origin can match.
+
+    An Origin header is always ``scheme://host[:port]`` with no trailing
+    slash. FRONTEND_URL is configured by hand, and the repository's own
+    .env.example sets it to a bare ``umponjwana.vercel.app`` — no scheme —
+    which matches no Origin at all, silently disabling CORS rather than
+    enforcing it (audit finding L7). A trailing slash does the same.
+
+    Both forms are repaired here, and https is assumed for anything that is
+    not localhost, so a misconfiguration degrades to "the real origin works"
+    rather than to "nothing works" or, worse, to a wildcard.
+    """
+    raw = (settings.FRONTEND_URL or "").strip().rstrip("/")
+    if not raw:
+        return []
+    if not raw.startswith(("http://", "https://")):
+        scheme = "http" if raw.startswith(("localhost", "127.0.0.1")) else "https"
+        raw = f"{scheme}://{raw}"
+    return [raw]
+
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[settings.FRONTEND_URL],
+    allow_origins=_allowed_origins(),
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

@@ -7,6 +7,10 @@
 
 create schema if not exists vdtest;
 
+-- A test that drops to `set local role authenticated` (least_privilege_test)
+-- still needs act_as and the assertions.
+grant usage on schema vdtest to anon, authenticated;
+
 -- ── Acting as somebody ──────────────────────────────────────────────────────
 -- The shim's auth.uid()/auth.role() read these GUCs. `false` (not `true`) so
 -- the setting survives past the end of the current statement.
@@ -46,10 +50,17 @@ create or replace function vdtest.make_user(
 declare v_id uuid := gen_random_uuid();
 begin
   insert into auth.users (id, email) values (v_id, p_email);
-  insert into profiles (id, role, email, full_name, staff_role, is_approved)
-  values (v_id, p_role::user_role, p_email, p_email, p_staff_role, p_approved)
+  -- approval_status as well as is_approved: 20260815_approval_consistency.sql
+  -- installs a trigger that, on INSERT, derives is_approved FROM
+  -- approval_status whenever the latter is non-null — and the column has a
+  -- NOT NULL default of 'pending', so it never is. Setting only is_approved
+  -- silently produces an unapproved supplier.
+  insert into profiles (id, role, email, full_name, staff_role, is_approved, approval_status)
+  values (v_id, p_role::user_role, p_email, p_email, p_staff_role, p_approved,
+          case when p_approved then 'approved' else 'pending' end)
   on conflict (id) do update
-    set role = excluded.role, staff_role = excluded.staff_role, is_approved = excluded.is_approved;
+    set role = excluded.role, staff_role = excluded.staff_role,
+        is_approved = excluded.is_approved, approval_status = excluded.approval_status;
   return v_id;
 end $$;
 
@@ -92,6 +103,26 @@ begin
 
   return v_order_id;
 end $$;
+
+-- ── Table grants ────────────────────────────────────────────────────────────
+-- Supabase issues `grant all on all tables in schema public to anon,
+-- authenticated, service_role` and relies on RLS as the actual gate. The shim
+-- cannot do that up front (the tables do not exist yet), so it happens here,
+-- after every migration has run — and deliberately NOT for UPDATE on profiles,
+-- whose column-level grants 20260704 and 20260913 set precisely.
+do $$
+declare r record;
+begin
+  for r in
+    select tablename from pg_tables
+     where schemaname = 'public' and tablename <> 'profiles'
+  loop
+    execute format('grant select, insert, update, delete on public.%I to anon, authenticated', r.tablename);
+  end loop;
+  grant select, insert, delete on public.profiles to anon, authenticated;
+end $$;
+
+grant execute on all functions in schema vdtest to anon, authenticated;
 
 -- ── Assertions ──────────────────────────────────────────────────────────────
 
