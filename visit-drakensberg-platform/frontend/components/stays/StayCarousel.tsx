@@ -4,6 +4,7 @@ import Link from 'next/link'
 import Image from 'next/image'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { formatMoney } from '@/lib/allocation'
+import { useAutoScrollCarousel } from '@/lib/carousel-autoplay'
 import SaveButton from '@/components/ui/SaveButton'
 
 export type StayCard = {
@@ -27,9 +28,16 @@ export type StayCard = {
  * page tall enough that finding one means a lot of vertical scrolling.
  * Native touch/trackpad scrolling works on any device; the arrow buttons are
  * a pointer-only convenience layered on top.
+ *
+ * The row also drifts a card at a time on its own, so a category shows more
+ * than the three or four stays that happen to fit — it holds still while the
+ * visitor is using it, and wraps back to the first stay at the end. See
+ * lib/carousel-autoplay.ts.
  */
 export default function StayCarousel({ stays }: { stays: StayCard[] }) {
   const trackRef = useRef<HTMLDivElement>(null)
+
+  useAutoScrollCarousel(trackRef, { itemCount: stays.length })
 
   function scrollByPage(direction: 1 | -1) {
     const el = trackRef.current
