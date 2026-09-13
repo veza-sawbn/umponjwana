@@ -35,27 +35,77 @@ What is weak is concentrated in four places:
 
 **26 findings: 3 critical, 7 high, 8 medium, 8 low.**
 
-| # | Severity | Finding | Area |
-|---|----------|---------|------|
-| C1 | Critical | Next.js 14.1.0 — middleware auth bypass (CVE-2025-29927) + 4 further CVEs | Dependencies / AuthZ |
-| C2 | Critical | Customer can mark their own order paid via `vd_record_order_payment` | Payments / RLS |
-| C3 | Critical | Password-reset & waiver link poisoning via `X-Forwarded-Host` | Broken authentication |
-| H1 | High | No rate limiting on any endpoint | API abuse / DDoS |
-| H2 | High | No security headers (CSP, HSTS, frame-ancestors, Referrer-Policy) | Hardening |
-| H3 | High | Payment webhook is not idempotent across its rollback path | Duplicate transactions |
-| H4 | High | `vd_book_seats` / `vd_release_seats` callable against any departure | IDOR / integrity |
-| H5 | High | Any user can send an arbitrary email from the platform to any user | Phishing / abuse |
-| H6 | High | Open redirect in `/api/auth/callback?next=` immediately after session issue | AuthN |
-| H7 | High | Permanent admin-recovery backdoor endpoint | Broken authentication |
-| M1 | Medium | Middleware authorizes on unverified `getSession()` | AuthZ |
-| M2 | Medium | SVG uploads permitted into a public storage bucket | Unsafe file upload |
-| M3 | Medium | Unauthenticated credential-forwarding proxy at `/api/backend/*` | SSRF / insecure API |
-| M4 | Medium | Backend session revocation is broken; `/docs` public; vulnerable `python-jose` | AuthN / deps |
-| M5 | Medium | `site_content` world-readable and drives middleware redirects | RLS / open redirect |
-| M6 | Medium | No backups, PITR policy, down-migrations or rollback procedure | Reliability |
-| M7 | Medium | No structured logging, error tracking, alerting or audit review | Monitoring |
-| M8 | Medium | Service-role key sent as a bearer token to a host-derived origin | Exposed secrets |
-| L1–L8 | Low | See [Low findings](#low-findings) | Various |
+**Remediation status (all fixes on `claude/production-security-audit-b6cy75`):**
+24 of 26 fixed and covered by tests. The two open items — **M6** (backups,
+PITR, rollback) and **M7** (monitoring and alerting) — are controls that have
+to be *set up* rather than patched: a plan tier, an owner, a tested restore.
+They are scoped with procedures and unclaimed checkboxes in
+[`RESILIENCE_RUNBOOK.md`](./RESILIENCE_RUNBOOK.md).
+
+Everything in this report describes what was found. The ✅ column says what has
+since changed on that branch.
+
+| # | Severity | Finding | Area | Fixed |
+|---|----------|---------|------|:---:|
+| C1 | Critical | Next.js 14.1.0 — middleware auth bypass (CVE-2025-29927) + 4 further CVEs | Dependencies / AuthZ | ✅ |
+| C2 | Critical | Customer can mark their own order paid via `vd_record_order_payment` | Payments / RLS | ✅ |
+| C3 | Critical | Password-reset & waiver link poisoning via `X-Forwarded-Host` | Broken authentication | ✅ |
+| H1 | High | No rate limiting on any endpoint | API abuse / DDoS | ✅ |
+| H2 | High | No security headers (CSP, HSTS, frame-ancestors, Referrer-Policy) | Hardening | ✅ |
+| H3 | High | Payment webhook is not idempotent across its rollback path | Duplicate transactions | ✅ |
+| H4 | High | `vd_book_seats` / `vd_release_seats` callable against any departure | IDOR / integrity | ✅¹ |
+| H5 | High | Any user can send an arbitrary email from the platform to any user | Phishing / abuse | ✅ |
+| H6 | High | Open redirect in `/api/auth/callback?next=` immediately after session issue | AuthN | ✅ |
+| H7 | High | Permanent admin-recovery backdoor endpoint | Broken authentication | ✅ |
+| M1 | Medium | Middleware authorizes on unverified `getSession()` | AuthZ | ✅ |
+| M2 | Medium | SVG uploads permitted into a public storage bucket | Unsafe file upload | ✅² |
+| M3 | Medium | Unauthenticated credential-forwarding proxy at `/api/backend/*` | SSRF / insecure API | ✅ |
+| M4 | Medium | Backend session revocation is broken; `/docs` public; vulnerable `python-jose` | AuthN / deps | ✅ |
+| M5 | Medium | `site_content` world-readable and drives middleware redirects | RLS / open redirect | ✅³ |
+| M6 | Medium | No backups, PITR policy, down-migrations or rollback procedure | Reliability | ☐ |
+| M7 | Medium | No structured logging, error tracking, alerting or audit review | Monitoring | ☐ |
+| M8 | Medium | Service-role key sent as a bearer token to a host-derived origin | Exposed secrets | ✅⁴ |
+| L1–L8 | Low | See [Low findings](#low-findings) | Various | ✅⁵ |
+
+¹ The IDOR in `vd_release_seats` is closed outright. `vd_book_seats` is bounded
+(20-seat ceiling, audited) but stays open to authenticated callers, because
+`/checkout` genuinely reserves before a booking row exists. Tying a seat hold
+to a booking row with a TTL is the real fix and is architectural — see
+[Follow-up work](#follow-up-work).
+² New uploads only. Any SVG already in the bucket is still public; the
+migration carries the query to find them.
+³ The redirect's reach is bounded to trusted hosts. The world-readable `select`
+on `site_content` is left as-is — every key it holds today is CMS content meant
+to be public, and narrowing it would break the anonymous site for no gain. The
+exposure to accept is that anything *else* put in that table is public by
+default.
+⁴ The destination can no longer be chosen by the request. The key still travels
+as a bearer token on one internal hop; removing it needs the receipt builder
+extracted from the route — see [Follow-up work](#follow-up-work).
+⁵ L5 is partly accepted: the admin routes that return a Postgres error message
+verify the caller is an admin first, and a constraint name is genuinely useful
+when diagnosing a failed invite. The unauthenticated case that mattered
+(`/api/backend/*`) is fixed.
+
+### Verification
+
+| Suite | Command | Coverage |
+|---|---|---|
+| Frontend unit | `npm test` (frontend) | 144 tests — origin allow-listing, redirect validation, rate limiting, constant-time comparison, security headers, route-artwork sanitisation |
+| SQL | `npm run test:db` (frontend) | 4 files against the **real** migrations loaded into a throwaway Postgres — payment authorization and idempotency, seat authorization, notification provenance, least privilege |
+| Backend | `pytest tests/ -q` (backend) | 17 tests — token type confusion, forged and unsigned tokens, the Supabase audience check, password hashing |
+
+All three run in CI on every push (`.github/workflows/security-tests.yml`),
+along with a fourth job that loads `schema.sql` plus all 58 migrations into an
+empty database.
+
+**Each regression test was checked against the pre-fix code and observed to
+fail there.** A test that passes against the vulnerable version proves nothing,
+so the SQL suite was run with the fix migration excluded (C2 fails as
+"the statement was ALLOWED, but must be refused") and the backend suite with
+`verify_aud` restored to `False` (the three audience cases fail). The procedure
+is written up in `supabase/tests/README.md` and `backend/tests/README.md` so
+the next person adding a regression test does the same.
 
 ### Clean — reviewed, no finding
 
@@ -621,15 +671,44 @@ intends.
 
 ---
 
-## Remediation order
+## Follow-up work
+
+Three things this branch deliberately did not do, each because the right fix is
+architectural and a security branch is the wrong place to make an architectural
+change quietly.
+
+**Seat holds should belong to a booking (H4).** `vd_book_seats` still lets any
+authenticated caller consume seats on any departure, because `/checkout`
+reserves them before the booking row exists. The ceiling and the audit line
+make abuse bounded and visible, not impossible. The real shape is a
+`vd_seat_holds` row keyed to a session with a TTL, claimed by the booking when
+it is created and swept when it is not — which is the same pattern
+`vd_expire_pending_bookings` already implements for rooms.
+
+**The receipt hop should not be an HTTP call (M8).** The iKhokha webhook posts
+to `/api/receipts/send` carrying the service-role key. The destination is now
+fixed rather than request-derived, but the key should not be in flight at all.
+`lib/notify-server.ts` already solved exactly this — it does the work in
+process, with no HTTP hop and no session to satisfy. The receipt builder should
+move out of the route the same way.
+
+**Migrations should be applied by a runner, not by hand (M6).** Every migration
+header says to run it in the Supabase SQL editor, ordering is enforced in prose,
+and the app has grown runtime schema-drift detection as a result
+(`isMissingTipColumn()` pattern-matches PostgREST error strings to notice an
+un-run migration). CI now proves they all load into an empty database in order;
+a runner with a migrations table is the next step.
+
+## Remediation order, as carried out
 
 1. **C1** — upgrade Next.js. One dependency change, closes five CVEs.
-2. **C2** — require `is_finance()` in `vd_record_order_payment`.
-3. **C3** — allow-list the origin in `lib/origin.ts`.
-4. **H6, H2** — open redirect and security headers; small, self-contained.
-5. **H3, H4, H5, H7** — idempotency key, seat-RPC authorization, notification scoping,
-   recovery-endpoint hardening.
-6. **M1–M5, M8, L1–L8** — defence in depth.
-7. **H1, M6, M7** — rate limiting, backup/rollback procedure, monitoring. These are
-   programme work rather than patches, and should be scheduled rather than squeezed into
-   this branch.
+2. **C3** — allow-list the origin in `lib/origin.ts`.
+3. **H2, H6** — security headers and the open redirect; small, self-contained.
+4. **C2, H3** — finance-only payment recording, and a unique reference so a
+   retried webhook cannot double-credit.
+5. **H4, H5** — seat-release authorization, notification provenance and volume.
+6. **H1, H7, L2, L6** — rate limiting, recovery-endpoint hardening,
+   constant-time secret comparison, a Redis client that authenticates.
+7. **M1–M5, M8, L1, L3, L4, L7** — defence in depth.
+8. **M6, M7** — scoped in `RESILIENCE_RUNBOOK.md` rather than closed. These
+   need an owner and a plan tier, not a patch.
