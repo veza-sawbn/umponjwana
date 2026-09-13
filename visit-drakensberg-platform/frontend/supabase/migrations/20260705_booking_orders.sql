@@ -12,6 +12,7 @@
 -- their own items, the guest's name/contact, party size, dates and special
 -- requests. Suppliers have NO access to vd_bookings at all.
 -- ============================================================================
+-- @rollback: additive — forward-only; safe to leave in place if the deploy is rolled back
 
 create table if not exists vd_booking_orders (
   id          text primary key,

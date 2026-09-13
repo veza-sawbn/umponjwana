@@ -28,6 +28,7 @@
 -- Phase 6) and is never gated by marketing consent — see §22's
 -- transactional/promotional distinction.
 -- ============================================================================
+-- @rollback: additive — forward-only; safe to leave in place if the deploy is rolled back
 
 -- ────────────────────────────────────────────────────────────────────────────
 -- 1. vd_email_templates

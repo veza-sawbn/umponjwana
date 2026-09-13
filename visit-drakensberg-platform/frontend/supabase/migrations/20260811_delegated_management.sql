@@ -25,6 +25,7 @@
 --   * Commission and agreement terms are extended additively at supplier level.
 --   * All new DB columns are backwards-compatible with NULL/default fallbacks.
 -- ============================================================================
+-- @rollback: additive — forward-only; safe to leave in place if the deploy is rolled back
 
 
 -- ────────────────────────────────────────────────────────────────────────────

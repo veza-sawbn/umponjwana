@@ -83,14 +83,15 @@ jobs:
         run: pytest tests/ -q
 
   migrations-load:
-    name: Migrations load in order
+    name: Migrations apply in order
     runs-on: ubuntu-latest
 
     # A migration that only loads when its predecessors happen to have been run
     # by hand is a production incident waiting for the next fresh environment —
     # 20260823_blog_author_fields.sql silently depends on schema.sql, which the
     # audit found by loading them all into an empty database. This job keeps
-    # that honest.
+    # that honest, and now runs them through supabase/migrate.sh so the runner
+    # an operator uses is itself exercised on every push.
     services:
       postgres:
         image: postgres:16
@@ -108,21 +109,30 @@ jobs:
       - uses: actions/checkout@v4
       - name: Install psql
         run: sudo apt-get update && sudo apt-get install -y postgresql-client
-      - name: Load schema and every migration into an empty database
+      - name: Apply every migration through the runner
         working-directory: visit-drakensberg-platform/frontend
         env:
           PGHOST: localhost
           PGPORT: '5432'
           PGUSER: postgres
           PGPASSWORD: postgres
+          # Non-interactive: the runner otherwise stops on a migration tagged
+          # destructive and asks for a snapshot id, which is right for a human
+          # against production and wrong for a throwaway database in CI.
+          MIGRATE_YES: '1'
         run: |
           set -euo pipefail
           psql -q -c 'create database migration_check;'
           export PGDATABASE=migration_check
           psql -q -v ON_ERROR_STOP=1 -f supabase/tests/00_supabase_shim.sql
           psql -q -v ON_ERROR_STOP=1 -f supabase/schema.sql
-          for migration in $(ls supabase/migrations/*.sql | sort); do
-            echo "-- $migration"
-            psql -q -v ON_ERROR_STOP=1 -f "$migration"
-          done
-          echo "All migrations loaded cleanly into an empty database."
+          # The ledger bootstraps itself; everything after it goes through
+          # supabase/migrate.sh, which is what an operator runs. So CI
+          # exercises the real path, including the checks that every migration
+          # carries a @rollback declaration and that none has been edited
+          # after being applied.
+          psql -q -v ON_ERROR_STOP=1 -f supabase/migrations/20260914_schema_migrations_ledger.sql
+          bash supabase/migrate.sh up
+          bash supabase/migrate.sh verify
+          test "$(bash supabase/migrate.sh status | head -1)" = "applied: $(ls supabase/migrations/*.sql | wc -l | tr -d ' ')    pending: 0"
+          echo "All migrations applied cleanly into an empty database, in order."

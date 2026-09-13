@@ -54,6 +54,7 @@
 -- — RLS ORs them together, so tightening this one narrows only the owner's own
 -- path.
 -- ============================================================================
+-- @rollback: reversible — grant update (email) on profiles to authenticated; and restore the "Owners update own" policy from 20260704_secure_data_layer.sql
 
 -- ── L3 ──────────────────────────────────────────────────────────────────────
 revoke update (email) on profiles from authenticated;

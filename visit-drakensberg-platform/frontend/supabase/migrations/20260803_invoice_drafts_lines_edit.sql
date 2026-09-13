@@ -1,3 +1,4 @@
+-- @rollback: destructive — vd_rebuild_order_lines deletes and re-inserts vd_order_lines for an order; a defect in the re-insert loses invoice lines
 -- Invoice drafts, line descriptions, and editable unpaid invoices.
 --
 -- Three capabilities for the manual-invoice flow in /admin/invoices:

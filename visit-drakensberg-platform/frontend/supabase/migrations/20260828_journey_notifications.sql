@@ -24,6 +24,7 @@
 -- modified, so none of the financial RPCs this touches change behaviour for
 -- anything other than the new notification.
 -- ============================================================================
+-- @rollback: additive — forward-only; safe to leave in place if the deploy is rolled back
 
 -- ────────────────────────────────────────────────────────────────────────────
 -- 1. New order lines outside the checkout flow → notify the supplier.

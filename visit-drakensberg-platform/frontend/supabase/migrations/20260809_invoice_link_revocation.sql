@@ -19,6 +19,7 @@
 -- read against the link the customer actually has rather than against a
 -- previous one.
 -- ============================================================================
+-- @rollback: additive — forward-only; safe to leave in place if the deploy is rolled back
 
 -- ────────────────────────────────────────────────────────────────────────────
 -- 1. Columns. Existing invoices' links were issued when the invoice was.

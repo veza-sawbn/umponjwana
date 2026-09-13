@@ -24,6 +24,7 @@
 -- This adds the owner to the test. It is a widening of the WHERE clause, so it
 -- can only ever hide rows, never expose new ones.
 -- ============================================================================
+-- @rollback: additive — forward-only; safe to leave in place if the deploy is rolled back
 
 
 -- ────────────────────────────────────────────────────────────────────────────

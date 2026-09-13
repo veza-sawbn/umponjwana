@@ -14,6 +14,7 @@
 -- never reaches the catalog on its own, and the team promotes an approved one
 -- into a real property (supplier account + vd_entities row) by hand.
 -- ============================================================================
+-- @rollback: additive — forward-only; safe to leave in place if the deploy is rolled back
 
 -- ────────────────────────────────────────────────────────────────────────────
 -- 1. The applications table

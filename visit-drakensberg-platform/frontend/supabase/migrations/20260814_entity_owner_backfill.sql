@@ -15,6 +15,7 @@
 -- publicly readable once its status is active — an orphan. This migration
 -- reunites those rows with their owner and stops new ones appearing.
 -- ============================================================================
+-- @rollback: additive — forward-only; safe to leave in place if the deploy is rolled back
 
 -- ─── 1. Backfill owner_id from the value.supplierId copy ────────────────────
 -- Only where the copy is a real uuid belonging to an existing user, so a

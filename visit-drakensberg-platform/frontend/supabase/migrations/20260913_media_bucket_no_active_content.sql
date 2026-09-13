@@ -44,6 +44,7 @@
 -- rather than run automatically: deleting storage objects is not something a
 -- migration should do to a production bucket on its own judgement.
 -- ============================================================================
+-- @rollback: reversible — re-add image/svg+xml and application/pdf to storage.buckets.allowed_mime_types for id='media'
 
 update storage.buckets
    set allowed_mime_types = array[

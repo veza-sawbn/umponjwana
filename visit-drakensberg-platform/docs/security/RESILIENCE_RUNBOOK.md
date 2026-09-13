@@ -10,8 +10,12 @@ that do not exist and have to be *set up* — an owner, a paid plan tier, a
 tested restore. This document is the decision record and the procedure, so the
 work is scoped rather than deferred indefinitely.
 
-**Status: NOT YET DONE.** The sections marked ☐ are unclaimed. Nothing here is
-a description of how the platform currently operates.
+**Status: partly done.** The tooling exists now — a migration runner with a
+ledger, rollback declarations on every migration, a financial backup script,
+and alerting wired into the code. What remains is the part that needs an
+account, a plan tier and a person: turning on PITR, pointing the backup script
+at storage the team controls, connecting an error tracker, and running a
+restore test. Those are the ☐ items below.
 
 ---
 
@@ -22,18 +26,19 @@ a description of how the platform currently operates.
 | Database backups | Whatever the Supabase plan provides by default. Nobody has recorded which plan, what the retention is, or whether PITR is on. |
 | Restore ever tested | No evidence of one, ever. |
 | RPO / RTO | Never stated. |
-| Down-migrations | None. All 57 migrations are forward-only. |
-| Migration runner | Applied by hand in the Supabase SQL editor, per the migrations' own headers. Nothing records what has been applied where. |
-| Migration ordering | Enforced by prose ("Run AFTER 20260809_…"). `20260823_blog_author_fields.sql` silently depends on `schema.sql`, which the audit found by loading everything into an empty database. |
-| Error tracking | None. `console.error` into Vercel function logs. |
+| Down-migrations | Still none — most of these genuinely cannot be reversed. Every migration now **declares** which it is (`-- @rollback:` … reversible / additive / destructive), and the runner refuses to apply one that does not. |
+| Migration runner | `frontend/supabase/migrate.sh`, backed by the `vd_schema_migrations` ledger. Records filename, checksum and duration; skips what is applied; refuses to run if an applied migration has been edited since. Exercised in CI on every push. |
+| Migration ordering | Enforced by the runner and proven by CI, which applies all 60 into an empty database on every push. `20260823_blog_author_fields.sql` silently depending on `schema.sql` is how the audit found this. |
+| Financial backups | `scripts/backup-financials.sh` dumps the money tables per-table plus the schema and a manifest. **Not scheduled and not uploaded anywhere yet** — see ☐ 2.2. |
+| Error tracking | Structured, redacting logger in `frontend/lib/observability.ts`. No external tracker connected yet — see ☐ 4.1. |
 | Uptime monitoring | None. |
-| Alerting | None. |
-| Audit log review | `vd_audit_log` is written diligently and read by nobody. |
+| Alerting | `frontend/lib/observability.ts` posts to `ALERT_WEBHOOK_URL`; the daily digest reads `vd_audit_log`. **Unset in production**, so nothing is being delivered — see ☐ 4.2. |
+| Audit log review | `/api/cron/audit-digest` summarises it daily. Was written diligently and read by nobody. |
 
-The one thing this branch did add is CI
-(`.github/workflows/security-tests.yml`), which now runs the three test suites
-and re-loads every migration into an empty Postgres on each push — so the
-ordering trap above cannot silently come back.
+CI (`.github/workflows/security-tests.yml`) runs the three test suites and
+applies every migration into an empty Postgres through the runner on each
+push, so the ordering trap above cannot silently come back and the runner an
+operator uses is itself tested.
 
 ---
 
@@ -53,7 +58,7 @@ Until PITR is on, the recovery floor is "yesterday's snapshot", and every
 booking, payment, invoice and waiver taken since then is gone in a restore.
 For a platform that takes money, that is the finding — not a preference.
 
-### ☐ 2.2 Add a backup this platform controls
+### ☐ 2.2 Schedule the backup this platform controls
 
 A provider-managed backup protects against hardware failure. It does not
 protect against the two failures that actually happen here:
@@ -64,10 +69,25 @@ protect against the two failures that actually happen here:
   and re-insert — a defect in the re-insert loses invoice lines);
 - losing access to the Supabase account itself.
 
-Schedule a `pg_dump` of the financial tables to storage under separate
-credentials — `vd_orders`, `vd_order_lines`, `vd_invoices`, `vd_receipts`,
-`vd_order_payments`, `vd_ledger_entries`, `vd_settlements`, `vd_bookings`,
-`vd_audit_log`. Daily is enough. Encrypt at rest. Keep 90 days.
+`scripts/backup-financials.sh` does the dump: the sixteen money tables, one
+file each, plus the schema and a manifest recording which migrations the
+database was on. Per-table because a real restore is nearly always "this one
+table lost rows", and `--column-inserts` because the output has to load into a
+table whose column order has since changed, which is the state you are in when
+you actually need it.
+
+```bash
+DATABASE_URL='postgres://…' scripts/backup-financials.sh /path/to/output
+```
+
+What it deliberately does NOT do is upload or encrypt — both depend on where
+you are putting it, and guessing would be worse than saying so. **The
+outstanding work is the schedule and the destination:** run it daily from
+somewhere that is not the same account as the database (a cron box, or a
+GitHub Actions schedule with the connection string in a secret), encrypt with
+`age` or `gpg` before it leaves the machine, keep 90 days. The dumps contain
+customer names, email addresses and payment records — treat them exactly as
+you would the database.
 
 ### ☐ 2.3 Test a restore, then write the date here
 
@@ -111,12 +131,14 @@ but every migration must say, in its header, which of these it is:
 - **Forward-only, additive**: safe to leave in place if the deploy is rolled
   back (a new nullable column, a new function, a new policy). Say so.
 - **Destructive**: state what data is at risk and that a snapshot is required
-  first. The two `delete from vd_order_lines` migrations are this, and neither
-  says so today.
+  first.
 
-The four migrations added in this security branch are all forward-only and
-additive except the payment-reference unique index, whose rollback is
-`drop index vd_order_payments_reference_key;`.
+This is now mechanical rather than a convention: the declaration goes in a
+`-- @rollback:` line in the migration header, all 60 existing migrations carry
+one, and `migrate.sh` refuses to apply a migration that does not. Three are
+tagged destructive — `20260704_secure_data_layer.sql` (deletes migrated blob
+keys from `site_content`) and the two that delete and re-insert
+`vd_order_lines` — and the runner stops for a snapshot id before each.
 
 ### 3.3 Rolling back a bad deploy
 
@@ -133,14 +155,45 @@ roll back with the code**:
    database — a restore-in-place discards everything written since the
    snapshot, which for this platform means real bookings and real payments.
 
-### 3.4 ☐ Adopt a migration runner
+### 3.4 The migration runner
 
-The end state is `supabase db push` (or Atlas, or Sqitch) with a migrations
-table recording what has been applied where, run from CI rather than pasted
-into the SQL editor. Until then, the runtime schema-drift detection this
-codebase has grown — `isMissingTipColumn()` in the iKhokha create route, which
-pattern-matches PostgREST error strings to detect an un-run migration — is
-load-bearing. That it needs to exist is the finding.
+`frontend/supabase/migrate.sh`, against the `vd_schema_migrations` ledger.
+
+```bash
+DATABASE_URL='postgres://…' supabase/migrate.sh status   # applied vs pending
+DATABASE_URL='postgres://…' supabase/migrate.sh plan     # what `up` would do
+DATABASE_URL='postgres://…' supabase/migrate.sh up       # apply pending, in order
+DATABASE_URL='postgres://…' supabase/migrate.sh verify   # checksums only
+```
+
+Use the **session** pooler or a direct connection, not the transaction pooler:
+migrations run in explicit transactions and create functions, and neither
+survives statement-level pooling.
+
+What it enforces:
+
+- one transaction per migration, so each lands whole or not at all, and a
+  failure stops the run instead of continuing into a migration that assumed
+  the failed one landed;
+- a migration already recorded is skipped;
+- a migration whose file changed since it was applied **aborts the whole run** —
+  the repository and production disagreeing about the schema is something to
+  find out now, not during a deploy;
+- every migration must carry a `-- @rollback:` declaration, or it is refused;
+- a migration declared `destructive` stops and asks for a snapshot id before
+  running (`MIGRATE_YES=1` skips the prompt — CI only, never production).
+
+**Bootstrapping.** `20260914_schema_migrations_ledger.sql` is the one migration
+applied by hand, because it creates the ledger. On a database that already
+carries the schema it backfills the 60 migrations up to itself with the
+sentinel checksum `pre-ledger`; on an empty database it backfills nothing, so
+every migration correctly shows as pending.
+
+**Still outstanding:** `isMissingTipColumn()` in the iKhokha create route —
+runtime code that pattern-matches PostgREST error strings to detect that
+`20260806_activity_tips.sql` has not been run. With the ledger in place that
+crutch can go, but removing it changes behaviour on the payment path and
+belongs in its own change rather than a security branch.
 
 ---
 

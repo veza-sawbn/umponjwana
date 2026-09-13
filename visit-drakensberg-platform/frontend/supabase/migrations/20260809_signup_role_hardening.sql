@@ -48,6 +48,7 @@
 -- the query at the bottom lists every privileged account with the role its
 -- signup payload asked for.
 -- ============================================================================
+-- @rollback: additive — forward-only; safe to leave in place if the deploy is rolled back
 
 -- ────────────────────────────────────────────────────────────────────────────
 -- 1. handle_new_user(): privileged fields from app_metadata only.

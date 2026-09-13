@@ -72,6 +72,7 @@
 -- retry is a no-op rather than a liability. Manual staff entries are unaffected
 -- — they default to an empty reference, which the partial index ignores.
 -- ============================================================================
+-- @rollback: reversible — drop index vd_order_payments_reference_key; then restore vd_record_order_payment from 20260804_guest_orders_repair.sql
 
 -- ────────────────────────────────────────────────────────────────────────────
 -- 1. One payment per gateway reference.

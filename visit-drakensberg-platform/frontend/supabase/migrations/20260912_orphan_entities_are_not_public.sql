@@ -26,6 +26,7 @@
 -- 20260906 migration's own note about admin-owned entities with
 -- is_approved = false). So nothing legitimate needs the NULL exemption.
 -- ============================================================================
+-- @rollback: additive — forward-only; safe to leave in place if the deploy is rolled back
 
 
 -- ────────────────────────────────────────────────────────────────────────────

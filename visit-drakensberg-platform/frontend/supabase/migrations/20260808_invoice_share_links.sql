@@ -31,6 +31,7 @@
 -- It also records when the link was opened, so the team can tell an invoice
 -- that was never read from one that is being ignored.
 -- ============================================================================
+-- @rollback: additive — forward-only; safe to leave in place if the deploy is rolled back
 
 -- ────────────────────────────────────────────────────────────────────────────
 -- 1. Token generator

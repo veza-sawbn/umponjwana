@@ -20,6 +20,7 @@
 -- hitting the route on a tighter schedule) is needed for the TTL to
 -- actually mean what it says.
 -- ============================================================================
+-- @rollback: additive — forward-only; safe to leave in place if the deploy is rolled back
 
 create or replace function public.vd_expire_pending_bookings(p_older_than_minutes int default 30)
 returns int language plpgsql security definer set search_path = public as $$

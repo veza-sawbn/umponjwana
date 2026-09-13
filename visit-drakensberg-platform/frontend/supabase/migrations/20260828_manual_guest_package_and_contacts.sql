@@ -19,6 +19,7 @@
 --    separation: each source is only ever written by its own path, so none
 --    of the three can silently overwrite or be wiped by another.
 -- ============================================================================
+-- @rollback: additive — forward-only; safe to leave in place if the deploy is rolled back
 
 alter table vd_departure_guests add column if not exists package_id text;
 

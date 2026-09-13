@@ -72,6 +72,7 @@
 -- docs/security/SECURITY_AUDIT_2026-09.md — it is an architectural change, not
 -- a patch, and does not belong in a security fix branch.
 -- ============================================================================
+-- @rollback: additive — new column, trigger and functions; old code ignores all three
 
 -- ────────────────────────────────────────────────────────────────────────────
 -- 1. Notification provenance

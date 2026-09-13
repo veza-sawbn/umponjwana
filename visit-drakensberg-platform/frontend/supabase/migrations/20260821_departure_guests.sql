@@ -14,6 +14,7 @@
 -- gets no public policy at all; only the owning supplier, ops staff acting on
 -- their behalf, and admins can ever read it.
 -- ============================================================================
+-- @rollback: additive — forward-only; safe to leave in place if the deploy is rolled back
 
 create table if not exists vd_departure_guests (
   id            uuid primary key default gen_random_uuid(),

@@ -39,6 +39,7 @@
 -- same function every other ops-delegation RLS policy already keys on, so
 -- this follows the established pattern rather than inventing a new one.
 -- ============================================================================
+-- @rollback: additive — forward-only; safe to leave in place if the deploy is rolled back
 
 drop policy if exists "Ops employees read managed supplier profiles" on profiles;
 

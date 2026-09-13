@@ -18,6 +18,7 @@
 --      existing vd_create_order RPC — the exact same path a normal booking
 --      uses, so the resulting invoice is payable online immediately.
 -- ============================================================================
+-- @rollback: additive — forward-only; safe to leave in place if the deploy is rolled back
 
 -- ────────────────────────────────────────────────────────────────────────────
 -- 1. handle_new_user(): seed staff_role from invite metadata.

@@ -70,6 +70,7 @@
 -- rate limiting in lib/rate-limit.ts and the audit trail below — not this
 -- table.
 -- ============================================================================
+-- @rollback: additive — new table and functions; the replaced functions are restorable from 20260829_activity_timeslots.sql and 20260913_notification_provenance_and_seat_authorization.sql
 
 -- ────────────────────────────────────────────────────────────────────────────
 -- 1. The holds table

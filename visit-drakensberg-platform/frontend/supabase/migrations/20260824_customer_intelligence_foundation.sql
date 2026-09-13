@@ -45,6 +45,7 @@
 --   - Email campaign tables (Phase 5)
 --   - Automation workflow engine tables (Phase 6)
 -- ============================================================================
+-- @rollback: additive — forward-only; safe to leave in place if the deploy is rolled back
 
 -- ────────────────────────────────────────────────────────────────────────────
 -- 1. vd_sessions — one row per browsing session, anonymous or identified.

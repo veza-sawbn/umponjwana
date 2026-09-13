@@ -14,6 +14,7 @@
 -- Signed waivers are legal records: they are immutable once submitted, and
 -- the token grants access to exactly one request row, never a listing.
 -- ============================================================================
+-- @rollback: additive — forward-only; safe to leave in place if the deploy is rolled back
 
 -- ─── 1. Templates ───────────────────────────────────────────────────────────
 create table if not exists vd_waiver_templates (

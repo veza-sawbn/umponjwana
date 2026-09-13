@@ -41,6 +41,7 @@
 --     have been dead on arrival for exactly the managed properties it is
 --     aimed at. Same gap class as 20260901's, different table.
 -- ============================================================================
+-- @rollback: additive — forward-only; safe to leave in place if the deploy is rolled back
 
 -- ────────────────────────────────────────────────────────────────────────────
 -- 1. Per-booking inventory hold

@@ -1,3 +1,4 @@
+-- @rollback: additive — forward-only; safe to leave in place if the deploy is rolled back
 -- Repair: guest orders were unusable because the schema still required a
 -- user_id.
 --
