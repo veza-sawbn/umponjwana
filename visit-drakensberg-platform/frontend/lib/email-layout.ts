@@ -205,7 +205,7 @@ function footerBlock(origin: string): string {
       <p style="margin:0 0 18px;">${nav}</p>
       <p style="margin:0;font-family:${FONT};font-weight:400;font-size:11px;line-height:1.7;color:${FOOT_TEXT};">
         Visit Drakensberg &middot; <a href="${origin}" style="color:${FOOT_TEXT};">visitdrakensberg.com</a><br/>
-        This is an automated message — please do not reply directly to this email.
+        This is an automated message. Please do not reply directly to this email.
       </p>
     </td>
   </tr>`

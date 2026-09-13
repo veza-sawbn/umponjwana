@@ -119,7 +119,7 @@ function SuccessInner() {
           <h1 className="font-display italic text-2xl text-[#000000] mb-2">Request sent</h1>
           <p className="font-sans text-sm text-gray-500 leading-relaxed mb-6">
             {booking.stay?.title ?? 'The property'} confirms availability before taking payment. You&apos;ll be
-            emailed the moment they answer — usually within a day. Once they confirm, you&apos;ll have{' '}
+            emailed the moment they answer, usually within a day. Once they confirm, you&apos;ll have{' '}
             {paymentWindowLabel(booking.checkIn)} to pay while your room is held.
             <span className="block mt-2 text-[#2d6a4f]">You have not been charged.</span>
           </p>
@@ -163,7 +163,7 @@ function SuccessInner() {
               <Loader2 size={28} className="animate-spin text-[#2d6a4f] mx-auto mb-4" />
               <h1 className="font-display italic text-2xl text-[#000000] mb-2">Confirming your payment…</h1>
               <p className="font-sans text-sm text-gray-500 leading-relaxed">
-                Payment received — confirming with the bank. This page will update automatically.
+                Payment received. We are confirming it with the bank, and this page will update automatically.
               </p>
             </>
           ) : (
@@ -175,16 +175,16 @@ function SuccessInner() {
                 {booking.holdExpiresAt ? (
                   lapsed ? (
                     <>The property confirmed your dates, but the payment window has passed and your room is no
-                    longer held. You can still try to pay — if it has since gone, we&apos;ll refund you in full.</>
+                    longer held. You can still try to pay, and if the room has since gone we&apos;ll refund you in full.</>
                   ) : (
                     <>
                       <span className="text-[#2d6a4f]">The property confirmed your dates.</span> Your room is held
-                      until <span className="font-medium">{holdDeadlineLabel(booking.holdExpiresAt)}</span> — pay
+                      until <span className="font-medium">{holdDeadlineLabel(booking.holdExpiresAt)}</span>. Pay
                       before then to confirm the booking.
                     </>
                   )
                 ) : (
-                  <>Your booking is on hold — the room/seats are reserved, but it won&apos;t be confirmed until payment succeeds.</>
+                  <>Your booking is on hold. The room or seats are reserved, but the booking is not confirmed until payment succeeds.</>
                 )}
               </p>
               <button
@@ -287,7 +287,7 @@ function SuccessInner() {
                       <Calendar size={14} className="text-[#C9A96E] mt-0.5 shrink-0" />
                       <div>
                         <p className="font-sans text-xs text-gray-400 uppercase tracking-wider mb-0.5">Dates</p>
-                        <p className="font-sans text-sm">{fmt(booking.checkIn)} — {fmt(booking.checkOut)}</p>
+                        <p className="font-sans text-sm">{fmt(booking.checkIn)} – {fmt(booking.checkOut)}</p>
                         <p className="font-sans text-xs text-gray-500">{booking.nights} night{booking.nights !== 1 ? 's' : ''}</p>
                       </div>
                     </div>

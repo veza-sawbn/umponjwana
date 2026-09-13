@@ -230,7 +230,7 @@ export default function CheckoutPage() {
       // dates. The guest is sent to their booking's page, which tracks the
       // request and grows a Pay button the moment it is approved.
       if (requestMode) {
-        toast.success('Request sent — the property will confirm your dates.')
+        toast.success('Request sent. The property will confirm your dates.')
         router.push(`/checkout/success?id=${saved.id}`)
         return
       }
@@ -239,7 +239,7 @@ export default function CheckoutPage() {
         // Booking + inventory hold succeeded but the order/invoice failed —
         // there's nothing to pay against. Send them to the booking's status
         // page rather than a broken payment redirect.
-        toast.error('Your booking was saved but payment setup failed — please contact us to complete it.')
+        toast.error('Your booking was saved, but payment setup failed. Please contact us to complete it.')
         router.push(`/checkout/success?id=${saved.id}`)
         return
       }
@@ -257,7 +257,7 @@ export default function CheckoutPage() {
         if (!res.ok || !json.paylinkUrl) throw new Error(json.error || 'Could not start payment')
         window.location.href = json.paylinkUrl
       } catch (payErr) {
-        toast.error(payErr instanceof Error ? payErr.message : 'Could not start payment — you can retry from your booking.')
+        toast.error(payErr instanceof Error ? payErr.message : 'We could not start the payment. You can retry from your booking.')
         router.push(`/checkout/success?id=${saved.id}`)
       }
     } catch (err) {
@@ -268,7 +268,7 @@ export default function CheckoutPage() {
       } else if (/unavailable/i.test(msg)) {
         toast.error('The property is unavailable for these dates. Please choose different dates.')
       } else {
-        toast.error('We could not complete your booking. You have not been charged — please try again.')
+        toast.error('We could not complete your booking. You have not been charged, so please try again.')
       }
       setLoading(false)
     }
@@ -337,7 +337,7 @@ export default function CheckoutPage() {
                   </div>
                 </div>
                 <p className="font-sans text-sm text-gray-600 leading-relaxed">
-                  Your card details are never entered on this site. After you submit, you&apos;ll be redirected to iKhokha&apos;s secure payment page to complete the transaction — your booking is only confirmed once that payment succeeds.
+                  Your card details are never entered on this site. After you submit, you&apos;ll be redirected to iKhokha&apos;s secure payment page to complete the transaction. Your booking is only confirmed once that payment succeeds.
                 </p>
               </div>
 
@@ -443,14 +443,14 @@ export default function CheckoutPage() {
                   {loading
                     ? (requestMode ? 'Sending your request…' : 'Redirecting to payment…')
                     : !settingsLoaded || !modeResolved ? 'Loading rates…'
-                    : requestMode ? `Request to Book — ${formatMoney(total)}`
-                    : `Continue to Payment — ${formatMoney(total)}`}
+                    : requestMode ? `Request to Book · ${formatMoney(total)}`
+                    : `Continue to Payment · ${formatMoney(total)}`}
                 </button>
                 {requestMode ? (
                   <p className="font-sans text-xs text-white/50 leading-relaxed mt-4">
                     <span className="text-[#C9A96E]">You won&apos;t be charged yet.</span> This property confirms
                     availability before taking payment. Once they confirm, you&apos;ll have{' '}
-                    {paymentWindowLabel(booking.checkIn)} to pay while your room is held — we&apos;ll email you.
+                    {paymentWindowLabel(booking.checkIn)} to pay while your room is held, and we&apos;ll email you.
                     {(booking.addons.length > 0 || booking.shuttles.length > 0) && (
                       <> Anything else in this trip is requested at the same time and isn&apos;t held until then.</>
                     )}

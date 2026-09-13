@@ -91,7 +91,7 @@ export async function POST(req: Request) {
       origin,
       eyebrow: 'Account security',
       heading: 'Reset your password',
-      preheader: 'Reset your Visit Drakensberg password — this link expires in 60 minutes.',
+      preheader: 'Reset your Visit Drakensberg password. This link expires in 60 minutes.',
       bodyHtml,
     })
 

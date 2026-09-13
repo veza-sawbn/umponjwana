@@ -246,7 +246,7 @@ export function ShuttleSearchForm({
         </button>
 
         <p className="font-sans text-xs text-forest/35 text-center">
-          Private vehicle, door to door. You pick the operator and the vehicle — no payment until checkout.
+          Private vehicle, door to door. You pick the operator and the vehicle, with no payment until checkout.
         </p>
       </div>
     </form>

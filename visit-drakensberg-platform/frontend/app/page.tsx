@@ -403,7 +403,7 @@ export default function HomePage() {
         p_email: email, p_consent_type: 'marketing_email', p_granted: true, p_source: 'newsletter_footer',
       }).then(({ error: consentError }) => { if (consentError) console.error('[newsletter] consent record failed:', consentError) })
       trackEvent(AnalyticsEvent.NEWSLETTER_SIGNUP, { source: 'home_footer' })
-      toast.success('You’re on the list — see you in the next dispatch.')
+      toast.success('You’re on the list. See you in the next dispatch.')
       setNewsletterEmail('')
     } catch {
       toast.error('Subscription failed. Please try again later.')
@@ -579,7 +579,7 @@ export default function HomePage() {
 
         {stories.length === 0 ? (
           <p className="font-sans text-sm text-forest/40 py-6">
-            No stories published yet — publish one under Admin → Blog & Content.
+            No stories published yet. Publish one under Admin → Blog & Content.
           </p>
         ) : (
           <motion.div
@@ -642,7 +642,7 @@ export default function HomePage() {
 
         {attractions.length === 0 ? (
           <p className="font-sans text-sm text-white/30 py-8">
-            Nothing featured yet — tick &ldquo;Featured on Homepage&rdquo; on a trail, nature reserve or town in the admin console.
+            Nothing featured yet. Tick &ldquo;Featured on Homepage&rdquo; on a trail, nature reserve or town in the admin console.
           </p>
         ) : (
           <div className="divide-y divide-white/10">
@@ -761,7 +761,7 @@ export default function HomePage() {
         </div>
 
         {journeys.length === 0 ? (
-          <p className="font-sans text-sm text-forest/40 py-8">No packages published yet — check back soon.</p>
+          <p className="font-sans text-sm text-forest/40 py-8">No packages published yet. Please check back soon.</p>
         ) : (
           <JourneysCarousel journeys={journeys} />
         )}

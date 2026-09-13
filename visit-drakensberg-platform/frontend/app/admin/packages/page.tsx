@@ -396,7 +396,7 @@ export default function AdminPackagesPage() {
 
             {draft.components.length === 0 ? (
               <div className="bg-[#F7F5F2] border border-dashed border-gray-300 py-8 text-center">
-                <span className="font-sans text-xs text-gray-400">No components yet — assemble the package from accommodation, activities, trails, experiences, guides, transfers, restaurants, equipment and local experiences.</span>
+                <span className="font-sans text-xs text-gray-400">No components yet. Assemble the package from accommodation, activities, trails, experiences, guides, transfers, restaurants, equipment and local experiences.</span>
               </div>
             ) : (
               <div className="space-y-2">
@@ -474,7 +474,7 @@ export default function AdminPackagesPage() {
       ) : visible.length === 0 ? (
         <div className="bg-white border border-gray-200 py-20 text-center">
           <Package size={28} className="text-gray-300 mx-auto mb-3" />
-          <p className="font-sans text-sm text-gray-400">No packages yet — create the first curated itinerary.</p>
+          <p className="font-sans text-sm text-gray-400">No packages yet. Create the first curated itinerary.</p>
         </div>
       ) : (
         <div className="space-y-3">

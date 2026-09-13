@@ -16,8 +16,8 @@ const labelClass = 'font-sans text-xs tracking-[0.1em] uppercase text-gray-400 b
 const CAMPAIGN_TYPE_OPTIONS: { value: EmailCampaign['campaignType']; label: string; hint: string }[] = [
   { value: 'broadcast', label: 'Broadcast', hint: 'One-off to everyone consented, or a segment' },
   { value: 'segmented', label: 'Segmented', hint: 'Targeted at customers matching a specific segment' },
-  { value: 'behavioral', label: 'Behavioural', hint: 'Trigger-driven — recorded here, sent by the automation engine' },
-  { value: 'lifecycle', label: 'Lifecycle', hint: 'Trigger-driven — recorded here, sent by the automation engine' },
+  { value: 'behavioral', label: 'Behavioural', hint: 'Trigger-driven: recorded here, sent by the automation engine' },
+  { value: 'lifecycle', label: 'Lifecycle', hint: 'Trigger-driven: recorded here, sent by the automation engine' },
 ]
 
 /** `<input type="datetime-local">` reads/writes local wall-clock time with
@@ -101,12 +101,12 @@ export default function EmailCampaignForm({ campaign }: { campaign: EmailCampaig
       <div>
         <label className={labelClass}>Template</label>
         <select value={templateId} onChange={e => setTemplateId(e.target.value)} disabled={locked} className={inputClass}>
-          <option value="">— Select a template —</option>
+          <option value="">Select a template</option>
           {templates.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
         </select>
         {templates.length === 0 && (
           <p className="font-sans text-xs text-gray-400 mt-2">
-            No templates yet — <Link href="/admin/campaigns/templates/new" className="text-[#2d6a4f] hover:underline">create one first</Link>.
+            No templates yet. <Link href="/admin/campaigns/templates/new" className="text-[#2d6a4f] hover:underline">create one first</Link>.
           </p>
         )}
       </div>
@@ -126,7 +126,7 @@ export default function EmailCampaignForm({ campaign }: { campaign: EmailCampaig
       <div>
         <label className={labelClass}>Schedule (optional)</label>
         <input type="datetime-local" value={scheduledAt} onChange={e => setScheduledAt(e.target.value)} disabled={locked} className={inputClass} />
-        <p className="font-sans text-xs text-gray-400 mt-2">Recorded as intent only — nothing fires automatically at this time yet. Use the Send button on the campaign page when ready.</p>
+        <p className="font-sans text-xs text-gray-400 mt-2">Recorded as intent only. Nothing fires automatically at this time yet. Use the Send button on the campaign page when ready.</p>
       </div>
 
       <div>

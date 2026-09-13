@@ -93,7 +93,7 @@ export async function POST(req: Request) {
     if (!guest) return NextResponse.json({ error: 'guest not found' }, { status: 404 })
     if (!guest.email) return NextResponse.json({ error: 'this guest has no email address on file' }, { status: 400 })
     if (!EMAIL_RE.test(guest.email)) {
-      return NextResponse.json({ error: `"${guest.email}" doesn't look like a valid email address — edit the guest's email and try again` }, { status: 400 })
+      return NextResponse.json({ error: `"${guest.email}" doesn't look like a valid email address. Edit the guest's email and try again` }, { status: 400 })
     }
 
     const [departures, tours, trails] = await Promise.all([
@@ -151,7 +151,7 @@ export async function POST(req: Request) {
 
     const result = await sendMail({
       to: guest.email,
-      subject: `Booking confirmed — ${tripName}`,
+      subject: `Booking confirmed for ${tripName}`,
       html,
     })
 

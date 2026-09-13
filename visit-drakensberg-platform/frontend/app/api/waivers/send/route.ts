@@ -95,7 +95,7 @@ export async function POST(req: Request) {
       ${detailTable(rows)}
       ${ctaButton(link, 'Review & sign your waiver')}
       <p style="margin:24px 0 0;font-size:13px;color:#666;">
-        This link is personal to you — please don't forward it. If someone else on the
+        This link is personal to you, so please don't forward it. If someone else on the
         booking still needs to sign, they will receive their own link.
       </p>
     `,
@@ -103,7 +103,7 @@ export async function POST(req: Request) {
 
   const { sent, error } = await sendMail({
     to: request.participant_email,
-    subject: `Waiver to sign — ${request.activity_name || supplierName}`,
+    subject: `Waiver to sign for ${request.activity_name || supplierName}`,
     html,
   })
 

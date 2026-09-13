@@ -71,7 +71,7 @@ export function OperatorTypeCarousel() {
             <h2 className="font-display text-3xl sm:text-4xl text-white mb-3">Three kinds of operator</h2>
             <p className="font-sans text-sm text-white/45 max-w-2xl">
               The Drakensberg is served by very different transport businesses. Which ones you see depends on the
-              trip you asked for — a long haul from the airport calls for a different operator than a drop at a
+              trip you asked for. A long haul from the airport calls for a different operator than a drop at a
               trailhead ten minutes up the valley.
             </p>
           </div>

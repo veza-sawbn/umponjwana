@@ -31,7 +31,7 @@ export function TimeslotEditor({ timeslots, onChange }: { timeslots: ActivityTim
     <div className="space-y-3">
       {timeslots.length === 0 && (
         <p className="font-sans text-[11px] text-black/35">
-          No fixed timeslots yet — visitors will just pick a date. Add one if this activity departs at set times each day.
+          No fixed timeslots yet, so visitors will simply pick a date. Add one if this activity departs at set times each day.
         </p>
       )}
       {timeslots.map(t => (

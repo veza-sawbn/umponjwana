@@ -184,7 +184,7 @@ export default function NewPropertyPage() {
 
         {step === 3 && (
           <div className="border-2 border-dashed border-black/10 rounded-lg p-10 text-center">
-            <p className="font-sans text-sm text-black/40">Photo upload — connect to Supabase Storage</p>
+            <p className="font-sans text-sm text-black/40">Photo upload: connect to Supabase Storage</p>
           </div>
         )}
 

@@ -212,7 +212,7 @@ export default function ListWithUsPage() {
    */
   async function uploadDoc(slot: 'accreditation' | 'insurance', file: File) {
     if (!applicationRef) {
-      setError('Still preparing the form — try that again in a moment.')
+      setError('The form is still loading. Please try that again in a moment.')
       return
     }
     if (file.size > COMPLIANCE_MAX_BYTES) {
@@ -315,7 +315,7 @@ export default function ListWithUsPage() {
       // Password only required when creating a new account
       if (!isSignedIn) {
         if (password.length < 8) return 'Your password must be at least 8 characters.'
-        if (password !== confirmPassword) return 'Passwords do not match — please re-enter.'
+        if (password !== confirmPassword) return 'Those passwords do not match. Please re-enter them.'
       }
       if (form.supplierTypes.length === 0) return 'Choose what you operate.'
     }
@@ -353,7 +353,7 @@ export default function ListWithUsPage() {
           : 'Tell us which EDTEA office issued your registration.'
       }
       if (!c.accreditationNumber.trim()) return 'Enter the number printed on your certificate.'
-      if (!c.accreditationDocId) return 'Upload your certificate — we cannot verify a listing without it.'
+      if (!c.accreditationDocId) return 'Please upload your certificate. We cannot verify a listing without it.'
       // Same helper the verification office reads expiry through, so the form
       // and the review queue cannot disagree about what "expired" means.
       if (expiryState(c.accreditationExpiry) === 'expired') {
@@ -500,11 +500,11 @@ export default function ListWithUsPage() {
             Reference <span className="text-[#2d6a4f] font-medium">{done.reference}</span>
           </p>
           <p className="font-sans text-sm text-gray-500 max-w-md mx-auto mb-4 leading-relaxed">
-            Our team reviews every operator before they go live — usually within two business days.
+            Our team reviews every operator before they go live, usually within two business days.
             We&apos;ll email <span className="text-black">{done.email}</span> with the outcome.
           </p>
           <p className="font-sans text-sm text-gray-500 max-w-md mx-auto mb-8 leading-relaxed">
-            Your supplier account is ready — please confirm your email address first (check your inbox),
+            Your supplier account is ready. Please confirm your email address first (check your inbox),
             then{' '}
             <Link href="/auth/login" className="text-[#2d6a4f] underline underline-offset-2 hover:text-[#235a3f]">
               sign in
@@ -536,13 +536,13 @@ export default function ListWithUsPage() {
           <p className="font-sans text-[10px] tracking-[0.2em] uppercase text-[#C9A96E] mb-2">Operator Listing</p>
           <h1 className="font-display italic text-4xl lg:text-5xl mb-3">List with us</h1>
           <p className="font-sans text-sm text-white/60 max-w-2xl leading-relaxed">
-            Stays, activities, guided tours, transport and experiences — tell us what you run and we&apos;ll
+            Stays, activities, guided tours, transport and experiences: tell us what you run and we&apos;ll
             take it from there. It takes about five minutes, our team reviews every operator before they go
             live, and there is no fee to apply.
           </p>
           <p className="font-sans text-sm text-white/60 max-w-2xl leading-relaxed mt-3">
             Have your <span className="text-white">EDTEA operator registration</span> or{' '}
-            <span className="text-white">CTO membership certificate</span> to hand — we need one of the two before a
+            <span className="text-white">CTO membership certificate</span> to hand. We need one of the two before a
             listing can go live.
           </p>
           {/* Readable before the form starts, not only at the checkbox at the
@@ -593,7 +593,7 @@ export default function ListWithUsPage() {
         {step === 0 && (
           <>
             <div className="bg-white border border-gray-200 p-6 lg:p-8 space-y-5">
-              <CardHead title="Your details" sub="Only our listings team sees this — it never appears on your public page." />
+              <CardHead title="Your details" sub="Only our listings team sees this. It never appears on your public page." />
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className={labelCls}>Contact name</label>
@@ -635,7 +635,7 @@ export default function ListWithUsPage() {
                   <div>
                     <p className="font-sans text-xs font-medium text-gray-700 mb-0.5">Create your supplier account</p>
                     <p className="font-sans text-[11px] text-gray-400 leading-relaxed">
-                      This gives you immediate access once your application is approved — no separate invite needed.
+                      This gives you immediate access once your application is approved, with no separate invite needed.
                       Confirm your email address after submitting.
                     </p>
                   </div>
@@ -658,7 +658,7 @@ export default function ListWithUsPage() {
             <div className="bg-white border border-gray-200 p-6 lg:p-8 space-y-5">
               <CardHead
                 title="What do you operate?"
-                sub="Choose the one that best describes your business — we'll ask for the details next."
+                sub="Choose the one that best describes your business. We'll ask for the details next."
               />
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5" role="radiogroup" aria-label="What do you operate?">
                 {APPLICANT_TYPES.map(t => {
@@ -718,7 +718,7 @@ export default function ListWithUsPage() {
               <div>
                 <label className={labelCls}>Description</label>
                 <textarea rows={4} value={form.description} onChange={e => set('description', e.target.value)}
-                  placeholder="What makes a trip with you memorable? Two to four sentences works best — guests skim this first."
+                  placeholder="What makes a trip with you memorable? Two to four sentences works best, as guests skim this first."
                   className={`${inputCls} resize-none`} />
               </div>
               <div>
@@ -730,7 +730,7 @@ export default function ListWithUsPage() {
             {/* Accommodation */}
             {has('Accommodation') && (
               <div className="bg-white border border-gray-200 p-6 lg:p-8 space-y-5">
-                <CardHead title="Your property" sub="Somewhere to stay — lodge, guesthouse, cottage or campsite." />
+                <CardHead title="Your property" sub="Somewhere to stay: a lodge, guesthouse, cottage or campsite." />
                 <div>
                   <label className={labelCls}>Property name</label>
                   <input value={form.stay.propertyName} onChange={e => setStay('propertyName', e.target.value)}
@@ -824,7 +824,7 @@ export default function ListWithUsPage() {
                   <input value={form.tour.certifications} onChange={e => setTour('certifications', e.target.value)}
                     placeholder="MDT registered, Wilderness First Aid Level 3, CATHSSETA" className={inputCls} />
                   <p className="font-sans text-xs text-gray-400 mt-1.5">
-                    We verify these before your tours go live — listing them now speeds up the review.
+                    We verify these before your tours go live, so listing them now speeds up the review.
                   </p>
                 </div>
               </div>
@@ -1013,7 +1013,7 @@ export default function ListWithUsPage() {
             <div className="bg-white border border-gray-200 p-6 lg:p-8 space-y-5">
               <CardHead
                 title="Accreditation"
-                sub="Our verification office checks every listing against real paperwork. We need one of these two — whichever you hold."
+                sub="Our verification office checks every listing against real paperwork. We need whichever one of these two you hold."
               />
 
               <div className="grid sm:grid-cols-2 gap-3">
@@ -1057,7 +1057,7 @@ export default function ListWithUsPage() {
                         onChange={e => setCompliance('accreditationIssuer', e.target.value)}
                         placeholder={form.compliance.accreditationKind === 'cto'
                           ? 'e.g. Central Drakensberg CTO'
-                          : 'e.g. KZN EDTEA — Pietermaritzburg'}
+                          : 'e.g. KZN EDTEA, Pietermaritzburg'}
                         className={inputCls}
                       />
                     </div>
@@ -1168,7 +1168,7 @@ export default function ListWithUsPage() {
           <div className="bg-white border border-gray-200 p-6 lg:p-8 space-y-5">
             <CardHead
               title="Choose your commission tier"
-              sub="Think of it as elevation on the mountain: everyone starts at base camp with full visibility. Higher tiers buy eligibility for better placement — never a guaranteed ranking or booking."
+              sub="Think of it as elevation on the mountain: everyone starts at base camp with full visibility. Higher tiers buy eligibility for better placement, never a guaranteed ranking or booking."
             />
             <TierLadder selected={form.commissionTier} onSelect={id => set('commissionTier', id)} />
 
@@ -1176,9 +1176,9 @@ export default function ListWithUsPage() {
               <Info size={14} className="text-[#2d6a4f] mt-0.5 shrink-0" />
               <p className="font-sans text-xs text-gray-600 leading-relaxed">
                 <span className="text-black font-medium">
-                  {tierById(form.commissionTier).rate}% is the total platform fee
+                  {tierById(form.commissionTier).rate}% is the total platform fee,
                 </span>{' '}
-                — not an additional charge on top of a base rate. The lowest selectable rate is {COMMISSION_MIN_RATE}%
+                not an additional charge on top of a base rate. The lowest selectable rate is {COMMISSION_MIN_RATE}%
                 and the highest is {COMMISSION_MAX_RATE}%. Moving up a tier applies immediately to new bookings.
                 Moving down requires notice, cannot take effect before your 90-day minimum hold ends, and never
                 changes bookings already confirmed.
@@ -1201,7 +1201,7 @@ export default function ListWithUsPage() {
         {/* ── Step 5 · Review ───────────────────────────────────────────── */}
         {step === STEP_REVIEW && (
           <div className="bg-white border border-gray-200 p-6 lg:p-8 space-y-5">
-            <CardHead title="Review & submit" sub="Check the details below — you can still go back and change anything." />
+            <CardHead title="Review & submit" sub="Check the details below. You can still go back and change anything." />
 
             <div className="border border-gray-200">
               <SummaryRow k="Contact" v={form.contactName} />
@@ -1248,7 +1248,7 @@ export default function ListWithUsPage() {
                 <SummaryRow k="Activities" v={form.activities.filter(a => a.name.trim()).map(a => {
                   const bits = [a.category, a.difficulty, a.durationHours && `${a.durationHours}h`,
                     a.pricePerPerson && `${formatMoney(Number(a.pricePerPerson))} pp`].filter(Boolean)
-                  return `${a.name} — ${bits.join(', ')}`
+                  return `${a.name}: ${bits.join(', ')}`
                 }).join(' · ')} />
               )}
               <SummaryRow
@@ -1274,7 +1274,7 @@ export default function ListWithUsPage() {
               )}
               <SummaryRow
                 k="Commission"
-                v={`${tierById(form.commissionTier).name} — ${tierById(form.commissionTier).rate}% total platform fee`}
+                v={`${tierById(form.commissionTier).name}, ${tierById(form.commissionTier).rate}% total platform fee`}
               />
             </div>
 
@@ -1383,7 +1383,7 @@ function DocUpload({
         <div className="min-w-0">
           <p className="font-sans text-sm text-black">
             {label}
-            {optionalDoc && <span className="text-gray-300 font-normal"> — optional</span>}
+            {optionalDoc && <span className="text-gray-300 font-normal"> (optional)</span>}
           </p>
           <p className="font-sans text-xs text-gray-400 mt-1">{hint}</p>
         </div>

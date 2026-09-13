@@ -50,7 +50,7 @@ function buildSchedule(b: SavedBooking, departures: Departure[], tours: Tour[], 
   if (b.stay && b.checkIn) {
     push(b.checkIn, {
       time: 'From 14:00',
-      title: `Check in — ${b.stay.title}`,
+      title: `Check in: ${b.stay.title}`,
       detail: [b.stay.roomName, b.stay.region, b.stay.address].filter(Boolean).join(' · '),
     })
   }
@@ -84,7 +84,7 @@ function buildSchedule(b: SavedBooking, departures: Departure[], tours: Tour[], 
       itineraryDays.forEach((day, i) => {
         push(addDaysIso(a.date!, day.dateOffset), {
           time: day.dateOffset === 0 ? 'Departure' : `Day ${i + 1}`,
-          title: day.label || `${a.title} — Day ${i + 1}`,
+          title: day.label || `${a.title} · Day ${i + 1}`,
           detail: [day.description, day.accommodation ? `Overnight: ${day.accommodation}` : '', day.transport || '', day.meals || '']
             .filter(Boolean).join(' · '),
         })
@@ -104,14 +104,14 @@ function buildSchedule(b: SavedBooking, departures: Departure[], tours: Tour[], 
   if (b.stay && b.checkOut) {
     push(b.checkOut, {
       time: 'By 10:00',
-      title: `Check out — ${b.stay.title}`,
+      title: `Check out: ${b.stay.title}`,
       detail: 'Settle any extras directly with the property before departure.',
     })
   }
 
   const dated = [...days.entries()].filter(([d]) => d)
     .sort((x, y) => x[0].localeCompare(y[0]))
-    .map(([date, events], i) => ({ date, label: `Day ${i + 1} — ${fmtLong(date)}`, events }))
+    .map(([date, events], i) => ({ date, label: `Day ${i + 1} · ${fmtLong(date)}`, events }))
   const undated = days.get('')
   if (undated?.length) dated.push({ date: '', label: 'Anytime during your stay', events: undated })
   return dated
@@ -188,7 +188,7 @@ export default function PrintableItineraryPage() {
             <div className="text-right">
               <p className="font-sans text-[10px] tracking-[0.14em] uppercase text-white/40">Booking Reference</p>
               <p className="font-display italic text-2xl text-[#C9A96E] tracking-wider">{booking.reference}</p>
-              <p className="font-sans text-xs text-white/50 mt-2">{fmtShort(booking.checkIn)}{booking.checkOut && booking.checkOut !== booking.checkIn ? ` — ${fmtShort(booking.checkOut)}` : ''}</p>
+              <p className="font-sans text-xs text-white/50 mt-2">{fmtShort(booking.checkIn)}{booking.checkOut && booking.checkOut !== booking.checkIn ? ` – ${fmtShort(booking.checkOut)}` : ''}</p>
             </div>
           </div>
 
@@ -291,7 +291,7 @@ export default function PrintableItineraryPage() {
                 ))}
               </div>
               <p className="font-sans text-[10px] text-gray-400 mt-5 leading-relaxed">
-                Carry this itinerary and photo ID at check-in. Weather in the Drakensberg changes quickly —
+                Carry this itinerary and photo ID at check-in. Weather in the Drakensberg changes quickly, so
                 confirm trail conditions with your guide or Ezemvelo before setting out.
                 Visit Drakensberg · KwaZulu-Natal, South Africa · bookings@visitdrakensberg.co.za
               </p>

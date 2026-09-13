@@ -38,7 +38,7 @@ export async function generateMetadata({ params }: { params: { id: string } }): 
   const activity = await resolveActivity(params.id)
   if (!activity) return { title: 'Activity Not Found' }
 
-  const title = activity.seoTitle || `${activity.name} — ${activity.region || 'Drakensberg'} | Visit Drakensberg`
+  const title = activity.seoTitle || `${activity.name}, ${activity.region || 'Drakensberg'} | Visit Drakensberg`
   const description = buildDescription(activity)
   const canonical = `/activities/${activity.slug || activity.id}`
 

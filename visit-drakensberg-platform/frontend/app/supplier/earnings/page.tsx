@@ -213,7 +213,7 @@ export default function SupplierEarningsPage() {
       {tab === 'statements' && (
         <div className="space-y-3">
           {statements.map(st => <StatementCard key={st.period} st={st} />)}
-          {!loading && statements.length === 0 && <p className="font-sans text-sm text-gray-400 py-8 text-center">No statements yet — statements are generated from your assigned services.</p>}
+          {!loading && statements.length === 0 && <p className="font-sans text-sm text-gray-400 py-8 text-center">No statements yet. Statements are generated from your assigned services.</p>}
         </div>
       )}
 

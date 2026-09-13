@@ -5,7 +5,7 @@ import { SUPPLIER_TERMS_SECTIONS, SUPPLIER_TERMS_VERSION } from '@/lib/supplier-
 export const metadata: Metadata = {
   title: 'Supplier Agreement',
   description:
-    'The commercial agreement between Visit Drakensberg and the businesses listed on it — accreditation, commission, settlement, listing accuracy and guest data.',
+    'The commercial agreement between Visit Drakensberg and the businesses listed on it, covering accreditation, commission, settlement, listing accuracy and guest data.',
   alternates: { canonical: '/supplier-terms' },
 }
 

@@ -80,7 +80,7 @@ export const GUIDE_TYPE_LABEL: Record<GuideType, string> = {
 export const GUIDE_TYPE_HINT: Record<GuideType, string> = {
   certified: 'Registered guide leading day walks, tours and activities.',
   trainee:
-    'Internally trained staff not yet registered — the SA Tourism guide number is optional for a trainee.',
+    'Internally trained staff not yet registered. The SA Tourism guide number is optional for a trainee.',
   expedition_leader:
     'Registered guide who leads multi-day and summit expeditions. The summit and expedition fields below carry the most weight for this type.',
 }

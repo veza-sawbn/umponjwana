@@ -28,7 +28,7 @@ export const TOUR_DATES: Record<string, TourDate[]> = {
       spots_remaining: 6,
       price_per_person: 950,
       duration: '7–9 hrs',
-      notes: 'Small group — max 6',
+      notes: 'Small group, max 6',
     },
     {
       id: 'tf-pkg-1',
@@ -100,7 +100,7 @@ export const TOUR_DATES: Record<string, TourDate[]> = {
       spots_remaining: 6,
       price_per_person: 1100,
       duration: '5 hrs (4am start)',
-      notes: 'Summit at sunrise — limited spots',
+      notes: 'Summit at sunrise, limited spots',
     },
   ],
 
@@ -116,7 +116,7 @@ export const TOUR_DATES: Record<string, TourDate[]> = {
       spots_remaining: 1,
       price_per_person: 1050,
       duration: '8–10 hrs',
-      notes: 'Technical summit — fitness assessment required',
+      notes: 'Technical summit, fitness assessment required',
     },
     {
       id: 'cp-pkg-1',
@@ -221,7 +221,7 @@ export const TOUR_DATES: Record<string, TourDate[]> = {
       spots_remaining: 2,
       price_per_person: 950,
       duration: 'Full day',
-      notes: 'Advanced multi-pitch routes — prior experience required',
+      notes: 'Advanced multi-pitch routes, prior experience required',
     },
     {
       id: 'rc-pkg-1',

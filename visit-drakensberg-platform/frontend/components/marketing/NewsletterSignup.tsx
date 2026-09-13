@@ -32,7 +32,7 @@ export default function NewsletterSignup({
   label,
   buttonLabel = 'Subscribe',
   placeholder = 'Your email address',
-  successMessage = 'You’re on the list — see you in the next dispatch.',
+  successMessage = 'You’re on the list. See you in the next dispatch.',
   tone = 'light',
   className = '',
 }: NewsletterSignupProps) {

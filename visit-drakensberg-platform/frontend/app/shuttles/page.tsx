@@ -370,7 +370,7 @@ function ShuttlesPageContent() {
                   <span>
                     <span className="block font-display text-base text-forest">Add a return trip</span>
                     <span className="block font-sans text-xs text-forest/45 mt-0.5">
-                      Book the leg home — {trip.destination.address || 'your destination'} back to {trip.pickup.address || 'your pickup'} — in the same trip.
+                      Book the leg home in the same trip, from {trip.destination.address || 'your destination'} back to {trip.pickup.address || 'your pickup'}.
                     </span>
                   </span>
                 </button>
@@ -450,7 +450,7 @@ function ShuttlesPageContent() {
                 {ready
                   ? 'Your transfer is in your trip. Nothing is charged until you complete checkout.'
                   : eligibleCount === 0 || returnEligibleCount === 0
-                    ? 'No registered partner covers this route yet — our team will place the transfer with the best available operator after checkout.'
+                    ? 'No registered partner covers this route yet. Our team will place the transfer with the best available operator after checkout.'
                     : 'Choose an operator and vehicle for each leg to continue.'}
               </p>
             </aside>

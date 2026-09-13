@@ -136,7 +136,7 @@ export function ShuttleTripCard({ shuttle }: { shuttle: ShuttleOption }) {
         >
           <span>
             Arrival & meet-and-greet details
-            {detailsMissing && <span className="ml-2 font-normal text-[#C9A96E]">Recommended — helps your driver find you</span>}
+            {detailsMissing && <span className="ml-2 font-normal text-[#C9A96E]">Recommended, helps your driver find you</span>}
             {!detailsMissing && <Check size={12} className="inline ml-2 text-emerald-600" />}
           </span>
           {detailsOpen ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
@@ -149,7 +149,7 @@ export function ShuttleTripCard({ shuttle }: { shuttle: ShuttleOption }) {
               <button onClick={saveDetails} className="rounded-lg bg-[#2d6a4f] px-4 py-2 font-sans text-xs text-white hover:bg-[#235a3f] transition-colors">
                 Save details
               </button>
-              {savedFlash && <p className="font-sans text-xs text-emerald-600 flex items-center gap-1"><Check size={12} /> Saved — shared with your transport partner at checkout.</p>}
+              {savedFlash && <p className="font-sans text-xs text-emerald-600 flex items-center gap-1"><Check size={12} /> Saved. This is shared with your transport partner at checkout.</p>}
             </div>
           </div>
         )}

@@ -47,7 +47,7 @@ export const DEFAULT_REGIONS: Region[] = [
     tagline: 'Royal Natal National Park · Amphitheatre',
     heroImage: 'https://images.unsplash.com/photo-1590098563548-8f14eed3a47f?w=1200&q=85',
     heroVideo: '',
-    overview: 'The Amphitheatre — a 5 km sheer basalt cliff — anchors the Northern Drakensberg. The Tugela River drops 948 metres over five falls here, making it the second highest waterfall on Earth. Royal Natal National Park offers some of the most dramatic scenery in Africa.',
+    overview: 'The Amphitheatre, a 5 km sheer basalt cliff, anchors the Northern Drakensberg. The Tugela River drops 948 metres over five falls here, making it the second highest waterfall on Earth. Royal Natal National Park offers some of the most dramatic scenery in Africa.',
     highlights: ['Tugela Falls Circuit', 'Amphitheatre via Chain Ladder', 'Policemans Helmet', 'Mont-aux-Sources'],
     gettingThere: '',
     gettingThereSections: [],

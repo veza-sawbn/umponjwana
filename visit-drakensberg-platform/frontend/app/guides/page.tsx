@@ -45,7 +45,7 @@ export default function GuidesPage() {
           <p className="font-sans text-[10px] tracking-[0.2em] uppercase text-[#C9A96E] mb-4">Expert Local Knowledge</p>
           <h1 className="font-display italic text-5xl lg:text-6xl mb-4">Guides & Tour Operators</h1>
           <p className="font-sans text-lg text-white/70 max-w-2xl">
-            Verified tourism businesses and their guide teams — certified guides, expedition leaders and the trainees coming up behind them, each checked by our team before they lead a single experience.
+            Verified tourism businesses and their guide teams: certified guides, expedition leaders and the trainees coming up behind them, each checked by our team before they lead a single experience.
           </p>
         </div>
       </section>

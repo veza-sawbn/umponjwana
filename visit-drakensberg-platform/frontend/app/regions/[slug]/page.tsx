@@ -369,7 +369,7 @@ export default async function RegionPage({ params }: { params: { slug: string } 
           <p className="font-sans text-[10px] tracking-[0.2em] uppercase text-[#C9A96E] mb-2">Plan by Season</p>
           <h2 className="font-display italic text-3xl text-[#000000] mb-3">When to Go</h2>
           <p className="font-sans text-sm text-gray-500 max-w-2xl mb-8 leading-relaxed">
-            {region.bestTime || `${region.name} changes character through the year — pick a season to see what's worth doing in it.`}
+            {region.bestTime || `${region.name} changes character through the year. Pick a season to see what's worth doing in it.`}
           </p>
           <SeasonMosaic regionSlug={region.slug} heroImage={heroImg} />
         </div>
@@ -464,7 +464,7 @@ export default async function RegionPage({ params }: { params: { slug: string } 
           <div className="max-w-[1440px] mx-auto px-6 lg:px-12">
             <SectionHeading icon={<Home size={20} />} label={`Stay in ${region.name}`} count={stays.length} />
             <p className="font-sans text-sm text-gray-400 mb-8 -mt-2">
-              Pick a stay first — distance chips on trails and activities below will update to show how far each is from your chosen lodge.
+              Pick a stay first. The distance chips on trails and activities below will then show how far each one is from your chosen lodge.
             </p>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
               {stays.map(({ prop, minPrice }) => (
@@ -524,7 +524,7 @@ export default async function RegionPage({ params }: { params: { slug: string } 
           <div className="max-w-[1440px] mx-auto px-6 lg:px-12 text-center">
             <p className="font-display italic text-3xl text-gray-300 mb-3">Coming soon</p>
             <p className="font-sans text-sm text-gray-400 mb-6">
-              Stays, trails and activities for {region.name} are being added — check back soon.
+              Stays, trails and activities for {region.name} are being added. Please check back soon.
             </p>
             <Link href="/stays" className="inline-block bg-[#2d6a4f] text-white px-6 py-3 font-sans text-sm hover:bg-[#235a3f] transition-colors">
               Browse all stays

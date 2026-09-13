@@ -69,8 +69,8 @@ function CopyLinkButton({ invoice, className, label = 'Copy link' }: {
       setCopied(true)
       setTimeout(() => setCopied(false), 2500)
       toast.success(invoice.share_revoked_at
-        ? 'Link copied, but it is revoked — the customer will not be able to open it. Re-issue it first.'
-        : 'Invoice link copied — paste it into any conversation.')
+        ? 'Link copied, but it is revoked, so the customer will not be able to open it. Re-issue it first.'
+        : 'Invoice link copied. Paste it into any conversation.')
     } else {
       toast.error('Your browser blocked the copy. The link is in this button\'s tooltip.')
     }
@@ -110,7 +110,7 @@ function LinkModal({ invoice, onClose, onDone }: {
     setBusy('revoke')
     try {
       await revokeInvoiceLink(invoice.id)
-      toast.success('Link revoked — any copy of it now opens nothing.')
+      toast.success('Link revoked. Any copy of it now opens nothing.')
       onDone(); onClose()
     } catch (e) {
       toast.error(e instanceof Error ? e.message : 'Could not revoke this link')
@@ -127,8 +127,8 @@ function LinkModal({ invoice, onClose, onDone }: {
       const fresh = invoiceShareUrl({ id: invoice.id, share_token: token, share_id_access: false })
       const copied = await copyToClipboard(fresh)
       toast.success(copied
-        ? 'New link issued and copied. Send it on — the revoked one stays dead.'
-        : 'New link issued. Send it on — the revoked one stays dead.')
+        ? 'New link issued and copied. Send it on, as the revoked one stays dead.'
+        : 'New link issued. Send it on, as the revoked one stays dead.')
       onDone(); onClose()
     } catch (e) {
       toast.error(e instanceof Error ? e.message : 'Could not re-issue this link')
@@ -154,7 +154,7 @@ function LinkModal({ invoice, onClose, onDone }: {
             {revoked
               ? `Revoked ${fmt(invoice.share_revoked_at)} — nobody can open this invoice from a link.`
               : onBareAddress
-                ? 'Active — opens on its own address, no login needed.'
+                ? 'Active. Opens on its own address, no login needed.'
                 : `Active since ${fmt(invoice.share_issued_at)} — replacement link, issued after a revoke.`}
           </div>
 
@@ -234,7 +234,7 @@ function LinkModal({ invoice, onClose, onDone }: {
                 )}
                 <p className="font-sans text-xs text-gray-400 mt-1.5">
                   Use when a link reached the wrong person. The customer loses access until a new one is issued
-                  {onBareAddress && ', and this address never opens the invoice again — the replacement is a different link'}.
+                  {onBareAddress && ', and this address never opens the invoice again, as the replacement is a different link'}.
                 </p>
               </div>
             )}
@@ -527,7 +527,7 @@ function InvoiceModal({ customers, suppliers, draft, editing, onClose, onDone }:
                 value={l.description}
                 onChange={e => setLine(i, { description: e.target.value })}
                 rows={2}
-                placeholder="Description — appears beneath the title on the customer's invoice (optional)"
+                placeholder="Description, appears beneath the title on the customer's invoice (optional)"
                 className="mt-2 w-full border border-gray-200 px-3 py-2 font-sans text-sm md:text-xs resize-none focus:outline-none"
               />
             </div>
@@ -549,7 +549,7 @@ function InvoiceModal({ customers, suppliers, draft, editing, onClose, onDone }:
             </div>
           </div>
           <p className="font-sans text-[10px] text-gray-400 mt-2">
-            Leave fee/VAT blank to use the configured rates. Any value entered — including 0 — is applied exactly.
+            Leave fee/VAT blank to use the configured rates. Any value entered, including 0, is applied exactly.
           </p>
         </div>
         </div>
@@ -611,7 +611,7 @@ function PaymentsModal({ invoice, onClose, onDone }: {
     setBusy(true)
     try {
       await recordOrderPayment({ orderId: invoice.order_id, amount: value, type, method, reference: reference.trim() })
-      toast.success('Payment recorded — receipt emailed to the customer.')
+      toast.success('Payment recorded. Receipt emailed to the customer.')
       setAmount(''); setReference('')
       await load()
       onDone()
@@ -775,7 +775,7 @@ function VoidModal({ invoice, onClose, onDone }: {
             </p>
           </div>
 
-          <p className="font-sans text-[10px] tracking-[0.14em] uppercase text-gray-400 mb-1.5">Reason (required — stored in audit trail)</p>
+          <p className="font-sans text-[10px] tracking-[0.14em] uppercase text-gray-400 mb-1.5">Reason (required, stored in audit trail)</p>
           <textarea
             value={reason}
             onChange={e => setReason(e.target.value)}
@@ -1134,7 +1134,7 @@ export default function AdminInvoicesPage() {
                       )}
                       <button
                         onClick={() => setLinkInvoice(i)}
-                        title="Share link — copy, revoke or re-issue"
+                        title="Share link: copy, revoke or re-issue"
                         className={`inline-flex items-center gap-1.5 font-sans text-xs hover:underline ${
                           i.share_revoked_at ? 'text-red-500' : 'text-[#2d6a4f]'}`}
                       >
@@ -1156,7 +1156,7 @@ export default function AdminInvoicesPage() {
                       {voidable && (
                         <button
                           onClick={() => setVoidingInvoice(i)}
-                          title="Void this invoice — reverses erroneous payments and resets balances"
+                          title="Void this invoice, reversing erroneous payments and resetting balances"
                           className="inline-flex items-center gap-1.5 font-sans text-xs text-red-400 hover:text-red-600 hover:underline"
                         >
                           <Ban size={12} /> Void
