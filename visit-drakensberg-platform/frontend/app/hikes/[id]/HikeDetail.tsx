@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import Footer from '@/components/layout/Footer'
 import { ArrowLeft, Mountain, Clock, TrendingUp, Users, Star, CheckCircle, ChevronRight, X, Bed, Zap } from 'lucide-react'
-import { getTrails, Trail, trailCategory } from '@/lib/trails'
+import { getTrailSummaries, Trail, trailCategory } from '@/lib/trails'
 import UpcomingDepartures from '@/components/tours/UpcomingDepartures'
 import TrailExperiences from '@/components/experiences/TrailExperiences'
 import { getDepartures } from '@/lib/departures'
@@ -67,7 +67,10 @@ export default function HikeDetail({
     // supplier content, and a signed-in admin or ops session would otherwise
     // read past the public RLS gate and offer a suspended supplier's
     // departures here. See lib/supabase-public.ts.
-    getTrails(publicSupabase).then(setAllTrails)
+    // Only ever used below for "Related Trails" — plain text (name, distance,
+    // difficulty), no image or artwork — so the lightweight summary read is
+    // enough. See lib/trails.ts's getTrailSummaries().
+    getTrailSummaries(publicSupabase).then(setAllTrails)
     Promise.all([getDepartures(publicSupabase), getTours(publicSupabase)]).then(([all, tours]) => {
       const activeTourIds = new Set(tours.filter(t => t.status === 'active').map(t => t.id))
       const today = new Date().toISOString().slice(0, 10)
