@@ -1,0 +1,128 @@
+name: Security tests
+
+# The repository had no CI at all when the September 2026 security audit ran
+# (finding M6), so the regression tests that audit added would only have been
+# run by whoever remembered to. This runs all three suites on every push and
+# pull request.
+
+on:
+  push:
+    branches: ['**']
+  pull_request:
+
+defaults:
+  run:
+    working-directory: visit-drakensberg-platform
+
+jobs:
+  frontend:
+    name: Frontend unit tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: visit-drakensberg-platform/frontend/package-lock.json
+      - run: npm ci
+        working-directory: visit-drakensberg-platform/frontend
+      - run: npm test
+        working-directory: visit-drakensberg-platform/frontend
+
+  database:
+    name: SQL security tests
+    runs-on: ubuntu-latest
+
+    # The migrations are loaded into a throwaway database built from scratch on
+    # every run. Nothing here can reach a real Supabase project: no project
+    # URL, no service-role key, no secrets of any kind are provided to this job.
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_HOST_AUTH_METHOD: trust
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install psql
+        run: sudo apt-get update && sudo apt-get install -y postgresql-client
+      - name: Run SQL security tests
+        working-directory: visit-drakensberg-platform/frontend
+        env:
+          PGHOST: localhost
+          PGPORT: '5432'
+          PGUSER: postgres
+          PGPASSWORD: postgres
+        run: bash supabase/tests/run.sh
+
+  backend:
+    name: Backend security tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install test dependencies
+        working-directory: visit-drakensberg-platform/backend
+        # Only what the security tests import. The full requirements.txt pulls
+        # in asyncpg and the Supabase client, which these tests stub out.
+        run: |
+          python -m pip install --upgrade pip
+          pip install "python-jose[cryptography]==3.4.0" "passlib[bcrypt]==1.7.4" "bcrypt==4.0.1" pytest
+      - name: Run backend security tests
+        working-directory: visit-drakensberg-platform/backend
+        run: pytest tests/ -q
+
+  migrations-load:
+    name: Migrations load in order
+    runs-on: ubuntu-latest
+
+    # A migration that only loads when its predecessors happen to have been run
+    # by hand is a production incident waiting for the next fresh environment —
+    # 20260823_blog_author_fields.sql silently depends on schema.sql, which the
+    # audit found by loading them all into an empty database. This job keeps
+    # that honest.
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_HOST_AUTH_METHOD: trust
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install psql
+        run: sudo apt-get update && sudo apt-get install -y postgresql-client
+      - name: Load schema and every migration into an empty database
+        working-directory: visit-drakensberg-platform/frontend
+        env:
+          PGHOST: localhost
+          PGPORT: '5432'
+          PGUSER: postgres
+          PGPASSWORD: postgres
+        run: |
+          set -euo pipefail
+          psql -q -c 'create database migration_check;'
+          export PGDATABASE=migration_check
+          psql -q -v ON_ERROR_STOP=1 -f supabase/tests/00_supabase_shim.sql
+          psql -q -v ON_ERROR_STOP=1 -f supabase/schema.sql
+          for migration in $(ls supabase/migrations/*.sql | sort); do
+            echo "-- $migration"
+            psql -q -v ON_ERROR_STOP=1 -f "$migration"
+          done
+          echo "All migrations loaded cleanly into an empty database."
