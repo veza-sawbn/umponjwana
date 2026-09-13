@@ -38,9 +38,13 @@ export default function StayCarousel({ stays }: { stays: StayCard[] }) {
 
   return (
     <div className="relative group/carousel">
+      {/* The track bleeds to the screen edge so the next card peeks past it,
+          but scroll-padding keeps the snap position on the page gutter —
+          without it, snapping swallows the padding and the first card sits
+          flush against the edge, out of line with the heading above it. */}
       <div
         ref={trackRef}
-        className="flex gap-5 overflow-x-auto snap-x snap-mandatory scroll-smooth scrollbar-none pb-2 -mx-6 px-6 lg:-mx-12 lg:px-12"
+        className="flex gap-5 overflow-x-auto snap-x snap-mandatory scroll-smooth scrollbar-none pb-2 -mx-6 px-6 scroll-pl-6 lg:-mx-12 lg:px-12 lg:scroll-pl-12"
       >
         {stays.map((stay) => <StayTile key={stay.id} stay={stay} />)}
       </div>
