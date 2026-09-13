@@ -40,13 +40,13 @@ function invoiceHtml(o: {
     eyebrow: `Invoice ${o.invoiceNumber}`,
     heading: 'Your invoice',
     preheader: settled
-      ? `Invoice ${o.invoiceNumber} — fully paid, no payment due.`
-      : `Invoice ${o.invoiceNumber} — ${money(o.balance, o.currency)} outstanding.`,
+      ? `Invoice ${o.invoiceNumber} is fully paid, with no payment due.`
+      : `Invoice ${o.invoiceNumber} has ${money(o.balance, o.currency)} outstanding.`,
     bodyHtml: `
       <p style="margin:0 0 4px;">Dear ${esc(o.customerName || 'traveller')},</p>
       <p style="margin:0 0 20px;">
         ${settled
-          ? `Here is invoice <strong>${esc(o.invoiceNumber)}</strong>${trip}. It is fully paid — no further payment is due.`
+          ? `Here is invoice <strong>${esc(o.invoiceNumber)}</strong>${trip}. It is fully paid, so no further payment is due.`
           : `Here is invoice <strong>${esc(o.invoiceNumber)}</strong>${trip}, with <strong>${esc(money(o.balance, o.currency))}</strong> still outstanding.`}
       </p>
       ${detailTable([
@@ -58,7 +58,7 @@ function invoiceHtml(o: {
         ['Paid to date', money(o.amountPaid, o.currency)],
       ], ['Balance due', money(o.balance, o.currency)])}
       ${ctaButton(o.invoiceUrl, settled ? 'View your invoice' : 'View & pay your invoice')}
-      ${finePrint(`This invoice covers your single trip with Visit Drakensberg — all accommodation,
+      ${finePrint(`This invoice covers your single trip with Visit Drakensberg. All accommodation,
         activities, transfers and extras appear on one document.`)}`,
   })
 }
@@ -107,7 +107,7 @@ export async function POST(req: Request) {
 
   const { sent, error } = await sendMail({
     to: email,
-    subject: `Invoice ${invoice.invoice_number} — Visit Drakensberg`,
+    subject: `Invoice ${invoice.invoice_number} from Visit Drakensberg`,
     html: invoiceHtml({
       customerName: order.customer_name,
       invoiceNumber: invoice.invoice_number,

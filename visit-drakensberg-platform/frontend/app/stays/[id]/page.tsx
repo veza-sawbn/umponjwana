@@ -50,7 +50,7 @@ export async function generateMetadata({ params }: { params: { id: string } }): 
   const { property, rooms } = resolved
   const minPrice = rooms.length > 0 ? Math.min(...rooms.map(r => r.basePrice)) : 0
 
-  const title = property.seoTitle || `${property.name} — ${property.region || 'Drakensberg'} | Visit Drakensberg`
+  const title = property.seoTitle || `${property.name}, ${property.region || 'Drakensberg'} | Visit Drakensberg`
   const description = buildDescription(property, minPrice)
   const canonical = `/stays/${property.slug || property.id}`
 

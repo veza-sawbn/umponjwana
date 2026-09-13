@@ -27,7 +27,7 @@ export const SITE_CONTENT_DEFAULTS = {
   },
   promotions: {
     enabled: false,
-    banner_text: 'Winter Special — 20% off selected lodges this July',
+    banner_text: 'Winter Special: 20% off selected lodges this July',
     banner_link: '/stays',
     banner_color: '#2d6a4f',
     deals_heading: 'Current Deals & Offers',
@@ -49,7 +49,7 @@ export const SITE_CONTENT_DEFAULTS = {
   },
   homepage_featured: {
     heading: 'Handpicked Experiences',
-    subheading: 'From summit hikes to starlit stays — curated by our local experts.',
+    subheading: 'From summit hikes to starlit stays, curated by our local experts.',
     max_listings: 6,
     regions: ['All'],
     types: ['Accommodation', 'Hiking', 'Activities', 'Experiences'],
@@ -67,7 +67,7 @@ export const SITE_CONTENT_DEFAULTS = {
     regions: [
       {
         id: 'reg-north', name: 'Northern Drakensberg', subtitle: 'Royal Natal · Bergville · Amphitheatre',
-        desc: 'Home to the iconic Amphitheatre and Tugela Falls — the second highest waterfall in the world. Gateway town: Bergville.',
+        desc: 'Home to the iconic Amphitheatre and Tugela Falls, the second highest waterfall in the world. Gateway town: Bergville.',
         img: 'https://images.unsplash.com/photo-1590098563548-8f14eed3a47f?w=900&q=80', href: '/regions#northern', visible: true,
       },
       {
@@ -104,7 +104,7 @@ export const SITE_CONTENT_DEFAULTS = {
     experiences_eyebrow: "What's on", experiences_heading: 'Events & Experiences',
     journeys_eyebrow: 'Curated journeys', journeys_heading: 'Multi-day packages',
     newsletter_eyebrow: 'Stay informed', newsletter_heading: 'Berg dispatches',
-    newsletter_body: 'Seasonal trail conditions, new accommodation, and stories from the escarpment — delivered monthly.',
+    newsletter_body: 'Seasonal trail conditions, new accommodation and stories from the escarpment, delivered monthly.',
   },
   stays_page: {
     eyebrow: 'Where to sleep',
@@ -145,7 +145,7 @@ export const SITE_CONTENT_DEFAULTS = {
   regions_page: {
     eyebrow: 'Where to go',
     heading: 'Choose your Berg',
-    subheading: 'Regions are configured by the admin team and used as the source of truth for stays, hikes, activities, routes and customer journey tracking.',
+    subheading: 'Every stay, hike, activity and shuttle route on the platform belongs to one of these regions. Start with the part of the range you want to explore.',
     towns_eyebrow: 'Where to base yourself',
     towns_heading: 'Surrounding Towns & Villages',
     towns_subheading: 'Gateway towns, boutique villages and farm stops that frame the Drakensberg experience.',
@@ -153,12 +153,12 @@ export const SITE_CONTENT_DEFAULTS = {
   towns_page: {
     eyebrow: 'Where to base yourself',
     heading: 'Towns & Cities',
-    subheading: 'Gateway towns, boutique villages and farm stops that frame the Drakensberg experience — grouped by the region they serve.',
+    subheading: 'Gateway towns, boutique villages and farm stops that frame the Drakensberg experience, grouped by the region they serve.',
   },
   stories_page: {
     eyebrow: 'MyDrakensberg',
     heading: 'Stories from the Berg',
-    subheading: 'In-depth writing on the culture, history, wildlife and landscapes of the Drakensberg — from guides, historians, naturalists and storytellers who know the Berg deeply.',
+    subheading: 'In-depth writing on the culture, history, wildlife and landscapes of the Drakensberg, by guides, historians, naturalists and storytellers who know the Berg well.',
   },
   plan_page: {
     eyebrow: 'Your journey',
@@ -172,15 +172,15 @@ export const SITE_CONTENT_DEFAULTS = {
     essential_2_title: 'Entry & permits',
     essential_2_body: 'A daily conservation fee applies in all KZN Wildlife reserves. Hiking permits for overnight trails must be pre-booked. No entry visa required for most nationalities for stays under 90 days.',
     essential_3_title: 'What to bring',
-    essential_3_body: 'Layers are essential at any time of year — temperatures drop fast above 2,000 m. A waterproof shell, broken-in hiking boots, sun protection, and a 2-litre water capacity are minimum requirements.',
+    essential_3_body: 'Layers are essential at any time of year, because temperatures drop fast above 2,000 m. A waterproof shell, broken-in hiking boots, sun protection and a 2-litre water capacity are the minimum.',
     essential_4_title: 'Safety',
-    essential_4_body: 'Never hike alone above the escarpment. Register your route with the camp office. Carry a whistle, first aid kit, and a charged phone. Afternoon lightning is common in summer — be off exposed ridges by 1 pm.',
+    essential_4_body: 'Never hike alone above the escarpment. Register your route with the camp office. Carry a whistle, first aid kit, and a charged phone. Afternoon lightning is common in summer, so be off exposed ridges by 1 pm.',
   },
   // SEO overrides for static pages — edited via /admin/seo.
   // Values here take precedence over the layout.tsx defaults for each route.
   // Stored as a flat record keyed by page id.
   seo_overrides: {
-    home:           { meta_title: 'Visit Drakensberg — Discover the Berg', meta_description: 'Explore accommodation, hiking trails, guided experiences and events in the Drakensberg mountains.', og_title: 'Visit Drakensberg', og_description: 'Plan your Drakensberg adventure.', canonical: 'https://visitdrakensberg.com/' },
+    home:           { meta_title: 'Visit Drakensberg | Discover the Berg', meta_description: 'Explore accommodation, hiking trails, guided experiences and events in the Drakensberg mountains.', og_title: 'Visit Drakensberg', og_description: 'Plan your Drakensberg adventure.', canonical: 'https://visitdrakensberg.com/' },
     stays:          { meta_title: 'Accommodation in the Drakensberg | Visit Drakensberg', meta_description: 'Browse lodges, camps, guesthouses and self-catering options across the Drakensberg.', og_title: 'Drakensberg Accommodation', og_description: 'Find the perfect stay in the Berg.', canonical: 'https://visitdrakensberg.com/stays' },
     hikes:          { meta_title: '', meta_description: '', og_title: '', og_description: '', canonical: '' },
     activities:     { meta_title: '', meta_description: '', og_title: '', og_description: '', canonical: '' },
@@ -223,8 +223,8 @@ export const SITE_CONTENT_DEFAULTS = {
   about_page: {
     eyebrow: 'Our story',
     heading: 'About Visit Drakensberg',
-    body_1: 'Visit Drakensberg is the premier tourism discovery and booking platform for the uKhahlamba-Drakensberg Park, a UNESCO World Heritage Site. We connect visitors with local accommodation providers, mountain guides, activity operators and shuttle services across the full 200-kilometre escarpment — from Royal Natal in the north to Sani Pass and Bushman\'s Nek in the south.',
-    body_2: 'Every listing on the platform is operated by a local supplier. Booking through Visit Drakensberg keeps tourism revenue in the communities that call these mountains home, and helps fund the conservation of one of the richest natural and cultural landscapes in Southern Africa — including more than 20,000 San rock art sites, the highest waterfall in Africa, and the last South African stronghold of the bearded vulture.',
+    body_1: 'Visit Drakensberg is the premier tourism discovery and booking platform for the uKhahlamba-Drakensberg Park, a UNESCO World Heritage Site. We connect visitors with local accommodation providers, mountain guides, activity operators and shuttle services across the full 200-kilometre escarpment, from Royal Natal in the north to Sani Pass and Bushman\'s Nek in the south.',
+    body_2: 'Every listing on the platform is operated by a local supplier. Booking through Visit Drakensberg keeps tourism revenue in the communities that call these mountains home, and helps fund the conservation of one of the richest natural and cultural landscapes in Southern Africa, home to more than 20,000 San rock art sites, the highest waterfall in Africa and the last South African stronghold of the bearded vulture.',
     suppliers_heading: 'For suppliers',
     suppliers_body: 'Run a lodge, guide hikes, operate shuttles or host experiences in the Berg? List your business on Visit Drakensberg and reach travellers planning their trip.',
     suppliers_cta: 'List your property',

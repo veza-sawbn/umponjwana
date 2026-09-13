@@ -159,7 +159,7 @@ export const EDITOR_PAGES: EditorPage[] = [
         reorderable: true,
         hideable: true,
         fields: [text('stories_eyebrow', 'Eyebrow'), text('stories_heading', 'Heading')],
-        note: 'Story cards show the 3 most recent published posts — edit them under Admin → Blog & Content.',
+        note: 'Story cards show the 3 most recent published posts. Edit them under Admin → Blog & Content.',
       },
       {
         id: 'attractions',
@@ -177,7 +177,7 @@ export const EDITOR_PAGES: EditorPage[] = [
         reorderable: true,
         hideable: true,
         fields: [text('journeys_eyebrow', 'Eyebrow'), text('journeys_heading', 'Heading')],
-        note: 'Journey cards are live data from published packages — edit them under Admin → Package Builder.',
+        note: 'Journey cards are live data from published packages. Edit them under Admin → Package Builder.',
       },
       {
         id: 'newsletter',
@@ -225,7 +225,7 @@ export const EDITOR_PAGES: EditorPage[] = [
           text('eyebrow', 'Eyebrow'), text('heading', 'Heading'), textarea('subheading', 'Subheading'),
         ],
       },
-      { id: 'hikes-listings', label: 'Trails & Hikes', note: 'Trails are live data — edit them under Admin → Hiking Trails.' },
+      { id: 'hikes-listings', label: 'Trails & Hikes', note: 'Trails are live data. Edit them under Admin → Hiking Trails.' },
       FOOTER_SECTION,
     ],
   },

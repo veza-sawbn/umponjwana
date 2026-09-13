@@ -64,14 +64,14 @@ export default function EmailTemplateForm({ template }: { template: EmailTemplat
         </div>
         <div>
           <label className={labelClass}>Preheader (inbox preview text)</label>
-          <input value={preheader} onChange={e => setPreheader(e.target.value)} placeholder="Optional — shown next to the subject in most inboxes" className={inputClass} />
+          <input value={preheader} onChange={e => setPreheader(e.target.value)} placeholder="Optional. Shown next to the subject in most inboxes" className={inputClass} />
         </div>
         <div>
           <label className={labelClass}>Body (HTML)</label>
           <textarea value={htmlBody} onChange={e => setHtmlBody(e.target.value)} rows={16}
             placeholder="<p>Hi there,</p><p>The berg is calling...</p>"
             className={`${inputClass} font-mono text-xs leading-relaxed`} />
-          <p className="font-sans text-xs text-gray-400 mt-2">Rendered inside the standard Visit Drakensberg branded shell — this box is just the content that goes inside it.</p>
+          <p className="font-sans text-xs text-gray-400 mt-2">Rendered inside the standard Visit Drakensberg branded shell. This box is just the content that goes inside it.</p>
         </div>
 
         <div className="flex gap-3 pt-2">

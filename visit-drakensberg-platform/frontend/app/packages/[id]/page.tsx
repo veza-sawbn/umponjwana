@@ -35,7 +35,7 @@ export async function generateMetadata({ params }: { params: { id: string } }): 
   const pkg = await resolvePackage(params.id)
   if (!pkg) return { title: 'Package Not Found' }
 
-  const title = pkg.seoTitle || `${pkg.title} — ${pkg.region || 'Drakensberg'} | Visit Drakensberg`
+  const title = pkg.seoTitle || `${pkg.title}, ${pkg.region || 'Drakensberg'} | Visit Drakensberg`
   const description = buildDescription(pkg)
   const canonical = `/packages/${pkg.slug || pkg.id}`
 

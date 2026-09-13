@@ -219,7 +219,7 @@ export default function EditActivityPage() {
           <F label="Child Age Cutoff (optional)"><input type="number" min="0" value={form.childMaxAge || ''} onChange={e => set('childMaxAge', +e.target.value)} placeholder="e.g. 12" className={inp} /></F>
           <F label="Child Price per Person (ZAR)"><input type="number" value={form.childPrice || ''} onChange={e => set('childPrice', +e.target.value)} disabled={!form.childMaxAge} placeholder="Leave blank to charge adult rate" className={`${inp} disabled:opacity-40`} /></F>
         </div>
-        <p className="-mt-3 font-sans text-[11px] text-black/35">Set an age cutoff to charge a separate rate for children at booking — visitors this age or younger pay the child rate.</p>
+        <p className="-mt-3 font-sans text-[11px] text-black/35">Set an age cutoff to charge a separate rate for children at booking. Visitors this age or younger pay the child rate.</p>
 
         <div className="pt-2 border-t border-black/8">
           <p className="font-sans text-sm font-medium text-black/70 mb-2">Timeslots</p>

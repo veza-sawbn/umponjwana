@@ -46,7 +46,7 @@ export async function generateMetadata({ params }: { params: { id: string } }): 
   const exp = await resolveExperience(params.id)
   if (!exp) return { title: 'Experience Not Found' }
 
-  const title = `${exp.title} — ${formatDateShort(exp.departureDate)} | Visit Drakensberg`
+  const title = `${exp.title}, ${formatDateShort(exp.departureDate)} | Visit Drakensberg`
   const description = `${exp.durationDays} day${exp.durationDays !== 1 ? 's' : ''} guided departure on ${exp.trailName || 'the trail'} with ${exp.operator}, departing ${formatDateShort(exp.departureDate)}. ${exp.description || ''}`.trim().slice(0, 160)
   const canonical = `/experiences/${exp.id}`
   const isPast = new Date(exp.departureDate) < new Date()

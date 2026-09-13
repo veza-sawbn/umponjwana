@@ -131,7 +131,7 @@ export function scoreCompany(
 
   const categoryRank = categories.indexOf(company.category)
   score += add('Category fit', (categoryRank === 0 ? 1 : categoryRank > 0 ? 0.55 : 0) * 10, 10,
-    categoryRank === 0 ? `${tripClass} trip — native category` : undefined)
+    categoryRank === 0 ? `${tripClass} trip, native category` : undefined)
 
   const bestVehicle = usableVehicles
     .map(v => ({ v, s: vehicleSuitability(v, tripClass, input.passengers) }))

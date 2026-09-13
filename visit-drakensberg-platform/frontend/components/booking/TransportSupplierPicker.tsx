@@ -89,7 +89,7 @@ export function TransportSupplierPicker({
   if (candidates.length === 0) {
     return (
       <p className="p-5 font-sans text-sm text-gray-400">
-        No registered transport partner covers this trip yet. You can still book — our team will place the transfer
+        No registered transport partner covers this trip yet. You can still book, and our team will place the transfer
         with the best available operator after checkout.
       </p>
     )

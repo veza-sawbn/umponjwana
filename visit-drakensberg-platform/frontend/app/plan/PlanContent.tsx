@@ -16,8 +16,8 @@ const TRIP_TYPES = [
   {
     title: '3-Day Weekend',
     label: 'Quick escape',
-    desc: 'A long weekend is enough for a single region — stay at Champagne Valley, do the Monk\'s Cowl trail, and see rock art at Injasuti.',
-    itinerary: ['Day 1: Arrive, settle in, afternoon walk', 'Day 2: Full day hike — Monk\'s Cowl or Cathedral Ridge', 'Day 3: Rock art & leisurely return'],
+    desc: 'A long weekend is enough for a single region. Stay at Champagne Valley, walk the Monk\'s Cowl trail and see the rock art at Injasuti.',
+    itinerary: ['Day 1: Arrive, settle in, afternoon walk', 'Day 2: Full day hike, Monk\'s Cowl or Cathedral Ridge', 'Day 3: Rock art & leisurely return'],
     // /stays honors region/check_in/check_out/guests — carry across whatever
     // the visitor has entered in the builder above instead of a fixed link.
     href: '/stays',
@@ -27,7 +27,7 @@ const TRIP_TYPES = [
     title: '7-Day Classic',
     label: 'Full experience',
     desc: 'A week lets you cover two regions and include a Sani Pass day-trip. The standard Drakensberg holiday.',
-    itinerary: ['Day 1–3: Northern Berg — Amphitheatre, Tugela Falls', 'Day 4: Transfer to Central Berg', 'Day 5–6: Cathedral Peak, Giants Castle', 'Day 7: Sani Pass day trip, depart'],
+    itinerary: ['Day 1–3: Northern Berg, Amphitheatre and Tugela Falls', 'Day 4: Transfer to Central Berg', 'Day 5–6: Cathedral Peak, Giants Castle', 'Day 7: Sani Pass day trip, depart'],
     href: '/packages',
     searchable: false,
   },
@@ -324,8 +324,8 @@ export default function PlanContent() {
             <p className="font-sans text-xs tracking-[0.2em] uppercase text-gold mb-2">Not sure what you want yet?</p>
             <h2 className="font-display text-3xl text-white mb-2">Request a custom trip on your own dates</h2>
             <p className="font-sans text-sm text-white/50 max-w-xl leading-relaxed">
-              Tell us your trail, dates and group size — we'll match you with an available guide and
-              tour operator, who'll confirm and send a quote before you pay anything.
+              Tell us your trail, dates and group size. We'll match you with an available guide and
+              tour operator, who will confirm and send a quote before you pay anything.
             </p>
           </div>
           <Link

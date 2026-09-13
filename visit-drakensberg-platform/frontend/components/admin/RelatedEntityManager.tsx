@@ -123,7 +123,7 @@ export function RelationshipPicker({
 
       {selected.length === 0 && (
         <p className="font-sans text-[11px] text-gray-400 mt-1">
-          No items linked — search above to add.
+          No items linked. Search above to add.
         </p>
       )}
     </div>

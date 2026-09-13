@@ -24,7 +24,7 @@ export function VehicleToggle({ checked, onChange }: { checked: boolean; onChang
         <label htmlFor="usesOwnVehicles" className="cursor-pointer">
           <span className="font-sans text-sm font-medium text-black/70">This activity uses your own vehicles</span>
           <span className="block font-sans text-[11px] text-black/40 mt-0.5">
-            Sani Pass 4×4 runs, game drives, guided tours by minibus — anything where you drive guests yourself.
+            Sani Pass 4×4 runs, game drives, guided tours by minibus: anything where you drive guests yourself.
           </span>
         </label>
       </div>
@@ -32,8 +32,8 @@ export function VehicleToggle({ checked, onChange }: { checked: boolean; onChang
         <p className="mt-3 pl-7 font-sans text-[11px] text-black/50 flex items-start gap-1.5">
           <Truck size={13} className="mt-px shrink-0 text-[#C9A96E]" />
           <span>
-            Saving adds the transport tools to your dashboard — Transport Company, Vehicles, Drivers and
-            Transport Jobs — so you can list the fleet and drivers that run it.
+            Saving adds the transport tools to your dashboard (Transport Company, Vehicles, Drivers and
+            Transport Jobs) so you can list the fleet and drivers that run it.
           </span>
         </p>
       )}

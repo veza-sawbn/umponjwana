@@ -169,7 +169,7 @@ export default function NewActivityPage() {
                   <button key={s} onClick={() => toggleSeason(s)} className={`font-sans text-xs px-3 py-1.5 rounded-full border transition-colors ${form.seasons.includes(s) ? 'bg-[#C9A96E] text-white border-[#C9A96E]' : 'border-black/15 text-black/60 hover:border-[#C9A96E]/40'}`}>{SEASON_META[s].label}</button>
                 ))}
               </div>
-              <p className="mt-1.5 font-sans text-[11px] text-black/35">Shown on the region's "When to Go" pages for whichever seasons you pick — leave blank if it doesn't vary by season.</p>
+              <p className="mt-1.5 font-sans text-[11px] text-black/35">Shown on the region's "When to Go" pages for whichever seasons you pick. Leave it blank if it doesn't vary by season.</p>
             </F>
             <F label="Topics">
               <div className="flex gap-2 flex-wrap">
@@ -224,7 +224,7 @@ export default function NewActivityPage() {
               <F label="Child Age Cutoff (optional)"><input type="number" min="0" value={form.childMaxAge} onChange={e => set('childMaxAge', e.target.value)} placeholder="e.g. 12" className={inp} /></F>
               <F label="Child Price per Person (ZAR)"><input type="number" value={form.childPrice} onChange={e => set('childPrice', e.target.value)} disabled={!form.childMaxAge} placeholder="Leave blank to charge adult rate" className={`${inp} disabled:opacity-40`} /></F>
             </div>
-            <p className="-mt-3 font-sans text-[11px] text-black/35">Set an age cutoff to charge a separate rate for children at booking — visitors this age or younger pay the child rate.</p>
+            <p className="-mt-3 font-sans text-[11px] text-black/35">Set an age cutoff to charge a separate rate for children at booking. Visitors this age or younger pay the child rate.</p>
 
             <div className="pt-2 border-t border-black/8">
               <p className="font-sans text-sm font-medium text-black/70 mb-2">Timeslots</p>
@@ -249,7 +249,7 @@ export default function NewActivityPage() {
           <div className="space-y-3">
             <p className="font-sans text-sm text-black/60">Review your activity before submitting.</p>
             <div className="rounded-lg bg-black/3 p-4 space-y-2">
-              {[['Name', form.name], ['Category', form.category], ['Region', form.region], ['Difficulty', form.difficulty], ['Duration', form.durationH ? `${form.durationH}h` : ''], ['Max Group', form.maxGroupSize], ['Meeting Point', form.meetingPoint], ['Own Vehicles', form.usesOwnVehicles ? 'Yes — adds the transport tools' : ''], ['Adult Price', form.pricePerPerson ? formatMoney(Number(form.pricePerPerson)) : ''], ['Child Price', form.childMaxAge ? `${formatMoney(Number(form.childPrice || form.pricePerPerson))} (${form.childMaxAge} & under)` : ''], ['Timeslots', form.timeslots.length ? form.timeslots.map(t => t.time).join(', ') : '']].map(([k, v]) => v ? (
+              {[['Name', form.name], ['Category', form.category], ['Region', form.region], ['Difficulty', form.difficulty], ['Duration', form.durationH ? `${form.durationH}h` : ''], ['Max Group', form.maxGroupSize], ['Meeting Point', form.meetingPoint], ['Own Vehicles', form.usesOwnVehicles ? 'Yes, adds the transport tools' : ''], ['Adult Price', form.pricePerPerson ? formatMoney(Number(form.pricePerPerson)) : ''], ['Child Price', form.childMaxAge ? `${formatMoney(Number(form.childPrice || form.pricePerPerson))} (${form.childMaxAge} & under)` : ''], ['Timeslots', form.timeslots.length ? form.timeslots.map(t => t.time).join(', ') : '']].map(([k, v]) => v ? (
                 <div key={k} className="flex gap-3 font-sans text-sm">
                   <span className="text-black/40 w-32 shrink-0">{k}</span>
                   <span className="text-black/80">{v}</span>

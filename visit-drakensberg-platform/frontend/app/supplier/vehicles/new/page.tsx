@@ -71,7 +71,7 @@ export default function NewVehiclePage() {
           <div>
             <p className="font-sans text-sm font-medium text-black/70">Rate for this vehicle</p>
             <p className="font-sans text-xs text-black/40 mt-1">
-              Price this vehicle in its own right — a 14-seater should not quote what a sedan quotes. Leave either
+              Price this vehicle in its own right, because a 14-seater should not quote what a sedan quotes. Leave either
               field blank to fall back to your company rate card.
             </p>
           </div>

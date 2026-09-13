@@ -86,7 +86,7 @@ export default function WaiverTemplateForm({ existing }: { existing?: WaiverTemp
           <input
             value={title}
             onChange={e => setTitle(e.target.value)}
-            placeholder="e.g. Guided Hike — Liability Waiver"
+            placeholder="e.g. Guided Hike Liability Waiver"
             className={inp}
           />
         </div>

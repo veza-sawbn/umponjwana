@@ -170,7 +170,7 @@ export default function GuidesPage() {
                 <p className="font-sans text-xs text-black/40 mt-0.5">
                   {g.guideNo
                     ? `${GUIDE_NO_LABEL} ${g.guideNo}`
-                    : type === 'trainee' ? 'In training — not yet registered' : 'No guide number on file'}
+                    : type === 'trainee' ? 'In training, not yet registered' : 'No guide number on file'}
                 </p>
                 <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-1">
                   {g.speciality && <span className="font-sans text-xs text-black/40 flex items-center gap-1"><Mountain size={11} /> {g.speciality}</span>}

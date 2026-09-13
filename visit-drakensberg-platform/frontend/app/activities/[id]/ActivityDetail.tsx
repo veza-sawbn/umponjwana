@@ -216,13 +216,13 @@ export default function ActivityDetail({ activityData, id }: { activityData: Act
                     {!date ? (
                       <p className="font-sans text-xs text-gray-400">Choose a date first.</p>
                     ) : dayTimeslots.length === 0 ? (
-                      <p className="font-sans text-xs text-amber-600">No timeslots run on this date — try another day.</p>
+                      <p className="font-sans text-xs text-amber-600">No timeslots run on this date. Please try another day.</p>
                     ) : (
                       <select value={timeslotId} onChange={e => setTimeslotId(e.target.value)} className="w-full border border-gray-300 px-3 py-2.5 font-sans text-sm focus:outline-none">
                         <option value="">Select a time…</option>
                         {dayTimeslots.map(t => {
                           const left = slotRemaining(activityData, date, t.id)
-                          return <option key={t.id} value={t.id} disabled={left <= 0}>{t.time}{left <= 0 ? ' — Fully booked' : ` — ${left} seat${left === 1 ? '' : 's'} left`}</option>
+                          return <option key={t.id} value={t.id} disabled={left <= 0}>{t.time}{left <= 0 ? ' · Fully booked' : ` · ${left} seat${left === 1 ? '' : 's'} left`}</option>
                         })}
                       </select>
                     )}
@@ -300,7 +300,7 @@ export default function ActivityDetail({ activityData, id }: { activityData: Act
               </button>
               {isAdded && (
                 <p className="font-sans text-xs text-center text-[#2d6a4f] mt-2">
-                  Saved to your trip — continue exploring
+                  Saved to your trip. Continue exploring
                 </p>
               )}
               <p className="font-sans text-xs text-center text-gray-400 mt-2">Free cancellation up to 48 hours before</p>

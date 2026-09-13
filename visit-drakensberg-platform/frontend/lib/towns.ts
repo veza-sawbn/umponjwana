@@ -53,7 +53,7 @@ export const DEFAULT_TOWNS: Town[] = [
   },
   {
     id: 'himeville', slug: 'himeville', regionSlug: 'south-berg', name: 'Himeville',
-    gateway: 'Southern Drakensberg — boutique',
+    gateway: 'Southern Drakensberg · boutique',
     description: 'A charming village with a restored fort, trout streams and boutique accommodation. A hidden gem.',
     image: 'https://images.unsplash.com/photo-1520250497591-112f2f40a3f4?w=900&q=80',
     highlights: [], seoTitle: 'Himeville | Visit Drakensberg', seoDescription: '',

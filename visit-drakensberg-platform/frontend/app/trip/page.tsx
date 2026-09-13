@@ -104,7 +104,7 @@ export default function TripPage() {
               {isEmpty ? (
                 <div className="bg-white border border-black/8 rounded-xl p-10 text-center">
                   <Mountain size={28} className="text-black/15 mx-auto mb-3" />
-                  <p className="font-sans text-sm text-black/30 mb-4">Nothing added yet — browse trails to get started.</p>
+                  <p className="font-sans text-sm text-black/30 mb-4">Nothing added yet. Browse trails to get started.</p>
                   <Link href="/hikes" className="inline-block font-sans text-sm text-[#2d6a4f] border border-[#2d6a4f] px-5 py-2 hover:bg-[#2d6a4f] hover:text-white transition-colors">
                     Browse Trails
                   </Link>
@@ -264,7 +264,7 @@ export default function TripPage() {
                   <div>
                     <p className="font-sans font-medium text-sm text-black/80 mb-1">Add a shuttle transfer</p>
                     <p className="font-sans text-xs text-black/40">
-                      Pick up anywhere — choose your transport partner and vehicle
+                      Pick up anywhere. Choose your transport partner and vehicle
                     </p>
                   </div>
                   <ChevronRight size={16} className="text-black/20 group-hover:text-[#C9A96E] transition-colors shrink-0 ml-4" />

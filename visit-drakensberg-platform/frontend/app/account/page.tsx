@@ -77,15 +77,15 @@ function BookingCard({ b, onCancel }: { b: SavedBooking; onCancel?: (b: SavedBoo
         </div>
         {b.status === 'requested' && (
           <p className="font-sans text-xs text-blue-700 mt-2 flex items-center gap-1.5">
-            <Clock size={11} /> Waiting on the property to confirm your dates — you have not been charged.
+            <Clock size={11} /> Waiting on the property to confirm your dates. You have not been charged.
           </p>
         )}
         {b.status === 'pending' && b.holdExpiresAt && (
           <p className={`font-sans text-xs mt-2 flex items-center gap-1.5 ${holdHasLapsed(b.holdExpiresAt) ? 'text-red-500' : 'text-[#8B6914]'}`}>
             <Clock size={11} />
             {holdHasLapsed(b.holdExpiresAt)
-              ? 'Your payment window has passed — pay now to try to keep this booking.'
-              : `Dates confirmed — pay by ${holdDeadlineLabel(b.holdExpiresAt)} to hold your room.`}
+              ? 'Your payment window has passed. Pay now to try to keep this booking.'
+              : `Dates confirmed. Pay by ${holdDeadlineLabel(b.holdExpiresAt)} to hold your room.`}
           </p>
         )}
         {b.status === 'declined' && b.declineReason && (

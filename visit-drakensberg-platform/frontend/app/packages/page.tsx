@@ -66,7 +66,7 @@ export default function PackagesPage() {
         <div className="max-w-[1440px] mx-auto">
           <p className="font-sans text-xs tracking-[0.2em] uppercase text-white/30 mb-3">Curated journeys</p>
           <h1 className="font-display text-5xl lg:text-6xl text-white leading-none mb-4">Packages</h1>
-          <p className="font-sans text-sm text-white/50">Complete Drakensberg experiences — stay, eat, explore, guided</p>
+          <p className="font-sans text-sm text-white/50">Complete Drakensberg experiences: stay, eat, explore, guided</p>
         </div>
       </section>
 
@@ -90,10 +90,10 @@ export default function PackagesPage() {
 
       <div className="max-w-[1440px] mx-auto px-6 lg:px-12 py-12">
         {!loading && cards.length === 0 && (
-          <p className="font-sans text-sm text-forest/40 py-16 text-center">No packages published yet — check back soon.</p>
+          <p className="font-sans text-sm text-forest/40 py-16 text-center">No packages published yet. Please check back soon.</p>
         )}
         {!loading && cards.length > 0 && filtered.length === 0 && (
-          <p className="font-sans text-sm text-forest/40 py-16 text-center">No packages in {TABS.find(t => t.slug === category)?.label} yet — try another category.</p>
+          <p className="font-sans text-sm text-forest/40 py-16 text-center">No packages in {TABS.find(t => t.slug === category)?.label} yet. Try another category.</p>
         )}
         <div className="grid lg:grid-cols-2 gap-8">
           {filtered.map((p) => (
