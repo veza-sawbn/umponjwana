@@ -6,6 +6,7 @@ import { sendMail } from '@/lib/mailer'
 import { emailShell, ctaButton, esc } from '@/lib/email-layout'
 import { getSiteOrigin } from '@/lib/origin'
 import { safeRedirectPath } from '@/lib/safe-redirect'
+import { rateLimit, rateLimitHeaders, callerKey } from '@/lib/rate-limit'
 
 export const dynamic = 'force-dynamic'
 
@@ -79,6 +80,17 @@ export async function POST(req: Request) {
   const supabase = createRouteHandlerClient({ cookies })
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'unauthorized' }, { status: 401 })
+
+  // A second bound on top of the database's per-hour insert cap: that one
+  // limits how many notifications an account may RAISE, this one how often it
+  // may ask us to put mail in somebody's inbox.
+  const limit = await rateLimit('notificationEmail', callerKey(req, user.id))
+  if (!limit.ok) {
+    return NextResponse.json(
+      { sent: false, error: 'rate limited' },
+      { status: 429, headers: rateLimitHeaders(limit) },
+    )
+  }
 
   // Runs under the caller's session on purpose: the RPC decides, from
   // vd_notifications.created_by, whether this caller is entitled to have this

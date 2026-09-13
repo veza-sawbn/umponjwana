@@ -1,7 +1,30 @@
 import { NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase-admin'
+import { rateLimit, rateLimitHeaders, callerKey } from '@/lib/rate-limit'
+import { bearerMatches, secretsMatch } from '@/lib/secret-compare'
 
 export const dynamic = 'force-dynamic'
+
+/**
+ * Record an attempt in vd_audit_log.
+ *
+ * Deliberately records no email address and no secret — only what happened and
+ * why it was refused, since the log is readable by every admin. Never throws:
+ * an audit failure must not turn into an error the caller can distinguish from
+ * a refusal, which would itself be an oracle.
+ */
+async function auditRecoveryAttempt(action: string, details: Record<string, unknown>) {
+  try {
+    await supabaseAdmin().from('vd_audit_log').insert({
+      action,
+      entity: 'auth',
+      entity_id: 'admin-recovery',
+      details,
+    })
+  } catch (e) {
+    console.error('[recover-admin] audit write failed:', e instanceof Error ? e.message : e)
+  }
+}
 
 /**
  * POST /api/admin/recover-admin
@@ -20,11 +43,26 @@ export const dynamic = 'force-dynamic'
  *   token. Once the admin can log in again, rotate ADMIN_RECOVERY_SECRET.
  *
  * SECURITY
- *   - Requires `Authorization: Bearer <ADMIN_RECOVERY_SECRET>` header.
- *   - ADMIN_RECOVERY_SECRET must be a strong random string (≥32 chars).
+ *   - Requires `Authorization: Bearer <ADMIN_RECOVERY_SECRET>` header,
+ *     compared in constant time (lib/secret-compare.ts).
+ *   - ADMIN_RECOVERY_SECRET must be at least 32 characters. This is ENFORCED,
+ *     not advisory: a short secret on an endpoint that sets any account's
+ *     password is not a configuration choice, it is an open door.
+ *   - ADMIN_RECOVERY_EMAIL must name the one account this endpoint may touch.
+ *     Without it the endpoint stays disabled.
+ *   - Rate limited to 5 attempts per hour per caller, failing closed.
+ *   - Every attempt, successful or not, writes an audit row.
  *   - Set ADMIN_RECOVERY_SECRET to a new value (or remove it) after use.
- *   - Only operates on the exact email address provided in the request body —
- *     cannot be used to change arbitrary accounts.
+ *
+ * WHAT THE AUDIT FOUND (H7)
+ *   This is a permanent backdoor that sets an arbitrary password on ANY
+ *   account by email and grants it role='admin'. The header above claimed it
+ *   "cannot be used to change arbitrary accounts" because it only acts on the
+ *   supplied email — but it acted on WHATEVER email was supplied, which is
+ *   every account. Its only protection was a static secret, compared with
+ *   `!==` (timing leak), with no rate limit (online brute force), no length
+ *   enforcement, no audit trail, and a listUsers({perPage:1000}) scan on every
+ *   call including failed ones. All six are addressed below.
  *
  * REQUEST BODY
  *   { "email": "zumaveza@gmail.com", "password": "<new-strong-password>" }
@@ -34,16 +72,38 @@ export const dynamic = 'force-dynamic'
  *   400/401/403/404/500 { "error": "<reason>" }
  */
 export async function POST(req: Request) {
-  // ── Guard: secret must be configured and match ────────────────────────────
+  // ── Guard: the endpoint must be deliberately, completely enabled ──────────
   const secret = process.env.ADMIN_RECOVERY_SECRET
-  if (!secret) {
-    // Endpoint is disabled when the env var is not set.
+  const allowedEmail = process.env.ADMIN_RECOVERY_EMAIL?.trim().toLowerCase()
+
+  // Disabled unless BOTH are set. Requiring the account up front means a
+  // leaked secret can only reach the one account the operator nominated,
+  // rather than every account on the platform.
+  if (!secret || !allowedEmail) {
     return NextResponse.json({ error: 'Not found' }, { status: 404 })
   }
 
-  const authHeader = req.headers.get('authorization') ?? ''
-  const providedSecret = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : ''
-  if (!providedSecret || providedSecret !== secret) {
+  // Enforced, not advised. A weak secret here is worth as much as no secret.
+  if (secret.length < 32) {
+    console.error('[recover-admin] ADMIN_RECOVERY_SECRET is shorter than 32 characters — endpoint disabled')
+    return NextResponse.json({ error: 'Not found' }, { status: 404 })
+  }
+
+  // Before the secret is even looked at: an attacker must not be able to make
+  // unlimited guesses. Fails closed, so a Redis outage does not open a window.
+  const limit = await rateLimit('adminRecovery', callerKey(req))
+  if (!limit.ok) {
+    console.warn('[recover-admin] rate limited')
+    return NextResponse.json(
+      { error: 'Too many attempts. Try again later.' },
+      { status: 429, headers: rateLimitHeaders(limit) },
+    )
+  }
+
+  if (!bearerMatches(req, secret)) {
+    // Audited: a wrong secret on this endpoint is an attack, not a typo, and
+    // nothing else in the system would have recorded it.
+    await auditRecoveryAttempt('admin.recovery_denied', { reason: 'bad secret' })
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
@@ -61,22 +121,43 @@ export async function POST(req: Request) {
   if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
     return NextResponse.json({ error: 'A valid email address is required.' }, { status: 400 })
   }
-  if (!password || password.length < 8) {
-    return NextResponse.json({ error: 'Password must be at least 8 characters.' }, { status: 400 })
+
+  // The nominated account, and only the nominated account. Compared in
+  // constant time like the secret, since the address is itself a second factor
+  // a leaked-secret attacker would have to guess.
+  if (!secretsMatch(email, allowedEmail)) {
+    await auditRecoveryAttempt('admin.recovery_denied', { reason: 'account not nominated' })
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+
+  // 8 was Supabase's floor, not a sensible one for the account this endpoint
+  // exists to restore — it is the platform admin.
+  if (!password || password.length < 12) {
+    return NextResponse.json({ error: 'Password must be at least 12 characters.' }, { status: 400 })
   }
 
   const admin = supabaseAdmin()
 
   // ── Look up the user by email ─────────────────────────────────────────────
-  const { data: listData, error: listError } = await admin.auth.admin.listUsers({ perPage: 1000 })
-  if (listError) {
-    console.error('[recover-admin] listUsers error:', listError)
-    return NextResponse.json({ error: 'Could not look up users.' }, { status: 500 })
+  // Was listUsers({ perPage: 1000 }) — a thousand user records pulled into
+  // memory on every call, failed attempts included. The profiles table is
+  // keyed on the same id and holds the address, so one indexed read does it.
+  const { data: profileRow, error: lookupError } = await admin
+    .from('profiles').select('id').ilike('email', email).maybeSingle()
+  if (lookupError) {
+    console.error('[recover-admin] profile lookup error:', lookupError)
+    return NextResponse.json({ error: 'Could not look up the account.' }, { status: 500 })
+  }
+  if (!profileRow?.id) {
+    await auditRecoveryAttempt('admin.recovery_denied', { reason: 'no such account' })
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  const targetUser = listData?.users?.find(u => u.email?.toLowerCase() === email)
+  const { data: targetData } = await admin.auth.admin.getUserById(profileRow.id as string)
+  const targetUser = targetData?.user
   if (!targetUser) {
-    return NextResponse.json({ error: `No account found for ${email}` }, { status: 404 })
+    await auditRecoveryAttempt('admin.recovery_denied', { reason: 'no auth user' })
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
   // ── Update the password ───────────────────────────────────────────────────
@@ -111,7 +192,11 @@ export async function POST(req: Request) {
     console.error('[recover-admin] app_metadata sync error:', metaError)
   }
 
-  console.info(`[recover-admin] Password updated for ${email} (${targetUser.id})`)
+  // The most privileged action the platform can take, so it leaves a row in
+  // the same audit log everything else does — not only a function log line
+  // that rotates away.
+  await auditRecoveryAttempt('admin.recovery_used', { userId: targetUser.id })
+  console.info(`[recover-admin] Password updated for the nominated account (${targetUser.id})`)
 
   return NextResponse.json({ ok: true, userId: updated?.user?.id ?? targetUser.id })
 }

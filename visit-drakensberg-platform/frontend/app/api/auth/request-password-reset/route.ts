@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 import { getSiteOrigin } from '@/lib/origin'
+import { rateLimit, rateLimitHeaders, callerKey } from '@/lib/rate-limit'
 import { sendMail } from '@/lib/mailer'
 import { emailShell, ctaButton, esc } from '@/lib/email-layout'
 
@@ -51,6 +52,25 @@ export async function POST(req: Request) {
 
   if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
     return NextResponse.json({ error: 'A valid email address is required.' }, { status: 400 })
+  }
+
+  // This route mails a real person through our own SMTP, so the cost of abuse
+  // lands on a third party's inbox and on our sender reputation. Budgeted per
+  // caller AND per target address, so neither one IP working through a list
+  // nor a distributed burst at one victim gets through. Fails closed: better
+  // to refuse a reset for fifteen minutes than to let a Redis outage open a
+  // mail-bomb window.
+  const limits = await Promise.all([
+    rateLimit('passwordReset', callerKey(req)),
+    rateLimit('passwordReset', `email:${email}`),
+  ])
+  const blocked = limits.find(l => !l.ok)
+  if (blocked) {
+    // Same shape as the success response below — telling an attacker which
+    // addresses are rate limited would undo the anti-enumeration behaviour
+    // this route is careful about everywhere else.
+    console.warn('[request-password-reset] rate limited')
+    return NextResponse.json({ ok: true }, { headers: rateLimitHeaders(blocked) })
   }
 
   const origin = getSiteOrigin(req)

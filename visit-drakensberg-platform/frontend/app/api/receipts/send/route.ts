@@ -5,6 +5,7 @@ import { supabaseAdmin } from '@/lib/supabase-admin'
 import { sendMail } from '@/lib/mailer'
 import { formatMoney as money } from '@/lib/allocation'
 import { emailShell, ctaButton, detailTable, esc, finePrint } from '@/lib/email-layout'
+import { bearerMatches } from '@/lib/secret-compare'
 
 export const dynamic = 'force-dynamic'
 
@@ -81,8 +82,10 @@ export async function POST(req: Request) {
   // Server-to-server callers (e.g. the iKhokha webhook, which has no browser
   // session to authenticate with) prove themselves with the service role key
   // and read via the admin client instead of an RLS-scoped session.
-  const bearer = req.headers.get('authorization')?.replace(/^Bearer\s+/i, '')
-  const isInternal = !!bearer && !!process.env.SUPABASE_SERVICE_ROLE_KEY && bearer === process.env.SUPABASE_SERVICE_ROLE_KEY
+  // Constant-time: `bearer === SUPABASE_SERVICE_ROLE_KEY` short-circuits at
+  // the first differing byte, and the key it leaks is the one that bypasses
+  // RLS entirely (audit finding L2).
+  const isInternal = bearerMatches(req, process.env.SUPABASE_SERVICE_ROLE_KEY)
 
   const supabase = isInternal ? supabaseAdmin() : createRouteHandlerClient({ cookies })
   if (!isInternal) {
