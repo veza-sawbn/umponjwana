@@ -300,14 +300,14 @@ function OfferCardBody({ item }: { item: MiniListItemData }) {
   return (
     <Link href={item.href} className="group block bg-white border border-black/8 hover:border-forest/30 transition-colors h-full">
       <div className="relative overflow-hidden aspect-[4/3] bg-mist">
-        {item.img ? (
-          <SafeImage src={item.img} alt={item.title} fill loading="lazy"
-            sizes="(max-width: 640px) 88vw, (max-width: 1024px) 45vw, 30vw"
-            className="object-cover transition-transform duration-500 group-hover:scale-105"
-            style={{ willChange: 'transform' }} />
-        ) : (
-          <div className="w-full h-full" style={{ background: item.badgeColor }} />
-        )}
+        {/* The category colour always sits underneath, so a listing with no
+            photo — and one whose photo fails to load — shows the same
+            deliberate block rather than an empty frame. */}
+        <div className="absolute inset-0" style={{ background: item.badgeColor }} />
+        <SafeImage src={item.img} alt={item.title} fill loading="lazy"
+          sizes="(max-width: 640px) 88vw, (max-width: 1024px) 45vw, 30vw"
+          className="object-cover transition-transform duration-500 group-hover:scale-105"
+          style={{ willChange: 'transform' }} />
         <span className="absolute top-3 left-3 font-sans text-[10px] tracking-[0.15em] uppercase bg-black/55 text-white px-2.5 py-1">
           {item.badgeLabel}
         </span>
