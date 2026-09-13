@@ -8,8 +8,10 @@ import Footer from '@/components/layout/Footer'
 import { ArrowLeft, ShieldCheck, Lock, Calendar, Users, MapPin, Bus } from 'lucide-react'
 import { useBooking, describeAddonParty } from '@/lib/booking-context'
 import { addBooking } from '@/lib/bookings'
-import { getDepartures, bookDepartureSeats, releaseDepartureSeats } from '@/lib/departures'
-import { bookActivityTimeslot, releaseActivityTimeslot } from '@/lib/activities'
+import { getDepartures } from '@/lib/departures'
+import {
+  holdDepartureSeats, holdActivitySlot, releaseInventoryHolds, claimInventoryHolds,
+} from '@/lib/inventory-holds'
 import { getSupplierEntities } from '@/lib/supplier-entities'
 import { getPropertyById } from '@/lib/properties'
 import { isRequestMode, paymentWindowLabel } from '@/lib/stay-requests'
@@ -167,28 +169,32 @@ export default function CheckoutPage() {
       const allDeps = requestMode ? [] : await getDepartures()
       const departureAddons = requestMode ? [] : snap.addons.filter(a => allDeps.some(d => d.id === a.id))
       const slotAddons = requestMode ? [] : snap.addons.filter(a => a.activityId && a.timeslotId && a.date)
-      const reserved: { id: string; seats: number }[] = []
-      const reservedSlots: { activityId: string; date: string; timeslotId: string; seats: number }[] = []
+      // Every seat taken here is a HOLD, not a booking: it records who took
+      // it and expires in 30 minutes if no booking claims it. Before this,
+      // an abandoned checkout kept a departure's seats until the daily sweep
+      // noticed — and kept an activity timeslot forever, because that sweep
+      // only ever released departures. See lib/inventory-holds.ts.
+      const holds: string[] = []
       try {
         for (const addon of departureAddons) {
-          await bookDepartureSeats(addon.id, addon.guests)
-          reserved.push({ id: addon.id, seats: addon.guests })
+          holds.push(await holdDepartureSeats(addon.id, addon.guests))
         }
         for (const addon of slotAddons) {
-          await bookActivityTimeslot(addon.activityId!, addon.date!, addon.timeslotId!, addon.guests)
-          reservedSlots.push({ activityId: addon.activityId!, date: addon.date!, timeslotId: addon.timeslotId!, seats: addon.guests })
+          holds.push(await holdActivitySlot(addon.activityId!, addon.date!, addon.timeslotId!, addon.guests))
         }
       } catch (seatErr) {
         // Roll back anything we already took, then surface the problem.
-        await Promise.all([
-          ...reserved.map(r => releaseDepartureSeats(r.id, r.seats).catch(() => {})),
-          ...reservedSlots.map(r => releaseActivityTimeslot(r.activityId, r.date, r.timeslotId, r.seats).catch(() => {})),
-        ])
-        const msg = seatErr instanceof Error && (seatErr.message.includes('seats') || seatErr.message.includes('timeslot'))
-          ? seatErr.message.includes('timeslot')
+        await releaseInventoryHolds(holds)
+        const message = seatErr instanceof Error ? seatErr.message : ''
+        const msg = /already hold/i.test(message)
+          // The per-account quota. Worth saying plainly rather than as a
+          // generic failure, because the guest can act on it.
+          ? 'You have another checkout still holding seats. Finish or cancel it, or try again in half an hour.'
+          : /timeslot/i.test(message)
             ? 'One of your activity timeslots no longer has enough seats. Please adjust your trip.'
-            : 'One of your tour departures no longer has enough seats. Please adjust your trip.'
-          : 'We could not reserve your booking. Please try again.'
+            : /seats/i.test(message)
+              ? 'One of your tour departures no longer has enough seats. Please adjust your trip.'
+              : 'We could not reserve your booking. Please try again.'
         toast.error(msg)
         setLoading(false)
         return
@@ -222,6 +228,18 @@ export default function CheckoutPage() {
         analyticsAnonId,
         analyticsSessionId,
       })
+
+      // The booking owns these seats now, so they stop expiring on their own.
+      // A failure here is not fatal: the holds simply keep their TTL and the
+      // sweep returns the seats, which is the safe direction to fail in — the
+      // alternative is a booking silently holding inventory forever.
+      if (holds.length > 0) {
+        try {
+          await claimInventoryHolds(saved.id, holds)
+        } catch (claimErr) {
+          console.error('Could not attach inventory holds to booking:', claimErr)
+        }
+      }
 
       completedRef.current = true
       booking.clearBooking()

@@ -122,8 +122,11 @@ export function slotRemaining(activity: Pick<Activity, 'timeslots' | 'slotBookin
   return Math.max(slot.capacity - slotBookedCount(activity, dateStr, timeslotId), 0)
 }
 
-/** Visitor-side booking: atomic, capacity-checked, executed server-side.
- *  Throws with a readable message when the timeslot is full for that date. */
+/** OPERATOR-side booking: a permanent, capacity-checked take on a timeslot of
+ *  an activity you run. NOT the checkout path — a guest reserving at checkout
+ *  takes a TTL'd hold through lib/inventory-holds.ts, and vd_book_activity_slot
+ *  now refuses anyone who is not the activity's owner, an ops employee managing
+ *  them, or staff. */
 export async function bookActivityTimeslot(activityId: string, dateStr: string, timeslotId: string, seats: number): Promise<void> {
   const { error } = await supabase.rpc('vd_book_activity_slot', {
     p_activity_id: activityId, p_slot_date: dateStr, p_timeslot_id: timeslotId, p_seats: seats,
@@ -131,7 +134,11 @@ export async function bookActivityTimeslot(activityId: string, dateStr: string, 
   if (error) throw new Error(error.message || 'Could not reserve this timeslot')
 }
 
-/** Free seats after a cancellation (booking owner or supplier). */
+/** Free seats on a timeslot (the activity's operator, staff, or a guest who
+ *  actually holds them). Until 20260914_inventory_holds.sql this accepted any
+ *  signed-in caller and any seat count, including a negative one — which
+ *  INFLATED the booked count and let anyone mark a timeslot permanently full.
+ *  Seats a guest holds normally come back through releaseBookingInventory. */
 export async function releaseActivityTimeslot(activityId: string, dateStr: string, timeslotId: string, seats: number): Promise<void> {
   const { error } = await supabase.rpc('vd_release_activity_slot', {
     p_activity_id: activityId, p_slot_date: dateStr, p_timeslot_id: timeslotId, p_seats: seats,

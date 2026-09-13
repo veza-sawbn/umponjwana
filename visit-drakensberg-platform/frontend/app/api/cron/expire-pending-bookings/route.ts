@@ -42,5 +42,23 @@ export async function GET(req: Request) {
     )
   }
 
-  return NextResponse.json({ expired: data ?? 0, expiredRequests: expiredRequests ?? 0 })
+  // Holds taken at checkout that no booking ever claimed — a closed tab, a
+  // crashed browser, a guest who changed their mind at the payment page.
+  // Before 20260914_inventory_holds.sql nothing released these at all: a
+  // departure's seats waited for this sweep to cancel the whole pending
+  // booking, and an activity timeslot was never released by anything.
+  const { data: expiredHolds, error: holdError } = await admin.rpc('vd_expire_inventory_holds')
+  if (holdError) {
+    console.error('[cron] expire-inventory-holds failed:', holdError)
+    return NextResponse.json(
+      { expired: data ?? 0, expiredRequests: expiredRequests ?? 0, error: holdError.message },
+      { status: 500 },
+    )
+  }
+
+  return NextResponse.json({
+    expired: data ?? 0,
+    expiredRequests: expiredRequests ?? 0,
+    expiredHolds: expiredHolds ?? 0,
+  })
 }

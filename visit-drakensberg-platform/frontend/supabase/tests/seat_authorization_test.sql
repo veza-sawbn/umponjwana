@@ -86,11 +86,22 @@ begin
     'not allowed to release seats',
     'a cancelled booking is no longer a claim on the seats');
 
-  -- ── vd_book_seats: still open to customers, but bounded ───────────────────
+  -- ── vd_book_seats: the operator's direct-take path ────────────────────────
+  -- 20260913 left this open to any authenticated caller, bounded at 20 seats,
+  -- because /checkout reserved through it before the booking row existed.
+  -- 20260914_inventory_holds.sql gave checkout a hold to use instead, so this
+  -- is now only what its remaining caller is: a supplier recording a guest who
+  -- booked off-platform (lib/departure-guests.ts addManualGuest).
   perform vdtest.act_as(v_guest);
+  perform vdtest.raises(
+    format('select vd_book_seats(%L, 3)', v_departure),
+    'not allowed to book seats',
+    'a customer no longer takes seats directly — checkout holds (see inventory_holds_test)');
+
+  perform vdtest.act_as(v_operator);
   perform vdtest.allows(
     format('select vd_book_seats(%L, 3)', v_departure),
-    'a customer may still reserve seats at checkout');
+    'the departure''s own operator may record an off-platform guest');
 
   perform vdtest.raises(
     format('select vd_book_seats(%L, 500)', v_departure),
@@ -111,7 +122,9 @@ begin
     'invalid seat count', 'a negative release is rejected even for the owner');
   perform vdtest.act_as(v_guest);
 
-  -- Capacity is still enforced.
+  -- Capacity is still enforced — as the operator, who is now the only caller
+  -- who gets past the authorization check above.
+  perform vdtest.act_as(v_operator);
   perform vdtest.raises(
     format('select vd_book_seats(%L, 20)', v_departure),
     'not enough seats available', 'capacity is still enforced');
