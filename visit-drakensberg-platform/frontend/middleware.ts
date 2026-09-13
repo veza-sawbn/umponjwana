@@ -76,9 +76,23 @@ export async function middleware(req: NextRequest) {
   }
   // ──────────────────────────────────────────────────────────────────────────
 
-  // Always call getSession so the helper has a chance to refresh the token and
-  // write updated Set-Cookie headers onto `res`.
-  const { data: { session } } = await supabase.auth.getSession()
+  // getSession() first, purely for its side effect: it is what gives the
+  // auth-helpers client a chance to refresh an expiring token and write the
+  // updated Set-Cookie headers onto `res`.
+  await supabase.auth.getSession()
+
+  // …but the ROUTING DECISION is made from getUser(), not getSession().
+  //
+  // getSession() decodes the JWT out of the cookie without verifying its
+  // signature — it has no key to verify with. So every branch below used to
+  // turn on session.user.app_metadata.role, a value a forged cookie could
+  // simply assert (audit finding M1). RLS kept forged credentials from reading
+  // anything privileged, since Postgres verifies the signature independently,
+  // but the console shell, its client bundles and the maintenance-mode bypass
+  // were all reachable. getUser() round-trips to the auth server, so the
+  // identity here is one Supabase has actually vouched for.
+  const { data: { user } } = await supabase.auth.getUser()
+  const session = user ? { user } : null
 
   let role: string | undefined
   let staffRole: string | undefined

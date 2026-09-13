@@ -26,10 +26,16 @@ const nextConfig = {
   },
   images: {
     remotePatterns: [
-      { protocol: 'https', hostname: '*.supabase.co' },
-      ...(supabaseHostname && !supabaseHostname.endsWith('.supabase.co')
+      // This project's own Supabase host, not '*.supabase.co'. The wildcard
+      // meant next/image would fetch and re-serve an image from ANY Supabase
+      // project on the internet, under our domain and our image-optimisation
+      // budget (audit finding M2). Falls back to the wildcard only when
+      // NEXT_PUBLIC_SUPABASE_URL is unset — otherwise every Storage photo
+      // breaks at build time with "hostname not configured", which crashes
+      // the whole page it is on rather than just that one photo.
+      ...(supabaseHostname
         ? [{ protocol: 'https', hostname: supabaseHostname }]
-        : []),
+        : [{ protocol: 'https', hostname: '*.supabase.co' }]),
       { protocol: 'https', hostname: 'images.unsplash.com' },
       { protocol: 'https', hostname: 'plus.unsplash.com' },
     ],
