@@ -199,43 +199,68 @@ belongs in its own change rather than a security branch.
 
 ## 4. Monitoring and alerting
 
-### ☐ 4.1 Error tracking
+### 4.1 Structured logging — done; ☐ an error tracker is not
 
-Add Sentry (or equivalent) to the Next.js app and the FastAPI backend.
-Minimum useful configuration:
+`frontend/lib/observability.ts` gives every operational event one shape: a
+single JSON line with a stable dotted `event` name, a severity, and fields
+that are **redacted by default** rather than by remembering — `email`,
+`customer_email`, `phone`, `full_name`, `token`, `token_hash`, `share_token`,
+`password`, `authorization` and anything matching a JWT, `sk_live_`, `re_` or
+a Postgres DSN, at any depth, including inside an `Error` message. Errors are
+reduced to name and message, so a stack trace carrying a query fragment does
+not reach the drain. 38 tests cover exactly this.
 
-- release tagging, so a spike maps to a deploy;
-- `beforeSend` scrubbing of `email`, `customer_email`, `phone`, `token`,
-  `token_hash`, `share_token`, `password` and anything matching `sk_`/`eyJ`.
-  Several handlers log whole Supabase error objects, which can carry query
-  fragments and row data;
-- user context limited to the user **id**, never the address.
+Use it instead of `console.error` in new code:
 
-### ☐ 4.2 Alert on these specifically
+```ts
+import { alertEvent, logEvent, EVENTS } from '@/lib/observability'
+
+logEvent({ event: 'booking.created', severity: 'info', fields: { bookingId } })
+await alertEvent({ event: EVENTS.PAYMENT_RECONCILIATION_FAILED, severity: 'critical', fields: { orderId, reason: e } })
+```
+
+☐ **Still outstanding: an actual error tracker.** Sentry (or equivalent) on the
+Next.js app and the FastAPI backend, with release tagging so a spike maps to a
+deploy and user context limited to the user **id**, never the address. The
+redaction above is what a `beforeSend` hook would otherwise have to do, so
+wiring one up is mostly configuration now.
+
+### 4.2 Alerts — wired; ☐ the destination is not set
 
 Generic uptime checks would not have caught any of the audit's findings. These
-would:
+are raised in code and delivered to `ALERT_WEBHOOK_URL` — any endpoint taking
+a JSON POST (Slack, Discord, PagerDuty Events v2, your own). **That variable
+is unset, so nothing is being delivered today**; setting it is the outstanding
+work, and it is one line of configuration. Repeats of the same event inside
+five minutes are collapsed, so an attack pages once rather than a thousand
+times and the channel stays readable.
 
-| Signal | Why it matters | Suggested threshold |
+| Event | Raised from | Why it matters |
 |---|---|---|
-| `/api/payments/ikhokha/webhook` non-2xx | A payment settled at the gateway and not in our database. The route returns 500/502 and relies on iKhokha retrying; nobody is told. | any, immediately |
-| `vd_payment_links` stuck `pending` > 1 hour with a paid gateway status | The same failure, seen from the data side | hourly sweep |
-| `[rate-limit] … could not be evaluated` | Redis is down, so password reset and admin recovery are failing closed — users cannot reset passwords | any, immediately |
-| `admin.recovery_denied` in `vd_audit_log` | Someone is guessing `ADMIN_RECOVERY_SECRET` | any, immediately |
-| `admin.recovery_used` | The backdoor was used. Should be near-never | any, immediately |
-| `notification rate limit reached` | An account is trying to mailshot other users | > 3/hour |
-| `[origin] ignoring untrusted x-forwarded-host` | Someone is attempting the C3 link-poisoning attack | any, immediately |
-| `[middleware] ignoring redirect to untrusted host` | An admin_redirects row is pointing off-site | any |
-| Role changes (`admin_set_role`, `admin_set_staff_role`) | Privilege escalation, legitimate or not | daily digest |
-| 5xx rate | Everything else | > 1% over 5 min |
+| `payment.reconciliation_failed` | the iKhokha webhook's catch | **The one this application most needed.** iKhokha took the customer's money and we could not record it. The route returns 500 and relies on iKhokha retrying; until this line nobody was told a paid order was sitting unpaid in our database. |
+| `payment.gateway_unreachable` | the same webhook | We cannot confirm whether a payment cleared at all |
+| `ratelimit.degraded` | `lib/rate-limit.ts` | Redis is down, so password reset and admin recovery are failing **closed** — real users cannot reset their passwords, and nothing else would have surfaced that |
+| `admin.recovery_denied` | `/api/admin/recover-admin` | Someone is guessing `ADMIN_RECOVERY_SECRET` |
+| `admin.recovery_used` | the same route | The backdoor was used. Should be near-never |
+| `security.untrusted_forwarded_host` | `lib/origin.ts` | Someone is attempting the C3 reset-link poisoning attack |
+| `security.untrusted_redirect_target` | `middleware.ts` | An `admin_redirects` row points off-site |
+| `audit.digest` | `/api/cron/audit-digest`, daily | Notable audit entries, and payment links stuck `pending` — the complement to the webhook alert, catching the case where no callback ever arrived |
 
-### ☐ 4.3 Read the audit log
+☐ **Not yet raised anywhere:** overall 5xx rate (> 1% over 5 minutes) and
+uptime, both of which need an external watcher rather than application code —
+see ☐ 4.4.
 
-`vd_audit_log` records order creation, payment recording, invoice link
-revocation and reissue, role changes, and now seat bookings and admin-recovery
-attempts. Nothing surfaces it. A weekly digest to the admin address of
-everything in the "alert" table above, plus every `invoice.link_revoked` and
-every role change, turns a write-only log into a control.
+### 4.3 Read the audit log — done
+
+`/api/cron/audit-digest` runs daily (05:00 UTC, `vercel.json`, guarded by
+`CRON_SECRET`). It counts the last 24 hours of `vd_audit_log`, escalates the
+entries that should be rare — `admin.recovery_used`, `admin.recovery_denied`,
+`invoice.link_revoked`, role and ops-assignment changes — and reports payment
+links left `pending` for over an hour.
+
+It stays quiet on a day with nothing notable, deliberately: a digest that
+pings every day regardless is one people learn to ignore, and then the day it
+matters they ignore that too.
 
 ### ☐ 4.4 Uptime
 

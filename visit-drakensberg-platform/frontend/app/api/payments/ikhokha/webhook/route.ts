@@ -3,6 +3,7 @@ import { getPaymentLinkStatus } from '@/lib/ikhokha'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 import { getSiteOrigin } from '@/lib/origin'
 import { sendOrderReceipt } from '@/lib/receipts-server'
+import { alertEvent, EVENTS } from '@/lib/observability'
 import { notifyServer, notifyServerMany } from '@/lib/notify-server'
 
 export const dynamic = 'force-dynamic'
@@ -36,7 +37,13 @@ export async function POST(req: Request) {
   try {
     status = await getPaymentLinkStatus(paylinkID)
   } catch (e) {
-    console.error('[ikhokha webhook] status check failed:', e)
+    // The gateway is the only authority on whether this payment cleared, so
+    // failing to reach it means we cannot reconcile at all.
+    await alertEvent({
+      event: EVENTS.PAYMENT_GATEWAY_UNREACHABLE,
+      severity: 'error',
+      fields: { paylinkId: paylinkID, orderId: link.order_id, reason: e },
+    })
     return NextResponse.json({ ok: false }, { status: 502 })
   }
 
@@ -247,7 +254,22 @@ export async function POST(req: Request) {
       }
     }).catch(err => console.error('[ikhokha webhook] receipt email threw:', err))
   } catch (e) {
-    console.error('[ikhokha webhook] failed to record order payment:', e)
+    // THE alert this application most needed and did not have: iKhokha has
+    // taken the customer's money and we could not record it. The 500 below
+    // relies on iKhokha retrying, and until this line nobody was told that a
+    // paid order was sitting unpaid in our database.
+    await alertEvent({
+      event: EVENTS.PAYMENT_RECONCILIATION_FAILED,
+      severity: 'critical',
+      fields: {
+        paylinkId: paylinkID,
+        orderId: link.order_id,
+        invoiceId: link.invoice_id,
+        amount: link.amount,
+        currency: link.currency,
+        reason: e,
+      },
+    })
     // Roll back to pending so a retried webhook (or manual reconciliation) can complete it.
     await admin.from('vd_payment_links').update({ status: 'pending' }).eq('id', link.id)
     return NextResponse.json({ ok: false }, { status: 500 })

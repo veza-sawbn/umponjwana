@@ -43,6 +43,8 @@
  *   4. req.url's own origin — last resort, correct for local dev without a proxy
  */
 
+import { alertEvent, EVENTS } from './observability'
+
 /** Hosts we will accept from a forwarded header, lowercased, no port. */
 function trustedHosts(): string[] {
   const hosts: string[] = []
@@ -121,7 +123,14 @@ export function getSiteOrigin(req: Request): string {
       const scheme = proto === 'http' ? 'http' : 'https'
       return `${scheme}://${host.toLowerCase()}`
     }
-    console.warn('[origin] ignoring untrusted x-forwarded-host:', host)
+    // Nobody sends this header by accident to a host we do not own: it is
+    // either a proxy misconfiguration or an attempt at the C3 reset-link
+    // poisoning attack. Either way somebody should look.
+    void alertEvent({
+      event: EVENTS.UNTRUSTED_FORWARDED_HOST,
+      severity: 'warn',
+      fields: { host, path: (() => { try { return new URL(req.url).pathname } catch { return null } })() },
+    })
   }
 
   return configuredOrigin(req)

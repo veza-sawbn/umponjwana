@@ -1,4 +1,5 @@
 import { redisCommand, isRedisConfigured } from './redis'
+import { alertEvent, EVENTS } from './observability'
 
 /**
  * Fixed-window rate limiting for API routes.
@@ -143,7 +144,15 @@ export async function rateLimit(
       retryAfter: Math.max(1, Math.ceil((resetAt - now) / 1000)),
     }
   } catch (e) {
-    console.error(`[rate-limit] ${name} could not be evaluated:`, e instanceof Error ? e.message : e)
+    // Redis is configured but unreachable. For the fail-closed rules that
+    // means password reset and admin recovery are now REFUSING legitimate
+    // users — a user-visible outage that would otherwise be invisible until
+    // someone complained.
+    void alertEvent({
+      event: EVENTS.RATE_LIMITER_DEGRADED,
+      severity: rule.failClosed ? 'critical' : 'warn',
+      fields: { rule: name, failClosed: Boolean(rule.failClosed), reason: e },
+    })
     if (rule.failClosed) {
       return { ok: false, limit: rule.limit, remaining: 0, retryAfter: rule.windowSeconds }
     }

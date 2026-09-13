@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 import { isTrustedHost } from '@/lib/origin'
 import { safeRedirectPath } from '@/lib/safe-redirect'
+import { alertEvent, EVENTS } from '@/lib/observability'
 
 const PROTECTED_ROUTES = ['/dashboard', '/checkout', '/supplier', '/admin', '/account', '/operations']
 const ADMIN_ROUTES = ['/admin']
@@ -77,7 +78,11 @@ export async function middleware(req: NextRequest) {
             let host = ''
             try { host = new URL(match.to).hostname } catch { host = '' }
             if (!host || !isTrustedHost(host)) {
-              console.warn('[middleware] ignoring redirect to untrusted host:', match.to)
+              void alertEvent({
+                event: EVENTS.UNTRUSTED_REDIRECT_TARGET,
+                severity: 'warn',
+                fields: { from: match.from, to: match.to, statusCode: match.statusCode },
+              })
               return res
             }
             target = match.to

@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 import { rateLimit, rateLimitHeaders, callerKey } from '@/lib/rate-limit'
 import { bearerMatches, secretsMatch } from '@/lib/secret-compare'
+import { alertEvent, EVENTS } from '@/lib/observability'
 
 export const dynamic = 'force-dynamic'
 
@@ -14,6 +15,14 @@ export const dynamic = 'force-dynamic'
  * a refusal, which would itself be an oracle.
  */
 async function auditRecoveryAttempt(action: string, details: Record<string, unknown>) {
+  // Alert as well as audit. A wrong secret on this endpoint is an attack, and
+  // a right one is the most privileged action the platform can take — neither
+  // should wait for somebody to read the audit log.
+  await alertEvent({
+    event: action === 'admin.recovery_used' ? EVENTS.ADMIN_RECOVERY_USED : EVENTS.ADMIN_RECOVERY_DENIED,
+    severity: 'critical',
+    fields: details,
+  })
   try {
     await supabaseAdmin().from('vd_audit_log').insert({
       action,
