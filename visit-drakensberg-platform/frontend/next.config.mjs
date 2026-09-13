@@ -1,3 +1,5 @@
+import { securityHeaders } from './security-headers.mjs'
+
 // Supabase project host, so a project fronted by a custom domain (rather
 // than the default *.supabase.co) still gets picked up by the remotePattern
 // below — otherwise every trail/region/property photo uploaded to Storage
@@ -37,6 +39,9 @@ const nextConfig = {
     NEXT_PUBLIC_SUPABASE_ANON_KEY: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
     NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL,
     NEXT_PUBLIC_SITE_URL: process.env.NEXT_PUBLIC_SITE_URL,
+  },
+  async headers() {
+    return securityHeaders()
   },
   async redirects() {
     return [
