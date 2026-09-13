@@ -12,6 +12,7 @@ import { Autoplay } from 'swiper/modules'
 import 'swiper/css'
 import SearchBar from '@/components/search/SearchBar'
 import HeroCarousel from '@/components/media/HeroCarousel'
+import { useSwiperAutoplay, CAROUSEL_SPEED_MS } from '@/lib/carousel-autoplay'
 import Footer from '@/components/layout/Footer'
 import { getAllSiteContent, SITE_CONTENT_DEFAULTS, type HomeCard } from '@/lib/site-content'
 import { useSiteSection } from '@/lib/use-site-section'
@@ -86,19 +87,20 @@ function cardDimClass(card: HomeCard, inEditor: boolean) {
  * carousel rendering the same RegionCardBody as the desktop grid it
  * replaces below the `sm` breakpoint. Looping needs enough cards to feel
  * like a loop rather than glitch, so it falls back to a plain (still
- * swipeable) row. Auto-advances on a timer (paused on touch/drag, and
- * while the visual editor is open so it doesn't fight admin clicks) and
- * resumes afterwards.
+ * swipeable) row. Auto-advances on the shared house cadence — paused on
+ * touch/drag, off-screen, and while the visual editor is open so it doesn't
+ * fight admin clicks — and resumes afterwards. See lib/carousel-autoplay.ts.
  */
 function RegionsCarousel({ regions, inEditor }: { regions: HomeCard[]; inEditor: boolean }) {
   const canLoop = regions.length > 2
+  const autoplay = useSwiperAutoplay({ slideCount: regions.length, enabled: !inEditor })
 
   return (
     <Swiper
       modules={[Autoplay]}
       loop={canLoop}
-      speed={700}
-      autoplay={inEditor || regions.length < 2 ? false : { delay: 6000, disableOnInteraction: false, pauseOnMouseEnter: true }}
+      speed={CAROUSEL_SPEED_MS}
+      {...autoplay}
       slidesPerView={1.15}
       spaceBetween={12}
       grabCursor
@@ -258,20 +260,22 @@ function JourneyCardBody({ pkg }: { pkg: MarketplacePackage }) {
  * always presented as a Swiper carousel (unlike Regions, which only swaps
  * to a carousel on mobile) since it's meant to read as a scrolling reel of
  * deals rather than a fixed grid. Peeks progressively more of the next
- * card as the viewport widens. Auto-advances on a timer (paused on
- * touch/drag and while the visual editor is open) and resumes afterwards.
+ * card as the viewport widens. Auto-advances on the shared house cadence
+ * (paused on touch/drag, off-screen, and while the visual editor is open)
+ * and resumes afterwards. See lib/carousel-autoplay.ts.
  */
 function JourneysCarousel({ journeys }: { journeys: MarketplacePackage[] }) {
   const editMode = useEditMode()
   const inEditor = Boolean(editMode)
   const canLoop = journeys.length > 3
+  const autoplay = useSwiperAutoplay({ slideCount: journeys.length, enabled: !inEditor })
 
   return (
     <Swiper
       modules={[Autoplay]}
       loop={canLoop}
-      speed={700}
-      autoplay={inEditor || journeys.length < 2 ? false : { delay: 6000, disableOnInteraction: false, pauseOnMouseEnter: true }}
+      speed={CAROUSEL_SPEED_MS}
+      {...autoplay}
       spaceBetween={20}
       grabCursor
       slidesPerView={1.15}
@@ -334,13 +338,14 @@ function OffersCarousel({ items }: { items: MiniListItemData[] }) {
   const editMode = useEditMode()
   const inEditor = Boolean(editMode)
   const canLoop = items.length > 3
+  const autoplay = useSwiperAutoplay({ slideCount: items.length, enabled: !inEditor })
 
   return (
     <Swiper
       modules={[Autoplay]}
       loop={canLoop}
-      speed={700}
-      autoplay={inEditor || items.length < 2 ? false : { delay: 6000, disableOnInteraction: false, pauseOnMouseEnter: true }}
+      speed={CAROUSEL_SPEED_MS}
+      {...autoplay}
       spaceBetween={20}
       grabCursor
       slidesPerView={1.15}
