@@ -20,6 +20,7 @@ import type { Property } from '@/lib/properties'
 import type { Activity } from '@/lib/activities'
 import { formatMoney } from '@/lib/allocation'
 import ReadMoreText from '@/components/ui/ReadMoreText'
+import SaveButton from '@/components/ui/SaveButton'
 
 const DIFF_COLOR: Record<string, string> = { Easy: '#4A7251', Moderate: '#C9A96E', Hard: '#c0392b', Strenuous: '#c0392b', Extreme: '#7f1d1d' }
 const DIFF_BG: Record<string, string> = { Easy: '#4A725122', Moderate: '#C9A96E22', Hard: '#c0392b22', Strenuous: '#c0392b22', Extreme: '#7f1d1d22' }
@@ -135,9 +136,22 @@ export default function HikeDetail({
               <h1 className="font-display italic text-5xl lg:text-6xl mb-4">{trail.name}</h1>
               <p className="font-sans text-sm text-white/60">Starting point: {trail.trailhead}</p>
             </div>
-            <span className="font-sans text-sm px-4 py-2 mt-2" style={{ color: DIFF_COLOR[diff], background: DIFF_BG[diff] }}>
-              {diff}
-            </span>
+            <div className="flex items-center gap-3 mt-2">
+              <SaveButton
+                variant="inline"
+                tone="dark"
+                listing={{
+                  id: trail.id,
+                  type: 'hike',
+                  title: trail.name,
+                  location: trail.region,
+                  image: trail.image,
+                }}
+              />
+              <span className="font-sans text-sm px-4 py-2" style={{ color: DIFF_COLOR[diff], background: DIFF_BG[diff] }}>
+                {diff}
+              </span>
+            </div>
           </div>
         </div>
       </section>

@@ -12,6 +12,7 @@ import type { Activity } from '@/lib/activities'
 import { timeslotsForDate, slotRemaining } from '@/lib/activities'
 import { formatMoney } from '@/lib/allocation'
 import ReadMoreText from '@/components/ui/ReadMoreText'
+import SaveButton from '@/components/ui/SaveButton'
 
 function mapActivityToView(a: Activity) {
   const durationParts = []
@@ -116,10 +117,22 @@ export default function ActivityDetail({ activityData, id }: { activityData: Act
           </Link>
           <span className="inline-block font-sans text-[10px] tracking-[0.14em] uppercase bg-[#C9A96E]/20 text-[#C9A96E] px-3 py-1.5 mb-4">{activity.category}</span>
           <h1 className="font-display italic text-5xl lg:text-6xl mb-4">{activity.title}</h1>
-          <div className="flex flex-wrap gap-5 font-sans text-sm text-white/60">
+          <div className="flex flex-wrap items-center gap-5 font-sans text-sm text-white/60">
             {activity.location && <span className="flex items-center gap-1.5"><MapPin size={14} />{activity.location}</span>}
             {activity.duration && <span className="flex items-center gap-1.5"><Clock size={14} />{activity.duration}</span>}
             {activity.group_size && <span className="flex items-center gap-1.5"><Users size={14} />{activity.group_size}</span>}
+            <SaveButton
+              variant="inline"
+              tone="dark"
+              listing={{
+                id,
+                type: 'activity',
+                title: activity.title,
+                location: activity.location || undefined,
+                price: activity.price_per_person || null,
+                image: activityData.photos?.[0],
+              }}
+            />
           </div>
         </div>
       </section>

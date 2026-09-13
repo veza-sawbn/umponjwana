@@ -7,6 +7,7 @@ import Footer from '@/components/layout/Footer'
 import { getPublishedPackages, PACKAGE_CATEGORIES, PACKAGE_CATEGORY_LABELS, type PackageCategory } from '@/lib/packages'
 import { publicSupabase } from '@/lib/supabase-public'
 import { formatMoney } from '@/lib/allocation'
+import SaveButton from '@/components/ui/SaveButton'
 
 // Filter tabs mirror the vocabulary curated in the Package Builder
 // (/admin/packages) — see lib/packages.ts PACKAGE_CATEGORIES.
@@ -96,7 +97,10 @@ export default function PackagesPage() {
         )}
         <div className="grid lg:grid-cols-2 gap-8">
           {filtered.map((p) => (
-            <Link key={p.id} href={`/packages/${p.id}`} className="group bg-white border border-black/8 block hover:border-forest/30 transition-colors">
+            // The heart is a sibling of the Link, not a child — a <button>
+            // inside an <a> is invalid HTML.
+            <div key={p.id} className="relative">
+            <Link href={`/packages/${p.id}`} className="group bg-white border border-black/8 block hover:border-forest/30 transition-colors">
               <div className="relative overflow-hidden aspect-[16/9]">
                 <Image src={p.img} alt={p.title} fill loading="lazy" sizes="(max-width: 1024px) 100vw, 50vw"
                   className="object-cover transition-transform duration-700 group-hover:scale-104" />
@@ -143,6 +147,21 @@ export default function PackagesPage() {
                 </div>
               </div>
             </Link>
+            {/* Below the "Save Rx" discount flag when there is one — that
+                badge is a price saving, this is the saved-listings heart. */}
+            <SaveButton
+              className={p.originalPrice ? '!top-14 !right-4' : '!top-4 !right-4'}
+              listing={{
+                id: p.id,
+                type: 'package',
+                title: p.title,
+                location: p.location,
+                price: p.price,
+                image: p.img,
+                rating: p.rating,
+              }}
+            />
+            </div>
           ))}
         </div>
       </div>

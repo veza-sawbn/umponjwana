@@ -13,6 +13,7 @@ import { getExperiencesByTrail, resolvePackageItinerary, type TrekkingExperience
 import { useBooking } from '@/lib/booking-context'
 import { formatMoney } from '@/lib/allocation'
 import ReadMoreText from '@/components/ui/ReadMoreText'
+import SaveButton from '@/components/ui/SaveButton'
 
 const DIFF_COLOR: Record<string, string> = {
   Easy: '#4A7251', Moderate: '#C9A96E', Challenging: '#c0392b', Extreme: '#8e44ad', Strenuous: '#c0392b',
@@ -137,9 +138,23 @@ export default function ExperienceDetail({ exp }: { exp: TrekkingExperience }) {
                 )}
               </div>
             </div>
-            <span className="font-sans text-sm px-4 py-2 mt-2" style={{ color: DIFF_COLOR[exp.difficulty] || '#C9A96E', background: (DIFF_COLOR[exp.difficulty] || '#C9A96E') + '22' }}>
-              {exp.difficulty}
-            </span>
+            <div className="flex items-center gap-3 mt-2">
+              <SaveButton
+                variant="inline"
+                tone="dark"
+                listing={{
+                  id: exp.id,
+                  type: 'experience',
+                  title: exp.title,
+                  location: exp.region || exp.meetingPoint,
+                  price: exp.pricePerPerson,
+                  rating: exp.rating ?? undefined,
+                }}
+              />
+              <span className="font-sans text-sm px-4 py-2" style={{ color: DIFF_COLOR[exp.difficulty] || '#C9A96E', background: (DIFF_COLOR[exp.difficulty] || '#C9A96E') + '22' }}>
+                {exp.difficulty}
+              </span>
+            </div>
           </div>
         </div>
       </section>

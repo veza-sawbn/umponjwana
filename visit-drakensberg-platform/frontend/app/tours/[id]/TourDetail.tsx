@@ -13,6 +13,7 @@ import type { NearbyStayResult } from '@/lib/modules'
 import NearbyStaysModule from '@/components/modules/NearbyStaysModule'
 import { formatMoney } from '@/lib/allocation'
 import ReadMoreText from '@/components/ui/ReadMoreText'
+import SaveButton from '@/components/ui/SaveButton'
 
 const DIFF_COLOR: Record<string, string> = { Easy: '#4A7251', Moderate: '#C9A96E', Strenuous: '#c0392b', Extreme: '#7f1d1d' }
 
@@ -68,9 +69,23 @@ export default function TourDetail({ tour, nearbyStays }: { tour: Tour; nearbySt
                 ) : null}
               </div>
             </div>
-            <span className="font-sans text-sm px-4 py-2 mt-2" style={{ color: diffColor, background: diffColor + '22' }}>
-              {diff}
-            </span>
+            <div className="flex items-center gap-3 mt-2">
+              <SaveButton
+                variant="inline"
+                tone="dark"
+                listing={{
+                  id: tour.id,
+                  type: 'tour',
+                  title: tour.name,
+                  location: tour.trailName || 'Drakensberg',
+                  price: tour.pricePerPerson,
+                  rating: tour.rating || undefined,
+                }}
+              />
+              <span className="font-sans text-sm px-4 py-2" style={{ color: diffColor, background: diffColor + '22' }}>
+                {diff}
+              </span>
+            </div>
           </div>
         </div>
       </section>

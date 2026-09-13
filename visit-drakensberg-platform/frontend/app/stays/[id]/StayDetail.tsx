@@ -14,6 +14,8 @@ import { Check, Clock } from 'lucide-react'
 import type { Property } from '@/lib/properties'
 import { isRequestMode } from '@/lib/stay-requests'
 import { getRoomUnitsLeft, type Room } from '@/lib/rooms'
+import SaveButton from '@/components/ui/SaveButton'
+import type { SaveableListing } from '@/lib/saved-listings'
 import { formatMoney } from '@/lib/allocation'
 import ReadMoreText from '@/components/ui/ReadMoreText'
 
@@ -79,6 +81,18 @@ export default function StayDetail({ property, rooms: roomsData, id }: { propert
   // before any payment is taken (see lib/stay-requests.ts). Say so here,
   // before the guest builds a whole trip around it.
   const requestOnly = isRequestMode(property)
+
+  // The snapshot both hero save buttons write — one object so the mobile
+  // photo hero and the desktop band can never disagree about what got saved.
+  const savedListing: SaveableListing = {
+    id,
+    type: 'stay',
+    title: stay.title,
+    location: stay.location,
+    price: stay.price_from || null,
+    image: stay.images[0],
+    rating: stay.rating || undefined,
+  }
 
   const [heroSlide, setHeroSlide] = useState(0)
   const [selectedRoom, setSelectedRoom] = useState<any>(null)
@@ -155,6 +169,13 @@ export default function StayDetail({ property, rooms: roomsData, id }: { propert
             {heroSlide + 1} / {stay.images.length}
           </span>
         )}
+        {/* Under the slide counter when there is one — the desktop hero puts
+            the same control inline next to the rating instead. */}
+        <SaveButton
+          tone="dark"
+          className={stay.images.length > 1 ? '!top-16 !right-6' : '!top-6 !right-6'}
+          listing={savedListing}
+        />
       </section>
 
       {/* Hero header — sm and up (mobile uses the photo hero above instead). */}
@@ -174,6 +195,7 @@ export default function StayDetail({ property, rooms: roomsData, id }: { propert
                 <span>({stay.review_count} reviews)</span>
               </span>
             )}
+            <SaveButton variant="inline" tone="dark" listing={savedListing} />
           </div>
         </div>
       </section>
