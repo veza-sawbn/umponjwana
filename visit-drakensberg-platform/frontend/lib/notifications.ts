@@ -48,25 +48,34 @@ export async function notify(
   link?: string,
 ): Promise<void> {
   if (!userId) return
+
+  let notificationId: string | null = null
   try {
-    await supabase.from('vd_notifications').insert({
+    const { data } = await supabase.from('vd_notifications').insert({
       user_id: userId,
       type,
       title,
       body,
       link: link ?? null,
-    })
+    }).select('id').maybeSingle()
+    notificationId = (data as { id: string } | null)?.id ?? null
   } catch {}
 
   // Mirror the in-app notification by email, fire-and-forget, so suppliers
   // and customers hear about it without having to be signed in. Skipped
   // gracefully if SMTP isn't configured or the recipient has no email on
   // file — see app/api/notifications/email.
-  if (typeof fetch === 'function') {
+  //
+  // Only the id travels. The route reads the stored row and mails THAT, so
+  // nobody can have us send wording that was never recorded — which is what
+  // the old {userId, title, body, link} payload allowed (audit finding H5).
+  // No id means the insert was refused (rate limit, or no session), and there
+  // is nothing legitimate to email.
+  if (notificationId && typeof fetch === 'function') {
     fetch('/api/notifications/email', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ userId, title, body, link: link ?? null }),
+      body: JSON.stringify({ notificationId }),
     }).catch(() => {})
   }
 }
