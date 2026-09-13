@@ -6,6 +6,7 @@ import { ArrowRight } from 'lucide-react'
 import { Swiper, SwiperSlide } from 'swiper/react'
 import { Autoplay } from 'swiper/modules'
 import 'swiper/css'
+import { useSwiperAutoplay, CAROUSEL_SPEED_MS } from '@/lib/carousel-autoplay'
 import { getRegions, DEFAULT_REGIONS, type Region } from '@/lib/regions'
 import { isOptimizableImageHost } from '@/lib/image-url'
 
@@ -71,12 +72,14 @@ function RegionCard({ region: r, index, onSelect }: { region: Region; index: num
 /** Mobile-only carousel counterpart — same cadence as the homepage's. */
 function RegionsCarousel({ regions, onSelect }: { regions: Region[]; onSelect: (name: string) => void }) {
   const canLoop = regions.length > 2
+  const autoplay = useSwiperAutoplay({ slideCount: regions.length })
+
   return (
     <Swiper
       modules={[Autoplay]}
       loop={canLoop}
-      speed={700}
-      autoplay={regions.length < 2 ? false : { delay: 6000, disableOnInteraction: false, pauseOnMouseEnter: true }}
+      speed={CAROUSEL_SPEED_MS}
+      {...autoplay}
       slidesPerView={1.15}
       spaceBetween={12}
       grabCursor

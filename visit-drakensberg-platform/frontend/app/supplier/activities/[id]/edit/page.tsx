@@ -9,6 +9,8 @@ import { GoogleAddressField } from '@/components/maps/GoogleAddressField'
 import { supplierMediaSource } from '@/lib/supplier-media'
 import { MediaGalleryPicker } from '@/components/media/MediaPicker'
 import { TimeslotEditor } from '@/components/activities/TimeslotEditor'
+import { VehicleToggle } from '@/components/activities/VehicleToggle'
+import { addSupplierType } from '@/lib/supplier-types'
 
 const HOURS = Array.from({ length: 13 }, (_, i) => i)
 const MINUTES = [0, 15, 30, 45]
@@ -16,6 +18,7 @@ const MINUTES = [0, 15, 30, 45]
 type FormState = {
   name: string; category: string; region: string; difficulty: string; durationH: number; durationM: number;
   minAge: number; maxGroup: number; meetingPoint: string; gpsLat: string; gpsLng: string;
+  usesOwnVehicles: boolean;
   description: string; whatToWear: string; photos: string[]; included: string[]; safetyNotes: string;
   pricePerPerson: number; priceGroup: number; childPrice: number; childMaxAge: number;
   timeslots: ActivityTimeslot[]; depositRequired: boolean; depositPercent: string;
@@ -26,6 +29,7 @@ type FormState = {
 const EMPTY: FormState = {
   name: '', category: '', region: '', difficulty: 'Moderate', durationH: 0, durationM: 0,
   minAge: 0, maxGroup: 1, meetingPoint: '', gpsLat: '', gpsLng: '',
+  usesOwnVehicles: false,
   description: '', whatToWear: '', photos: [], included: [], safetyNotes: '',
   pricePerPerson: 0, priceGroup: 0, childPrice: 0, childMaxAge: 0, timeslots: [],
   depositRequired: false, depositPercent: '30',
@@ -46,6 +50,9 @@ export default function EditActivityPage() {
   const { id } = useParams<{ id: string }>()
   const router = useRouter()
   const [form, setForm] = useState<FormState>(EMPTY)
+  // The activity's own owner, so unlocking the transport tools targets the
+  // supplier who actually holds the listing rather than whoever is signed in.
+  const [supplierId, setSupplierId] = useState('')
   const [regions, setRegions] = useState<string[]>([])
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -59,11 +66,13 @@ export default function EditActivityPage() {
   useEffect(() => {
     getActivityById(id).then(a => {
       if (a) {
+        setSupplierId(a.supplierId)
         setForm({
           name: a.name, category: a.category, region: a.region ?? '', difficulty: a.difficulty,
           durationH: a.durationH, durationM: a.durationM,
           minAge: a.minAge, maxGroup: a.maxGroup,
           meetingPoint: a.meetingPoint, gpsLat: a.gpsLat, gpsLng: a.gpsLng,
+          usesOwnVehicles: a.usesOwnVehicles ?? false,
           description: a.description, whatToWear: a.whatToWear ?? '', photos: a.photos ?? [],
           included: a.included, safetyNotes: a.safetyNotes,
           pricePerPerson: a.pricePerPerson, priceGroup: a.priceGroup,
@@ -93,6 +102,20 @@ export default function EditActivityPage() {
     setSaving(true)
     try {
       await updateActivity(id, form)
+      // Best-effort, like the revalidate in lib/activities.ts: the edit is
+      // already saved, so a failure here costs the supplier the fleet tools,
+      // never their listing.
+      let unlockedTools = false
+      if (form.usesOwnVehicles && supplierId) {
+        try {
+          unlockedTools = await addSupplierType(supplierId, 'Shuttle')
+        } catch (e) {
+          console.error('[activities] could not add the Shuttle supplier type:', e)
+        }
+      }
+      // SupplierProvider reads the profile once on mount, so the tools we just
+      // unlocked only appear after a full page load — see lib/supplier-types.ts.
+      if (unlockedTools) { window.location.href = '/supplier/activities'; return }
       router.push('/supplier/activities')
     } catch {
       setError('Failed to save changes. Please try again.')
@@ -158,6 +181,8 @@ export default function EditActivityPage() {
           <F label="GPS Latitude"><input value={form.gpsLat} onChange={e => set('gpsLat', e.target.value)} className={inp} /></F>
           <F label="GPS Longitude"><input value={form.gpsLng} onChange={e => set('gpsLng', e.target.value)} className={inp} /></F>
         </div>
+
+        <VehicleToggle checked={form.usesOwnVehicles} onChange={v => set('usesOwnVehicles', v)} />
 
         <F label="Description" required><textarea value={form.description} onChange={e => set('description', e.target.value)} rows={3} className={`${inp} resize-none`} /></F>
 

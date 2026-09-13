@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Check, ChevronLeft, ChevronRight, Mountain, Plane, Route } from 'lucide-react'
+import { useAutoScrollCarousel } from '@/lib/carousel-autoplay'
 import { SUPPLIER_CATEGORIES, type SupplierCategory } from '@/lib/transport'
 
 // Illustration per operator category — the picture carries the distinction
@@ -22,10 +23,19 @@ const CATEGORIES = Object.entries(SUPPLIER_CATEGORIES) as [
  * screen, swipeable, with arrows and dots for pointer users. The track is a
  * plain scroll-snap list, so keyboard scrolling and swipe both work without
  * any of it being simulated in JavaScript — the arrows just scroll it.
+ *
+ * It cycles through the three operator types on its own (see
+ * lib/carousel-autoplay.ts) so a visitor who never swipes still learns that
+ * there is more than one kind of operator. Because the auto-advance moves
+ * the real scroll position, the arrows and dots below stay in step with it
+ * for free — `syncActive` reads them all back off the same scroll. On `lg`,
+ * where all three cards already fit side by side, nothing advances.
  */
 export function OperatorTypeCarousel() {
   const trackRef = useRef<HTMLDivElement>(null)
   const [active, setActive] = useState(0)
+
+  useAutoScrollCarousel(trackRef, { itemCount: CATEGORIES.length })
 
   // Which card is centred, read back from the scroll position so swipe,
   // arrows and dots never disagree about where the visitor is.
