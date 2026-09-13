@@ -162,13 +162,13 @@ export const EDITOR_PAGES: EditorPage[] = [
         note: 'Story cards show the 3 most recent published posts — edit them under Admin → Blog & Content.',
       },
       {
-        id: 'trails',
-        label: 'Top Trails',
+        id: 'attractions',
+        label: 'Top Attractions',
         contentKey: 'home_sections',
         reorderable: true,
         hideable: true,
-        fields: [text('trails_eyebrow', 'Eyebrow'), text('trails_heading', 'Heading')],
-        note: 'Trail rows are live data from published trails — edit them under Admin → Hiking Trails.',
+        fields: [text('attractions_eyebrow', 'Eyebrow'), text('attractions_heading', 'Heading')],
+        note: 'Rows are whatever is ticked "Featured on Homepage" under Admin → Hiking Trails, Nature Reserves and Towns & Cities.',
       },
       {
         id: 'journeys',

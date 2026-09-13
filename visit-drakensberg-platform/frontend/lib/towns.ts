@@ -14,6 +14,9 @@ export type Town = {
   highlights: string[]
   seoTitle: string
   seoDescription: string
+  /** Surfaced in the homepage "Top Attractions" section. Optional: towns
+   *  saved before this existed simply aren't featured. See lib/attractions.ts. */
+  featured?: boolean
   createdAt?: string
   updatedAt?: string
 }
@@ -88,6 +91,7 @@ function normalizeTown(town: Partial<Town> & { name: string; id?: string }): Tow
     highlights: town.highlights || [],
     seoTitle: town.seoTitle || `${town.name} | Visit Drakensberg`,
     seoDescription: town.seoDescription || '',
+    featured: town.featured ?? false,
     createdAt: town.createdAt,
     updatedAt: town.updatedAt,
   }
