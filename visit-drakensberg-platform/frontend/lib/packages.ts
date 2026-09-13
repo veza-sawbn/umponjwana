@@ -63,6 +63,16 @@ export const PACKAGE_STATUS_LABELS: Record<PackageStatus, string> = {
   archived: 'Archived',
 }
 
+// Marketplace packages are sold either per traveller, or as a single
+// flat-rate group product — "R16,000 for a group of 8". Rows written before
+// group pricing existed carry no `pricingMode` and are per-person.
+export type PackagePricingMode = 'per_person' | 'group'
+
+export const PACKAGE_PRICING_MODE_LABELS: Record<PackagePricingMode, string> = {
+  per_person: 'Per Person',
+  group: 'Group (flat rate)',
+}
+
 export type PackageComponentType =
   | 'accommodation'
   | 'activity'
@@ -131,8 +141,15 @@ export type MarketplacePackage = {
   region: string
   durationNights: number
   maxGuests: number
+  // Per-person sell price. For a group-priced package this is the derived
+  // per-head equivalent (groupPrice / groupSize), kept in step by
+  // normalizePackagePricing() so every surface that reads it — search cards,
+  // saved listings, recommendations — still shows a sensible number.
   pricePerPerson: number
-  originalPrice?: number
+  pricingMode?: PackagePricingMode // absent ⇒ 'per_person' (pre-group-pricing rows)
+  groupPrice?: number              // group mode: flat price covering the whole group
+  groupSize?: number               // group mode: guests the flat price covers
+  originalPrice?: number           // strike-through "was" price, in the package's own pricing unit
   tag?: string
   featured: boolean
   categories: PackageCategory[] // trip-length/occasion tabs shown on /packages
@@ -150,6 +167,76 @@ export type MarketplacePackage = {
 const KIND = 'package'
 
 const publicStatus = (s: PackageStatus): 'active' | 'draft' => (s === 'published' ? 'active' : 'draft')
+
+/** Pricing model of a package — legacy rows without the field are per-person. */
+export function packagePricingMode(pkg: Pick<MarketplacePackage, 'pricingMode'>): PackagePricingMode {
+  return pkg.pricingMode === 'group' ? 'group' : 'per_person'
+}
+
+export function isGroupPriced(pkg: Pick<MarketplacePackage, 'pricingMode'>): boolean {
+  return packagePricingMode(pkg) === 'group'
+}
+
+/** Guests the flat group price covers. Never zero, so it is safe to divide by. */
+export function packageGroupSize(pkg: Pick<MarketplacePackage, 'groupSize' | 'maxGuests'>): number {
+  return Math.max(1, Math.round(pkg.groupSize || pkg.maxGuests || 1))
+}
+
+/** Headline price shown on cards and the detail page: the flat group price
+ *  for a group package, the per-person price otherwise. */
+export function packageHeadlinePrice(pkg: Pick<MarketplacePackage, 'pricingMode' | 'groupPrice' | 'pricePerPerson'>): number {
+  return isGroupPriced(pkg) ? Math.max(0, pkg.groupPrice || 0) : Math.max(0, pkg.pricePerPerson || 0)
+}
+
+/** Unit the headline price is quoted in — "per person" or "for 8 guests". */
+export function packagePriceUnit(pkg: Pick<MarketplacePackage, 'pricingMode' | 'groupSize' | 'maxGuests'>): string {
+  if (!isGroupPriced(pkg)) return 'per person'
+  const size = packageGroupSize(pkg)
+  return `for ${size} guest${size !== 1 ? 's' : ''}`
+}
+
+/** Per-head equivalent, derived for a group package so per-person surfaces
+ *  (search, saved listings, comparisons) stay meaningful. */
+export function packagePricePerPerson(pkg: Pick<MarketplacePackage, 'pricingMode' | 'groupPrice' | 'groupSize' | 'maxGuests' | 'pricePerPerson'>): number {
+  if (!isGroupPriced(pkg)) return Math.max(0, pkg.pricePerPerson || 0)
+  return Math.round(Math.max(0, pkg.groupPrice || 0) / packageGroupSize(pkg))
+}
+
+/** What one booking of this package costs. A group package is sold as a
+ *  whole unit, so the flat price stands whatever the party size. */
+export function packagePriceTotal(pkg: Pick<MarketplacePackage, 'pricingMode' | 'groupPrice' | 'pricePerPerson'>, guests: number): number {
+  if (isGroupPriced(pkg)) return Math.max(0, pkg.groupPrice || 0)
+  return Math.max(0, pkg.pricePerPerson || 0) * Math.max(0, guests)
+}
+
+/** Most guests one booking may cover — the group size for a group package. */
+export function packageGuestCap(pkg: Pick<MarketplacePackage, 'pricingMode' | 'groupSize' | 'maxGuests'>): number {
+  return isGroupPriced(pkg) ? packageGroupSize(pkg) : Math.max(1, pkg.maxGuests || 1)
+}
+
+/**
+ * Reconciles the authored pricing before a package is written: a group
+ * package carries a whole-number group size, drives `maxGuests` from it (it
+ * is sold as one unit) and keeps the derived `pricePerPerson` in step; a
+ * per-person package drops the group fields entirely so a package switched
+ * back does not keep a stale flat rate.
+ */
+export function normalizePackagePricing<T extends Pick<MarketplacePackage,
+  'pricingMode' | 'groupPrice' | 'groupSize' | 'pricePerPerson' | 'maxGuests'>>(pkg: T): T {
+  if (packagePricingMode(pkg) !== 'group') {
+    return { ...pkg, pricingMode: 'per_person', groupPrice: undefined, groupSize: undefined }
+  }
+  const groupSize = packageGroupSize(pkg)
+  const groupPrice = Math.max(0, pkg.groupPrice || 0)
+  return {
+    ...pkg,
+    pricingMode: 'group',
+    groupSize,
+    groupPrice,
+    maxGuests: groupSize,
+    pricePerPerson: Math.round(groupPrice / groupSize),
+  }
+}
 
 export function packageTotals(pkg: MarketplacePackage) {
   const cost = pkg.components.reduce((s, c) => s + c.costPrice, 0)

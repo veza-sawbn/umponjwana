@@ -1,6 +1,6 @@
 import type { Metadata } from 'next'
 import { notFound } from 'next/navigation'
-import { getPackageById, type MarketplacePackage } from '@/lib/packages'
+import { getPackageById, packageHeadlinePrice, type MarketplacePackage } from '@/lib/packages'
 import { publicSupabase } from '@/lib/supabase-public'
 import PackageDetail from './PackageDetail'
 import JsonLd from '@/components/seo/JsonLd'
@@ -67,9 +67,11 @@ export default async function PackagePage({ params }: { params: { id: string } }
     description: pkg.seoDescription || pkg.summary || pkg.description || undefined,
     image: pkg.image || undefined,
     url: canonicalUrl,
-    offers: pkg.pricePerPerson ? {
+    // A group package's offer is the flat rate for the whole group; a
+    // per-person package quotes the per-traveller price, as before.
+    offers: packageHeadlinePrice(pkg) ? {
       '@type': 'Offer',
-      price: pkg.pricePerPerson,
+      price: packageHeadlinePrice(pkg),
       priceCurrency: 'ZAR',
       availability: pkg.packageStatus === 'published' ? 'https://schema.org/InStock' : 'https://schema.org/OutOfStock',
       url: canonicalUrl,
