@@ -1,6 +1,6 @@
 import { getTours, resolveItinerary, type Tour, type PricingTier, type ComposedItineraryDay } from './tours'
 import { getDepartures, type Departure, type DeparturePackage } from './departures'
-import { getTrails, type Trail, type TrailDay } from './trails'
+import { getTrailSummaries, type Trail, type TrailDay } from './trails'
 import type { SupabaseClient } from '@supabase/supabase-js'
 
 export type { DeparturePackage, ComposedItineraryDay }
@@ -179,7 +179,9 @@ function compose(dep: Departure, tour: Tour, trail?: Trail): TrekkingExperience 
 // Components can pass a session-less client (lib/supabase-public.ts) — same
 // pattern as lib/regions.ts's getRegions(). Existing callers are unaffected.
 async function loadAll(client?: SupabaseClient): Promise<TrekkingExperience[]> {
-  const [departures, tours, trails] = await Promise.all([getDepartures(client), getTours(client), getTrails(client)])
+  // compose() below only ever reads trail.name/trail.region, so the
+  // lightweight summary read is enough here — see getTrailSummaries().
+  const [departures, tours, trails] = await Promise.all([getDepartures(client), getTours(client), getTrailSummaries(client)])
   const tourById = new Map(tours.filter(t => t.status === 'active').map(t => [t.id, t]))
   const trailById = new Map(trails.map(t => [t.id, t]))
   const list: TrekkingExperience[] = []

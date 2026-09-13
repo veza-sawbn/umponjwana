@@ -1,6 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { supabase } from './auth'
-import { getTrails, type Trail } from './trails'
+import { getTrailSummaries, type Trail } from './trails'
 import { getReserves, type Reserve } from './reserves'
 import { getTowns, type Town } from './towns'
 
@@ -55,7 +55,7 @@ export async function getFeaturedAttractions(
   client: SupabaseClient = supabase,
 ): Promise<Attraction[]> {
   const [trails, reserves, towns] = await Promise.all([
-    getTrails(client).catch((): Trail[] => []),
+    getTrailSummaries(client).catch((): Trail[] => []),
     getReserves(client).catch((): Reserve[] => []),
     getTowns(client).catch((): Town[] => []),
   ])

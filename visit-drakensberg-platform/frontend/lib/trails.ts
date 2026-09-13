@@ -242,6 +242,38 @@ export async function getTrails(client: SupabaseClient = supabase): Promise<Trai
   return DEFAULT_TRAILS
 }
 
+// A list-view read, deliberately lighter than getTrails().
+//
+// getTrails() reads the whole `trails` row, and every trail in it carries an
+// `analytics` field (a full-resolution elevation/GPS profile, per-section
+// breakdowns, and a pre-rendered route-artwork SVG) plus a raw `gpx` track —
+// together routinely 95-99%+ of that trail's size. Summed across all trails
+// the row is multiple megabytes, and PostgREST does not reliably serve that:
+// production logs show it failing outright with a server-side timeout
+// ("Warp server error: Thread killed by timeout manager"), not a permissions
+// error. Every getTrails() caller already catches that and falls back to
+// DEFAULT_TRAILS — which is how real, published trails were replaced by
+// hardcoded sample entries on the homepage without anything visibly
+// "erroring": the fallback is silent by design, for a Supabase outage, not
+// for a 10MB row.
+//
+// vd_trail_summaries() (see supabase/migrations/20260913_trail_summaries_rpc.sql)
+// returns the same trails with analytics/gpx stripped — a 157x smaller
+// payload — for a caller that only renders a name, image, distance,
+// elevation, duration or difficulty and never a route chart or artwork.
+// Use this for list views (home page, "What's on") and keep getTrails() for
+// anything that renders RouteArtwork/RouteProfileChart or a trail's own
+// detail page.
+export async function getTrailSummaries(client: SupabaseClient = supabase): Promise<Trail[]> {
+  try {
+    const { data, error } = await client.rpc('vd_trail_summaries')
+    if (!error && Array.isArray(data)) return data as Trail[]
+  } catch {
+    // fall through to defaults
+  }
+  return DEFAULT_TRAILS
+}
+
 export async function saveTrails(trails: Trail[]): Promise<void> {
   await supabase.from('site_content').upsert(
     { key: 'trails', value: { items: trails }, updated_at: new Date().toISOString() },
