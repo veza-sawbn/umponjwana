@@ -1,4 +1,5 @@
 import { supabase } from './auth'
+import { CENTER_POSITION_CSS } from './image-position'
 
 // Per-section presentation overrides applied by the visual editor.
 export type SectionStyle = {
@@ -17,10 +18,19 @@ export const SITE_CONTENT_DEFAULTS = {
     cta_label: 'Plan Your Trip',
     cta_link: '/plan',
     image_url: 'https://images.unsplash.com/photo-1590098563548-8f14eed3a47f?w=1800&q=85',
+    // Focal point the hero crops around, as a CSS `object-position` string.
+    // See lib/image-position.ts — `50% 50%` is the browser's own default, so
+    // heroes saved before this existed keep rendering exactly as they did.
+    image_position: CENTER_POSITION_CSS,
     // Carousel of hero background images (crossfade + slow zoom). Falls back
     // to a single static image_url when empty, so existing sites keep
     // working without reconfiguration.
     images: [] as string[],
+    // Per-carousel-image focal points, keyed by image URL: the photos in a
+    // carousel rarely want the same crop, and keying by URL (rather than by
+    // index) means reordering or removing a photo can't shuffle the crops
+    // onto the wrong ones. Missing entries are centred.
+    image_positions: {} as Record<string, string>,
     video_url: '',
     overlay_opacity: 40,
     location_label: 'KwaZulu-Natal · South Africa',

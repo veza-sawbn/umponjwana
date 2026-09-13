@@ -128,6 +128,9 @@ export type MarketplacePackage = {
   summary: string
   description: string
   image: string
+  /** Focal point the hero crops around (lib/image-position.ts). Empty =
+   *  centred, which is what packages saved before this field existed keep doing. */
+  imagePosition?: string
   region: string
   durationNights: number
   maxGuests: number

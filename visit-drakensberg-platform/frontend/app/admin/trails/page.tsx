@@ -7,6 +7,7 @@ import { SEASONS, SEASON_META, SEASON_TOPICS, SEASON_TOPIC_META, type Season, ty
 import { analyseGpxAsync, ROUTE_TYPES } from '@/lib/gpx'
 import RouteArtwork from '@/components/trails/RouteArtwork'
 import { MediaPicker, MediaGalleryPicker } from '@/components/media/MediaPicker'
+import { ImagePositionPicker } from '@/components/media/ImagePositionPicker'
 import { adminMediaSource } from '@/lib/admin-supabase'
 import { SeoPanel } from '@/components/admin/SeoPanel'
 import { RelationshipPicker, type RelatedItem } from '@/components/admin/RelatedEntityManager'
@@ -384,6 +385,17 @@ function TrailForm({ trail, onChange, onSave, onCancel, saveLabel, saving }: {
         <label className={labelCls}>Hero Image</label>
         <MediaPicker value={trail.image} onChange={url => onChange('image', url)} source={adminMediaSource} />
       </div>
+
+      {trail.image && (
+        <div>
+          <label className={labelCls}>Hero Image Position</label>
+          <ImagePositionPicker
+            image={trail.image}
+            value={trail.imagePosition ?? ''}
+            onChange={position => onChange('imagePosition', position)}
+          />
+        </div>
+      )}
 
       <GpxBuilder trail={trail} onApply={patch => Object.entries(patch).forEach(([field, value]) => onChange(field, value))} />
 

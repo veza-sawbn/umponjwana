@@ -11,6 +11,7 @@ import { getDepartures } from '@/lib/departures'
 import { getTours } from '@/lib/tours'
 import { getExperiencesByTrail, type TrekkingExperience } from '@/lib/experiences'
 import { publicSupabase } from '@/lib/supabase-public'
+import { backgroundPositionStyle } from '@/lib/image-position'
 import type { TourDate } from '@/components/tours/UpcomingDepartures'
 import { CalendarPlus } from 'lucide-react'
 import RouteArtwork from '@/components/trails/RouteArtwork'
@@ -117,8 +118,8 @@ export default function HikeDetail({
       <section className={`${headerBg} text-white py-20 px-6 lg:px-12 mt-16 relative overflow-hidden`}>
         {trail.image && (
           <div
-            className="absolute inset-0 bg-cover bg-center opacity-20"
-            style={{ backgroundImage: `url(${trail.image})` }}
+            className="absolute inset-0 bg-cover opacity-20"
+            style={{ backgroundImage: `url(${trail.image})`, ...backgroundPositionStyle(trail.imagePosition) }}
           />
         )}
         <div className="max-w-[1440px] mx-auto relative">
@@ -280,8 +281,8 @@ export default function HikeDetail({
                   {/* Hero image as first gallery cell if no dedicated gallery */}
                   {trail.gallery.length === 0 && trail.image && (
                     <div
-                      className="aspect-[4/3] bg-cover bg-center cursor-pointer col-span-3"
-                      style={{ backgroundImage: `url(${trail.image})` }}
+                      className="aspect-[4/3] bg-cover cursor-pointer col-span-3"
+                      style={{ backgroundImage: `url(${trail.image})`, ...backgroundPositionStyle(trail.imagePosition) }}
                       onClick={() => setLightboxImg(trail.image)}
                     />
                   )}

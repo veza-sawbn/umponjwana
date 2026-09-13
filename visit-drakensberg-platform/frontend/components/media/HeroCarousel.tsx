@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { optimizedImageUrl, viewportImageWidth } from '@/lib/image-url'
 import { usePrefersReducedMotion } from '@/lib/carousel-autoplay'
+import { imagePositionToCss } from '@/lib/image-position'
 
 // Shared with the homepage hero — a slow cross-fading, gently panning
 // full-bleed image carousel. Renders absolutely positioned by default, so
@@ -19,12 +20,19 @@ export default function HeroCarousel({
   alt = '',
   className = 'absolute inset-0',
   onIndexChange,
+  positions,
 }: {
   images: string[]
   alt?: string
   className?: string
   /** Fires with the slide index whenever it changes — lets a parent show its own "2 / 6" counter or dots in sync. */
   onIndexChange?: (index: number) => void
+  /**
+   * Focal points keyed by image URL (see lib/image-position.ts). A slide with
+   * no entry crops from its centre, which is what every caller got before
+   * this existed — so passing nothing changes nothing.
+   */
+  positions?: Record<string, string>
 }) {
   const reduced = usePrefersReducedMotion()
   const [index, setIndex] = useState(0)
@@ -126,6 +134,10 @@ export default function HeroCarousel({
           src={optimizedImageUrl(images[index], { width: targetWidth })}
           alt={alt}
           className="w-full h-full object-cover"
+          // The ken-burns pan above animates transforms, which move the whole
+          // frame; this decides which part of the photo is inside that frame
+          // to begin with. The two compose rather than fight.
+          style={{ objectPosition: imagePositionToCss(positions?.[images[index]]) }}
           fetchPriority={isFirstSlide ? 'high' : 'auto'}
           loading={isFirstSlide ? 'eager' : 'lazy'}
           decoding="async"
