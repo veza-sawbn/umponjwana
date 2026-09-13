@@ -106,3 +106,170 @@ export function parseContactsCsv(text: string): CsvContactRow[] {
     })
     .filter(r => r.name || r.email)
 }
+
+/* ────────────────────────────────────────────────────────────────────────────
+ * Directory contacts — the platform's own outreach list, compiled from the
+ * regional tourism directories. A different shape from the per-supplier
+ * address-book CSV above: one row per establishment, with the multi-valued
+ * columns ("Source Site(s)", "Category", emails, phones, socials …) packed
+ * into pipe- or semicolon-separated cells, which are split back out here so
+ * the import can segment on them. See vd_import_directory_contacts() in
+ * supabase/migrations/20260913_directory_contacts_segmentation.sql.
+ * ──────────────────────────────────────────────────────────────────────────── */
+
+export type DirectoryContactRow = {
+  establishment: string
+  contactPerson: string
+  emails: string[]
+  phones: string[]
+  websites: string[]
+  socials: string[]
+  address: string
+  bookingUrl: string
+  sourceListingUrls: string[]
+  sourceSites: string[]
+  categories: string[]
+  regions: string[]
+  contactStatus: string
+  /** ISO yyyy-mm-dd, or '' when the cell is blank or unparseable. */
+  verifiedOn: string
+  priority: '' | 'high' | 'medium' | 'low'
+  outreachStatus: DirectoryOutreachStatus
+  lastContacted: string
+  followUpDate: string
+  owner: string
+  outreachNotes: string
+  dataNotes: string
+}
+
+export type DirectoryOutreachStatus =
+  'not_contacted' | 'contacted' | 'in_conversation' | 'converted' | 'declined' | 'unreachable'
+
+/** Header lookup that ignores case, spacing and punctuation, so
+ *  "Source Site(s)", "source sites" and "Source_Sites" all resolve. */
+function normaliseHeader(h: string) {
+  return h.trim().toLowerCase().replace(/[^a-z0-9]/g, '')
+}
+
+const DIRECTORY_HEADER_ALIASES: Record<string, keyof DirectoryContactRow> = {
+  establishment: 'establishment', business: 'establishment', businessname: 'establishment', name: 'establishment',
+  sourcesites: 'sourceSites', sourcesite: 'sourceSites', source: 'sourceSites',
+  category: 'categories', categories: 'categories',
+  region: 'regions', regions: 'regions', area: 'regions',
+  contactperson: 'contactPerson', contact: 'contactPerson',
+  email: 'emails', emails: 'emails', emailaddress: 'emails',
+  phone: 'phones', phones: 'phones', telephone: 'phones', mobile: 'phones',
+  website: 'websites', websites: 'websites', web: 'websites',
+  social: 'socials', socials: 'socials', socialmedia: 'socials',
+  address: 'address',
+  bookingdirectoryurl: 'bookingUrl', bookingurl: 'bookingUrl', directoryurl: 'bookingUrl',
+  sourcelistingurls: 'sourceListingUrls', sourcelistingurl: 'sourceListingUrls', listingurl: 'sourceListingUrls',
+  contactstatus: 'contactStatus',
+  verifiedon: 'verifiedOn', verified: 'verifiedOn',
+  priority: 'priority',
+  outreachstatus: 'outreachStatus', status: 'outreachStatus',
+  lastcontacted: 'lastContacted',
+  followupdate: 'followUpDate', followup: 'followUpDate',
+  owner: 'owner', assignedto: 'owner',
+  outreachnotes: 'outreachNotes', notes: 'outreachNotes',
+  datanotes: 'dataNotes',
+}
+
+/** Pipes separate whole listings, semicolons separate values within one —
+ *  both are just separators once the cell is split for segmentation. */
+function splitList(value: string, semicolons = true): string[] {
+  const parts = (value || '').split(semicolons ? /\s*[|;]\s*/ : /\s*\|\s*/)
+  return [...new Set(parts.map(p => p.trim()).filter(Boolean))]
+}
+
+/** yyyy-mm-dd out of an ISO cell or anything Date can read; '' otherwise.
+ *  Deliberately strict about the common dd/mm/yyyy-vs-mm/dd/yyyy ambiguity:
+ *  a slashed date is only accepted when the first part can't be a month. */
+function toIsoDate(value: string): string {
+  const v = (value || '').trim()
+  if (!v) return ''
+  const iso = v.match(/^(\d{4})-(\d{2})-(\d{2})/)
+  if (iso) return `${iso[1]}-${iso[2]}-${iso[3]}`
+  const slashed = v.match(/^(\d{1,2})[/.](\d{1,2})[/.](\d{4})$/)
+  if (slashed) {
+    const [, a, b, y] = slashed
+    if (Number(a) > 12) return `${y}-${b.padStart(2, '0')}-${a.padStart(2, '0')}`
+    return ''
+  }
+  const parsed = new Date(v)
+  return isNaN(parsed.getTime()) ? '' : parsed.toISOString().slice(0, 10)
+}
+
+function toOutreachStatus(value: string): DirectoryOutreachStatus {
+  const v = (value || '').trim().toLowerCase()
+  if (/converted|listed|signed|onboard/.test(v)) return 'converted'
+  if (/declin|not interested|no thanks|rejected/.test(v)) return 'declined'
+  if (/unreachable|bounced|no contact/.test(v)) return 'unreachable'
+  if (/conversation|in progress|negotiat|replied|responded/.test(v)) return 'in_conversation'
+  if (/^contacted|emailed|called|reached out/.test(v)) return 'contacted'
+  return 'not_contacted'
+}
+
+function toPriority(value: string): '' | 'high' | 'medium' | 'low' {
+  const v = (value || '').trim().toLowerCase()
+  if (/^(high|1|a|urgent)$/.test(v)) return 'high'
+  if (/^(medium|med|2|b|normal)$/.test(v)) return 'medium'
+  if (/^(low|3|c)$/.test(v)) return 'low'
+  return ''
+}
+
+/** True when the file looks like the master directory compile rather than
+ *  the name/email/phone address-book CSV — used by the import UI to pick a
+ *  parser instead of asking which kind of file this is. */
+export function isDirectoryContactsCsv(text: string): boolean {
+  const [header] = parseCsv(text)
+  if (!header) return false
+  const keys = header.map(normaliseHeader)
+  return keys.includes('establishment') && (keys.includes('sourcesites') || keys.includes('sourcelistingurls'))
+}
+
+/** Parses the master directory CSV. Rows with no establishment name are
+ *  dropped — that name is the row's identity on import (see the unique index
+ *  on lower(establishment)), so a nameless row has nothing to upsert against. */
+export function parseDirectoryContactsCsv(text: string): DirectoryContactRow[] {
+  const table = parseCsv(text)
+  if (table.length === 0) return []
+
+  const columns = new Map<keyof DirectoryContactRow, number>()
+  table[0].forEach((h, i) => {
+    const field = DIRECTORY_HEADER_ALIASES[normaliseHeader(h)]
+    if (field && !columns.has(field)) columns.set(field, i)
+  })
+  if (!columns.has('establishment')) return []
+
+  const cell = (row: string[], field: keyof DirectoryContactRow) => {
+    const i = columns.get(field)
+    return i === undefined ? '' : (row[i] ?? '').trim()
+  }
+
+  return table.slice(1)
+    .map(r => ({
+      establishment: cell(r, 'establishment'),
+      contactPerson: cell(r, 'contactPerson'),
+      emails: splitList(cell(r, 'emails')),
+      phones: splitList(cell(r, 'phones')),
+      websites: splitList(cell(r, 'websites'), false),
+      socials: splitList(cell(r, 'socials'), false),
+      address: cell(r, 'address'),
+      bookingUrl: splitList(cell(r, 'bookingUrl'), false)[0] ?? '',
+      sourceListingUrls: splitList(cell(r, 'sourceListingUrls'), false),
+      sourceSites: splitList(cell(r, 'sourceSites')),
+      categories: splitList(cell(r, 'categories')),
+      regions: splitList(cell(r, 'regions')),
+      contactStatus: cell(r, 'contactStatus'),
+      verifiedOn: toIsoDate(cell(r, 'verifiedOn')),
+      priority: toPriority(cell(r, 'priority')),
+      outreachStatus: toOutreachStatus(cell(r, 'outreachStatus')),
+      lastContacted: toIsoDate(cell(r, 'lastContacted')),
+      followUpDate: toIsoDate(cell(r, 'followUpDate')),
+      owner: cell(r, 'owner'),
+      outreachNotes: cell(r, 'outreachNotes'),
+      dataNotes: cell(r, 'dataNotes'),
+    }))
+    .filter(r => r.establishment)
+}
