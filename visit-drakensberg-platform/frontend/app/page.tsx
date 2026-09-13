@@ -28,7 +28,10 @@ import { getSupplierEntities } from '@/lib/supplier-entities'
 import { getActivities, type Activity } from '@/lib/activities'
 import { trackEvent, AnalyticsEvent } from '@/lib/analytics'
 import { getPublishedPosts, type BlogPost } from '@/lib/blog-posts'
-import { getPublishedPackages, type MarketplacePackage } from '@/lib/packages'
+import {
+  getPublishedPackages, isGroupPriced, packageGroupSize, packageHeadlinePrice,
+  type MarketplacePackage,
+} from '@/lib/packages'
 import { formatMoney } from '@/lib/allocation'
 
 /* ─── Data ─────────────────────────────────────────────────────────────────── */
@@ -243,8 +246,8 @@ function JourneyCardBody({ pkg }: { pkg: MarketplacePackage }) {
             {pkg.originalPrice && (
               <span className="font-sans text-xs text-forest/30 line-through mr-1.5">{formatMoney(pkg.originalPrice)}</span>
             )}
-            <span className="font-display text-lg text-forest">{formatMoney(pkg.pricePerPerson)}</span>
-            <span className="font-sans text-xs text-forest/40"> pp</span>
+            <span className="font-display text-lg text-forest">{formatMoney(packageHeadlinePrice(pkg))}</span>
+            <span className="font-sans text-xs text-forest/40"> {isGroupPriced(pkg) ? `/ ${packageGroupSize(pkg)} guests` : 'pp'}</span>
           </span>
           <span className="font-sans text-xs text-forest group-hover:text-gold transition-colors inline-flex items-center gap-1">
             View <ArrowRight className="w-3 h-3" />
