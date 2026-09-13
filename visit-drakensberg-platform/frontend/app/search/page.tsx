@@ -3,6 +3,7 @@
 import { useState, useEffect, Suspense } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
+import Image from 'next/image'
 import Footer from '@/components/layout/Footer'
 import { Calendar, Users, MapPin, ArrowRight, Search, SlidersHorizontal, X, Check, Bed, ChevronDown } from 'lucide-react'
 import { useBooking } from '@/lib/booking-context'
@@ -13,6 +14,7 @@ import { getRoomsByProperty } from '@/lib/rooms'
 import { getActivities, type Activity } from '@/lib/activities'
 import { getTrails, trailStartPoint, type Trail } from '@/lib/trails'
 import { getSupplierEntities } from '@/lib/supplier-entities'
+import { publicSupabase } from '@/lib/supabase-public'
 import { StayDistance, useStayCoords, haversineKm } from '@/lib/stay-distance'
 import { trackEvent, AnalyticsEvent } from '@/lib/analytics'
 import { formatMoney } from '@/lib/allocation'
@@ -223,22 +225,26 @@ function SearchResults() {
   }, [])
 
   useEffect(() => {
-    getProperties().then(async props => {
+    // publicSupabase (session-less) throughout — a signed-in admin or ops
+    // session would otherwise read past the public RLS gate and return
+    // suspended suppliers' listings in search results. See
+    // lib/supabase-public.ts.
+    getProperties(publicSupabase).then(async props => {
       const active = props.filter(p => p.status === 'active')
       const cards = await Promise.all(active.map(async p => {
-        const rooms = await getRoomsByProperty(p.id)
+        const rooms = await getRoomsByProperty(p.id, publicSupabase)
         const minPrice = rooms.length > 0 ? Math.min(...rooms.map(r => r.basePrice)) : 0
         return propertyToLiveStay(p, minPrice)
       }))
       setLiveStays(cards)
     })
-    getActivities().then(items => {
+    getActivities(publicSupabase).then(items => {
       setLiveActivities(items.filter(a => a.status === 'active').map(activityToLiveActivity))
     })
-    getTrails().then(trails => {
+    getTrails(publicSupabase).then(trails => {
       setLiveHikes(trails.filter(t => t.status === 'published').map(trailToLiveHike))
     })
-    getSupplierEntities<any>('events').then((all: LiveEvent[]) => {
+    getSupplierEntities<any>('events', undefined, publicSupabase).then((all: LiveEvent[]) => {
       const now = new Date().toISOString()
       // RLS already hides drafts from the public; filtering defensively in
       // case a signed-in supplier is browsing and sees their own drafts too.
@@ -452,7 +458,7 @@ function SearchResults() {
                     <Link href={`/stays/${stay.id}?check_in=${checkIn}&check_out=${checkOut}&guests=${guests}`}>
                       <div className="aspect-[4/3] overflow-hidden relative bg-[#2d6a4f]/10">
                         {stay.img ? (
-                          <img src={stay.img} alt={stay.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" />
+                          <Image src={stay.img} alt={stay.title} fill loading="lazy" sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw" className="object-cover group-hover:scale-105 transition-transform duration-700" />
                         ) : (
                           <div className="w-full h-full flex items-center justify-center">
                             <span className="font-display italic text-lg text-[#2d6a4f]/40">{stay.title}</span>
@@ -530,7 +536,7 @@ function SearchResults() {
                 <Link key={h.id} href={`/hikes/${h.id}`} className="group bg-white">
                   <div className="aspect-[4/3] overflow-hidden relative bg-[#2d6a4f]/10">
                     {h.img ? (
-                      <img loading="lazy" decoding="async" src={h.img} alt={h.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" />
+                      <Image src={h.img} alt={h.title} fill loading="lazy" sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw" className="object-cover group-hover:scale-105 transition-transform duration-700" />
                     ) : (
                       <div className="w-full h-full flex items-center justify-center">
                         <span className="font-display italic text-lg text-[#2d6a4f]/40">{h.title}</span>
@@ -562,7 +568,7 @@ function SearchResults() {
                 <Link key={a.id} href={`/activities/${a.id}`} className="group bg-white">
                   <div className="aspect-[4/3] overflow-hidden relative bg-[#C9A96E]/10">
                     {a.img ? (
-                      <img loading="lazy" decoding="async" src={a.img} alt={a.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" />
+                      <Image src={a.img} alt={a.title} fill loading="lazy" sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw" className="object-cover group-hover:scale-105 transition-transform duration-700" />
                     ) : (
                       <div className="w-full h-full flex items-center justify-center">
                         <span className="font-display italic text-lg text-[#C9A96E]/50">{a.title}</span>

@@ -44,6 +44,13 @@ export default function TrailCardsCarousel({
               difficultyColor={difficultyColor[t.difficulty]}
               bottomRightBadge={trailCategory(t) === 'speciality_walk' ? t.speciality_type : undefined}
               routeArtworkTrail={t}
+              saveListing={{
+                id: t.id,
+                type: 'hike',
+                title: t.name,
+                location: t.region,
+                image: t.image,
+              }}
               meta={
                 <>
                   <p className="font-sans text-xs text-forest/40">{t.distance} · {t.elevation} · {t.duration}</p>

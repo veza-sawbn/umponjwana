@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
+import Image from 'next/image'
 import { MapPin, Mountain, Zap, Home, ArrowRight, ChevronRight, Clock, Navigation, Bus } from 'lucide-react'
 import Footer from '@/components/layout/Footer'
 import { getRegions, regionsMatch, type Region } from '@/lib/regions'
@@ -285,7 +286,7 @@ export default async function RegionPage({ params }: { params: { slug: string } 
 
       {/* ── Hero ─────────────────────────────────────────────────────────── */}
       <section className="relative h-[70vh] min-h-[480px] overflow-hidden">
-        <img src={heroImg} alt={region.name} className="absolute inset-0 w-full h-full object-cover" />
+        <Image src={heroImg} alt={region.name} fill priority sizes="100vw" className="object-cover" />
         <div className="absolute inset-0 bg-gradient-to-b from-black/30 via-black/20 to-black/70" />
 
         <div className="absolute top-20 left-0 right-0 px-6 lg:px-12">

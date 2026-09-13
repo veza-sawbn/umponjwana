@@ -10,6 +10,7 @@ import TrailExperiences from '@/components/experiences/TrailExperiences'
 import { getDepartures } from '@/lib/departures'
 import { getTours } from '@/lib/tours'
 import { getExperiencesByTrail, type TrekkingExperience } from '@/lib/experiences'
+import { publicSupabase } from '@/lib/supabase-public'
 import type { TourDate } from '@/components/tours/UpcomingDepartures'
 import { CalendarPlus } from 'lucide-react'
 import RouteArtwork from '@/components/trails/RouteArtwork'
@@ -19,6 +20,7 @@ import type { Property } from '@/lib/properties'
 import type { Activity } from '@/lib/activities'
 import { formatMoney } from '@/lib/allocation'
 import ReadMoreText from '@/components/ui/ReadMoreText'
+import SaveButton from '@/components/ui/SaveButton'
 
 const DIFF_COLOR: Record<string, string> = { Easy: '#4A7251', Moderate: '#C9A96E', Hard: '#c0392b', Strenuous: '#c0392b', Extreme: '#7f1d1d' }
 const DIFF_BG: Record<string, string> = { Easy: '#4A725122', Moderate: '#C9A96E22', Hard: '#c0392b22', Strenuous: '#c0392b22', Extreme: '#7f1d1d22' }
@@ -61,8 +63,12 @@ export default function HikeDetail({
   const [experiences, setExperiences] = useState<TrekkingExperience[]>([])
 
   useEffect(() => {
-    getTrails().then(setAllTrails)
-    Promise.all([getDepartures(), getTours()]).then(([all, tours]) => {
+    // publicSupabase (session-less) — the departures below are bookable
+    // supplier content, and a signed-in admin or ops session would otherwise
+    // read past the public RLS gate and offer a suspended supplier's
+    // departures here. See lib/supabase-public.ts.
+    getTrails(publicSupabase).then(setAllTrails)
+    Promise.all([getDepartures(publicSupabase), getTours(publicSupabase)]).then(([all, tours]) => {
       const activeTourIds = new Set(tours.filter(t => t.status === 'active').map(t => t.id))
       const today = new Date().toISOString().slice(0, 10)
       const tourDates: TourDate[] = all
@@ -84,7 +90,7 @@ export default function HikeDetail({
         }))
       setDepartures(tourDates)
     })
-    getExperiencesByTrail(trail.id).then(setExperiences)
+    getExperiencesByTrail(trail.id, publicSupabase).then(setExperiences)
   }, [trail.id])
 
   const diff = trail.difficulty
@@ -130,9 +136,22 @@ export default function HikeDetail({
               <h1 className="font-display italic text-5xl lg:text-6xl mb-4">{trail.name}</h1>
               <p className="font-sans text-sm text-white/60">Starting point: {trail.trailhead}</p>
             </div>
-            <span className="font-sans text-sm px-4 py-2 mt-2" style={{ color: DIFF_COLOR[diff], background: DIFF_BG[diff] }}>
-              {diff}
-            </span>
+            <div className="flex items-center gap-3 mt-2">
+              <SaveButton
+                variant="inline"
+                tone="dark"
+                listing={{
+                  id: trail.id,
+                  type: 'hike',
+                  title: trail.name,
+                  location: trail.region,
+                  image: trail.image,
+                }}
+              />
+              <span className="font-sans text-sm px-4 py-2" style={{ color: DIFF_COLOR[diff], background: DIFF_BG[diff] }}>
+                {diff}
+              </span>
+            </div>
           </div>
         </div>
       </section>

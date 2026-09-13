@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
+import Image from 'next/image'
 import Footer from '@/components/layout/Footer'
 import {
   CheckCircle, Star, ArrowLeft, Mountain, Award, Globe, Building2,
@@ -9,6 +10,7 @@ import {
 } from 'lucide-react'
 import { getOperatorForGuide, GUIDE_TYPE_LABEL, guideTypeOf, type GuideProfile, type OperatorProfile } from '@/lib/operators'
 import { getUpcomingExperiences, type TrekkingExperience } from '@/lib/experiences'
+import { publicSupabase } from '@/lib/supabase-public'
 import { formatMoney } from '@/lib/allocation'
 
 const csv = (s?: string) => (s ?? '').split(',').map(x => x.trim()).filter(Boolean)
@@ -30,8 +32,11 @@ export default function GuideDetail({ guide }: { guide: GuideProfile }) {
   const [departures, setDepartures] = useState<TrekkingExperience[]>([])
 
   useEffect(() => {
-    getOperatorForGuide(guide).then(setOperator)
-    getUpcomingExperiences().then(exps => setDepartures(exps.filter(e => e.leadGuide === guide.name)))
+    // publicSupabase (session-less) — matches the server shell's own read, so
+    // a signed-in admin or ops session sees the same page a visitor does
+    // rather than one including suspended suppliers. See lib/supabase-public.ts.
+    getOperatorForGuide(guide, publicSupabase).then(setOperator)
+    getUpcomingExperiences(publicSupabase).then(exps => setDepartures(exps.filter(e => e.leadGuide === guide.name)))
   }, [guide])
 
   const guideType = guideTypeOf(guide)
@@ -248,9 +253,9 @@ export default function GuideDetail({ guide }: { guide: GuideProfile }) {
               <div className="bg-white border border-gray-200 p-5">
                 <p className="font-sans text-[10px] tracking-[0.12em] uppercase text-gray-400 mb-3">Associated Tour Operator</p>
                 <div className="flex items-center gap-3 mb-3">
-                  <div className="w-12 h-12 bg-[#2d6a4f]/10 flex items-center justify-center shrink-0 overflow-hidden">
+                  <div className="relative w-12 h-12 bg-[#2d6a4f]/10 flex items-center justify-center shrink-0 overflow-hidden">
                     {operator.logo
-                      ? <img src={operator.logo} alt={operator.companyName} className="w-full h-full object-cover" />
+                      ? <Image src={operator.logo} alt={operator.companyName} fill loading="lazy" sizes="48px" className="object-cover" />
                       : <Building2 size={18} className="text-[#2d6a4f]" />}
                   </div>
                   <div>

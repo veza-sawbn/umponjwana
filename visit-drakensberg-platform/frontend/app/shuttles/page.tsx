@@ -174,6 +174,24 @@ function ShuttlesPageContent() {
 
   function runSearch() {
     const wantsReturn = search.tripType === 'return'
+
+    // Carry the searched journey into the trip itself, not just into the
+    // shuttle leg. /checkout reads the party size and travel dates off the
+    // booking context, so without this a visitor who starts here reached
+    // checkout showing the default "2 guests" and no dates — their own
+    // answers, dropped on the way.
+    //
+    // Only fills what the trip does not already carry. A cart that already
+    // has a stay owns its dates and guest count: the stay's night count, and
+    // therefore its price, is derived from checkIn/checkOut, so overwriting
+    // them with a transfer date would silently re-price the accommodation.
+    const nextCheckIn = booking.checkIn || search.date
+    const nextCheckOut = booking.checkOut || (wantsReturn ? search.returnDate : '')
+    const nextGuests = booking.stay ? booking.guests : (search.passengers || booking.guests)
+    if (nextCheckIn !== booking.checkIn || nextCheckOut !== booking.checkOut || nextGuests !== booking.guests) {
+      booking.setSearch(booking.region, nextCheckIn, nextCheckOut, nextGuests)
+    }
+
     legIdsRef.current = legIdsRef.current ?? {
       outbound: `shuttle-${Date.now()}`,
       inbound: `shuttle-return-${Date.now()}`,

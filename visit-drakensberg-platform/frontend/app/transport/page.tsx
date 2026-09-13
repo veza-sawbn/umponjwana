@@ -6,6 +6,7 @@ import EditablePageHeader from '@/components/editor/EditablePageHeader'
 import { ArrowRight, Bus, Clock, MapPin } from 'lucide-react'
 import { getPublishedRoutes, routeDurationLabel, routePrice, routeSlug, type Route } from '@/lib/transport-routes'
 import { getTransportCompanies, type TransportCompany } from '@/lib/transport'
+import { publicSupabase } from '@/lib/supabase-public'
 import { formatMoney } from '@/lib/allocation'
 
 // Named shuttle routes are real supplier-authored data (see
@@ -19,7 +20,10 @@ export default function TransportPage() {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    Promise.all([getPublishedRoutes(), getTransportCompanies()])
+    // publicSupabase (session-less) — a signed-in admin or ops session would
+    // otherwise read past the public RLS gate and list suspended transport
+    // suppliers' routes here. See lib/supabase-public.ts.
+    Promise.all([getPublishedRoutes(publicSupabase), getTransportCompanies(publicSupabase)])
       .then(([r, c]) => { setRoutes(r); setCompanies(c) })
       .finally(() => setLoading(false))
   }, [])

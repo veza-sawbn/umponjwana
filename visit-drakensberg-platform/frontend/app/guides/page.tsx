@@ -1,10 +1,12 @@
 'use client'
 
 import Link from 'next/link'
+import Image from 'next/image'
 import Footer from '@/components/layout/Footer'
 import { Filter, UserCheck, Building2, MapPin, Star, Users, Award, Globe } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { getOperators, getGuidesByOperator, type OperatorProfile, type GuideProfile } from '@/lib/operators'
+import { publicSupabase } from '@/lib/supabase-public'
 
 // Supplier directory organised by tourism businesses:
 // Tour Operator → Guide Team → Guide Profile.
@@ -16,9 +18,12 @@ export default function GuidesPage() {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    getOperators().then(async ops => {
+    // publicSupabase (session-less) — a signed-in admin or ops session would
+    // otherwise read past the public RLS gate and list suspended suppliers
+    // in this directory. See lib/supabase-public.ts.
+    getOperators(publicSupabase).then(async ops => {
       setOperators(ops)
-      const entries = await Promise.all(ops.map(async o => [o.id, await getGuidesByOperator(o)] as const))
+      const entries = await Promise.all(ops.map(async o => [o.id, await getGuidesByOperator(o, publicSupabase)] as const))
       setTeams(Object.fromEntries(entries))
       setLoading(false)
     })
@@ -74,9 +79,9 @@ export default function GuidesPage() {
                 <div key={o.id} className="bg-white border border-gray-200 hover:border-[#2d6a4f] transition-colors flex flex-col">
                   <div className="p-6 flex-1">
                     <div className="flex items-start gap-4 mb-4">
-                      <div className="w-16 h-16 bg-[#2d6a4f]/10 flex items-center justify-center shrink-0 overflow-hidden">
+                      <div className="relative w-16 h-16 bg-[#2d6a4f]/10 flex items-center justify-center shrink-0 overflow-hidden">
                         {o.logo
-                          ? <img src={o.logo} alt={o.companyName} className="w-full h-full object-cover" />
+                          ? <Image src={o.logo} alt={o.companyName} fill loading="lazy" sizes="64px" className="object-cover" />
                           : <Building2 size={22} className="text-[#2d6a4f]" />}
                       </div>
                       <div className="min-w-0">

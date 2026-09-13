@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
+import Image from 'next/image'
 import { ArrowRight } from 'lucide-react'
 import Footer from '@/components/layout/Footer'
 import Editable from '@/components/editor/Editable'
@@ -47,8 +48,8 @@ export default function RegionsPage() {
           <div className="max-w-[1440px] mx-auto px-6 lg:px-12">
             <div className={`grid lg:grid-cols-2 gap-12 lg:gap-20 items-center ${i % 2 === 1 ? 'lg:[direction:rtl]' : ''}`}>
               <div className="relative [direction:ltr]">
-                <div className="aspect-[4/3] overflow-hidden">
-                  <img src={regionImage(r, i)} alt={r.name} className="w-full h-full object-cover" />
+                <div className="relative aspect-[4/3] overflow-hidden">
+                  <Image src={regionImage(r, i)} alt={r.name} fill loading="lazy" sizes="(max-width: 1024px) 100vw, 50vw" className="object-cover" />
                 </div>
               </div>
               <div className="[direction:ltr]">

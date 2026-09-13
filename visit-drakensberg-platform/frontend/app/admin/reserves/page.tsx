@@ -13,7 +13,7 @@ function blankReserve(): Reserve {
   return {
     id: `reserve-${Date.now()}`, slug: '', regionSlug: '', name: 'New Reserve', shortName: '', tagline: '',
     description: '', image: '', viewpointName: '', bestTime: '', permits: '', facilities: [], peaks: [],
-    seoTitle: '', seoDescription: '',
+    seoTitle: '', seoDescription: '', featured: false,
   }
 }
 
@@ -125,6 +125,12 @@ export default function AdminReservesPage() {
             </div>
             <div><label className={labelCls}>Hero Image</label><MediaPicker value={data.image} onChange={url => update('image', url)} source={adminMediaSource} /></div>
             <div><label className={labelCls}>Description</label><textarea value={data.description} onChange={e => update('description', e.target.value)} rows={5} className={`${inputCls} resize-none`}/></div>
+            {/* Feeds the homepage "Top Attractions" band (lib/attractions.ts),
+                alongside featured trails and towns. */}
+            <label className="flex items-center gap-2 font-sans text-sm text-gray-700 cursor-pointer">
+              <input type="checkbox" checked={Boolean(data.featured)} onChange={e => update('featured', e.target.checked)} className="accent-[#2d6a4f]" />
+              Featured on Homepage
+            </label>
             <div className="grid grid-cols-2 gap-4">
               <div><label className={labelCls}>Panorama Viewpoint Name</label><input value={data.viewpointName} onChange={e => update('viewpointName', e.target.value)} className={inputCls}/></div>
               <div><label className={labelCls}>Best Time to Visit</label><input value={data.bestTime} onChange={e => update('bestTime', e.target.value)} className={inputCls}/></div>

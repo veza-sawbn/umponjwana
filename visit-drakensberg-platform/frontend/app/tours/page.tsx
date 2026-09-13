@@ -7,6 +7,7 @@ import { Users, Star } from 'lucide-react'
 import { getTours, type Tour } from '@/lib/tours'
 import { getTrails, type Trail } from '@/lib/trails'
 import { getOperators, type OperatorProfile } from '@/lib/operators'
+import { publicSupabase } from '@/lib/supabase-public'
 import { regionsMatch } from '@/lib/regions'
 import { formatMoney } from '@/lib/allocation'
 import ExploreCard from '@/components/trails/ExploreCard'
@@ -32,14 +33,17 @@ export default function ToursPage() {
   const [region, setRegion] = useState('All')
 
   useEffect(() => {
-    getTours()
+    // publicSupabase (session-less) — a signed-in admin or ops session would
+    // otherwise read past the public RLS gate and list suspended suppliers'
+    // tours here. See lib/supabase-public.ts.
+    getTours(publicSupabase)
       .then(all => setTours(all.filter(t => t.status === 'active')))
       .finally(() => setLoading(false))
     // Each tour is built on a Trail (lib/trails.ts) — fetched here so its
     // card can show the trail's real photo and route artwork, the same
     // image and design /hikes' trail cards show for that trail.
-    getTrails().then(all => setTrails(all)).catch(() => setTrails([]))
-    getOperators().then(all => setOperators(all)).catch(() => setOperators([]))
+    getTrails(publicSupabase).then(all => setTrails(all)).catch(() => setTrails([]))
+    getOperators(publicSupabase).then(all => setOperators(all)).catch(() => setOperators([]))
   }, [])
 
   const trailById = new Map(trails.map(t => [t.id, t]))
@@ -113,6 +117,15 @@ export default function ToursPage() {
                   difficultyColor={DIFF_COLOR[t.difficulty] || '#2d6a4f'}
                   topLeftBadge={t.featured ? 'Featured' : undefined}
                   routeArtworkTrail={trail}
+                  saveListing={{
+                    id: t.id,
+                    type: 'tour',
+                    title: t.name,
+                    location: t.trailName || 'Drakensberg',
+                    price: t.pricePerPerson,
+                    image: trail?.image,
+                    rating: t.rating,
+                  }}
                   meta={
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-3 font-sans text-xs text-forest/40">

@@ -4,9 +4,11 @@ import Link from 'next/link'
 import Footer from '@/components/layout/Footer'
 import EditablePageHeader from '@/components/editor/EditablePageHeader'
 import { getActivities, ACTIVITY_CATEGORIES, type Activity } from '@/lib/activities'
+import { publicSupabase } from '@/lib/supabase-public'
 import { StayDistance } from '@/lib/stay-distance'
 import { regionsMatch } from '@/lib/regions'
 import { formatMoney } from '@/lib/allocation'
+import SaveButton from '@/components/ui/SaveButton'
 
 // Derived from the canonical activity-category vocabulary (lib/activities.ts)
 // so every category a supplier can tag is reachable via a public filter tab —
@@ -26,7 +28,10 @@ export default function ActivitiesPage() {
   useEffect(() => {
     const regionParam = new URLSearchParams(window.location.search).get('region')
     if (regionParam) setRegionFilter(regionParam)
-    getActivities()
+    // publicSupabase (session-less) — a signed-in admin or ops session would
+    // otherwise read past the public RLS gate and list suspended suppliers'
+    // activities here. See lib/supabase-public.ts.
+    getActivities(publicSupabase)
       .then(items => setActivities(items.filter(a => a.status === 'active')))
       .finally(() => setLoading(false))
   }, [])
@@ -78,7 +83,10 @@ export default function ActivitiesPage() {
               {filtered.map((a) => {
                 const durationLabel = [a.durationH && `${a.durationH}h`, a.durationM && `${a.durationM}m`].filter(Boolean).join(' ') || ''
                 return (
-                  <Link key={a.id} href={`/activities/${a.id}`} className="group block">
+                  // The heart is a sibling of the Link, not a child — a
+                  // <button> inside an <a> is invalid HTML.
+                  <div key={a.id} className="relative">
+                  <Link href={`/activities/${a.id}`} className="group block">
                     <div className="relative overflow-hidden aspect-square mb-4 bg-[#1a1a2e]">
                       {a.photos?.[0] && (
                         <img
@@ -105,6 +113,17 @@ export default function ActivitiesPage() {
                       </span>
                     </div>
                   </Link>
+                  <SaveButton
+                    listing={{
+                      id: a.id,
+                      type: 'activity',
+                      title: a.name,
+                      location: a.meetingPoint || a.region || 'Drakensberg',
+                      price: a.pricePerPerson,
+                      image: a.photos?.[0],
+                    }}
+                  />
+                  </div>
                 )
               })}
             </div>

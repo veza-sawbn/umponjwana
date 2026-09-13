@@ -93,10 +93,14 @@ export default function SupplierCarousel({ operators }: { operators: OperatorPro
 
   return (
     <div>
-      {/* Mobile shell: auto-sliding carousel */}
+      {/* Mobile shell: auto-sliding carousel. The track bleeds to the screen
+          edge so the next card peeks past it, but scroll-padding keeps the
+          snap position on the page gutter — without it, snapping swallows
+          the padding and the first card sits flush against the edge, out
+          of line with the heading above it. */}
       <div
         ref={trackRef}
-        className="lg:hidden flex gap-4 overflow-x-auto snap-x snap-mandatory scrollbar-none pb-1 -mx-6 px-6"
+        className="lg:hidden flex gap-4 overflow-x-auto snap-x snap-mandatory scrollbar-none pb-1 -mx-6 px-6 scroll-pl-6"
       >
         {operators.map(o => <SupplierCard key={o.id} o={o} />)}
       </div>

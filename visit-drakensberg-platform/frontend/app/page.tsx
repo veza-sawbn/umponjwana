@@ -1,6 +1,7 @@
 'use client'
 import { useState, useEffect, useMemo } from 'react'
 import Link from 'next/link'
+import SafeImage from '@/components/ui/SafeImage'
 import toast from 'react-hot-toast'
 import { ArrowRight, ChevronDown, X } from 'lucide-react'
 import { supabase } from '@/lib/auth'
@@ -20,6 +21,7 @@ import Editable from '@/components/editor/Editable'
 import EditableSection from '@/components/editor/EditableSection'
 import EditableCard from '@/components/editor/EditableCard'
 import { getTrails, type Trail } from '@/lib/trails'
+import { getFeaturedAttractions, ATTRACTION_KIND_LABEL, type Attraction } from '@/lib/attractions'
 import { getUpcomingExperiences, type TrekkingExperience } from '@/lib/experiences'
 import { getSupplierEntities } from '@/lib/supplier-entities'
 import { getActivities, type Activity } from '@/lib/activities'
@@ -133,13 +135,13 @@ function HeroSection({ hero }: { hero: typeof SITE_CONTENT_DEFAULTS.hero }) {
           <HeroCarousel images={carouselImages} />
         ) : (
           <Editable section="hero" fieldKey="image_url" value={imageUrl} label="Background Image" type="image">
-            <img
+            <SafeImage
               src={imageUrl}
               alt="Drakensberg mountains"
-              className="w-full h-full object-cover"
-              fetchPriority="high"
-              loading="eager"
-              decoding="async"
+              fill
+              priority
+              sizes="100vw"
+              className="object-cover"
             />
           </Editable>
         )}
@@ -190,10 +192,13 @@ function RegionCardBody({ region: r }: { region: HomeCard }) {
   return (
     <Link href={String(r.href || '/regions')} className="group block">
       <div className="relative overflow-hidden aspect-[4/3] mb-4">
-        <img loading="lazy" decoding="async"
+        <SafeImage
           src={String(r.img)}
           alt={String(r.name)}
-          className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+          fill
+          loading="lazy"
+          sizes="(max-width: 640px) 90vw, 31vw"
+          className="object-cover transition-transform duration-500 group-hover:scale-105"
           style={{ willChange: 'transform' }}
         />
       </div>
@@ -211,10 +216,13 @@ function JourneyCardBody({ pkg }: { pkg: MarketplacePackage }) {
   return (
     <Link href={`/packages/${pkg.id}`} className="group block bg-white border border-black/8 hover:border-forest/30 transition-colors h-full">
       <div className="relative overflow-hidden aspect-[4/3]">
-        <img loading="lazy" decoding="async"
+        <SafeImage
           src={pkg.image || 'https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?w=900&q=80'}
           alt={pkg.title}
-          className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+          fill
+          loading="lazy"
+          sizes="(max-width: 640px) 88vw, (max-width: 1024px) 45vw, 30vw"
+          className="object-cover transition-transform duration-500 group-hover:scale-105"
           style={{ willChange: 'transform' }}
         />
         {pkg.tag && (
@@ -292,13 +300,14 @@ function OfferCardBody({ item }: { item: MiniListItemData }) {
   return (
     <Link href={item.href} className="group block bg-white border border-black/8 hover:border-forest/30 transition-colors h-full">
       <div className="relative overflow-hidden aspect-[4/3] bg-mist">
-        {item.img ? (
-          <img loading="lazy" decoding="async" src={item.img} alt={item.title}
-            className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
-            style={{ willChange: 'transform' }} />
-        ) : (
-          <div className="w-full h-full" style={{ background: item.badgeColor }} />
-        )}
+        {/* The category colour always sits underneath, so a listing with no
+            photo — and one whose photo fails to load — shows the same
+            deliberate block rather than an empty frame. */}
+        <div className="absolute inset-0" style={{ background: item.badgeColor }} />
+        <SafeImage src={item.img} alt={item.title} fill loading="lazy"
+          sizes="(max-width: 640px) 88vw, (max-width: 1024px) 45vw, 30vw"
+          className="object-cover transition-transform duration-500 group-hover:scale-105"
+          style={{ willChange: 'transform' }} />
         <span className="absolute top-3 left-3 font-sans text-[10px] tracking-[0.15em] uppercase bg-black/55 text-white px-2.5 py-1">
           {item.badgeLabel}
         </span>
@@ -362,6 +371,7 @@ export default function HomePage() {
   const inEditor = Boolean(editMode)
   const [promoBannerDismissed, setPromoBannerDismissed] = useState(false)
   const [trails, setTrails] = useState<Trail[]>([])
+  const [attractions, setAttractions] = useState<Attraction[]>([])
   const [scheduledHikes, setScheduledHikes] = useState<TrekkingExperience[]>([])
   const [upcomingEvents, setUpcomingEvents] = useState<PublicEvent[]>([])
   const [featuredActivities, setFeaturedActivities] = useState<Activity[]>([])
@@ -413,6 +423,9 @@ export default function HomePage() {
     getTrails(publicSupabase)
       .then(all => setTrails(all.filter(t => t.status === 'published')))
       .catch(() => setTrails([]))
+    getFeaturedAttractions(publicSupabase)
+      .then(setAttractions)
+      .catch(() => setAttractions([]))
     getUpcomingExperiences(publicSupabase)
       .then(exps => setScheduledHikes(exps.slice(0, 3)))
       .catch(() => setScheduledHikes([]))
@@ -485,10 +498,13 @@ export default function HomePage() {
             <motion.div key={cat.id} variants={staggerChild} whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }} transition={{ duration: 0.2, ease: [0, 0, 0.2, 1] }} className={cardDimClass(cat, inEditor)}>
               <EditableCard contentKey="home_cards" fieldKey="categories" index={index} label={String(cat.label ?? 'Category Card')}>
                 <Link href={String(cat.href || '/')} className="group relative overflow-hidden aspect-[3/4] block">
-                  <img loading="lazy" decoding="async"
+                  <SafeImage
                     src={String(cat.img)}
                     alt={String(cat.label)}
-                    className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                    fill
+                    loading="lazy"
+                    sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 20vw"
+                    className="object-cover transition-transform duration-500 group-hover:scale-105"
                     style={{ willChange: 'transform' }}
                   />
                   <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/10 to-transparent" />
@@ -578,7 +594,7 @@ export default function HomePage() {
                 <Link href={`/mydrakensberg/${s.slug}`} className="group block">
                   <div className="relative overflow-hidden aspect-[3/2] mb-4 bg-forest/5">
                     {s.featured_image && (
-                      <img loading="lazy" decoding="async" src={s.featured_image} alt={s.title} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" style={{ willChange: 'transform' }} />
+                      <SafeImage src={s.featured_image} alt={s.title} fill loading="lazy" sizes="(max-width: 768px) 100vw, 33vw" className="object-cover transition-transform duration-500 group-hover:scale-105" style={{ willChange: 'transform' }} />
                     )}
                   </div>
                   <p className="font-sans text-[10px] tracking-[0.15em] uppercase text-gold mb-2">
@@ -594,43 +610,66 @@ export default function HomePage() {
     </EditableSection>
   )
 
-  const trailsSection = (
-    <EditableSection key="trails" id="trails" label="Top Trails" className="bg-forest">
+  // "Top Attractions" — an editorial pick, not a slice of the catalogue.
+  //
+  // This replaces a "Top Trails" band that rendered the first four published
+  // trails and ignored the trail's own "Featured on Homepage" flag, so that
+  // checkbox in Admin → Hiking Trails did nothing. Worse, when getTrails()
+  // fell back to DEFAULT_TRAILS (an unreachable Supabase, missing env vars)
+  // the band listed trails like tugela-falls and giants-castle that are not
+  // in the live catalogue at all — and /hikes/[id], reading successfully
+  // server-side, 404'd on every one of them.
+  //
+  // Now the rows are exactly what an admin ticked, across trails, nature
+  // reserves and towns (lib/attractions.ts), and every href points at a
+  // record that was actually read from the store it links into.
+  const attractionsSection = (
+    <EditableSection key="attractions" id="attractions" label="Top Attractions" className="bg-forest">
       <div className="max-w-[1440px] mx-auto px-6 lg:px-12 py-20">
         <div className="flex items-end justify-between mb-10">
           <div>
-            <Editable section="home_sections" fieldKey="trails_eyebrow" value={hs.trails_eyebrow} label="Trails Eyebrow" type="text">
-              <p className="font-sans text-xs tracking-[0.2em] uppercase text-white/30 mb-2">{hs.trails_eyebrow}</p>
+            <Editable section="home_sections" fieldKey="attractions_eyebrow" value={hs.attractions_eyebrow} label="Attractions Eyebrow" type="text">
+              <p className="font-sans text-xs tracking-[0.2em] uppercase text-white/30 mb-2">{hs.attractions_eyebrow}</p>
             </Editable>
-            <Editable section="home_sections" fieldKey="trails_heading" value={hs.trails_heading} label="Trails Heading" type="text">
-              <h2 className="font-display text-4xl text-white">{hs.trails_heading}</h2>
+            <Editable section="home_sections" fieldKey="attractions_heading" value={hs.attractions_heading} label="Attractions Heading" type="text">
+              <h2 className="font-display text-4xl text-white">{hs.attractions_heading}</h2>
             </Editable>
           </div>
-          <Link href="/hikes" className="hidden sm:flex items-center gap-2 font-sans text-sm text-white/40 hover:text-white transition-colors">
-            All hikes <ArrowRight className="w-4 h-4" />
+          <Link href="/plan" className="hidden sm:flex items-center gap-2 font-sans text-sm text-white/40 hover:text-white transition-colors">
+            Plan your trip <ArrowRight className="w-4 h-4" />
           </Link>
         </div>
 
-        {trails.length === 0 ? (
-          <p className="font-sans text-sm text-white/30 py-8">Trails will appear here once published.</p>
+        {attractions.length === 0 ? (
+          <p className="font-sans text-sm text-white/30 py-8">
+            Nothing featured yet — tick &ldquo;Featured on Homepage&rdquo; on a trail, nature reserve or town in the admin console.
+          </p>
         ) : (
           <div className="divide-y divide-white/10">
-            {trails.slice(0, 4).map((t, i) => (
-              <Link key={t.id} href={`/hikes/${t.id}`} className="group flex items-center justify-between py-5 hover:pl-2 transition-all duration-200">
-                <div className="flex items-center gap-6">
-                  <span className="font-sans text-2xl text-white/15 font-light tabular-nums w-8">{String(i + 1).padStart(2, '0')}</span>
-                  <div>
-                    <h3 className="font-display text-lg text-white group-hover:text-gold transition-colors">{t.name}</h3>
-                    <p className="font-sans text-xs text-white/35 mt-0.5">{t.distance} · {t.elevation} · {t.duration}</p>
+            {attractions.slice(0, 6).map((a, i) => (
+              <Link key={`${a.kind}:${a.id}`} href={a.href} className="group flex items-center justify-between py-5 hover:pl-2 transition-all duration-200">
+                <div className="flex items-center gap-6 min-w-0">
+                  <span className="font-sans text-2xl text-white/15 font-light tabular-nums w-8 shrink-0">{String(i + 1).padStart(2, '0')}</span>
+                  <div className="min-w-0">
+                    <h3 className="font-display text-lg text-white group-hover:text-gold transition-colors truncate">{a.name}</h3>
+                    <p className="font-sans text-xs text-white/35 mt-0.5 truncate">{a.meta}</p>
                   </div>
                 </div>
-                <div className="flex items-center gap-4">
-                  <span
-                    className="font-sans text-xs px-2.5 py-1"
-                    style={{ color: DIFF_COLOR[t.difficulty], background: DIFF_COLOR[t.difficulty] + '22' }}
-                  >
-                    {t.difficulty}
-                  </span>
+                <div className="flex items-center gap-4 shrink-0 ml-4">
+                  {/* A trail's difficulty is the useful badge; for a reserve or
+                      town it is the kind, so a visitor knows what they'd open. */}
+                  {a.difficulty ? (
+                    <span
+                      className="font-sans text-xs px-2.5 py-1 hidden sm:inline"
+                      style={{ color: DIFF_COLOR[a.difficulty] ?? '#4A7251', background: (DIFF_COLOR[a.difficulty] ?? '#4A7251') + '22' }}
+                    >
+                      {a.difficulty}
+                    </span>
+                  ) : (
+                    <span className="font-sans text-xs px-2.5 py-1 text-white/50 bg-white/10 hidden sm:inline">
+                      {ATTRACTION_KIND_LABEL[a.kind]}
+                    </span>
+                  )}
                   <ArrowRight className="w-4 h-4 text-white/20 group-hover:text-gold transition-colors" />
                 </div>
               </Link>
@@ -775,7 +814,7 @@ export default function HomePage() {
     regions: regionsSection,
     experiences: experiencesSection,
     stories: storiesSection,
-    trails: trailsSection,
+    attractions: attractionsSection,
     journeys: journeysSection,
     newsletter: newsletterSection,
   }

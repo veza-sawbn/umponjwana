@@ -1,3 +1,15 @@
+// Supabase project host, so a project fronted by a custom domain (rather
+// than the default *.supabase.co) still gets picked up by the remotePattern
+// below — otherwise every trail/region/property photo uploaded to Storage
+// would hit next/image's "hostname not configured" error, which crashes
+// the whole page it's on, not just that one photo.
+let supabaseHostname
+try {
+  supabaseHostname = new URL(process.env.NEXT_PUBLIC_SUPABASE_URL || '').hostname
+} catch {
+  supabaseHostname = null
+}
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   // @react-pdf/renderer (invoice PDF generation) pulls in yoga-layout, which
@@ -13,8 +25,38 @@ const nextConfig = {
   images: {
     remotePatterns: [
       { protocol: 'https', hostname: '*.supabase.co' },
+      ...(supabaseHostname && !supabaseHostname.endsWith('.supabase.co')
+        ? [{ protocol: 'https', hostname: supabaseHostname }]
+        : []),
       { protocol: 'https', hostname: 'images.unsplash.com' },
       { protocol: 'https', hostname: 'plus.unsplash.com' },
+
+      // Third-party hosts that live content actually points at. Admins and
+      // suppliers paste image URLs from wherever they found them, and an
+      // un-allow-listed host is not a soft failure: in production the loader
+      // still emits /_next/image?url=… and the optimizer answers 400, so the
+      // photo is simply blank. That is what emptied the homepage "What's on"
+      // reel — the three soonest hike cards and one activity all sit on hosts
+      // in this list, while the 89 images on Supabase/Unsplash were fine.
+      //
+      // Allow-listing beats letting the browser fetch these directly: the
+      // optimizer fetches server-side with no Referer, so hotlink protection
+      // (wixstatic and gstatic in particular) does not trip, and the result is
+      // cached and resized instead of shipped full-size.
+      //
+      // This is a snapshot of what is in the database, not a policy — a URL
+      // pasted from a new host tomorrow still won't match, which is why
+      // components/ui/SafeImage.tsx keeps its unoptimized fallback. The
+      // durable fix is uploading photos through Admin → Media Library so they
+      // land in Supabase Storage.
+      { protocol: 'https', hostname: 'hiking-trails.com' },
+      { protocol: 'https', hostname: 'www.alexnail.com' },
+      { protocol: 'https', hostname: 'encrypted-tbn0.gstatic.com' },
+      { protocol: 'https', hostname: 'www.champagnesportsresort.com' },
+      { protocol: 'https', hostname: 'wildmanranch.com' },
+      { protocol: 'https', hostname: 'static.wixstatic.com' },
+      { protocol: 'https', hostname: 'upload.wikimedia.org' },
+      { protocol: 'https', hostname: 'southafrica.co.za' },
     ],
   },
   env: {

@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
+import Image from 'next/image'
 import Footer from '@/components/layout/Footer'
 import { MapPin, Star, Users, Wifi, Flame, Utensils, Car, ArrowLeft, Calendar, Waves, TreePine, ShieldCheck, BedDouble } from 'lucide-react'
 import SmartRecommendations from '@/components/booking/SmartRecommendations'
@@ -13,6 +14,8 @@ import { Check, Clock } from 'lucide-react'
 import type { Property } from '@/lib/properties'
 import { isRequestMode } from '@/lib/stay-requests'
 import { getRoomUnitsLeft, type Room } from '@/lib/rooms'
+import SaveButton from '@/components/ui/SaveButton'
+import type { SaveableListing } from '@/lib/saved-listings'
 import { formatMoney } from '@/lib/allocation'
 import ReadMoreText from '@/components/ui/ReadMoreText'
 
@@ -78,6 +81,18 @@ export default function StayDetail({ property, rooms: roomsData, id }: { propert
   // before any payment is taken (see lib/stay-requests.ts). Say so here,
   // before the guest builds a whole trip around it.
   const requestOnly = isRequestMode(property)
+
+  // The snapshot both hero save buttons write — one object so the mobile
+  // photo hero and the desktop band can never disagree about what got saved.
+  const savedListing: SaveableListing = {
+    id,
+    type: 'stay',
+    title: stay.title,
+    location: stay.location,
+    price: stay.price_from || null,
+    image: stay.images[0],
+    rating: stay.rating || undefined,
+  }
 
   const [heroSlide, setHeroSlide] = useState(0)
   const [selectedRoom, setSelectedRoom] = useState<any>(null)
@@ -154,6 +169,13 @@ export default function StayDetail({ property, rooms: roomsData, id }: { propert
             {heroSlide + 1} / {stay.images.length}
           </span>
         )}
+        {/* Under the slide counter when there is one — the desktop hero puts
+            the same control inline next to the rating instead. */}
+        <SaveButton
+          tone="dark"
+          className={stay.images.length > 1 ? '!top-16 !right-6' : '!top-6 !right-6'}
+          listing={savedListing}
+        />
       </section>
 
       {/* Hero header — sm and up (mobile uses the photo hero above instead). */}
@@ -173,19 +195,20 @@ export default function StayDetail({ property, rooms: roomsData, id }: { propert
                 <span>({stay.review_count} reviews)</span>
               </span>
             )}
+            <SaveButton variant="inline" tone="dark" listing={savedListing} />
           </div>
         </div>
       </section>
 
       {/* Desktop/tablet 4-up photo collage. */}
       <div className="hidden sm:grid grid-cols-4 grid-rows-2 h-[52vh] min-h-[340px] gap-px">
-        <div className="col-span-2 row-span-2 overflow-hidden">
-          <img src={stay.images[0]} alt={stay.title} className="w-full h-full object-cover" />
+        <div className="relative col-span-2 row-span-2 overflow-hidden">
+          <Image src={stay.images[0]} alt={stay.title} fill priority sizes="50vw" className="object-cover" />
         </div>
         {[1, 2, 3].map(i => (
-          <div key={i} className="overflow-hidden bg-[#2d6a4f]/10">
+          <div key={i} className="relative overflow-hidden bg-[#2d6a4f]/10">
             {stay.images[i] ? (
-              <img src={stay.images[i]} alt="" className="w-full h-full object-cover" />
+              <Image src={stay.images[i]} alt="" fill loading="lazy" sizes="25vw" className="object-cover" />
             ) : (
               <div className="w-full h-full flex items-center justify-center">
                 <span className="font-sans text-xs text-gray-400">Photo {i + 1}</span>
@@ -282,9 +305,9 @@ export default function StayDetail({ property, rooms: roomsData, id }: { propert
                             <button
                               type="button"
                               onClick={e => { e.stopPropagation(); setDetailRoom(room) }}
-                              className="block w-full aspect-[4/3] overflow-hidden bg-gray-100"
+                              className="relative block w-full aspect-[4/3] overflow-hidden bg-gray-100"
                             >
-                              <img src={room.images[0]} alt={room.name} className="w-full h-full object-cover hover:opacity-90 transition-opacity" />
+                              <Image src={room.images[0]} alt={room.name} fill loading="lazy" sizes="160px" className="object-cover hover:opacity-90 transition-opacity" />
                             </button>
                             {room.images.length > 1 && (
                               <div className="grid grid-cols-3 gap-1 mt-1">
@@ -295,7 +318,7 @@ export default function StayDetail({ property, rooms: roomsData, id }: { propert
                                     onClick={e => { e.stopPropagation(); setDetailRoom(room) }}
                                     className="relative aspect-square overflow-hidden bg-gray-100"
                                   >
-                                    <img src={url} alt="" className="w-full h-full object-cover hover:opacity-90 transition-opacity" />
+                                    <Image src={url} alt="" fill loading="lazy" sizes="53px" className="object-cover hover:opacity-90 transition-opacity" />
                                     {i === 2 && room.images.length > 4 && (
                                       <span className="absolute inset-0 bg-black/50 flex items-center justify-center font-sans text-[10px] text-white">
                                         +{room.images.length - 4}

@@ -3,6 +3,7 @@
 import { useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
+import Image from 'next/image'
 import Footer from '@/components/layout/Footer'
 import {
   ArrowLeft, Users, CheckCircle, Package as PackageIcon, MapPin, Star,
@@ -13,6 +14,7 @@ import { COMPONENT_TYPE_LABELS, PACKAGE_CATEGORY_LABELS, type MarketplacePackage
 import { bookPackage } from '@/lib/package-bookings'
 import { getTrails, type Trail } from '@/lib/trails'
 import { formatMoney } from '@/lib/allocation'
+import SaveButton from '@/components/ui/SaveButton'
 
 /**
  * Client island rendered inside the server shell (page.tsx), which already
@@ -115,7 +117,7 @@ export default function PackageDetail({ pkg, id }: { pkg: MarketplacePackage; id
   return (
     <div className="min-h-screen bg-[#F7F5F2]">
       <section className="relative h-[45vh] min-h-[360px] overflow-hidden mt-16">
-        <img src={pkg.image || 'https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?w=1200&q=80'} alt={pkg.title} className="w-full h-full object-cover" />
+        <Image src={pkg.image || 'https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?w=1200&q=80'} alt={pkg.title} fill priority sizes="100vw" className="object-cover" />
         <div className="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent" />
         <div className="absolute bottom-0 left-0 right-0 px-6 lg:px-12 pb-10">
           <div className="max-w-[1440px] mx-auto">
@@ -128,9 +130,23 @@ export default function PackageDetail({ pkg, id }: { pkg: MarketplacePackage; id
               ))}
             </div>
             <h1 className="font-display italic text-4xl lg:text-6xl text-white">{pkg.title}</h1>
-            <p className="font-sans text-sm text-white/70 mt-2 flex items-center gap-2">
-              <MapPin size={13} /> {pkg.region || 'Drakensberg'} · {pkg.durationNights} night{pkg.durationNights !== 1 ? 's' : ''} · max {pkg.maxGuests} guests
-            </p>
+            <div className="flex flex-wrap items-center gap-4 mt-2">
+              <p className="font-sans text-sm text-white/70 flex items-center gap-2">
+                <MapPin size={13} /> {pkg.region || 'Drakensberg'} · {pkg.durationNights} night{pkg.durationNights !== 1 ? 's' : ''} · max {pkg.maxGuests} guests
+              </p>
+              <SaveButton
+                variant="inline"
+                tone="dark"
+                listing={{
+                  id: pkg.id,
+                  type: 'package',
+                  title: pkg.title,
+                  location: pkg.region || 'Drakensberg',
+                  price: pkg.pricePerPerson,
+                  image: pkg.image,
+                }}
+              />
+            </div>
           </div>
         </div>
       </section>
@@ -166,7 +182,7 @@ export default function PackageDetail({ pkg, id }: { pkg: MarketplacePackage; id
                       {(c.gallery ?? []).length > 0 && (
                         <div className="flex gap-2 mt-3 overflow-x-auto">
                           {(c.gallery ?? []).map((url, i) => (
-                            <img key={i} src={url} alt={`${c.title} photo ${i + 1}`}
+                            <Image key={i} src={url} alt={`${c.title} photo ${i + 1}`} width={96} height={80} loading="lazy"
                               className="w-24 h-20 object-cover shrink-0 border border-gray-100" />
                           ))}
                         </div>

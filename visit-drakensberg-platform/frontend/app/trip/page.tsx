@@ -63,6 +63,22 @@ export default function TripPage() {
 
   const subtotal = booking.totalPrice
 
+  // Transport is part of the trip, not a gate in front of checkout.
+  //
+  // Every shuttle leg is configured inline above (ShuttleTripCard: partner,
+  // vehicle, meet & greet), so a trip that already carries one has nothing
+  // left to answer. Sending it through /checkout/shuttle anyway showed the
+  // visitor a blank "how are you getting there?" form for a transfer they
+  // had already booked on /shuttles — that page only recognises a leg still
+  // missing a partner, so a finished one left the form empty. Re-answering
+  // it then added a *second* leg and charged for two transfers.
+  //
+  // A trip with no transport at all is the one case still worth asking
+  // about, so that keeps the interstitial.
+  function continueToCheckout() {
+    router.push(hasShuttle ? '/checkout' : '/checkout/shuttle')
+  }
+
   return (
     <div className="min-h-screen bg-[#F7F5F2]">
 
@@ -328,7 +344,7 @@ export default function TripPage() {
               )}
 
               <button
-                onClick={() => router.push('/checkout/shuttle')}
+                onClick={continueToCheckout}
                 disabled={isEmpty}
                 className="w-full bg-[#2d6a4f] text-white font-sans text-sm py-3 rounded-lg hover:bg-[#235a3f] transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
               >

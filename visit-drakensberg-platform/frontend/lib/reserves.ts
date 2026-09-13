@@ -20,6 +20,9 @@ export type Reserve = {
   peaks: ReservePeak[]
   seoTitle: string
   seoDescription: string
+  /** Surfaced in the homepage "Top Attractions" section. Optional: reserves
+   *  saved before this existed simply aren't featured. See lib/attractions.ts. */
+  featured?: boolean
   createdAt?: string
   updatedAt?: string
 }
@@ -144,6 +147,7 @@ function normalizeReserve(reserve: Partial<Reserve> & { name: string; id?: strin
     peaks: reserve.peaks || [],
     seoTitle: reserve.seoTitle || `${reserve.name} | Visit Drakensberg`,
     seoDescription: reserve.seoDescription || '',
+    featured: reserve.featured ?? false,
     createdAt: reserve.createdAt,
     updatedAt: reserve.updatedAt,
   }

@@ -1,11 +1,13 @@
 'use client'
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
+import Image from 'next/image'
 import { ArrowRight } from 'lucide-react'
 import { Swiper, SwiperSlide } from 'swiper/react'
 import { Autoplay } from 'swiper/modules'
 import 'swiper/css'
 import { getRegions, DEFAULT_REGIONS, type Region } from '@/lib/regions'
+import { isOptimizableImageHost } from '@/lib/image-url'
 
 function regionImage(region: Region, index: number) {
   return region.heroImage || DEFAULT_REGIONS[index % DEFAULT_REGIONS.length]?.heroImage || DEFAULT_REGIONS[0].heroImage
@@ -36,12 +38,28 @@ function RegionCard({ region: r, index, onSelect }: { region: Region; index: num
   return (
     <Link href={`/hikes?region=${encodeURIComponent(r.name)}`} onClick={handleClick} className="group block">
       <div className="relative overflow-hidden aspect-[4/3] mb-4">
-        <img loading="lazy" decoding="async"
-          src={regionImage(r, index)}
-          alt={r.name}
-          className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
-          style={{ willChange: 'transform' }}
-        />
+        {isOptimizableImageHost(regionImage(r, index)) ? (
+          <Image
+            src={regionImage(r, index)}
+            alt={r.name}
+            fill
+            loading="lazy"
+            sizes="(max-width: 640px) 90vw, 31vw"
+            className="object-cover transition-transform duration-500 group-hover:scale-105"
+            style={{ willChange: 'transform' }}
+          />
+        ) : (
+          // Host next/image isn't configured for (see next.config.mjs) —
+          // fall back to a plain <img> instead of crashing the whole page.
+          <img
+            src={regionImage(r, index)}
+            alt={r.name}
+            loading="lazy"
+            decoding="async"
+            className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+            style={{ willChange: 'transform' }}
+          />
+        )}
       </div>
       <p className="font-sans text-[10px] tracking-[0.15em] uppercase text-gold mb-1">{r.tagline || 'Drakensberg region'}</p>
       <h3 className="font-display text-2xl text-forest mb-2">{r.name}</h3>
