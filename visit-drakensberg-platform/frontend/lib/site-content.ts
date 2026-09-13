@@ -88,7 +88,7 @@ export const SITE_CONTENT_DEFAULTS = {
   // Section layout for the homepage: render order, hidden sections, and
   // per-section style overrides (keyed by section id, shared by all pages).
   home_layout: {
-    section_order: ['stats', 'categories', 'regions', 'experiences', 'stories', 'trails', 'journeys', 'newsletter'] as string[],
+    section_order: ['stats', 'categories', 'regions', 'experiences', 'stories', 'attractions', 'journeys', 'newsletter'] as string[],
     hidden: [] as string[],
     styles: {} as Record<string, SectionStyle>,
   },
@@ -100,7 +100,7 @@ export const SITE_CONTENT_DEFAULTS = {
     categories_eyebrow: 'What to do', categories_heading: 'Explore the Berg',
     regions_eyebrow: 'By region', regions_heading: 'Choose your Berg',
     stories_eyebrow: 'Journal', stories_heading: 'Stories from the Berg',
-    trails_eyebrow: 'On foot', trails_heading: 'Top trails',
+    attractions_eyebrow: 'Worth the detour', attractions_heading: 'Top attractions',
     experiences_eyebrow: "What's on", experiences_heading: 'Events & Experiences',
     journeys_eyebrow: 'Curated journeys', journeys_heading: 'Multi-day packages',
     newsletter_eyebrow: 'Stay informed', newsletter_heading: 'Berg dispatches',
