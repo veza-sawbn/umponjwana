@@ -196,7 +196,7 @@ export default function SupplierWorkspacePage() {
           </div>
           <p className="font-sans text-[11px] text-gray-400 mt-4 leading-relaxed">
             Permissions are set per supplier by a platform administrator. They govern this
-            supplier only — your access to other suppliers is configured separately.
+            supplier only. Your access to other suppliers is configured separately.
           </p>
         </div>
       </section>

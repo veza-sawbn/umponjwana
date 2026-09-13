@@ -37,7 +37,7 @@ function ImportModal({ suppliers, onClose, onImported }: {
     file.text().then(text => {
       const parsed = parseContactsCsv(text)
       if (parsed.length === 0) {
-        setError('No usable rows found — the CSV needs a header row with a name (or first/last name) and/or email column.')
+        setError('No usable rows found. The CSV needs a header row with a name (or first/last name) and/or email column.')
         setRows([])
       } else {
         setRows(parsed)
@@ -82,10 +82,10 @@ function ImportModal({ suppliers, onClose, onImported }: {
         <button onClick={() => fileInputRef.current?.click()}
           className="w-full border-2 border-dashed border-gray-200 bg-[#F7F5F2] p-8 text-center font-sans text-sm text-gray-500 hover:border-[#2d6a4f] transition-colors mb-1">
           <Upload size={24} className="mx-auto mb-2 text-gray-300" />
-          {fileName || 'Choose a .csv file — needs a name and/or email column'}
+          {fileName || 'Choose a .csv file with a name and/or email column'}
         </button>
         <p className="font-sans text-[11px] text-gray-400 mb-4">
-          Recognised columns: name (or First Name/Last Name), email, phone — any order, case-insensitive.
+          Recognised columns: name (or First Name/Last Name), email, phone, in any order and case-insensitive.
           Exports with numbered columns like Email 1/Email 2 (e.g. Wix) work too.
         </p>
 
@@ -157,7 +157,7 @@ export default function SupplierContactsPanel() {
     <div>
       <div className="mb-6 flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
         <p className="font-sans text-sm text-gray-500 max-w-2xl">
-          Every supplier&apos;s own contact list, across the whole platform — booking-derived, imported or
+          Every supplier&apos;s own contact list, across the whole platform: booking-derived, imported or
           manually added. Each supplier only ever sees their own.
         </p>
         <div className="flex gap-2 shrink-0">

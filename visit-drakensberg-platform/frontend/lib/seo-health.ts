@@ -44,7 +44,7 @@ export function computeSeoHealth(entity: SeoHealthInput): SeoHealthResult {
       score += 15
       good.push('SEO title length optimal (30–60 chars)')
     } else {
-      warnings.push(`SEO title is ${title.length} chars — aim for 30–60`)
+      warnings.push(`SEO title is ${title.length} chars. Aim for 30–60`)
     }
   }
 
@@ -62,7 +62,7 @@ export function computeSeoHealth(entity: SeoHealthInput): SeoHealthResult {
       score += 15
       good.push('Meta description length optimal (100–160 chars)')
     } else {
-      warnings.push(`Meta description is ${desc.length} chars — aim for 100–160`)
+      warnings.push(`Meta description is ${desc.length} chars. Aim for 100–160`)
     }
   }
 
@@ -71,7 +71,7 @@ export function computeSeoHealth(entity: SeoHealthInput): SeoHealthResult {
     score += 10
     good.push('URL slug present')
   } else {
-    critical.push('No URL slug — cannot generate canonical URL')
+    critical.push('No URL slug, so no canonical URL can be generated')
   }
 
   // ── Robots index (5 pts) ─────────────────────────────────────────────────
@@ -87,7 +87,7 @@ export function computeSeoHealth(entity: SeoHealthInput): SeoHealthResult {
     score += 10
     good.push('Featured image present')
   } else {
-    warnings.push('No featured image — add one for rich OG / social previews')
+    warnings.push('No featured image. Add one for rich OG and social previews')
   }
 
   // ── Content length (5 pts) ───────────────────────────────────────────────
@@ -95,7 +95,7 @@ export function computeSeoHealth(entity: SeoHealthInput): SeoHealthResult {
     score += 5
     good.push('Content length sufficient')
   } else {
-    warnings.push('Content too short — aim for at least 100 characters')
+    warnings.push('Content too short. Aim for at least 100 characters')
   }
 
   return { score, critical, warnings, good }

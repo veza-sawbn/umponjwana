@@ -88,7 +88,7 @@ export async function POST(req: Request, { params }: { params: { id: string } })
 
   const { sent, error } = await sendMail({
     to,
-    subject: `${label} — ${data.supplierName}`,
+    subject: `${label} for ${data.supplierName}`,
     html,
     attachments: [{
       filename: agreementFileName(data.supplierName, documentParam, data.version),

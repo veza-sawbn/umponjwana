@@ -120,7 +120,7 @@ export default function EditVehiclePage() {
           onChange={setLocation}
         />
         <p className="font-sans text-xs text-black/40">
-          Location updates automatically when a trip completes (the vehicle parks at the drop-off) — only set it here
+          Location updates automatically when a trip completes (the vehicle parks at the drop-off). Only set it here
           to correct the record.
         </p>
       </div>

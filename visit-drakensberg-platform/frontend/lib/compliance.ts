@@ -62,7 +62,7 @@ type DocTypeSpec = {
 export const DOC_TYPES: Record<ComplianceDocType, DocTypeSpec> = {
   edtea_registration: {
     label: 'EDTEA operator registration',
-    hint: 'KZN Department of Economic Development, Tourism and Environmental Affairs — tourism operator registration certificate.',
+    hint: 'KZN Department of Economic Development, Tourism and Environmental Affairs: tourism operator registration certificate.',
     applicantHint: 'Your current registration certificate from KZN EDTEA, as a PDF.',
     issuerLabel: 'Issuing office',
     referenceLabel: 'Registration number',

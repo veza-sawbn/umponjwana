@@ -1,9 +1,10 @@
 'use client'
 import { Swiper, SwiperSlide } from 'swiper/react'
-import { Pagination } from 'swiper/modules'
+import { Autoplay, Pagination } from 'swiper/modules'
 import 'swiper/css'
 import 'swiper/css/pagination'
 import TrailExperiences from '@/components/experiences/TrailExperiences'
+import { useSwiperAutoplay, CAROUSEL_AUTOPLAY_SLOW_MS, CAROUSEL_SPEED_MS } from '@/lib/carousel-autoplay'
 import type { Trail } from '@/lib/trails'
 import type { TrekkingExperience } from '@/lib/experiences'
 
@@ -17,15 +18,24 @@ import type { TrekkingExperience } from '@/lib/experiences'
  * than clipping or stretching to match its neighbours. Pagination dots
  * stand in for the peek affordance a fractional slidesPerView normally
  * gives, since a full-width slide doesn't show a sliver of the next one.
+ *
+ * It moves through the trails on its own, but on the slow cadence rather
+ * than the house one: a slide here is a whole block of departures to read,
+ * not a single card to glance at, so it gets noticeably longer on screen
+ * before the next trail comes round.
  */
 export default function TrailExperiencesCarousel({
   groups,
 }: {
   groups: { trail: Trail; exps: TrekkingExperience[] }[]
 }) {
+  const autoplay = useSwiperAutoplay({ slideCount: groups.length, delayMs: CAROUSEL_AUTOPLAY_SLOW_MS })
+
   return (
     <Swiper
-      modules={[Pagination]}
+      modules={[Autoplay, Pagination]}
+      speed={CAROUSEL_SPEED_MS}
+      {...autoplay}
       slidesPerView={1}
       spaceBetween={32}
       autoHeight

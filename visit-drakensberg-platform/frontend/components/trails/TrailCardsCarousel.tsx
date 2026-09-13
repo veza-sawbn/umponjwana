@@ -1,17 +1,24 @@
 'use client'
 import { Swiper, SwiperSlide } from 'swiper/react'
+import { Autoplay } from 'swiper/modules'
 import 'swiper/css'
 import ExploreCard from '@/components/trails/ExploreCard'
+import { useSwiperAutoplay, CAROUSEL_SPEED_MS } from '@/lib/carousel-autoplay'
 import { trailStartPoint, trailCategory } from '@/lib/trails'
 import { StayDistance } from '@/lib/stay-distance'
 import type { Trail } from '@/lib/trails'
 
 /**
  * Swipeable presentation of the /hikes results — replaces the old static
- * grid in the same slot. Unlike the homepage's marketing carousels this one
- * browses a genuine (and potentially long) filtered result set, so it never
- * loops or autoplays: swiping to the end should feel like reaching the end
- * of the list, not looping back to the start.
+ * grid in the same slot. It drifts through the results on its own so a
+ * filtered set shows more than its first three trails at a glance, and
+ * holds still as soon as the visitor takes over.
+ *
+ * Unlike the homepage's marketing reels, though, this one browses a genuine
+ * (and potentially long) result set, so it neither loops nor wraps: it
+ * advances to the last trail and stops there, because reaching the end
+ * should feel like reaching the end of the list rather than being carried
+ * back to the start.
  */
 export default function TrailCardsCarousel({
   trails, difficultyColor,
@@ -19,8 +26,13 @@ export default function TrailCardsCarousel({
   trails: Trail[]
   difficultyColor: Record<string, string>
 }) {
+  const autoplay = useSwiperAutoplay({ slideCount: trails.length, stopOnLastSlide: true })
+
   return (
     <Swiper
+      modules={[Autoplay]}
+      speed={CAROUSEL_SPEED_MS}
+      {...autoplay}
       spaceBetween={24}
       slidesPerView={1.15}
       breakpoints={{

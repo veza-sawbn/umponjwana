@@ -87,7 +87,7 @@ export async function generateMetadata({ params }: { params: { id: string } }): 
   const trail = await resolveTrail(params.id)
   if (!trail) return { title: 'Trail Not Found' }
 
-  const title = trail.seoTitle || `${trail.name} — ${trail.region} | Visit Drakensberg`
+  const title = trail.seoTitle || `${trail.name}, ${trail.region} | Visit Drakensberg`
   const description = buildDescription(trail)
   const canonical = `/hikes/${trail.slug || trail.id}`
 

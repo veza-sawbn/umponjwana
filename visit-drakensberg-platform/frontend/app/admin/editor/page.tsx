@@ -375,7 +375,7 @@ export default function AdminEditorPage() {
           <span className="font-sans text-[11px] text-white/30 whitespace-nowrap hidden md:inline">
             {draftStatus === 'saving' && 'Saving draft…'}
             {draftStatus === 'saved' && (unsavedCount > 0 ? `Draft saved · ${unsavedCount} change${unsavedCount === 1 ? '' : 's'} pending publish` : 'All changes published')}
-            {draftStatus === 'error' && <span className="text-red-400">Draft save failed — check your connection</span>}
+            {draftStatus === 'error' && <span className="text-red-400">Draft save failed. Check your connection</span>}
           </span>
         </div>
 

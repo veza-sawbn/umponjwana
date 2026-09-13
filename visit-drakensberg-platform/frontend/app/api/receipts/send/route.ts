@@ -46,13 +46,13 @@ function receiptHtml(o: {
     heading: o.isRefund ? 'Refund processed' : 'Payment received',
     preheader: o.isRefund
       ? `Refund of ${money(o.amount, o.currency)} processed against your booking.`
-      : `Payment of ${money(o.amount, o.currency)} received — thank you.`,
+      : `Payment of ${money(o.amount, o.currency)} received. Thank you.`,
     bodyHtml: `
       <p style="margin:0 0 4px;">Dear ${esc(o.customerName || 'traveller')},</p>
       <p style="margin:0 0 20px;">
         ${o.isRefund
           ? `We have processed a refund of <strong>${esc(money(o.amount, o.currency))}</strong> against your booking.`
-          : `Thank you — we have received your payment of <strong>${esc(money(o.amount, o.currency))}</strong>.`}
+          : `Thank you. We have received your payment of <strong>${esc(money(o.amount, o.currency))}</strong>.`}
       </p>
       ${detailTable([
         ['Receipt', o.receiptNumber],
@@ -64,7 +64,7 @@ function receiptHtml(o: {
         ['Total paid to date', money(o.totalPaid, o.currency)],
       ], ['Balance due', money(o.balance, o.currency)])}
       ${ctaButton(o.invoiceUrl, 'View your invoice')}
-      ${finePrint(`This receipt covers your single trip invoice with Visit Drakensberg — all accommodation,
+      ${finePrint(`This receipt covers your single trip invoice with Visit Drakensberg. All accommodation,
         activities, transfers and extras appear on one document. Keep this email for your records.`)}`,
   })
 }
@@ -120,8 +120,8 @@ export async function POST(req: Request) {
     const result = await sendMail({
       to: email,
       subject: isRefund
-        ? `Refund receipt ${receipt.receipt_number} — ${order.order_number}`
-        : `Payment receipt ${receipt.receipt_number} — ${order.order_number}`,
+        ? `Refund receipt ${receipt.receipt_number} for ${order.order_number}`
+        : `Payment receipt ${receipt.receipt_number} for ${order.order_number}`,
       html: receiptHtml({
         customerName: order.customer_name,
         receiptNumber: receipt.receipt_number,

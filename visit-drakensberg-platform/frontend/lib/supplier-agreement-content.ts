@@ -65,7 +65,7 @@ export const SUPPLIER_TERMS_SECTIONS: LegalSection[] = [
   {
     heading: '3. Commission and platform fee',
     body: [
-      'You select a commission tier when you apply. The rate shown for that tier is the total platform fee, inclusive of booking commission and payment handling — not an additional charge on top of a base rate. The applicable rate is confirmed in writing when your application is approved.',
+      'You select a commission tier when you apply. The rate shown for that tier is the total platform fee, inclusive of booking commission and payment handling, not an additional charge on top of a base rate. The applicable rate is confirmed in writing when your application is approved.',
       'Moving to a higher tier takes effect immediately for new bookings. Moving to a lower tier requires notice and cannot take effect before the end of the 90-day minimum hold on your current tier. No tier change affects bookings already confirmed.',
       'Commission is calculated on the total booking value excluding any separately itemised statutory levy or park entry fee collected on behalf of a third party.',
     ],
@@ -98,7 +98,7 @@ export const SUPPLIER_TERMS_SECTIONS: LegalSection[] = [
     heading: '7. Rate parity and off-platform diversion',
     body: [
       'You may set your own prices, and you may sell through any other channel, including your own website, at any price you choose. We do not require rate parity.',
-      'What you may not do is take a guest who found you through Visit Drakensberg off the platform in order to avoid the platform fee — for example by cancelling a platform booking and re-taking it directly, or by directing an enquirer to book elsewhere in order to bypass commission. Where that happens we may charge the fee that would have been due.',
+      'What you may not do is take a guest who found you through Visit Drakensberg off the platform in order to avoid the platform fee, for example by cancelling a platform booking and re-taking it directly, or by directing an enquirer to book elsewhere in order to bypass commission. Where that happens we may charge the fee that would have been due.',
     ],
   },
   {
@@ -106,7 +106,7 @@ export const SUPPLIER_TERMS_SECTIONS: LegalSection[] = [
     body: [
       'To fulfil a booking we give you the guest details you need: name, contact details, party size, dates and any special requests. In respect of that information you act as an operator for the platform within the meaning of the Protection of Personal Information Act, 2013 (POPIA).',
       'You may use guest information only to deliver the booking. You may not use it for marketing, add it to a mailing list, sell it, or share it with anyone other than as needed to deliver the booking, unless the guest has separately given you consent for that purpose.',
-      'You must keep it secure, retain it only as long as you need it or the law requires, and tell us without delay — and in any event within 72 hours — if it is lost, accessed without authority, or disclosed in error, so that we can meet our own notification obligations.',
+      'You must keep it secure, retain it only as long as you need it or the law requires, and tell us without delay, and in any event within 72 hours, if it is lost, accessed without authority, or disclosed in error, so that we can meet our own notification obligations.',
     ],
   },
   {
@@ -140,7 +140,7 @@ export const SUPPLIER_TERMS_SECTIONS: LegalSection[] = [
   {
     heading: '13. Governing law and disputes',
     body: [
-      'This agreement is governed by the law of the Republic of South Africa. Before pursuing formal proceedings, both parties will attempt in good faith to resolve a dispute directly — raise it with us at hello@visitdrakensberg.com or through our concern channel.',
+      'This agreement is governed by the law of the Republic of South Africa. Before pursuing formal proceedings, both parties will attempt in good faith to resolve a dispute directly. Raise it with us at hello@visitdrakensberg.com or through our concern channel.',
     ],
   },
 ]
@@ -162,14 +162,14 @@ export const CODE_OF_CONDUCT_SECTIONS: LegalSection[] = [
     body: [
       'Hold the registrations, licences, permits and insurance your operation requires, and keep them current. Where you operate in a protected area, hold the concessions and permits that area requires and observe its conditions.',
       'Keep accurate records of the bookings you take through us. Do not misreport, under-declare or conceal bookings in order to reduce commission.',
-      'Describe what you offer truthfully in every channel — the listing, your responses to enquiries, and what you say to a guest on arrival.',
+      'Describe what you offer truthfully in every channel: the listing, your responses to enquiries, and what you say to a guest on arrival.',
     ],
   },
   {
     heading: '2. No bribery, no kickbacks',
     body: [
       'Do not offer, give, request or accept anything of value in order to obtain a listing, improve your placement in search or curation, influence a review, or obtain any other advantage on the platform.',
-      'This applies to our staff without exception. No Visit Drakensberg employee, and no operations employee who manages a supplier account on our behalf, may accept cash, free stays, discounted services, or gifts beyond ordinary hospitality of nominal value from a supplier. If one asks you for something, report it — see "Raising a concern" below.',
+      'This applies to our staff without exception. No Visit Drakensberg employee, and no operations employee who manages a supplier account on our behalf, may accept cash, free stays, discounted services, or gifts beyond ordinary hospitality of nominal value from a supplier. If one asks you for something, report it. See "Raising a concern" below.',
       'Tell us if you, a family member or a business partner has an interest in a Visit Drakensberg employee’s business, or an employee has an interest in yours, so it can be recorded and managed.',
     ],
   },
@@ -179,7 +179,7 @@ export const CODE_OF_CONDUCT_SECTIONS: LegalSection[] = [
       'Guest safety is not a document exercise. For every activity you run:',
     ],
     list: [
-      'Brief guests honestly on difficulty, fitness required, weather exposure and what to bring, before they commit — not on the morning.',
+      'Brief guests honestly on difficulty, fitness required, weather exposure and what to bring, before they commit rather than on the morning.',
       'Maintain equipment, vehicles and premises, and take them out of service when they are not safe.',
       'Carry appropriate first aid capability and a working means of calling for help, and know the evacuation route for the terrain you work in.',
       'Have a stated plan for weather deterioration in the Berg, and use it. Turning a group back is never a commercial decision.',
@@ -204,7 +204,7 @@ export const CODE_OF_CONDUCT_SECTIONS: LegalSection[] = [
   {
     heading: '5. Treat workers decently',
     body: [
-      'Everyone who works for you — permanent, seasonal, casual or contracted — is entitled to be treated with dignity. No threats, bullying, violence, or harassment of any kind, including sexual harassment.',
+      'Everyone who works for you, whether permanent, seasonal, casual or contracted, is entitled to be treated with dignity. No threats, bullying, violence, or harassment of any kind, including sexual harassment.',
       'Employ nobody under 15, nobody below the age of completing compulsory schooling, and nobody below the minimum age the law sets for the work. Anyone aged 15 to 18 may not do hazardous work, work that interferes with their schooling, or work that harms their health or development.',
       'Work must be freely chosen. No forced or bonded labour, no retention of identity documents, no debt tied to employment, and no penalty for leaving.',
       'Pay at least the legal minimum for the work, on time, with legally required benefits. Deductions from wages as a disciplinary measure are not permitted.',
@@ -248,7 +248,7 @@ export const CODE_OF_CONDUCT_SECTIONS: LegalSection[] = [
   {
     heading: '9. Raising a concern',
     body: [
-      'If you see something that breaches this Code — by another supplier, by one of our staff, by an operations employee managing an account, or within your own business — report it. You can do so anonymously.',
+      'If you see something that breaches this Code, whether by another supplier, by one of our staff, by an operations employee managing an account, or within your own business, report it. You can do so anonymously.',
       'Use the concern form at /report-a-concern, or email hello@visitdrakensberg.com. Anonymous reports are read and acted on; they are simply harder to follow up, so leave contact details if you are willing.',
       'We do not retaliate against anyone who raises a concern in good faith, and we do not permit a supplier to retaliate against a worker or guest who does. Retaliation is itself a breach of this Code. A report that turns out to be mistaken, but was made honestly, carries no consequence.',
       'We expect you to give your own workers a way to raise concerns. If you do not have one, tell them they can use ours.',

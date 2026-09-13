@@ -12,6 +12,7 @@ import { Autoplay } from 'swiper/modules'
 import 'swiper/css'
 import SearchBar from '@/components/search/SearchBar'
 import HeroCarousel from '@/components/media/HeroCarousel'
+import { useSwiperAutoplay, CAROUSEL_SPEED_MS } from '@/lib/carousel-autoplay'
 import Footer from '@/components/layout/Footer'
 import { getAllSiteContent, SITE_CONTENT_DEFAULTS, type HomeCard } from '@/lib/site-content'
 import { useSiteSection } from '@/lib/use-site-section'
@@ -86,19 +87,20 @@ function cardDimClass(card: HomeCard, inEditor: boolean) {
  * carousel rendering the same RegionCardBody as the desktop grid it
  * replaces below the `sm` breakpoint. Looping needs enough cards to feel
  * like a loop rather than glitch, so it falls back to a plain (still
- * swipeable) row. Auto-advances on a timer (paused on touch/drag, and
- * while the visual editor is open so it doesn't fight admin clicks) and
- * resumes afterwards.
+ * swipeable) row. Auto-advances on the shared house cadence — paused on
+ * touch/drag, off-screen, and while the visual editor is open so it doesn't
+ * fight admin clicks — and resumes afterwards. See lib/carousel-autoplay.ts.
  */
 function RegionsCarousel({ regions, inEditor }: { regions: HomeCard[]; inEditor: boolean }) {
   const canLoop = regions.length > 2
+  const autoplay = useSwiperAutoplay({ slideCount: regions.length, enabled: !inEditor })
 
   return (
     <Swiper
       modules={[Autoplay]}
       loop={canLoop}
-      speed={700}
-      autoplay={inEditor || regions.length < 2 ? false : { delay: 6000, disableOnInteraction: false, pauseOnMouseEnter: true }}
+      speed={CAROUSEL_SPEED_MS}
+      {...autoplay}
       slidesPerView={1.15}
       spaceBetween={12}
       grabCursor
@@ -258,20 +260,22 @@ function JourneyCardBody({ pkg }: { pkg: MarketplacePackage }) {
  * always presented as a Swiper carousel (unlike Regions, which only swaps
  * to a carousel on mobile) since it's meant to read as a scrolling reel of
  * deals rather than a fixed grid. Peeks progressively more of the next
- * card as the viewport widens. Auto-advances on a timer (paused on
- * touch/drag and while the visual editor is open) and resumes afterwards.
+ * card as the viewport widens. Auto-advances on the shared house cadence
+ * (paused on touch/drag, off-screen, and while the visual editor is open)
+ * and resumes afterwards. See lib/carousel-autoplay.ts.
  */
 function JourneysCarousel({ journeys }: { journeys: MarketplacePackage[] }) {
   const editMode = useEditMode()
   const inEditor = Boolean(editMode)
   const canLoop = journeys.length > 3
+  const autoplay = useSwiperAutoplay({ slideCount: journeys.length, enabled: !inEditor })
 
   return (
     <Swiper
       modules={[Autoplay]}
       loop={canLoop}
-      speed={700}
-      autoplay={inEditor || journeys.length < 2 ? false : { delay: 6000, disableOnInteraction: false, pauseOnMouseEnter: true }}
+      speed={CAROUSEL_SPEED_MS}
+      {...autoplay}
       spaceBetween={20}
       grabCursor
       slidesPerView={1.15}
@@ -300,14 +304,14 @@ function OfferCardBody({ item }: { item: MiniListItemData }) {
   return (
     <Link href={item.href} className="group block bg-white border border-black/8 hover:border-forest/30 transition-colors h-full">
       <div className="relative overflow-hidden aspect-[4/3] bg-mist">
-        {item.img ? (
-          <SafeImage src={item.img} alt={item.title} fill loading="lazy"
-            sizes="(max-width: 640px) 88vw, (max-width: 1024px) 45vw, 30vw"
-            className="object-cover transition-transform duration-500 group-hover:scale-105"
-            style={{ willChange: 'transform' }} />
-        ) : (
-          <div className="w-full h-full" style={{ background: item.badgeColor }} />
-        )}
+        {/* The category colour always sits underneath, so a listing with no
+            photo — and one whose photo fails to load — shows the same
+            deliberate block rather than an empty frame. */}
+        <div className="absolute inset-0" style={{ background: item.badgeColor }} />
+        <SafeImage src={item.img} alt={item.title} fill loading="lazy"
+          sizes="(max-width: 640px) 88vw, (max-width: 1024px) 45vw, 30vw"
+          className="object-cover transition-transform duration-500 group-hover:scale-105"
+          style={{ willChange: 'transform' }} />
         <span className="absolute top-3 left-3 font-sans text-[10px] tracking-[0.15em] uppercase bg-black/55 text-white px-2.5 py-1">
           {item.badgeLabel}
         </span>
@@ -334,13 +338,14 @@ function OffersCarousel({ items }: { items: MiniListItemData[] }) {
   const editMode = useEditMode()
   const inEditor = Boolean(editMode)
   const canLoop = items.length > 3
+  const autoplay = useSwiperAutoplay({ slideCount: items.length, enabled: !inEditor })
 
   return (
     <Swiper
       modules={[Autoplay]}
       loop={canLoop}
-      speed={700}
-      autoplay={inEditor || items.length < 2 ? false : { delay: 6000, disableOnInteraction: false, pauseOnMouseEnter: true }}
+      speed={CAROUSEL_SPEED_MS}
+      {...autoplay}
       spaceBetween={20}
       grabCursor
       slidesPerView={1.15}
@@ -403,7 +408,7 @@ export default function HomePage() {
         p_email: email, p_consent_type: 'marketing_email', p_granted: true, p_source: 'newsletter_footer',
       }).then(({ error: consentError }) => { if (consentError) console.error('[newsletter] consent record failed:', consentError) })
       trackEvent(AnalyticsEvent.NEWSLETTER_SIGNUP, { source: 'home_footer' })
-      toast.success('You’re on the list — see you in the next dispatch.')
+      toast.success('You’re on the list. See you in the next dispatch.')
       setNewsletterEmail('')
     } catch {
       toast.error('Subscription failed. Please try again later.')
@@ -579,7 +584,7 @@ export default function HomePage() {
 
         {stories.length === 0 ? (
           <p className="font-sans text-sm text-forest/40 py-6">
-            No stories published yet — publish one under Admin → Blog & Content.
+            No stories published yet. Publish one under Admin → Blog & Content.
           </p>
         ) : (
           <motion.div
@@ -642,7 +647,7 @@ export default function HomePage() {
 
         {attractions.length === 0 ? (
           <p className="font-sans text-sm text-white/30 py-8">
-            Nothing featured yet — tick &ldquo;Featured on Homepage&rdquo; on a trail, nature reserve or town in the admin console.
+            Nothing featured yet. Tick &ldquo;Featured on Homepage&rdquo; on a trail, nature reserve or town in the admin console.
           </p>
         ) : (
           <div className="divide-y divide-white/10">
@@ -761,7 +766,7 @@ export default function HomePage() {
         </div>
 
         {journeys.length === 0 ? (
-          <p className="font-sans text-sm text-forest/40 py-8">No packages published yet — check back soon.</p>
+          <p className="font-sans text-sm text-forest/40 py-8">No packages published yet. Please check back soon.</p>
         ) : (
           <JourneysCarousel journeys={journeys} />
         )}

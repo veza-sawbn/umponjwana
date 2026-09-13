@@ -102,7 +102,7 @@ export default function BookingsPage() {
     } catch (e) {
       const message = e instanceof Error ? e.message : ''
       toast.error(/sold out/i.test(message)
-        ? 'That room is no longer free for these dates — decline the request instead.'
+        ? 'That room is no longer free for these dates. Decline the request instead.'
         : message || 'Could not record your decision. Please try again.')
     } finally {
       setDeciding(null)
@@ -262,7 +262,7 @@ export default function BookingsPage() {
                           rows={2}
                           value={declineReason}
                           onChange={e => setDeclineReason(e.target.value)}
-                          placeholder="Why these dates don't work — shared with the guest (optional)…"
+                          placeholder="Why these dates don't work. This is shared with the guest (optional)…"
                           className="w-full font-sans text-sm border border-black/10 px-3 py-2 outline-none focus:border-[#C9A96E]/50 bg-white resize-none"
                         />
                         <div className="flex gap-2">
@@ -307,7 +307,7 @@ export default function BookingsPage() {
                 {o.status === 'pending' && (
                   <div className="border-t border-black/6 px-5 py-3 bg-amber-50/50">
                     <p className="font-sans text-xs text-amber-800 flex items-center gap-1.5">
-                      <Clock size={12} /> You confirmed these dates — the room is held while {o.customerName} pays.
+                      <Clock size={12} /> You confirmed these dates. The room is held while {o.customerName} pays.
                       It releases automatically if they don&apos;t.
                     </p>
                   </div>

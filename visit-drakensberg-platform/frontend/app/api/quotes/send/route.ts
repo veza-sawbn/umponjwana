@@ -39,17 +39,17 @@ export async function POST(req: Request) {
 
   const { sent, error } = await sendMail({
     to: quote.customer_email,
-    subject: `Your quote ${quote.quote_number} — Visit Drakensberg`,
+    subject: `Your quote ${quote.quote_number} from Visit Drakensberg`,
     html: emailShell({
       origin,
       eyebrow: `Quote ${quote.quote_number}`,
       heading: 'Your quote is ready',
-      preheader: `${money(Number(quote.total), quote.currency)} total${validUntil ? ` — valid until ${validUntil}` : ''}.`,
+      preheader: `${money(Number(quote.total), quote.currency)} total${validUntil ? `, valid until ${validUntil}` : ''}.`,
       bodyHtml: `
         <p style="margin:0 0 4px;">Dear ${esc(quote.customer_name || 'traveller')},</p>
         <p style="margin:0 0 20px;">
-          We've put together a quote${quote.trip_name ? ` for ${esc(quote.trip_name)}` : ''} —
-          <strong>${esc(money(Number(quote.total), quote.currency))}</strong> total.
+          We've put together a quote${quote.trip_name ? ` for ${esc(quote.trip_name)}` : ''}, coming to
+          <strong>${esc(money(Number(quote.total), quote.currency))}</strong> in total.
           ${validUntil ? `This quote is valid until ${esc(validUntil)}.` : ''}
         </p>
         ${detailTable([

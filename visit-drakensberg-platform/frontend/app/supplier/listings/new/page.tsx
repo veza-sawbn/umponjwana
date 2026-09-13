@@ -175,7 +175,7 @@ export default function NewListingPage() {
                   value={form.description}
                   onChange={(e) => update('description', e.target.value)}
                   rows={5}
-                  placeholder="Describe your listing — what makes it special, what guests can expect..."
+                  placeholder="Describe your listing: what makes it special, and what guests can expect..."
                   className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#2D6A4F] resize-none"
                 />
                 <p className="text-xs text-gray-400 mt-1">{form.description.length} / 2000 characters</p>

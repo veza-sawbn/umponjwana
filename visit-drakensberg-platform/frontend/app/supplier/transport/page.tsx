@@ -92,7 +92,7 @@ export default function TransportCompanyPage() {
       </div>
       <p className="font-sans text-sm text-black/50 max-w-xl">
         Register your company on the transport marketplace. Booking opportunities are matched to you by
-        suitability — your operator category, service regions, fleet availability, reliability and pricing all count.
+        suitability: your operator category, service regions, fleet availability, reliability and pricing all count.
       </p>
 
       {company && (

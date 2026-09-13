@@ -76,7 +76,7 @@ export async function POST(req: Request) {
       await notifyServer({
         userId: link.user_id,
         type: 'payment',
-        title: `Payment declined — ${declinedOrder?.order_number ?? link.order_id}`,
+        title: `Payment declined for ${declinedOrder?.order_number ?? link.order_id}`,
         body: 'Your card payment was declined and no charge was made. You can try again from your invoice.',
         link: invoiceUrl,
       }, getSiteOrigin(req))
@@ -88,7 +88,7 @@ export async function POST(req: Request) {
         financeStaff.map(f => (f as { id: string }).id),
         {
           type: 'payment',
-          title: `Payment declined — ${declinedOrder?.order_number ?? link.order_id}`,
+          title: `Payment declined for ${declinedOrder?.order_number ?? link.order_id}`,
           body: `${declinedOrder?.customer_name || 'A customer'}'s online payment attempt of ${link.amount} ${link.currency} was declined.`,
           link: '/admin/orders',
         },
@@ -177,7 +177,7 @@ export async function POST(req: Request) {
             tripValue.status = 'confirmed'
             tripValue.timeline = [
               ...timeline,
-              { at: new Date().toISOString(), status: 'confirmed', note: 'Payment received — booking confirmed' },
+              { at: new Date().toISOString(), status: 'confirmed', note: 'Payment received, booking confirmed' },
             ]
             await admin.from('vd_trip_requests')
               .update({ status: 'confirmed', value: tripValue, updated_at: new Date().toISOString() })

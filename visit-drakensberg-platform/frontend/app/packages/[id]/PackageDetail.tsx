@@ -99,7 +99,7 @@ export default function PackageDetail({ pkg, id }: { pkg: MarketplacePackage; id
           <h1 className="font-display italic text-4xl text-[#000000] mb-3">Package booked</h1>
           <p className="font-sans text-sm text-gray-500 mb-2">Reference <span className="text-[#2d6a4f] font-medium">{done.reference}</span></p>
           <p className="font-sans text-sm text-gray-500 max-w-md mx-auto mb-8 leading-relaxed">
-            You completed one booking — Visit Drakensberg now coordinates every supplier in your itinerary. Each provider receives only their assigned services and confirms availability; you'll be notified as your trip is finalised.
+            You completed one booking, and Visit Drakensberg now coordinates every supplier in your itinerary. Each provider receives only their assigned services and confirms availability, and you'll be notified as your trip is finalised.
           </p>
           <div className="flex items-center justify-center gap-3 flex-wrap">
             <Link href="/account" className="bg-[#2d6a4f] text-white px-6 py-3 font-sans text-sm hover:bg-[#235a3f] transition-colors">My Bookings →</Link>
@@ -194,7 +194,7 @@ export default function PackageDetail({ pkg, id }: { pkg: MarketplacePackage; id
               {suppliers.length > 1 && (
                 <p className="font-sans text-xs text-gray-400 mt-3 flex items-start gap-1.5">
                   <Info size={12} className="mt-0.5 shrink-0" />
-                  One booking, {suppliers.length} local businesses — Visit Drakensberg coordinates {suppliers.join(', ')} on your behalf.
+                  One booking, {suppliers.length} local businesses. Visit Drakensberg coordinates {suppliers.join(', ')} on your behalf.
                 </p>
               )}
             </div>
@@ -277,7 +277,7 @@ export default function PackageDetail({ pkg, id }: { pkg: MarketplacePackage; id
                   {booking ? 'Booking…' : 'Book this Package →'}
                 </button>
                 <p className="font-sans text-[10px] text-gray-400 text-center leading-relaxed">
-                  One booking covers everything — we coordinate all providers in this itinerary for you.
+                  One booking covers everything. We coordinate all providers in this itinerary for you.
                 </p>
               </div>
             </div>

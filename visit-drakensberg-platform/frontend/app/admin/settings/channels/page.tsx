@@ -150,7 +150,7 @@ export default function ChannelConnectionsPage() {
               {!setup.canSend && (
                 <div className="flex items-start gap-2 bg-amber-50 border border-amber-200 px-3 py-2 mb-4">
                   <AlertTriangle size={14} className="text-amber-500 mt-0.5 shrink-0" />
-                  <p className="font-sans text-xs text-amber-700">Outbound delivery for this channel isn’t live yet — you can still store credentials so it’s ready to switch on.</p>
+                  <p className="font-sans text-xs text-amber-700">Outbound delivery for this channel isn’t live yet, but you can still store credentials so it’s ready to switch on.</p>
                 </div>
               )}
 
@@ -165,7 +165,7 @@ export default function ChannelConnectionsPage() {
                         type="password"
                         value={secretInputs[f.key] ?? ''}
                         onChange={e => setSecretInputs(s => ({ ...s, [f.key]: e.target.value }))}
-                        placeholder={conn?.secret?.[f.key] ? '•••••••••• (saved — leave blank to keep)' : (f.placeholder || '')}
+                        placeholder={conn?.secret?.[f.key] ? '•••••••••• (saved, leave blank to keep)' : (f.placeholder || '')}
                         className={inputCls}
                       />
                     ) : (
@@ -192,7 +192,7 @@ export default function ChannelConnectionsPage() {
                       {copied === 'wh' ? <Check size={14} /> : <Copy size={14} />}
                     </button>
                   </div>
-                  <p className="font-sans text-[11px] text-gray-400 mt-2">Note: the inbound receiver endpoint is scaffolded but not yet deployed — outbound sending works once connected; inbound delivery is the remaining step.</p>
+                  <p className="font-sans text-[11px] text-gray-400 mt-2">Note: the inbound receiver endpoint is scaffolded but not yet deployed. Outbound sending works once connected; inbound delivery is the remaining step.</p>
                 </div>
               )}
 

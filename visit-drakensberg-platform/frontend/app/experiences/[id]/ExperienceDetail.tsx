@@ -96,7 +96,7 @@ export default function ExperienceDetail({ exp }: { exp: TrekkingExperience }) {
     booking.addAddon({
       id: exp.id,
       type: 'hike',
-      title: `${exp.title} — ${exp.operator}${exp.leadGuide ? ` · ${exp.leadGuide}` : ''}${hasMultiplePackages ? ` (${selectedPackage.name})` : ''}`,
+      title: `${exp.title} · ${exp.operator}${exp.leadGuide ? ` · ${exp.leadGuide}` : ''}${hasMultiplePackages ? ` (${selectedPackage.name})` : ''}`,
       supplierId: exp.operatorId,
       date: exp.departureDate,
       price_per_person: selectedPackage.pricePerPerson,
@@ -212,11 +212,11 @@ export default function ExperienceDetail({ exp }: { exp: TrekkingExperience }) {
             {itinerary.days.length > 0 && (
               <div>
                 <h2 className="font-display italic text-2xl text-[#000000] mb-1">
-                  Day-by-Day Itinerary{hasMultiplePackages && selectedPackage ? ` — ${selectedPackage.name}` : ''}
+                  Day-by-Day Itinerary{hasMultiplePackages && selectedPackage ? `: ${selectedPackage.name}` : ''}
                 </h2>
                 <p className="font-sans text-xs text-gray-400 mb-4">
                   {itinerary.days.length} day{itinerary.days.length !== 1 ? 's' : ''}
-                  {hasMultiplePackages ? ' for this rate — choose a different rate below to see its itinerary.' : ''}
+                  {hasMultiplePackages ? ' for this rate. Choose a different rate below to see its itinerary.' : ''}
                 </p>
                 <div className="bg-white border border-gray-200 divide-y divide-gray-200">
                   {itinerary.days.map((day, i) => {
@@ -408,7 +408,7 @@ export default function ExperienceDetail({ exp }: { exp: TrekkingExperience }) {
                   onClick={() => booking.removeAddon(exp.id)}
                   className="w-full font-sans text-sm py-3 bg-[#2d6a4f] text-white hover:bg-red-600 transition-colors inline-flex items-center justify-center gap-2"
                 >
-                  <Check size={14} /> Added to Trip — remove
+                  <Check size={14} /> Added to Trip · Remove
                 </button>
               ) : (
                 <>

@@ -135,7 +135,7 @@ export default function AdminRegionsPage() {
               <div className="space-y-4">
                 <div>
                   <label className={labelCls}>Intro</label>
-                  <textarea value={data.gettingThere} onChange={e => update('gettingThere', e.target.value)} rows={3} className={`${inputCls} resize-none`} placeholder="A short overview — blank lines between paragraphs are preserved on the public page."/>
+                  <textarea value={data.gettingThere} onChange={e => update('gettingThere', e.target.value)} rows={3} className={`${inputCls} resize-none`} placeholder="A short overview. Blank lines between paragraphs are preserved on the public page."/>
                 </div>
 
                 <div>

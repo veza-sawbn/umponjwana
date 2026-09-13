@@ -168,7 +168,7 @@ async function diagnoseSupplierApprovalBlock(): Promise<string> {
     // 20260815_approval_consistency.sql hasn't been applied to this database
     // yet, so the underlying schema RLS is still operating on stale logic.
     return 'Your account shows as approved, but the database still rejected this save. ' +
-      'This usually means a pending database update hasn\'t been applied yet — ask ' +
+      'This usually means a pending database update has not been applied yet. Ask ' +
       'whoever manages the Supabase project to confirm migration ' +
       '20260815_approval_consistency.sql has been run.'
   } catch {

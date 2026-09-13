@@ -314,7 +314,7 @@ export default function Navbar() {
           </div>
 
           {/* ── Col 2: Centred logo ── */}
-          <Link href="/" aria-label="Visit Drakensberg — Home">
+          <Link href="/" aria-label="Visit Drakensberg Home">
             <Logo className={`h-8 w-auto transition-colors duration-300 ${
               transparent ? 'text-gold' : 'text-forest'
             }`} />

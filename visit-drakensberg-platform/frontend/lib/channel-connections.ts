@@ -42,7 +42,7 @@ export const CHANNEL_SETUP: Partial<Record<ChannelId, ChannelSetup>> = {
       { key: 'displayPhone', label: 'Display Phone Number', placeholder: '+27 82 000 0000' },
       { key: 'accessToken', label: 'Permanent Access Token', secret: true, help: 'A System User token with whatsapp_business_messaging permission.' },
       { key: 'appSecret', label: 'App Secret', secret: true, help: 'Used to verify inbound webhook signatures.' },
-      { key: 'verifyToken', label: 'Webhook Verify Token', secret: true, help: 'Any string you choose — paste the same value in the Meta webhook config.' },
+      { key: 'verifyToken', label: 'Webhook Verify Token', secret: true, help: 'Any string you choose. Paste the same value in the Meta webhook config.' },
     ],
   },
   messenger: {

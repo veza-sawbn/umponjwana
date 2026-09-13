@@ -134,7 +134,7 @@ export default function MessagesPage() {
                 <div className="flex-1 overflow-y-auto p-5 space-y-3 bg-[#FAFAF9]">
                   {selected.messages.length === 0 && (
                     <p className="font-sans text-xs text-black/30 text-center pt-8">
-                      No messages yet — wait for the customer to start the conversation.
+                      No messages yet. Wait for the customer to start the conversation.
                     </p>
                   )}
                   {selected.messages.map(m => (

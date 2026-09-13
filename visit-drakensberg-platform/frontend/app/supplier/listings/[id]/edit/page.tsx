@@ -42,7 +42,7 @@ const MOCK_LISTINGS: Record<string, any> = {
   l3: {
     id: 'l3', title: 'Tugela Falls Guided Hike', category: 'hike', status: 'published',
     location: 'Royal Natal National Park',
-    description: 'Guided hike to the base and summit of Tugela Falls — the second highest waterfall in the world. Chain ladder ascent, certified guides.',
+    description: 'Guided hike to the base and summit of Tugela Falls, the second highest waterfall in the world. Chain ladder ascent, certified guides.',
     price: 580, images: [],
     rooms: [],
     guides: [

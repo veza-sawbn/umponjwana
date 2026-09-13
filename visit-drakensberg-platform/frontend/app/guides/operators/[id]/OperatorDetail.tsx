@@ -122,7 +122,7 @@ export default function OperatorDetail({ operator }: { operator: OperatorProfile
             <div>
               <h2 className="font-display italic text-2xl text-[#000000] mb-6">Customer Reviews</h2>
               <div className="bg-white border border-gray-200 p-8 text-center">
-                <p className="font-sans text-sm text-gray-400">No reviews yet — be the first to book and share your experience.</p>
+                <p className="font-sans text-sm text-gray-400">No reviews yet. Be the first to book and share your experience.</p>
               </div>
             </div>
           </div>

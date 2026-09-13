@@ -174,7 +174,7 @@ export default function TourDetail({ tour, nearbyStays }: { tour: Tour; nearbySt
                 </div>
               ) : (
                 <p className="font-sans text-sm text-gray-500 bg-white border border-gray-200 p-5">
-                  No scheduled departures right now — request custom dates and the operator will check availability.
+                  No scheduled departures right now. Request custom dates and the operator will check availability.
                 </p>
               )}
             </div>

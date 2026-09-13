@@ -78,7 +78,7 @@ function MediaLibraryDialog({ source, accept, onPick, onClose }: {
           {loading ? (
             <div className="py-16 flex justify-center"><Loader2 className="w-5 h-5 text-gray-300 animate-spin" /></div>
           ) : filtered.length === 0 ? (
-            <p className="py-16 text-center font-sans text-sm text-gray-400">No {accept === 'both' ? 'media' : `${accept}s`} yet — upload one to get started.</p>
+            <p className="py-16 text-center font-sans text-sm text-gray-400">No {accept === 'both' ? 'media' : `${accept}s`} yet. Upload one to get started.</p>
           ) : (
             <div className="grid grid-cols-4 gap-3">
               {filtered.map(item => (

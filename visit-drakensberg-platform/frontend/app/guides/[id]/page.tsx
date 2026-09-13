@@ -25,7 +25,7 @@ export async function generateMetadata({ params }: { params: { id: string } }): 
   const guide = await resolveGuide(params.id)
   if (!guide) return { title: 'Guide Not Found' }
 
-  const title = guide.seoTitle || `${guide.name} — Certified Mountain Guide | Visit Drakensberg`
+  const title = guide.seoTitle || `${guide.name}, Certified Mountain Guide | Visit Drakensberg`
   const description = guide.seoDescription || guide.bio || `${guide.name} is a certified Drakensberg mountain guide${guide.yearsExperience ? ` with ${guide.yearsExperience} years of experience` : ''}.`
   const canonical = `/guides/${guide.slug || guide.id}`
 

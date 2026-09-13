@@ -165,7 +165,7 @@ export default function GuideDetail({ guide }: { guide: GuideProfile }) {
                 <div>
                   <p className="font-sans text-[10px] tracking-[0.12em] uppercase text-gray-400 mb-1">SA Tourism Guide Number</p>
                   <p className="font-sans text-sm font-medium">
-                    {guide.guideNo || (guideType === 'trainee' ? 'In training — not yet registered' : 'On file')}
+                    {guide.guideNo || (guideType === 'trainee' ? 'In training, not yet registered' : 'On file')}
                   </p>
                 </div>
               </div>
@@ -198,7 +198,7 @@ export default function GuideDetail({ guide }: { guide: GuideProfile }) {
                 </div>
               ) : (
                 <p className="font-sans text-sm text-gray-500 bg-white border border-gray-200 p-5">
-                  No scheduled departures with {firstName} right now — request custom dates below and the operator will check availability.
+                  No scheduled departures with {firstName} right now. Request custom dates below and the operator will check availability.
                 </p>
               )}
               {blockedDays.length > 0 && (
@@ -221,7 +221,7 @@ export default function GuideDetail({ guide }: { guide: GuideProfile }) {
                 )}
               </div>
               <div className="bg-white border border-gray-200 p-8 text-center">
-                <p className="font-sans text-sm text-gray-400">No reviews yet — be the first to book and share your experience.</p>
+                <p className="font-sans text-sm text-gray-400">No reviews yet. Be the first to book and share your experience.</p>
               </div>
             </div>
           </div>
@@ -231,7 +231,7 @@ export default function GuideDetail({ guide }: { guide: GuideProfile }) {
             <div className="bg-[#2d6a4f] text-white p-6">
               <h3 className="font-display italic text-xl mb-4">Book {firstName} for a Private Trip</h3>
               <p className="font-sans text-sm text-white/70 mb-6">
-                Request custom dates on any trail — {operator ? operator.companyName : 'the operator'} confirms {firstName}'s availability before you pay.
+                Request custom dates on any trail. {operator ? operator.companyName : 'The operator'} confirms {firstName}'s availability before you pay.
               </p>
               {/* The operator rides along with the guide: /experiences/request
                   can only offer a guide once their operator is selected, so

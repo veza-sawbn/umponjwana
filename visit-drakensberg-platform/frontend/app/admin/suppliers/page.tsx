@@ -39,7 +39,7 @@ const STATUS_OPTIONS: {
 }[] = [
   { id: 'approved',  label: 'Approved',  blurb: 'Listings live on the site',
     activeBorder: 'border-[#2d6a4f]', activeBg: 'bg-[#2d6a4f]/5', activeText: 'text-[#2d6a4f]' },
-  { id: 'pending',   label: 'Pending',   blurb: 'Not yet reviewed — hidden',
+  { id: 'pending',   label: 'Pending',   blurb: 'Not yet reviewed, hidden',
     activeBorder: 'border-[#C9A96E]', activeBg: 'bg-[#C9A96E]/10', activeText: 'text-[#8B6914]' },
   { id: 'suspended', label: 'Suspended', blurb: 'Temporarily off the site',
     activeBorder: 'border-orange-400', activeBg: 'bg-orange-50', activeText: 'text-orange-700' },
@@ -302,7 +302,7 @@ function SupplierDetailPanel({
             <label className={labelCls}>
               Owner Contact Email
               <span className="ml-1.5 normal-case tracking-normal text-gray-300">
-                {supplier.isVdManaged ? 'stored for transfer — not the login address' : 'owner\'s email'}
+                {supplier.isVdManaged ? 'stored for transfer, not the login address' : 'owner\'s email'}
               </span>
             </label>
             <input
@@ -319,7 +319,7 @@ function SupplierDetailPanel({
             <div>
               <p className="font-sans text-xs font-medium text-gray-700">Supplier documents</p>
               <p className="font-sans text-[11px] text-gray-400 mt-0.5 leading-relaxed">
-                A PDF of the document as accepted — the acceptance record (who, when, on what commission) followed by
+                A PDF of the document as accepted: the acceptance record (who, when, on what commission) followed by
                 the full text at the version they accepted.
               </p>
             </div>
@@ -540,7 +540,7 @@ export default function AdminSuppliersPage() {
           <p className="font-sans text-[10px] tracking-[0.14em] uppercase text-gray-400 mb-1">Admin Console</p>
           <h1 className="font-display italic text-3xl text-[#000000]">Suppliers</h1>
           <p className="font-sans text-sm text-gray-500 mt-1">
-            All supplier profiles. Only approved suppliers appear on the public site — suspending or removing one hides every listing they own.
+            All supplier profiles. Only approved suppliers appear on the public site. Suspending or removing one hides every listing they own.
           </p>
         </div>
         <button

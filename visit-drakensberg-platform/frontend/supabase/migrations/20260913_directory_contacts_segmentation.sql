@@ -128,10 +128,10 @@ create policy "Admins read contact segment members" on vd_contact_segment_member
 -- vd_apply_contact_segments() below owns every row in it.
 
 insert into vd_contact_segments (id, name, description, segment_group, rule, sort_order) values
-  ('reach:email',      'Has Email',            'A published email address — reachable by an outreach campaign', 'Reachability', '{"type":"has_email"}',      10),
+  ('reach:email',      'Has Email',            'A published email address, so reachable by an outreach campaign', 'Reachability', '{"type":"has_email"}',      10),
   ('reach:phone',      'Has Phone',            'A published phone number',                                      'Reachability', '{"type":"has_phone"}',      20),
   ('reach:both',       'Email + Phone',        'Both an email address and a phone number',                      'Reachability', '{"type":"has_both"}',       30),
-  ('reach:none',       'No Direct Contact',    'Nothing published to reach them on — needs research first',     'Reachability', '{"type":"unreachable"}',    40),
+  ('reach:none',       'No Direct Contact',    'Nothing published to reach them on, so needs research first',     'Reachability', '{"type":"unreachable"}',    40),
   ('outreach:not_contacted',  'Not Contacted',   'No outreach attempted yet',                                   'Outreach',     '{"type":"outreach_status","value":"not_contacted"}',  50),
   ('outreach:contacted',      'Contacted',       'Reached out, no reply yet',                                   'Outreach',     '{"type":"outreach_status","value":"contacted"}',      60),
   ('outreach:in_conversation','In Conversation', 'Actively talking to them',                                    'Outreach',     '{"type":"outreach_status","value":"in_conversation"}',70),

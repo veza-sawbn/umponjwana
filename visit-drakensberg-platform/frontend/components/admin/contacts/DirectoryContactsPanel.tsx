@@ -47,13 +47,13 @@ function ImportModal({ onClose, onImported }: { onClose: () => void; onImported:
     file.text().then(text => {
       if (!isDirectoryContactsCsv(text)) {
         setRows([])
-        setError('That looks like a plain address-book CSV. This importer needs the master directory export — a header row with Establishment plus Source Site(s) or Source Listing URL(s).')
+        setError('That looks like a plain address-book CSV. This importer needs the master directory export, with a header row carrying Establishment plus Source Site(s) or Source Listing URL(s).')
         return
       }
       const parsed = parseDirectoryContactsCsv(text)
       if (parsed.length === 0) {
         setRows([])
-        setError('No usable rows found — every row needs an establishment name.')
+        setError('No usable rows found. Every row needs an establishment name.')
         return
       }
       setRows(parsed)
@@ -314,8 +314,8 @@ export default function DirectoryContactsPanel() {
     <div>
       <div className="mb-6 flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
         <p className="font-sans text-sm text-gray-500 max-w-2xl">
-          Establishments compiled from the regional directories — the list we work through to get them onto the
-          platform. Segments are computed from the data itself; combine chips to narrow to an outreach list.
+          Establishments compiled from the regional directories: the list we work through to get them onto the
+          platform. Segments are computed from the data itself, so combine chips to narrow down an outreach list.
         </p>
         <div className="flex gap-2 shrink-0">
           <button onClick={() => setShowImport(true)}

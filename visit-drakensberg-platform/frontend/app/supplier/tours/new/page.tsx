@@ -193,7 +193,7 @@ export default function NewTourPage() {
             </a>
           </div>
           <p className="font-sans text-xs text-black/35 mt-1">
-            Taken from your company profile — every tour is published under it.
+            Taken from your company profile. Every tour is published under it.
           </p>
         </F>
 
@@ -287,9 +287,9 @@ export default function NewTourPage() {
             )}
           />
           <p className="font-sans text-xs text-black/35 mt-1">
-            Each departure can offer a subset of these tiers — e.g. Shuttled on one date, Self-Drive on another.
+            Each departure can offer a subset of these tiers, for example Shuttled on one date and Self-Drive on another.
             {selectedTrail && selectedTrail.days.length > 0
-              ? ' Each tier starts from the trail’s day-by-day plan (Admin → Trails) — customize it per tier above.'
+              ? ' Each tier starts from the trail’s day-by-day plan (Admin → Trails). Customise it per tier above.'
               : ' Add a day-by-day plan to this trail at Admin → Trails to let tiers customize their itinerary.'}
           </p>
         </F>

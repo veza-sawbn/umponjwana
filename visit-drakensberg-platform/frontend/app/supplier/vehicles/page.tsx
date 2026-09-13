@@ -70,8 +70,8 @@ export default function VehiclesPage() {
       </div>
 
       <p className="font-sans text-xs text-black/40 max-w-2xl">
-        Each vehicle carries its own rate — set it when you add or edit the vehicle, and guests are quoted that price
-        when they pick it. Availability updates automatically as trips are accepted, started and completed — a
+        Each vehicle carries its own rate. Set it when you add or edit the vehicle, and guests are quoted that price
+        when they pick it. Availability updates automatically as trips are accepted, started and completed, and a
         completed trip parks the vehicle at its drop-off location, ready for follow-on work. Use maintenance and date
         blocks for the exceptions.
       </p>

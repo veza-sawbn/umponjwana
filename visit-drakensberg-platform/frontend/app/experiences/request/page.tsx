@@ -253,7 +253,7 @@ function RequestContent() {
             {done.guideName
               ? <>Your request names <span className="text-[#2d6a4f]">{done.guideName}</span>, and {guideFirstName} confirms availability first,</>
               : <>The guide confirms availability first,</>}{' '}
-            then the tour operator reviews the operation and sends you a quote. You'll be notified at every step — this is never an instant booking.
+            then the tour operator reviews the operation and sends you a quote. You'll be notified at every step. This is never an instant booking.
           </p>
           <div className="flex items-center justify-center gap-3 flex-wrap">
             <Link href="/account/requests" className="bg-[#2d6a4f] text-white px-6 py-3 font-sans text-sm hover:bg-[#235a3f] transition-colors">
@@ -363,7 +363,7 @@ function RequestContent() {
               <select value={form.trailId} onChange={e => set('trailId', e.target.value)} className={inputCls}>
                 <option value="">Select a trail…</option>
                 {trails.map(t => (
-                  <option key={t.id} value={t.id}>{t.name} — {t.region} ({t.difficulty})</option>
+                  <option key={t.id} value={t.id}>{t.name} · {t.region} ({t.difficulty})</option>
                 ))}
               </select>
             </div>

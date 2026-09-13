@@ -155,7 +155,7 @@ export default function ToursPage() {
               <p className="font-sans text-xs tracking-[0.2em] uppercase text-gold mb-2">Meet the Operators</p>
               <h2 className="font-display text-3xl text-forest leading-none mb-2">Explore by Supplier</h2>
               <p className="font-sans text-sm text-forest/50">
-                Every guided tour above is run by one of these verified Drakensberg operators — open a profile to see their full team, certifications and track record.
+                Every guided tour above is run by one of these verified Drakensberg operators. Open a profile to see their full team, certifications and track record.
               </p>
             </div>
             <SupplierCarousel operators={tourSuppliers} />
