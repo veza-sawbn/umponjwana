@@ -1,6 +1,8 @@
 import { createMiddlewareClient } from '@supabase/auth-helpers-nextjs'
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
+import { isTrustedHost } from '@/lib/origin'
+import { safeRedirectPath } from '@/lib/safe-redirect'
 
 const PROTECTED_ROUTES = ['/dashboard', '/checkout', '/supplier', '/admin', '/account', '/operations']
 const ADMIN_ROUTES = ['/admin']
@@ -64,10 +66,32 @@ export async function middleware(req: NextRequest) {
         const items = rData.value.items as RItem[]
         const match = items.find((r: RItem) => r.from === pathname)
         if (match) {
-          const target = match.to.startsWith('http')
-            ? match.to
-            : new URL(match.to, req.url).toString()
-          return NextResponse.redirect(target, { status: match.statusCode ?? 301 })
+          // An off-site redirect target is a lot of authority for one CMS row
+          // to carry: a 301 is cached by browsers and is painful to undo, and
+          // site_content is world-readable, so anyone can see where the site
+          // points. Genuine off-site moves still work, but only to a host we
+          // already trust — anything else is treated as a path on this site
+          // rather than followed (audit finding M5).
+          let target: string
+          if (/^https?:\/\//i.test(match.to)) {
+            let host = ''
+            try { host = new URL(match.to).hostname } catch { host = '' }
+            if (!host || !isTrustedHost(host)) {
+              console.warn('[middleware] ignoring redirect to untrusted host:', match.to)
+              return res
+            }
+            target = match.to
+          } else {
+            // Also guards against a "to" of '//attacker.example', which
+            // new URL(…, base) resolves as an absolute off-site URL.
+            const safe = safeRedirectPath(match.to, '')
+            if (!safe) {
+              console.warn('[middleware] ignoring malformed redirect target:', match.to)
+              return res
+            }
+            target = new URL(safe, req.url).toString()
+          }
+          return NextResponse.redirect(target, { status: match.statusCode === 302 ? 302 : 301 })
         }
       }
     } catch {
