@@ -92,7 +92,7 @@ export default async function PackagePage({ params }: { params: { id: string } }
     <>
       <JsonLd data={productJsonLd} />
       <JsonLd data={breadcrumbJsonLd} />
-      <PackageDetail pkg={pkg} id={params.id} />
+      <PackageDetail pkg={pkg} id={pkg.id} />
     </>
   )
 }

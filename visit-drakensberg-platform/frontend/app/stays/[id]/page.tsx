@@ -25,10 +25,12 @@ const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://visitdrakensberg.c
 // docs/destination-graph/PHASE_D.md.
 export const revalidate = 300
 
-async function resolveStay(id: string): Promise<{ property: Property; rooms: Room[] } | null> {
-  const property = await getPropertyById(id, publicSupabase)
+async function resolveStay(idOrSlug: string): Promise<{ property: Property; rooms: Room[] } | null> {
+  const property = await getPropertyById(idOrSlug, publicSupabase)
   if (!property) return null
-  const rooms = await getRoomsByProperty(id, publicSupabase)
+  // property.id, not the URL segment — the segment is `slug || id`, and rooms
+  // are keyed on the property id alone.
+  const rooms = await getRoomsByProperty(property.id, publicSupabase)
   return { property, rooms }
 }
 

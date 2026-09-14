@@ -76,6 +76,25 @@ const nextConfig = {
         destination: '/list-with-us',
         permanent: true,
       },
+      {
+        // The journal lives at /mydrakensberg. Nothing on the site links to
+        // /blog, but it is the path crawlers and old inbound links guess for
+        // it — PetalBot walked into a 404 there. /stories, the other name this
+        // content has had, already redirects from app/stories/page.tsx; this
+        // is the same handling for the conventional one, as a 308 so search
+        // engines move on rather than re-crawling a dead path.
+        source: '/blog',
+        destination: '/mydrakensberg',
+        permanent: true,
+      },
+      {
+        // Post slugs are shared between the two paths, so a deep link lands on
+        // its article; an unknown slug 404s at /mydrakensberg/[slug] as it
+        // would have anyway.
+        source: '/blog/:slug',
+        destination: '/mydrakensberg/:slug',
+        permanent: true,
+      },
     ]
   },
 }

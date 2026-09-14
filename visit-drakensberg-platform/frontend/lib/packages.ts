@@ -1,4 +1,4 @@
-import { listEntities, getEntity, insertEntity, updateEntity, deleteEntity, newEntityId } from './entities'
+import { listEntities, getEntityByIdOrSlug, insertEntity, updateEntity, deleteEntity, newEntityId } from './entities'
 import type { GraphFields } from './graph-fields'
 import { slugify, uniqueSlug } from './slugify'
 import type { SupabaseClient } from '@supabase/supabase-js'
@@ -258,8 +258,12 @@ export async function getPublishedPackages(client?: SupabaseClient): Promise<Mar
   )
 }
 
-export async function getPackageById(id: string, client?: SupabaseClient): Promise<MarketplacePackage | null> {
-  return client ? getEntity<MarketplacePackage>(KIND, id, client) : getEntity<MarketplacePackage>(KIND, id)
+/** Accepts either form of the public URL segment (`slug || id`) — see
+ *  getEntityByIdOrSlug(). */
+export async function getPackageById(idOrSlug: string, client?: SupabaseClient): Promise<MarketplacePackage | null> {
+  return client
+    ? getEntityByIdOrSlug<MarketplacePackage>(KIND, idOrSlug, client)
+    : getEntityByIdOrSlug<MarketplacePackage>(KIND, idOrSlug)
 }
 
 export async function addPackage(
