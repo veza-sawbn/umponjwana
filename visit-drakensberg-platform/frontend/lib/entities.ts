@@ -98,6 +98,46 @@ export async function getEntity<T>(kind: string, id: string, client: SupabaseCli
   return null
 }
 
+/**
+ * Resolves a public detail-page URL segment, which is `slug || id` — see
+ * lib/slugify.ts and every `canonical` in app/*\/[id]/page.tsx.
+ *
+ * Link generation has emitted the slug form since the destination-graph work,
+ * but resolution never learned to read it back: every entity-backed detail
+ * route looked the segment up with getEntity() alone, so a slugged listing
+ * 404'd at its own canonical URL — including the ones app/sitemap.ts submits
+ * to search engines. Trails escaped this only because they resolve through
+ * the vd_trail_by_id RPC, which takes either form.
+ *
+ * ID first, so existing id-based callers keep their single-query path and
+ * their exact behaviour; the slug query only runs when the segment is not an
+ * id. uniqueSlug() collides new slugs against every sibling's `slug || id`,
+ * so the two forms can't both match different rows.
+ */
+export async function getEntityByIdOrSlug<T>(
+  kind: string,
+  idOrSlug: string,
+  client: SupabaseClient = supabase,
+): Promise<T | null> {
+  if (!idOrSlug) return null
+
+  const byId = await getEntity<T>(kind, idOrSlug, client)
+  if (byId) return byId
+
+  try {
+    // Not .maybeSingle(): it errors on multiple rows, and a duplicate slug in
+    // the data is not a reason to fail a page that can serve the first match.
+    const { data } = await client
+      .from('vd_entities')
+      .select('*')
+      .eq('kind', kind)
+      .eq('value->>slug', idOrSlug)
+      .limit(1)
+    if (Array.isArray(data) && data.length > 0) return rowToItem<T>(data[0] as EntityRow)
+  } catch {}
+  return null
+}
+
 export async function insertEntity<T extends { id: string; status?: string; supplierId?: string }>(
   kind: string,
   item: T,

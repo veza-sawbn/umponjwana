@@ -1,4 +1,4 @@
-import { listEntities, getEntity, insertEntity, updateEntity, deleteEntity, newEntityId, listEntitiesByOwner } from './entities'
+import { listEntities, getEntityByIdOrSlug, insertEntity, updateEntity, deleteEntity, newEntityId, listEntitiesByOwner } from './entities'
 import type { GraphFields } from './graph-fields'
 import { slugify, uniqueSlug } from './slugify'
 import type { Season, SeasonTopic } from './seasons'
@@ -155,8 +155,12 @@ export async function getActivitiesBySupplier(supplierId: string): Promise<Activ
   return listEntitiesByOwner<Activity>(KIND, supplierId)
 }
 
-export async function getActivityById(id: string, client?: SupabaseClient): Promise<Activity | null> {
-  return client ? getEntity<Activity>(KIND, id, client) : getEntity<Activity>(KIND, id)
+/** Accepts either form of the public URL segment (`slug || id`) — see
+ *  getEntityByIdOrSlug(). */
+export async function getActivityById(idOrSlug: string, client?: SupabaseClient): Promise<Activity | null> {
+  return client
+    ? getEntityByIdOrSlug<Activity>(KIND, idOrSlug, client)
+    : getEntityByIdOrSlug<Activity>(KIND, idOrSlug)
 }
 
 // The public activity page (app/activities/[id]/page.tsx) is ISR-cached for
