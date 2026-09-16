@@ -5,6 +5,7 @@ import { notify } from './notifications'
 import { createOrdersForBooking, cancelOrdersForBooking } from './booking-orders'
 import { createOrderForBooking, cancelOrderForBooking } from './orders'
 import { createTransportRequestForBooking } from './transport-dispatch'
+import { releaseTicketsForBooking } from './tickets'
 import { trackEvent, AnalyticsEvent } from './analytics'
 
 export type SavedBooking = {
@@ -288,6 +289,9 @@ export async function updateBookingStatus(
     await cancelOrdersForBooking(id)
     // Reverse the Master Order's financials (refund liability, ledger).
     await cancelOrderForBooking(id)
+    // Void any issued (unredeemed) tickets and free their capacity back to
+    // the event — a no-op when this booking never included an event line.
+    await releaseTicketsForBooking(id).catch(err => console.error('[bookings] ticket release failed:', err))
     if (opts?.notifyUser) {
       await notify(booking.userId, 'cancellation', `Booking ${booking.reference} cancelled`,
         'Your booking has been cancelled by the supplier. If you were charged, a refund will follow within 5 business days.',

@@ -259,7 +259,11 @@ export async function buildOrderLinesFromBooking(booking: SavedBooking): Promise
       supplierId: a.supplierId && UUID_RE.test(a.supplierId) ? a.supplierId : null,
       supplierName: a.operator || 'Visit Drakensberg',
       category: a.type, // activity | hike | tour | event
-      productId: a.id,
+      // An event addon's `id` is a composite cart key (`event-<eventId>`),
+      // not the event's own id — vd_canonical_unit_price's 'event' branch
+      // needs "<eventId>:<ticketTypeId>" to price the chosen tier. Every
+      // other addon type keeps pricing by its plain `id`, unchanged.
+      productId: a.type === 'event' && a.eventId && a.ticketTypeId ? `${a.eventId}:${a.ticketTypeId}` : a.id,
       title: a.title,
       serviceDate: a.date,
       guests: a.guests,
@@ -268,6 +272,9 @@ export async function buildOrderLinesFromBooking(booking: SavedBooking): Promise
       unitPrice: a.price_per_person,
       grossAmount: a.price_per_person * a.guests,
       validatePrice: true,
+      ...(a.eventId && a.sessionId && a.ticketTypeId
+        ? { value: { eventId: a.eventId, sessionId: a.sessionId, ticketTypeId: a.ticketTypeId } }
+        : {}),
     })
   }
 

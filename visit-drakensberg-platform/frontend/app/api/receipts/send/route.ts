@@ -39,6 +39,9 @@ function receiptHtml(o: {
   balance: number
   invoiceUrl: string
   origin: string
+  /** Set when this order included at least one event ticket line — links to
+   *  the buyer's QR ticket wallet instead of (or alongside) the invoice. */
+  ticketsUrl?: string
 }) {
   return emailShell({
     origin: o.origin,
@@ -64,6 +67,7 @@ function receiptHtml(o: {
         ['Total paid to date', money(o.totalPaid, o.currency)],
       ], ['Balance due', money(o.balance, o.currency)])}
       ${ctaButton(o.invoiceUrl, 'View your invoice')}
+      ${o.ticketsUrl ? ctaButton(o.ticketsUrl, 'View your tickets') : ''}
       ${finePrint(`This receipt covers your single trip invoice with Visit Drakensberg. All accommodation,
         activities, transfers and extras appear on one document. Keep this email for your records.`)}`,
   })
@@ -113,6 +117,13 @@ export async function POST(req: Request) {
   // to sign in with.
   const invoiceUrl = `${origin}/invoices/${invoice?.id ?? order.id}`
 
+  // Tickets, unlike the invoice, live behind a signed-in account (they carry
+  // a redeemable QR) — only worth linking when this order actually included
+  // an event ticket line, and only as a pointer, not a login bypass.
+  const { data: eventLine } = await supabase
+    .from('vd_order_lines').select('id').eq('order_id', body.orderId).eq('category', 'event').limit(1).maybeSingle()
+  const ticketsUrl = eventLine ? `${origin}/account/tickets` : undefined
+
   let sent = false
   let sendError: string | null = null
 
@@ -136,6 +147,7 @@ export async function POST(req: Request) {
         totalPaid: Number(order.amount_paid),
         balance: Number(order.outstanding_balance),
         invoiceUrl,
+        ticketsUrl,
         origin,
       }),
     })
