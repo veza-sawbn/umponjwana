@@ -6,6 +6,7 @@ import { getReserves, saveAllReserves, type Reserve, type ReservePeak } from '@/
 import { getRegions, DEFAULT_REGIONS, type Region } from '@/lib/regions'
 import { adminMediaSource } from '@/lib/admin-supabase'
 import { MediaPicker } from '@/components/media/MediaPicker'
+import { ImagePositionPicker } from '@/components/media/ImagePositionPicker'
 
 type PeakDifficulty = ReservePeak['difficulty']
 
@@ -124,6 +125,16 @@ export default function AdminReservesPage() {
               <div><label className={labelCls}>Tagline</label><input value={data.tagline} onChange={e => update('tagline', e.target.value)} className={inputCls}/></div>
             </div>
             <div><label className={labelCls}>Hero Image</label><MediaPicker value={data.image} onChange={url => update('image', url)} source={adminMediaSource} /></div>
+            {data.image && (
+              <div>
+                <label className={labelCls}>Hero Image Position</label>
+                <ImagePositionPicker
+                  image={data.image}
+                  value={data.imagePosition ?? ''}
+                  onChange={position => update('imagePosition', position)}
+                />
+              </div>
+            )}
             <div><label className={labelCls}>Description</label><textarea value={data.description} onChange={e => update('description', e.target.value)} rows={5} className={`${inputCls} resize-none`}/></div>
             {/* Feeds the homepage "Top Attractions" band (lib/attractions.ts),
                 alongside featured trails and towns. */}

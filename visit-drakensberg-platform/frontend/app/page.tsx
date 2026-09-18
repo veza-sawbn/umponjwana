@@ -16,6 +16,7 @@ import { useSwiperAutoplay, CAROUSEL_SPEED_MS } from '@/lib/carousel-autoplay'
 import Footer from '@/components/layout/Footer'
 import { getAllSiteContent, SITE_CONTENT_DEFAULTS, type HomeCard } from '@/lib/site-content'
 import { useSiteSection } from '@/lib/use-site-section'
+import { objectPositionStyle } from '@/lib/image-position'
 import { staggerContainer, staggerChild, fadeUp } from '@/lib/motion'
 import { useEditMode } from '@/lib/edit-mode-context'
 import Editable from '@/components/editor/Editable'
@@ -130,6 +131,11 @@ function HeroSection({ hero }: { hero: typeof SITE_CONTENT_DEFAULTS.hero }) {
   const imageUrl = String(editMode?.getValue('hero', 'image_url', hero.image_url) ?? hero.image_url)
   const carouselImages = (editMode?.getValue('hero', 'images', hero.images) ?? hero.images) as string[]
   const overlayOpacity = Number(editMode?.getValue('hero', 'overlay_opacity', hero.overlay_opacity) ?? hero.overlay_opacity)
+  // Which part of the photo the hero crops around. This hero is the most
+  // aggressive crop on the site — near-square on a phone, a wide letterbox on
+  // a desktop — so a centred crop routinely loses the subject.
+  const imagePosition = String(editMode?.getValue('hero', 'image_position', hero.image_position) ?? hero.image_position)
+  const carouselPositions = (editMode?.getValue('hero', 'image_positions', hero.image_positions) ?? hero.image_positions) as Record<string, string>
 
   return (
     <EditableSection id="hero" label="Hero" className="relative h-[80vh] min-h-[480px] lg:h-screen lg:min-h-[600px] flex flex-col">
@@ -137,7 +143,7 @@ function HeroSection({ hero }: { hero: typeof SITE_CONTENT_DEFAULTS.hero }) {
         {hero.video_url ? (
           <video src={hero.video_url} autoPlay muted loop playsInline className="w-full h-full object-cover" />
         ) : carouselImages.length > 1 ? (
-          <HeroCarousel images={carouselImages} />
+          <HeroCarousel images={carouselImages} positions={carouselPositions} />
         ) : (
           <Editable section="hero" fieldKey="image_url" value={imageUrl} label="Background Image" type="image">
             <SafeImage
@@ -147,6 +153,7 @@ function HeroSection({ hero }: { hero: typeof SITE_CONTENT_DEFAULTS.hero }) {
               priority
               sizes="100vw"
               className="object-cover"
+              style={objectPositionStyle(imagePosition)}
             />
           </Editable>
         )}

@@ -20,6 +20,7 @@ import {
 import { getAdminSuppliers, adminMediaSource, type AdminSupplier } from '@/lib/admin-supabase'
 import { getTrails, type Trail } from '@/lib/trails'
 import { MediaPicker, MediaGalleryPicker } from '@/components/media/MediaPicker'
+import { ImagePositionPicker } from '@/components/media/ImagePositionPicker'
 import { SeoPanel } from '@/components/admin/SeoPanel'
 import { formatMoney } from '@/lib/allocation'
 
@@ -341,6 +342,16 @@ export default function AdminPackagesPage() {
                 <label className={labelCls}>Hero Image</label>
                 <MediaPicker value={draft.image} onChange={url => set('image', url)} source={adminMediaSource} />
               </div>
+              {draft.image && (
+                <div className="col-span-2">
+                  <label className={labelCls}>Hero Image Position</label>
+                  <ImagePositionPicker
+                    image={draft.image}
+                    value={draft.imagePosition ?? ''}
+                    onChange={position => set('imagePosition', position)}
+                  />
+                </div>
+              )}
               <div>
                 <label className={labelCls}>Region</label>
                 <input value={draft.region} onChange={e => set('region', e.target.value)} placeholder="e.g. Royal Natal" className={inputCls} />

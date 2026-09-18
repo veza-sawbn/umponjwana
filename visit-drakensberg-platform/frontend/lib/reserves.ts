@@ -1,5 +1,6 @@
 import { supabase } from './auth'
 import type { SupabaseClient } from '@supabase/supabase-js'
+import { imagePositionToCss } from './image-position'
 
 export type ReservePeak = { id: string; name: string; elevation: number; difficulty: 'accessible' | 'moderate' | 'expert' }
 
@@ -13,6 +14,9 @@ export type Reserve = {
   tagline: string
   description: string
   image: string
+  /** Focal point the hero crops around (lib/image-position.ts). Empty =
+   *  centred, which is what rows saved before this field existed keep doing. */
+  imagePosition?: string
   viewpointName: string
   bestTime: string
   permits: string
@@ -140,6 +144,7 @@ function normalizeReserve(reserve: Partial<Reserve> & { name: string; id?: strin
     tagline: reserve.tagline || '',
     description: reserve.description || '',
     image: reserve.image || '',
+    imagePosition: reserve.imagePosition ? imagePositionToCss(reserve.imagePosition) : '',
     viewpointName: reserve.viewpointName || '',
     bestTime: reserve.bestTime || '',
     permits: reserve.permits || '',

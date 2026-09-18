@@ -19,6 +19,7 @@ import {
 import { bookPackage } from '@/lib/package-bookings'
 import { getTrails, type Trail } from '@/lib/trails'
 import { formatMoney } from '@/lib/allocation'
+import { objectPositionStyle } from '@/lib/image-position'
 import SaveButton from '@/components/ui/SaveButton'
 
 /**
@@ -129,7 +130,7 @@ export default function PackageDetail({ pkg, id }: { pkg: MarketplacePackage; id
   return (
     <div className="min-h-screen bg-[#F7F5F2]">
       <section className="relative h-[45vh] min-h-[360px] overflow-hidden mt-16">
-        <Image src={pkg.image || 'https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?w=1200&q=80'} alt={pkg.title} fill priority sizes="100vw" className="object-cover" />
+        <Image src={pkg.image || 'https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?w=1200&q=80'} alt={pkg.title} fill priority sizes="100vw" className="object-cover" style={objectPositionStyle(pkg.imagePosition)} />
         <div className="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent" />
         <div className="absolute bottom-0 left-0 right-0 px-6 lg:px-12 pb-10">
           <div className="max-w-[1440px] mx-auto">

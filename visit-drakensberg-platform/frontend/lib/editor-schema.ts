@@ -13,7 +13,7 @@ import type { SiteContentKey } from './site-content'
  *   3. registering it here.
  * ──────────────────────────────────────────────────────────────────────────── */
 
-export type EditorFieldType = 'text' | 'textarea' | 'image' | 'number' | 'range' | 'color' | 'link'
+export type EditorFieldType = 'text' | 'textarea' | 'image' | 'number' | 'range' | 'color' | 'link' | 'position'
 
 export interface EditorField {
   key: string
@@ -21,6 +21,12 @@ export interface EditorField {
   type: EditorFieldType
   min?: number
   max?: number
+  /**
+   * `position` fields only: the sibling field in the same section holding the
+   * image URL this focal point applies to. A focal point is meaningless on
+   * its own — the inspector needs the photo to aim at.
+   */
+  imageKey?: string
 }
 
 export interface EditorCardCollection {
@@ -98,6 +104,7 @@ export const EDITOR_PAGES: EditorPage[] = [
           textarea('subheadline', 'Subheadline'),
           text('location_label', 'Location Label'),
           image('image_url', 'Background Image'),
+          { key: 'image_position', label: 'Background Image Position', type: 'position', imageKey: 'image_url' },
           link('video_url', 'Background Video URL'),
           { key: 'overlay_opacity', label: 'Overlay Opacity', type: 'range', min: 0, max: 100 },
           text('cta_label', 'CTA Label'),

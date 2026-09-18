@@ -36,6 +36,9 @@ export type Trail = {
   status: 'published' | 'draft'
   featured: boolean
   image: string
+  /** Focal point the hero backdrop crops around (lib/image-position.ts).
+   *  Empty = centred, as trails saved before this field existed stay. */
+  imagePosition?: string
   gallery: string[]
   description: string
   trailhead: string

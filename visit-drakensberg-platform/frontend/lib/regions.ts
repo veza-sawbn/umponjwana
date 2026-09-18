@@ -1,5 +1,6 @@
 import { supabase } from './auth'
 import type { SupabaseClient } from '@supabase/supabase-js'
+import { imagePositionToCss } from './image-position'
 
 export type Subregion = { id: string; name: string; description: string }
 
@@ -16,6 +17,9 @@ export type Region = {
   name: string
   tagline: string
   heroImage: string
+  /** Focal point the hero crops around (lib/image-position.ts). Empty = centred,
+   *  which is what regions saved before this field existed keep doing. */
+  heroImagePosition?: string
   heroVideo: string
   overview: string
   highlights: string[]
@@ -170,6 +174,7 @@ function normalizeRegion(region: Partial<Region> & { name: string; id?: string }
     name: region.name,
     tagline: region.tagline || '',
     heroImage: region.heroImage || '',
+    heroImagePosition: region.heroImagePosition ? imagePositionToCss(region.heroImagePosition) : '',
     heroVideo: region.heroVideo || '',
     overview: region.overview || '',
     highlights: region.highlights || [],

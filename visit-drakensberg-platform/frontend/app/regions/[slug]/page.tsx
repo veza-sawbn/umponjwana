@@ -16,6 +16,7 @@ import { publicSupabase } from '@/lib/supabase-public'
 import { StayDistance } from '@/lib/stay-distance'
 import ShuttleRoutesModule from '@/components/modules/ShuttleRoutesModule'
 import SeasonMosaic from '@/components/modules/SeasonMosaic'
+import { objectPositionStyle } from '@/lib/image-position'
 import TrackView from '@/components/analytics/TrackView'
 import { formatMoney } from '@/lib/allocation'
 import JsonLd from '@/components/seo/JsonLd'
@@ -286,7 +287,7 @@ export default async function RegionPage({ params }: { params: { slug: string } 
 
       {/* ── Hero ─────────────────────────────────────────────────────────── */}
       <section className="relative h-[70vh] min-h-[480px] overflow-hidden">
-        <Image src={heroImg} alt={region.name} fill priority sizes="100vw" className="object-cover" />
+        <Image src={heroImg} alt={region.name} fill priority sizes="100vw" className="object-cover" style={objectPositionStyle(region.heroImagePosition)} />
         <div className="absolute inset-0 bg-gradient-to-b from-black/30 via-black/20 to-black/70" />
 
         <div className="absolute top-20 left-0 right-0 px-6 lg:px-12">
@@ -371,7 +372,7 @@ export default async function RegionPage({ params }: { params: { slug: string } 
           <p className="font-sans text-sm text-gray-500 max-w-2xl mb-8 leading-relaxed">
             {region.bestTime || `${region.name} changes character through the year. Pick a season to see what's worth doing in it.`}
           </p>
-          <SeasonMosaic regionSlug={region.slug} heroImage={heroImg} />
+          <SeasonMosaic regionSlug={region.slug} heroImage={heroImg} heroImagePosition={region.heroImagePosition} />
         </div>
       </section>
 

@@ -8,6 +8,7 @@ import { getRegions, type Region } from '@/lib/regions'
 import { getSeasonalContent } from '@/lib/modules'
 import { SEASON_META, isSeason, type Season } from '@/lib/seasons'
 import { publicSupabase } from '@/lib/supabase-public'
+import { objectPositionStyle } from '@/lib/image-position'
 import SeasonTopicSection from '@/components/modules/SeasonTopicSection'
 import JsonLd from '@/components/seo/JsonLd'
 
@@ -95,7 +96,7 @@ export default async function SeasonPage({ params }: { params: { slug: string; s
 
       {/* ── Hero ─────────────────────────────────────────────────────────── */}
       <section className="relative h-[42vh] min-h-[320px] overflow-hidden">
-        <Image src={heroImg} alt="" fill priority sizes="100vw" className="object-cover" />
+        <Image src={heroImg} alt="" fill priority sizes="100vw" className="object-cover" style={objectPositionStyle(region.heroImagePosition)} />
         <div
           className="absolute inset-0"
           style={{ background: `linear-gradient(to top, rgba(${meta.tint},0.82) 0%, rgba(${meta.tint},0.28) 60%, rgba(${meta.tint},0.08) 100%)` }}

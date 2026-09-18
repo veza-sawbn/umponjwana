@@ -5,6 +5,7 @@ import { Plus, Trash2, Check } from 'lucide-react'
 import { getRegions, saveAllRegions, DEFAULT_REGIONS, type Region } from '@/lib/regions'
 import { adminMediaSource } from '@/lib/admin-supabase'
 import { MediaPicker } from '@/components/media/MediaPicker'
+import { ImagePositionPicker } from '@/components/media/ImagePositionPicker'
 import { SeoPanel } from '@/components/admin/SeoPanel'
 
 // Reads/writes lib/regions.ts directly — the same module the public site
@@ -117,6 +118,16 @@ export default function AdminRegionsPage() {
               <div><label className={labelCls}>Tagline</label><input value={data.tagline} onChange={e => update('tagline', e.target.value)} className={inputCls}/></div>
             </div>
             <div><label className={labelCls}>Hero Image</label><MediaPicker value={data.heroImage} onChange={url => update('heroImage', url)} source={adminMediaSource} /></div>
+            {data.heroImage && (
+              <div>
+                <label className={labelCls}>Hero Image Position</label>
+                <ImagePositionPicker
+                  image={data.heroImage}
+                  value={data.heroImagePosition ?? ''}
+                  onChange={position => update('heroImagePosition', position)}
+                />
+              </div>
+            )}
             <div><label className={labelCls}>Hero Video</label><MediaPicker value={data.heroVideo} onChange={url => update('heroVideo', url)} source={adminMediaSource} accept="video" /></div>
             <div><label className={labelCls}>Overview</label><textarea value={data.overview} onChange={e => update('overview', e.target.value)} rows={5} className={`${inputCls} resize-none`}/></div>
 

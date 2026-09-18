@@ -1,5 +1,6 @@
 import { supabase } from './auth'
 import type { SupabaseClient } from '@supabase/supabase-js'
+import { imagePositionToCss } from './image-position'
 
 export type Town = {
   id: string
@@ -11,6 +12,9 @@ export type Town = {
   gateway: string
   description: string
   image: string
+  /** Focal point the hero crops around (lib/image-position.ts). Empty =
+   *  centred, which is what rows saved before this field existed keep doing. */
+  imagePosition?: string
   highlights: string[]
   seoTitle: string
   seoDescription: string
@@ -88,6 +92,7 @@ function normalizeTown(town: Partial<Town> & { name: string; id?: string }): Tow
     gateway: town.gateway || '',
     description: town.description || '',
     image: town.image || '',
+    imagePosition: town.imagePosition ? imagePositionToCss(town.imagePosition) : '',
     highlights: town.highlights || [],
     seoTitle: town.seoTitle || `${town.name} | Visit Drakensberg`,
     seoDescription: town.seoDescription || '',
