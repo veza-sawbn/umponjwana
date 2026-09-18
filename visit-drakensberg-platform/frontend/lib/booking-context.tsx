@@ -40,6 +40,15 @@ export type BookingAddon = {
   activityId?: string
   timeslotId?: string
   timeslotTime?: string
+  // Which supplier_events row, session and ticket tier a `type: 'event'`
+  // addon booked — distinct from `id` above, which is a composite cart key
+  // (`event-<eventId>`). Lets checkout price the exact tier (vd_canonical_
+  // unit_price's 'event' branch resolves "<eventId>:<ticketTypeId>") and
+  // lets cancellation release the right session/tier's tickets. Absent for
+  // every other addon type.
+  eventId?: string
+  sessionId?: string
+  ticketTypeId?: string
 }
 
 /** Human-readable party size for a cart/order line — "2 adults, 1 child"

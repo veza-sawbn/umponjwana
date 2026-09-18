@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import {
-  CalendarDays, Heart, Star, Gift, Map, Settings, LogOut, User, ChevronDown, Receipt, MessageCircle,
+  CalendarDays, Heart, Star, Gift, Map, Settings, LogOut, User, ChevronDown, Receipt, MessageCircle, Ticket,
 } from 'lucide-react'
 import Footer from '@/components/layout/Footer'
 import Logo from '@/components/Logo'
@@ -16,6 +16,7 @@ const NAV = [
   { href: '/account/itinerary', label: 'Itinerary', icon: Star },
   { href: '/account/messages', label: 'Messages', icon: MessageCircle },
   { href: '/account/orders', label: 'Orders & Invoices', icon: Receipt },
+  { href: '/account/tickets', label: 'My Tickets', icon: Ticket },
   { href: '/account/saved', label: 'Saved', icon: Heart },
   { href: '/account/loyalty', label: 'Rewards & Wallet', icon: Gift },
   { href: '/account/recommendations', label: 'Planning', icon: Map },

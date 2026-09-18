@@ -23,6 +23,13 @@ export type OrderItem = {
   // item type and for activities with no timeslots configured.
   activityId?: string
   timeslotId?: string
+  // Carried through from BookingAddon for a `type: 'event'` item — not used
+  // for release here (tickets are released in bulk per booking via
+  // releaseTicketsForBooking(), not per supplier order line) but kept so the
+  // supplier's own order view can show which session/tier was booked.
+  eventId?: string
+  sessionId?: string
+  ticketTypeId?: string
 }
 
 export type SupplierOrder = {
@@ -106,6 +113,9 @@ export async function createOrdersForBooking(booking: SavedBooking): Promise<voi
       unitPrice: a.price_per_person,
       total: a.price_per_person * a.guests,
       ...(a.activityId && a.timeslotId ? { activityId: a.activityId, timeslotId: a.timeslotId } : {}),
+      ...(a.eventId && a.sessionId && a.ticketTypeId
+        ? { eventId: a.eventId, sessionId: a.sessionId, ticketTypeId: a.ticketTypeId }
+        : {}),
     }
     bySupplier.set(a.supplierId, [...(bySupplier.get(a.supplierId) ?? []), item])
   }
