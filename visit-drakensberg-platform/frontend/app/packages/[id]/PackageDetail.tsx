@@ -10,7 +10,12 @@ import {
   Calendar, Minus, Plus, Info, Mountain,
 } from 'lucide-react'
 import { supabase } from '@/lib/auth'
-import { COMPONENT_TYPE_LABELS, PACKAGE_CATEGORY_LABELS, type MarketplacePackage } from '@/lib/packages'
+import {
+  COMPONENT_TYPE_LABELS, PACKAGE_CATEGORY_LABELS,
+  isGroupPriced, packageGroupSize, packageGuestCap, packageHeadlinePrice,
+  packagePricePerPerson, packagePriceTotal, packagePriceUnit,
+  type MarketplacePackage,
+} from '@/lib/packages'
 import { bookPackage } from '@/lib/package-bookings'
 import { getTrails, type Trail } from '@/lib/trails'
 import { formatMoney } from '@/lib/allocation'
@@ -31,7 +36,14 @@ export default function PackageDetail({ pkg, id }: { pkg: MarketplacePackage; id
   const [trails, setTrails] = useState<Trail[]>([])
   const [userId, setUserId] = useState<string | null>(null)
 
-  const [form, setForm] = useState({ startDate: '', guests: 2, customerName: '', customerEmail: '', customerPhone: '', specialRequests: '' })
+  // A group package is sold as one unit, so the party starts at the group
+  // size it is priced for; a per-person package starts at the usual two.
+  const guestCap = packageGuestCap(pkg)
+  const groupPriced = isGroupPriced(pkg)
+  const [form, setForm] = useState({
+    startDate: '', guests: groupPriced ? guestCap : Math.min(2, guestCap),
+    customerName: '', customerEmail: '', customerPhone: '', specialRequests: '',
+  })
   const set = (k: string, v: unknown) => setForm(f => ({ ...f, [k]: v }))
   const [booking, setBooking] = useState(false)
   const [error, setError] = useState('')
@@ -133,7 +145,8 @@ export default function PackageDetail({ pkg, id }: { pkg: MarketplacePackage; id
             <h1 className="font-display italic text-4xl lg:text-6xl text-white">{pkg.title}</h1>
             <div className="flex flex-wrap items-center gap-4 mt-2">
               <p className="font-sans text-sm text-white/70 flex items-center gap-2">
-                <MapPin size={13} /> {pkg.region || 'Drakensberg'} · {pkg.durationNights} night{pkg.durationNights !== 1 ? 's' : ''} · max {pkg.maxGuests} guests
+                <MapPin size={13} /> {pkg.region || 'Drakensberg'} · {pkg.durationNights} night{pkg.durationNights !== 1 ? 's' : ''} ·{' '}
+                {groupPriced ? `group of ${packageGroupSize(pkg)}` : `max ${pkg.maxGuests} guests`}
               </p>
               <SaveButton
                 variant="inline"
@@ -143,7 +156,7 @@ export default function PackageDetail({ pkg, id }: { pkg: MarketplacePackage; id
                   type: 'package',
                   title: pkg.title,
                   location: pkg.region || 'Drakensberg',
-                  price: pkg.pricePerPerson,
+                  price: packagePricePerPerson(pkg),
                   image: pkg.image,
                 }}
               />
@@ -224,12 +237,15 @@ export default function PackageDetail({ pkg, id }: { pkg: MarketplacePackage; id
             <div className="bg-white border border-gray-200 p-6 sticky top-24">
               <div className="flex items-baseline justify-between mb-5">
                 <div>
-                  {pkg.originalPrice && pkg.originalPrice > pkg.pricePerPerson && (
+                  {pkg.originalPrice && pkg.originalPrice > packageHeadlinePrice(pkg) && (
                     <p className="font-sans text-xs text-gray-400 line-through">{formatMoney(pkg.originalPrice)}</p>
                   )}
-                  <p className="font-display italic text-3xl text-[#2d6a4f]">{formatMoney(pkg.pricePerPerson)}</p>
+                  <p className="font-display italic text-3xl text-[#2d6a4f]">{formatMoney(packageHeadlinePrice(pkg))}</p>
+                  {groupPriced && (
+                    <p className="font-sans text-xs text-gray-400 mt-0.5">{formatMoney(packagePricePerPerson(pkg))} per person</p>
+                  )}
                 </div>
-                <p className="font-sans text-xs text-gray-400">per person</p>
+                <p className="font-sans text-xs text-gray-400">{packagePriceUnit(pkg)}</p>
               </div>
 
               <div className="space-y-4">
@@ -238,13 +254,20 @@ export default function PackageDetail({ pkg, id }: { pkg: MarketplacePackage; id
                   <input type="date" min={new Date().toISOString().slice(0, 10)} value={form.startDate} onChange={e => set('startDate', e.target.value)}
                     className="w-full border border-gray-200 px-3 py-2.5 font-sans text-sm focus:outline-none focus:border-[#2d6a4f] bg-white" />
                 </div>
-                <div className="flex items-center justify-between">
-                  <span className="font-sans text-sm text-gray-600">Guests</span>
-                  <div className="flex items-center border border-gray-200">
-                    <button onClick={() => set('guests', Math.max(1, form.guests - 1))} className="px-3 py-2 text-gray-500 hover:text-black disabled:opacity-30" disabled={form.guests <= 1}><Minus size={13} /></button>
-                    <span className="font-sans text-sm px-3 min-w-[32px] text-center">{form.guests}</span>
-                    <button onClick={() => set('guests', Math.min(pkg.maxGuests, form.guests + 1))} className="px-3 py-2 text-gray-500 hover:text-black disabled:opacity-30" disabled={form.guests >= pkg.maxGuests}><Plus size={13} /></button>
+                <div>
+                  <div className="flex items-center justify-between">
+                    <span className="font-sans text-sm text-gray-600">Guests</span>
+                    <div className="flex items-center border border-gray-200">
+                      <button onClick={() => set('guests', Math.max(1, form.guests - 1))} className="px-3 py-2 text-gray-500 hover:text-black disabled:opacity-30" disabled={form.guests <= 1}><Minus size={13} /></button>
+                      <span className="font-sans text-sm px-3 min-w-[32px] text-center">{form.guests}</span>
+                      <button onClick={() => set('guests', Math.min(guestCap, form.guests + 1))} className="px-3 py-2 text-gray-500 hover:text-black disabled:opacity-30" disabled={form.guests >= guestCap}><Plus size={13} /></button>
+                    </div>
                   </div>
+                  {groupPriced && (
+                    <p className="font-sans text-[10px] text-gray-400 mt-1.5 text-right">
+                      Flat rate for the group — the price is the same for up to {guestCap} guest{guestCap !== 1 ? 's' : ''}.
+                    </p>
+                  )}
                 </div>
                 <div>
                   <label className="block font-sans text-[10px] tracking-[0.12em] uppercase text-gray-400 mb-1.5">Full Name</label>
@@ -269,7 +292,7 @@ export default function PackageDetail({ pkg, id }: { pkg: MarketplacePackage; id
 
                 <div className="border-t border-gray-100 pt-4 flex items-center justify-between">
                   <span className="font-sans text-sm text-gray-500"><Users size={12} className="inline mr-1 -mt-0.5" />{form.guests} guest{form.guests !== 1 ? 's' : ''}</span>
-                  <span className="font-display italic text-xl text-[#2d6a4f]">{formatMoney(pkg.pricePerPerson * form.guests)}</span>
+                  <span className="font-display italic text-xl text-[#2d6a4f]">{formatMoney(packagePriceTotal(pkg, form.guests))}</span>
                 </div>
 
                 {error && <p className="font-sans text-sm text-red-500">{error}</p>}

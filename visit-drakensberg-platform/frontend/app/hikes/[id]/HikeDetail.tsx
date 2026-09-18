@@ -324,7 +324,7 @@ export default function HikeDetail({
                   {relatedProperties.map(p => (
                     <Link
                       key={p.id}
-                      href={`/stay/${p.slug || p.id}`}
+                      href={`/stays/${p.slug || p.id}`}
                       className="block bg-white border border-gray-200 hover:border-[#C9A96E] transition-colors group overflow-hidden"
                     >
                       {p.photos?.[0] && (

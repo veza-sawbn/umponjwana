@@ -4,7 +4,10 @@ import Image from 'next/image'
 import { useEffect, useState } from 'react'
 import { ArrowRight } from 'lucide-react'
 import Footer from '@/components/layout/Footer'
-import { getPublishedPackages, PACKAGE_CATEGORIES, PACKAGE_CATEGORY_LABELS, type PackageCategory } from '@/lib/packages'
+import {
+  getPublishedPackages, PACKAGE_CATEGORIES, PACKAGE_CATEGORY_LABELS,
+  packageHeadlinePrice, packagePricePerPerson, packagePriceUnit, type PackageCategory,
+} from '@/lib/packages'
 import { publicSupabase } from '@/lib/supabase-public'
 import { formatMoney } from '@/lib/allocation'
 import SaveButton from '@/components/ui/SaveButton'
@@ -20,7 +23,9 @@ type PackageCard = {
   id: string
   title: string
   duration: string
-  price: number
+  price: number          // headline price, quoted in `priceUnit`
+  priceUnit: string      // 'per person' | 'for 8 guests' — see packagePriceUnit()
+  pricePerPerson: number // per-head equivalent, for saved listings
   originalPrice?: number
   location: string
   img: string
@@ -45,7 +50,9 @@ export default function PackagesPage() {
         id: p.id,
         title: p.title,
         duration: `${p.durationNights} night${p.durationNights !== 1 ? 's' : ''}`,
-        price: p.pricePerPerson,
+        price: packageHeadlinePrice(p),
+        priceUnit: packagePriceUnit(p),
+        pricePerPerson: packagePricePerPerson(p),
         originalPrice: p.originalPrice,
         location: p.region || 'Drakensberg',
         img: p.image || 'https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?w=900&q=80',
@@ -127,7 +134,7 @@ export default function PackagesPage() {
                       <p className="font-sans text-xs text-forest/30 line-through">{formatMoney(p.originalPrice)}</p>
                     )}
                     <p className="font-display text-2xl text-forest">{formatMoney(p.price)}</p>
-                    <p className="font-sans text-xs text-forest/40">per person</p>
+                    <p className="font-sans text-xs text-forest/40">{p.priceUnit}</p>
                   </div>
                 </div>
 
@@ -156,7 +163,7 @@ export default function PackagesPage() {
                 type: 'package',
                 title: p.title,
                 location: p.location,
-                price: p.price,
+                price: p.pricePerPerson,
                 image: p.img,
                 rating: p.rating,
               }}
