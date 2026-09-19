@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
-import { Plus, Send, FileText, AlertTriangle } from 'lucide-react'
+import { Plus, Send, FileText, AlertTriangle, Users } from 'lucide-react'
 import { getEmailCampaigns, type EmailCampaign } from '@/lib/email-campaigns-admin'
 
 const STATUS_LABEL: Record<EmailCampaign['status'], string> = {
@@ -38,9 +38,12 @@ export default function EmailCampaignsPage() {
           <h1 className="font-display italic text-2xl sm:text-3xl text-[#000000]">Email Campaigns</h1>
           <p className="font-sans text-sm text-gray-500 mt-1">Create, target and send campaign emails to consented customers.</p>
         </div>
-        <div className="flex gap-2 shrink-0">
+        <div className="flex flex-wrap gap-2 shrink-0">
           <Link href="/admin/campaigns/templates" className="inline-flex items-center justify-center gap-2 border border-gray-200 px-4 py-3 sm:py-2 font-sans text-sm text-gray-600 hover:border-[#2d6a4f] hover:text-[#2d6a4f] transition-colors">
             <FileText size={14} /> Templates
+          </Link>
+          <Link href="/admin/campaigns/send" className="inline-flex items-center justify-center gap-2 border border-gray-200 px-4 py-3 sm:py-2 font-sans text-sm text-gray-600 hover:border-[#2d6a4f] hover:text-[#2d6a4f] transition-colors">
+            <Users size={14} /> Send to Contacts
           </Link>
           <Link href="/admin/campaigns/new" className="inline-flex items-center justify-center gap-2 bg-[#2d6a4f] text-white px-4 py-3 sm:py-2 font-sans text-sm hover:bg-[#245a41] transition-colors">
             <Plus size={14} /> New Campaign
@@ -51,9 +54,11 @@ export default function EmailCampaignsPage() {
       <div className="mb-6 bg-white border border-gray-200 p-4 flex items-start gap-3">
         <AlertTriangle size={16} className="text-[#C9A96E] shrink-0 mt-0.5" />
         <p className="font-sans text-xs text-gray-500 leading-relaxed">
-          Sending is currently a <strong>dry run</strong> — the real, consented audience is resolved and recorded, but no
-          email actually leaves the platform. Real delivery needs a marketing email provider wired in first (the existing
-          transactional mailbox isn&apos;t suited to bulk sends).
+          Sending a campaign to a whole <strong>segment</strong> is still a dry run — the consented audience is resolved
+          and recorded, but no email leaves the platform. Bulk delivery needs a marketing email provider wired in first.
+          To actually send, use <Link href="/admin/campaigns/send" className="text-[#2d6a4f] hover:underline">Send to
+          Contacts</Link>: hand-picked recipients, up to 50 at a time, delivered individually through the Visit
+          Drakensberg mailbox.
         </p>
       </div>
 

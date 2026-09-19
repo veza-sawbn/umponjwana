@@ -93,12 +93,22 @@ tags itself with the class hooks the dark-mode and stacking rules key off.
 
 ## Campaign starters
 
-`frontend/lib/email-starters.ts` holds four promotional starting points —
-seasonal newsletter, story digest, enquiry follow-up, listing invitation — built
-from the blocks above and served to the admin form by
+`frontend/lib/email-starters.ts` holds eleven starting points, built from the
+blocks above and served to the admin form by
 `app/api/admin/campaigns/starters`. They are generated server-side on request
 rather than stored as literal HTML in a client module, so there is never a
 second copy of the markup to drift.
+
+Each carries an `audience` tag, because the two recipient lists are not
+interchangeable — customer copy addresses a traveller as "you" about their own
+trip, contact copy addresses a business about listing with us:
+
+| Audience | Starters |
+|---|---|
+| `customers` | Seasonal newsletter · Story digest · Enquiry follow-up · Region spotlight · What to book now · Event announcement · Win-back |
+| `contacts` | Listing invitation · Outreach first approach · Outreach follow-up · Partner update |
+
+The tag sorts the picker; it never restricts it.
 
 **There is no merge-tag engine.** Nothing substitutes `{{first_name}}` on the
 way out; the only send that exists today is a dry run. The starters therefore
@@ -125,3 +135,54 @@ is invented, and nothing is promised on the operator's behalf.
 3. Check dark mode (`prefers-color-scheme: dark`) and a narrow viewport.
 4. If you added a colour, add it to `email-tokens.ts` and check its contrast on
    the ground it will actually sit on.
+
+
+## Sending
+
+There are two send paths, and the difference between them is the whole reason
+either is safe.
+
+### Segment campaigns — dry run
+
+`vd_campaign_dry_run_send()` resolves the real consented audience, records the
+count and the outcome, and **delivers nothing**. Pointing the business SMTP
+mailbox at an entire segment is what the 20260825 migration header rules out:
+no bounce or complaint webhooks, no provider-side suppression list, and real
+reputation risk at volume. That stays true and that path stays a dry run until
+an ESP is wired in.
+
+### Hand-picked recipients — real delivery
+
+`app/api/admin/campaigns/send`, driven by `/admin/campaigns/send`, actually
+sends. The objection above is about *bulk*, not about volume in the abstract:
+fifty individually addressed messages, each recipient chosen by a human, is
+ordinary business correspondence. What keeps it that way:
+
+- **A hard cap of 50 per send**, enforced in the route, not just the UI.
+- **One message per recipient**, each with its own unsubscribe link. Never a
+  shared BCC — a shared unsubscribe link cannot identify who clicked it, and a
+  BCC list is one misconfiguration away from disclosing the whole list.
+- **A per-recipient consent check at send time**, against `vd_consent_state()`.
+  What the picker shows is advisory; the server decides.
+- **Every attempt logged** to `vd_email_sends` — successes, skips and failures
+  alike, through the service role, against a table with a read policy for
+  admins and no write policy at all.
+
+### The consent rule
+
+`frontend/lib/email-consent.ts` states it once, and both the picker and the
+send route import exactly that function:
+
+| Recipient kind | `granted` | `withdrawn` | `unknown` |
+|---|---|---|---|
+| `customer` — a person, consumer marketing, **opt-in** | send | skip | **skip** |
+| `contact` — a business, B2B outreach, **opt-out** | send | skip | **send** |
+
+Silence is not consent from a person; from a business that has not refused an
+approach, it is not a refusal either. `vd_is_subscribed()` cannot express this —
+it coalesces a missing record to `false` — which is why `vd_consent_state()`
+exists and returns three states rather than two.
+
+The module has no imports and must keep none: the send route needs the rule,
+and `lib/email-recipients.ts` pulls in the browser Supabase client, which must
+never reach a route handler's server bundle.
