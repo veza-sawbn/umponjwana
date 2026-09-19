@@ -8,9 +8,20 @@ import { getActivities } from '@/lib/activities'
 import { getPackages } from '@/lib/packages'
 import { getTours } from '@/lib/tours'
 import { getRoutes, routeSlug } from '@/lib/transport-routes'
+import { getPublishedPosts } from '@/lib/blog-posts'
+import { getFieldGuideIndex } from '@/lib/field-guide'
+import { STATIC_ROUTES, EDITORIAL_FALLBACK_SLUGS } from '@/lib/seo-routes'
 import { publicSupabase } from '@/lib/supabase-public'
 
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://visitdrakensberg.com'
+
+// Regenerate hourly rather than only at build. Without this the sitemap is
+// prerendered once per deploy, so a lodge a supplier published on Tuesday
+// stays out of it until something else triggers a Vercel build — on a
+// platform where operators add listings themselves, that is the difference
+// between a page being discoverable the same afternoon and weeks later. The
+// same interval the CMS-backed public routes use.
+export const revalidate = 3600
 
 // Public, indexable routes. Detail pages backed by live Supabase data are
 // added incrementally as each entity type gets a real generateMetadata pass
@@ -20,46 +31,9 @@ const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://visitdrakensberg.c
 // logic in app/experiences/[id]/page.tsx) are intentionally left out of the
 // sitemap; a crawler reaches them via the trail/tour pages that link to them
 // instead.
-const STATIC_ROUTES = [
-  { path: '', priority: 1.0 },
-  { path: '/stays', priority: 0.9 },
-  { path: '/hikes', priority: 0.9 },
-  { path: '/activities', priority: 0.9 },
-  { path: '/tours', priority: 0.8 },
-  { path: '/transport', priority: 0.6 },
-  { path: '/search', priority: 0.8 },
-  { path: '/regions', priority: 0.8 },
-  { path: '/nature-reserves', priority: 0.7 },
-  { path: '/packages', priority: 0.7 },
-  { path: '/events', priority: 0.7 },
-  { path: '/shuttles', priority: 0.6 },
-  { path: '/guides', priority: 0.6 },
-  { path: '/plan', priority: 0.6 },
-  { path: '/mydrakensberg', priority: 0.6 },
-  { path: '/about', priority: 0.4 },
-  { path: '/list-with-us', priority: 0.4 },
-  // The supplier documents an operator is asked to accept, and the concern
-  // channel the Code of Conduct points people at. Indexed on purpose: a
-  // business deciding whether to list should be able to read the terms
-  // before starting the form, and find the concern channel without one.
-  // (Neither is blocked by robots.ts — the /supplier/ disallow carries a
-  // trailing slash, so it does not match /supplier-terms.)
-  { path: '/supplier-terms', priority: 0.3 },
-  { path: '/supplier-code-of-conduct', priority: 0.3 },
-  { path: '/report-a-concern', priority: 0.3 },
-  { path: '/privacy', priority: 0.2 },
-  { path: '/terms', priority: 0.2 },
-]
-
-// Editorial article slugs defined in app/mydrakensberg/[slug]/page.tsx
-const STORY_SLUGS = [
-  'san-bushmen-rock-art-giants-castle',
-  'tugela-falls-chain-ladder-guide',
-  'bearded-vulture-lammergeier',
-  'zulu-cuisine-foothills',
-  'battle-of-isandlwana-history',
-  'conservation-umdoni-wetlands',
-]
+//
+// The static route list itself lives in lib/seo-routes.ts, because the admin
+// Sitemap Control tool reports on the same set and used to keep its own copy.
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const now = new Date()
@@ -69,7 +43,9 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   // DEFAULT_* content the live pages themselves fall back to on a read
   // failure, so the sitemap never silently drops URLs that the site is
   // still actually serving.
-  const [regions, reserves, towns, trails, properties, activities, packages, tours, routes] = await Promise.all([
+  const [
+    regions, reserves, towns, trails, properties, activities, packages, tours, routes, posts, fieldGuides,
+  ] = await Promise.all([
     getRegions(publicSupabase).catch(() => DEFAULT_REGIONS),
     getReserves(publicSupabase).catch(() => DEFAULT_RESERVES),
     getTowns(publicSupabase).catch(() => DEFAULT_TOWNS),
@@ -79,18 +55,45 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     getPackages(publicSupabase).catch(() => []),
     getTours(publicSupabase).catch(() => []),
     getRoutes(publicSupabase).catch(() => []),
+    getPublishedPosts(publicSupabase).catch(() => []),
+    getFieldGuideIndex(publicSupabase).catch(() => []),
   ])
+
+  // Editorial articles come from two places while the journal finishes moving
+  // into the CMS: published `blog_posts` rows, and the articles still compiled
+  // into app/mydrakensberg/[slug]/page.tsx. Both are served at the same URL
+  // shape, and the route prefers the CMS row, so a slug present in both is one
+  // URL — emit it once.
+  const storySlugs = [
+    ...posts.map(post => post.slug).filter(Boolean),
+    ...EDITORIAL_FALLBACK_SLUGS.filter(slug => !posts.some(post => post.slug === slug)),
+  ]
+  const storyLastModified = new Map(
+    posts.map(post => [post.slug, new Date(post.updated_at || post.published_at || post.created_at)]),
+  )
 
   return [
     ...STATIC_ROUTES.map(r => ({
-      url: `${SITE_URL}${r.path}`,
+      // `|| '/'` for the homepage: the root layout's canonical resolves to
+      // https://visitdrakensberg.com/ (metadataBase + '/'), and a sitemap
+      // entry without the slash is a different URL string to Search Console,
+      // which reports it as submitted-but-canonicalised-elsewhere.
+      url: `${SITE_URL}${r.path || '/'}`,
       lastModified: now,
       changeFrequency: 'weekly' as const,
       priority: r.priority,
     })),
-    ...STORY_SLUGS.map(slug => ({
+    ...storySlugs.map(slug => ({
       url: `${SITE_URL}/mydrakensberg/${slug}`,
-      lastModified: now,
+      lastModified: storyLastModified.get(slug) ?? now,
+      changeFrequency: 'monthly' as const,
+      priority: 0.5,
+    })),
+    // Published field guides. The index rows are what /field-guide itself
+    // renders, so anything listed there is live and has a detail page.
+    ...fieldGuides.map(guide => ({
+      url: `${SITE_URL}/field-guide/${guide.slug}`,
+      lastModified: guide.publishedAt ? new Date(guide.publishedAt) : now,
       changeFrequency: 'monthly' as const,
       priority: 0.5,
     })),

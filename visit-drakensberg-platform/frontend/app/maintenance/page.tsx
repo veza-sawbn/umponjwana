@@ -1,6 +1,16 @@
+import type { Metadata } from 'next'
 import Link from 'next/link'
 
-export const metadata = { title: 'Down for Maintenance' }
+// noindex matters more here than on most utility pages: while the toggle is
+// on, middleware.ts 302s every public URL to /maintenance. A crawl during a
+// maintenance window would otherwise find this page — and, with no canonical
+// of its own, it inherited the root layout's `canonical: '/'`, pointing the
+// homepage's canonical at a "Back soon" stub.
+export const metadata: Metadata = {
+  title: 'Down for Maintenance',
+  robots: { index: false, follow: false },
+  alternates: { canonical: '/maintenance' },
+}
 
 // The public site is closed, but two doors stay open (see
 // MAINTENANCE_EXEMPT_ROUTES in middleware.ts): the sign-in flow, so suppliers

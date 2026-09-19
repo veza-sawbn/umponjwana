@@ -41,6 +41,11 @@ Full reasoning and evidence: **[ARCHITECTURE_CHANGE_DECISION.md](./ARCHITECTURE_
 | 7 | [IMPLEMENTATION_ROADMAP.md](./IMPLEMENTATION_ROADMAP.md) | Phased plan, dependency graph, risk register, success measures |
 | 8 | [ARCHITECTURE_CHANGE_DECISION.md](./ARCHITECTURE_CHANGE_DECISION.md) | The GREEN/AMBER/RED determination with codebase evidence |
 
+**Added since the audit:** [SEARCH_CONSOLE_SETUP.md](./SEARCH_CONSOLE_SETUP.md)
+— the crawl surface as it stands today, the one-time Search Console steps, and
+what the Pages report's labels mean for this site. Start there if the question
+is "why isn't it indexed"; start above if it is "why isn't it ranking".
+
 ---
 
 ## Part 19 — the seven answers
