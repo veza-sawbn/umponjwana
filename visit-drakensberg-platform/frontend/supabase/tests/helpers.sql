@@ -122,6 +122,15 @@ begin
   grant select, insert, delete on public.profiles to anon, authenticated;
 end $$;
 
+-- The same arrangement for storage: Supabase grants the roles access to
+-- storage.objects and leans entirely on the policies on it. Without this a
+-- test of a storage policy fails with "permission denied for schema storage"
+-- — which looks like the policy working and is not, so a policy that had been
+-- dropped by mistake would still read as "refused".
+grant usage on schema storage to anon, authenticated;
+grant select, insert, update, delete on storage.objects to anon, authenticated;
+grant select on storage.buckets to anon, authenticated;
+
 grant execute on all functions in schema vdtest to anon, authenticated;
 
 -- ── Assertions ──────────────────────────────────────────────────────────────

@@ -62,21 +62,47 @@ flipped. (It is also not a useful target: the token arrives in an email we
 sent, and getting one sent now requires passing the captcha on
 `/auth/forgot-password`.)
 
+### Uploads: one challenge, then a grant
+
+A Turnstile token is redeemable once, so a challenge per file would mean eight
+of them for an applicant simply attaching pictures of their lodge. Instead:
+
+1. The applicant solves **one** challenge on step 1 of the wizard.
+2. `POST /api/listing-applications/upload-grant` trades it for a **two-hour,
+   reference-scoped grant** — an HMAC in an httpOnly cookie
+   (`lib/upload-grant.ts`). The key is derived from
+   `SUPABASE_SERVICE_ROLE_KEY`, domain-separated, so there is no fourth secret
+   to set correctly in three environments.
+3. Each upload asks `POST /api/listing-applications/upload-url` for a signed
+   URL for **one object at a path the server chooses**, then PUTs the bytes
+   straight to Supabase Storage.
+4. Certificates are registered through
+   `POST /api/listing-applications/compliance-document`, which requires the
+   same grant and refuses any `storage_path` outside `applications/<ref>/`.
+
+The bytes never pass through a Vercel function — deliberately: the body limit
+there is about 4.5 MB and these files run to 15 MB. What moved to the server is
+the decision, not the payload.
+
+If the grant lapses while the form is open, the upload comes back
+`needsGrant: true`, and the form renews it from the step-1 widget and retries
+once rather than making someone who has filled in four steps start again.
+
+**Suppliers are untouched.** An approved supplier is signed in and writes only
+into `suppliers/<their own uid>/…`, which `auth.uid()` pins exactly. RLS is
+already the right control there.
+
 ### What this does not cover
 
-The anonymous storage `INSERT` into `media/listing-applications/…`, opened by
-the same 2026-08-07 migration and covered by the same warning. Photos are
-uploaded while the applicant is still filling the form, so closing it means
-routing uploads through a server route that verifies a token — a larger change
-than the application write, and the bucket's own limits (50 MB per object, an
-allowed-MIME list, and `20260913_media_bucket_no_active_content.sql`) still
-apply. **Open item** — tracked in `SECURITY_AUDIT_2026-09.md` under follow-up
-work.
+Nothing outstanding on the applicant path. All four anonymous write endpoints
+the 2026-08-07 and 2026-09-05 migrations opened are closed:
 
-The direct `insert` into `vd_listing_applications` **was** the other half of
-this and is now closed: the table no longer accepts anonymous inserts at all
-(`20260921_listing_applications_server_only.sql`), so the route is the only
-way in and its captcha is not skippable.
+| Endpoint | Closed by |
+|---|---|
+| `vd_listing_applications` insert | `20260921_listing_applications_server_only.sql` |
+| `media/listing-applications/…` | `20260921_applicant_uploads_server_only.sql` |
+| `compliance/applications/…` | `20260921_applicant_uploads_server_only.sql` |
+| `vd_compliance_documents` insert | `20260921_applicant_uploads_server_only.sql` |
 
 ## Configuration
 
@@ -155,15 +181,21 @@ all three.
 | `frontend/components/security/Turnstile.tsx` | The widget: explicit render, `reset()` and `refresh()` |
 | `frontend/app/api/listing-applications/route.ts` | The only way into `vd_listing_applications` |
 | `frontend/lib/listing-application-intake.ts` | Server-owned id/status/timestamp, size ceiling |
-| `frontend/supabase/migrations/20260921_…_server_only.sql` | Drops the anonymous insert policy |
+| `frontend/lib/upload-grant.ts` | Signs and verifies the two-hour upload grant |
+| `frontend/lib/listing-application-uploads.ts` | Server-chosen storage paths, MIME and size rules |
+| `frontend/lib/applicant-upload.ts` | The browser half: grant, signed URL, PUT |
+| `frontend/app/api/listing-applications/upload-grant/route.ts` | Captcha → grant |
+| `frontend/app/api/listing-applications/upload-url/route.ts` | Grant → one signed upload URL |
+| `frontend/app/api/listing-applications/compliance-document/route.ts` | Grant → one registry row |
+| `frontend/supabase/migrations/20260921_…_server_only.sql` | Drops the four anonymous write policies |
 | `frontend/tests/turnstile.test.ts` | The contract the forms depend on |
 | `frontend/tests/turnstile-verify.test.ts` | Including the fail-closed behaviour |
 | `frontend/tests/listing-application-intake.test.ts` | What the client no longer decides |
 | `frontend/supabase/tests/listing_application_intake_test.sql` | That anon really cannot insert |
 
-## Deploying the listing-application change
+## Deploying the listing-application changes
 
-`20260921_listing_applications_server_only.sql` makes the old client-side
-insert fail. **Deploy the frontend first**, confirm a test application lands,
-and only then run the migration — a build that still performs the direct
-insert loses every application submitted in between.
+Both `20260921_*_server_only.sql` migrations make the old client-side writes
+fail. **Deploy the frontend first**, confirm a test application lands with a
+photo and a certificate attached, and only then run them — a build that still
+writes directly loses every application and every upload submitted in between.

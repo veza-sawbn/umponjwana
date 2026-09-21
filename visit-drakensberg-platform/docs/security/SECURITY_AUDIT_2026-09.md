@@ -782,19 +782,26 @@ harness caught it on the first run.
 Two things remain deliberately undone in code, plus the configuration steps in
 the runbook.
 
-**The anonymous storage upload is still open.**
-`20260807_listing_applications.sql` opened two unauthenticated write endpoints
-under one warning. The table insert is now closed —
-`20260921_listing_applications_server_only.sql` drops the public policy, and
-`POST /api/listing-applications` is the only way in, behind a verified
-Turnstile token, a rate limit and a server-owned id, status and timestamp. The
-storage `INSERT` into `media/listing-applications/…` is not. Photos are
-uploaded while the applicant is still filling the form, so closing it means
-routing uploads through a server route that verifies a token — a larger change
-than the application write, and one that should not ride along with it. The
-bucket's own limits still apply (50 MB per object, an allowed-MIME list, and
-`20260913_media_bucket_no_active_content.sql`), so the exposure is bucket
-volume rather than content.
+**The applicant write path is now closed in full** — recorded here because the
+list of what was open is the useful part. `20260807_listing_applications.sql`
+and `20260905_supplier_compliance.sql` opened four unauthenticated write
+endpoints between them, under one repeated warning. All four are shut:
+
+| Was open to anyone holding the anon key | Closed by |
+|---|---|
+| `vd_listing_applications` insert | `20260921_listing_applications_server_only.sql` |
+| `media/listing-applications/…` object insert | `20260921_applicant_uploads_server_only.sql` |
+| `compliance/applications/…` object insert | `20260921_applicant_uploads_server_only.sql` |
+| `vd_compliance_documents` insert | `20260921_applicant_uploads_server_only.sql` |
+
+The third and fourth mattered more than their "write-only, private bucket"
+framing suggested: the browser chose *which application's folder* it wrote
+into, and the registry policy could not check that `storage_path` named an
+object the applicant had uploaded. A caller could lodge a row pointing at
+another application's certificate, and the verification office finds an
+application's evidence by exactly that path prefix — so that is how an operator
+gets assessed against someone else's papers. See
+`docs/security/TURNSTILE.md` for what replaced them.
 
 **`isMissingTipColumn()` should go.** `app/api/payments/ikhokha/create/route.ts`
 pattern-matches PostgREST error strings to detect that

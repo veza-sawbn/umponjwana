@@ -125,6 +125,79 @@ begin
   perform vdtest.ok(
     (select rolbypassrls from pg_roles where rolname = 'service_role'),
     'the service role bypasses RLS — the API route is still the way in');
+end $$;
+
+reset role;
+
+-- ══ THE UPLOAD ENDPOINTS ═══════════════════════════════════════════════════
+-- 20260807 and 20260905 opened three anonymous writes between them, under one
+-- warning. 20260921_applicant_uploads_server_only.sql closes all three.
+set local role anon;
+
+do $$
+begin
+  perform vdtest.act_as_nobody();
+
+  -- (1) media/listing-applications/… — a public-read bucket, so anything
+  -- written here is world-readable, and the browser chose the whole filename.
+  perform vdtest.raises(
+    $sql$insert into storage.objects (bucket_id, name)
+         values ('media', 'listing-applications/bot.jpg')$sql$,
+    'row-level security',
+    'anon cannot write into the public listing-photos prefix');
+
+  -- (2) compliance/applications/… — write-only to anon, but the browser chose
+  -- WHICH application's folder.
+  perform vdtest.raises(
+    $sql$insert into storage.objects (bucket_id, name)
+         values ('compliance', 'applications/LP-AAA222/forged.pdf')$sql$,
+    'row-level security',
+    'anon cannot write into another application''s certificate folder');
+
+  -- (3) The registry row. The old policy pinned review_status, supplier_id and
+  -- the review columns — all of which this row satisfies. It is refused
+  -- anyway, which is the point: the policy could never check that storage_path
+  -- named an object this applicant had actually uploaded.
+  perform vdtest.raises(
+    $sql$insert into vd_compliance_documents
+           (id, supplier_id, application_ref, doc_type, storage_path,
+            file_name, mime_type, byte_size, review_status)
+         values ('cdoc-forged', null, 'LP-AAA222', 'edtea_registration',
+                 'applications/LP-AAA222/somebody-elses.pdf',
+                 'x.pdf', 'application/pdf', 10, 'pending')$sql$,
+    'row-level security',
+    'anon cannot lodge a registry row pointing at someone else''s certificate');
+end $$;
+
+reset role;
+
+-- Suppliers are deliberately untouched: signed in, and writing only into their
+-- own subtree, which auth.uid() pins exactly. Breaking that while closing the
+-- applicant path would be a silent regression in the supplier portal.
+do $$
+declare v_supplier uuid;
+begin
+  v_supplier := vdtest.make_user('lodge-owner@example.test', 'supplier', null, true);
+  perform set_config('test.supplier', v_supplier::text, false);
+end $$;
+
+set local role authenticated;
+
+do $$
+declare v_supplier uuid := current_setting('test.supplier')::uuid;
+begin
+  perform vdtest.act_as(v_supplier);
+
+  perform vdtest.allows(
+    format($sql$insert into storage.objects (bucket_id, name)
+                values ('compliance', 'suppliers/%s/renewal.pdf')$sql$, v_supplier),
+    'an approved supplier still uploads into their own compliance subtree');
+
+  perform vdtest.raises(
+    $sql$insert into storage.objects (bucket_id, name)
+         values ('compliance', 'suppliers/00000000-0000-0000-0000-000000000000/x.pdf')$sql$,
+    'row-level security',
+    'and still cannot write into another supplier''s subtree');
 
   raise notice 'listing application intake: all assertions passed';
 end $$;
