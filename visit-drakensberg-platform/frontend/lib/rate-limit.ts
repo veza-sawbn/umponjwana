@@ -71,6 +71,15 @@ export const RATE_LIMITS = {
   paymentCreate: { limit: 20, windowSeconds: 300 },
   /** Unauthenticated proxy to the legacy backend. */
   backendProxy: { limit: 120, windowSeconds: 60 },
+  /**
+   * The public "list with us" front door — the form that took 144 submissions
+   * in September 2026, 109 of them scripted. Generous for a form a human
+   * spends fifteen minutes on, and budgeted per caller AND per contact
+   * address. Fails OPEN: unlike password reset, the limiter is not the primary
+   * control here — the captcha is, and that fails closed — so a Redis outage
+   * should not close the supplier pipeline too.
+   */
+  listingApplication: { limit: 5, windowSeconds: 3600 },
 } as const satisfies Record<string, RateLimitRule>
 
 // ── In-process fallback ─────────────────────────────────────────────────────
