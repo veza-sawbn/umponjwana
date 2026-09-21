@@ -112,6 +112,42 @@ it, the platform has no recovery objective, only a hope.
 
 ## 3. Migrations and rollback
 
+### 3.0 What happened on 2026-09-21, and the rule it produced
+
+The ledger this section describes had never been applied to production. That is
+not a footnote — it is the reason M6 exists, demonstrated:
+
+> **Production was six migrations behind the repository, and nothing knew.**
+
+It surfaced immediately after the security branch was merged and deployed. The
+new build called eight RPCs that did not exist in the database:
+`vd_hold_inventory`, `vd_claim_inventory_holds`, `vd_expire_inventory_holds`,
+`vd_release_inventory_hold`, `vd_release_booking_inventory`,
+`vd_book_activity_slot`, `vd_release_activity_slot` and
+`vd_notification_for_email`. `holdDepartureSeats()` throws on error and
+`/checkout` calls it, so **checkout for tour departures and activity timeslots
+was broken from the moment the deploy went live** until the missing migrations
+were applied. Notification emails were failing for the same reason.
+
+Missing were `20260828_journey_notifications`, `20260829_activity_timeslots`,
+`20260913_notification_provenance_and_seat_authorization`,
+`20260914_inventory_holds`, `20260914_schema_migrations_ledger` and
+`20260918_email_template_hero`. All six were additive, and all six were applied
+and verified the same day; the ledger now holds 67 rows against 67 files on
+disk with nothing pending. Sixty of those rows carry the `pre-ledger` sentinel
+rather than a real checksum, so they are *asserted*, not verified — the first
+real checksum comparison happens on the next migration.
+
+Two consequences worth keeping:
+
+- **A deploy is not done when the code ships.** Frontend and schema are one
+  release. Check the database revision *before* merging, not after — the CI job
+  that applies every migration to an empty database proves the files are
+  coherent, and proves nothing at all about production.
+- **This was found by probing for objects, not by reading a record**, because
+  there was no record. That is precisely what the ledger is for, and it is now
+  in place.
+
 ### 3.1 Before applying any migration to production
 
 1. Load it into a scratch database first — `supabase/tests/run.sh` builds one
