@@ -216,7 +216,7 @@ export default function QuotePage() {
           )}
 
           <p className="mt-10 pt-6 border-t border-gray-200 font-sans text-[11px] text-gray-400 leading-relaxed">
-            This is a quotation, not a tax invoice — no payment is due against it. Prices are held
+            This is a quotation, not a tax invoice, so no payment is due against it. Prices are held
             {quote.valid_until ? ` until ${fmt(quote.valid_until)}` : ' for the validity period above'} and remain subject to
             availability at the time of booking. A tax invoice is issued by {business.business_name} once the quote is accepted.
           </p>

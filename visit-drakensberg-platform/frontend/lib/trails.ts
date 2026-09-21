@@ -36,6 +36,9 @@ export type Trail = {
   status: 'published' | 'draft'
   featured: boolean
   image: string
+  /** Focal point the hero backdrop crops around (lib/image-position.ts).
+   *  Empty = centred, as trails saved before this field existed stay. */
+  imagePosition?: string
   gallery: string[]
   description: string
   trailhead: string
@@ -89,12 +92,12 @@ export const DEFAULT_TRAILS: Trail[] = [
       'https://images.unsplash.com/photo-1486870591958-9b9d0d1dda99?w=800&q=80',
       'https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=800&q=80',
     ],
-    description: 'One of the most dramatic hikes in Africa, the Tugela Falls Circuit climbs from the Mahai campsite in Royal Natal National Park to the base and top of the Tugela Falls — the second highest waterfall in the world at 948m. The route ascends the iconic chain ladder to reach the Amphitheatre plateau, with panoramic views across the full Berg escarpment and into Lesotho.',
+    description: 'One of the most dramatic hikes in Africa, the Tugela Falls Circuit climbs from the Mahai campsite in Royal Natal National Park to the base and top of the Tugela Falls, the second highest waterfall in the world at 948m. The route ascends the iconic chain ladder to reach the Amphitheatre plateau, with panoramic views across the full Berg escarpment and into Lesotho.',
     trailhead: 'Sentinel Car Park, Royal Natal National Park',
     permit_required: true,
     permit_cost: 80,
     what_to_bring: ['Layers (summit wind is significant)', '3L water minimum', 'Snacks and lunch', 'Hiking poles', 'Rain jacket', 'Headlamp for early starts', 'Park entry permit'],
-    highlights: ['Chain ladder ascent to the Amphitheatre plateau', 'Tugela Falls — the second highest waterfall in the world', 'Panoramic views across the escarpment into Lesotho'],
+    highlights: ['Chain ladder ascent to the Amphitheatre plateau', 'Tugela Falls, the second highest waterfall in the world', 'Panoramic views across the escarpment into Lesotho'],
     trail_type: 'Out and back',
     is_multi_day: false,
     days: [],
@@ -133,7 +136,7 @@ export const DEFAULT_TRAILS: Trail[] = [
     featured: false,
     image: 'https://images.unsplash.com/photo-1486870591958-9b9d0d1dda99?w=800&q=80',
     gallery: [],
-    description: 'The iconic pyramid summit of Cathedral Peak rewards fit hikers with 360-degree views across both the escarpment and the foothills. The route requires route-finding skills on the upper section — a guide is highly recommended.',
+    description: 'The iconic pyramid summit of Cathedral Peak rewards fit hikers with 360-degree views across both the escarpment and the foothills. The route requires route-finding skills on the upper section, so a guide is highly recommended.',
     trailhead: 'Cathedral Peak Hotel Trailhead',
     permit_required: false,
     permit_cost: 0,
@@ -173,7 +176,7 @@ export const DEFAULT_TRAILS: Trail[] = [
     featured: true,
     image: 'https://images.unsplash.com/photo-1441974231531-c6227db76b6e?w=800&q=80',
     gallery: [],
-    description: "The holy grail of South African hiking — a continuous traverse of the entire Drakensberg escarpment from Sentinel Peak in the north to Bushman's Nek in the south. A serious multi-day expedition requiring full wilderness self-sufficiency.",
+    description: "The holy grail of South African hiking: a continuous traverse of the entire Drakensberg escarpment from Sentinel Peak in the north to Bushman's Nek in the south. A serious multi-day expedition requiring full wilderness self-sufficiency.",
     trailhead: 'Sentinel Car Park, Royal Natal',
     permit_required: true,
     permit_cost: 200,
@@ -185,7 +188,7 @@ export const DEFAULT_TRAILS: Trail[] = [
       { label: 'Day 2: Ifidi to Mlambonja Buttress', distance: '18 km', elevation: '+600m', difficulty: 'Moderate', notes: 'Long plateau traverse, stunning views into Lesotho.' },
       { label: 'Day 3: Mlambonja to Cathedral Ridge', distance: '12 km', elevation: '+750m', difficulty: 'Strenuous', notes: 'Technical scrambling required on Cathedral ridge section.' },
       { label: 'Day 4: Rest Day at Twins Cave', distance: '0 km', elevation: '0m', difficulty: 'Easy', notes: 'Cave shelter. Explore nearby San rock art panels.' },
-      { label: 'Day 5: Cathedral to Ndedema Gorge', distance: '20 km', elevation: '+400m', difficulty: 'Moderate', notes: 'Descend into the gorge — highest concentration of San art in the Berg.' },
+      { label: 'Day 5: Cathedral to Ndedema Gorge', distance: '20 km', elevation: '+400m', difficulty: 'Moderate', notes: 'Descend into the gorge, which holds the highest concentration of San art in the Berg.' },
     ],
   },
   {
@@ -240,6 +243,88 @@ export async function getTrails(client: SupabaseClient = supabase): Promise<Trai
     // fall through to defaults
   }
   return DEFAULT_TRAILS
+}
+
+// A list-view read, deliberately lighter than getTrails().
+//
+// getTrails() reads the whole `trails` row, and every trail in it carries an
+// `analytics` field (a full-resolution elevation/GPS profile, per-section
+// breakdowns, and a pre-rendered route-artwork SVG) plus a raw `gpx` track —
+// together routinely 95-99%+ of that trail's size. Summed across all trails
+// the row is multiple megabytes, and PostgREST does not reliably serve that:
+// production logs show it failing outright with a server-side timeout
+// ("Warp server error: Thread killed by timeout manager"), not a permissions
+// error. Every getTrails() caller already catches that and falls back to
+// DEFAULT_TRAILS — which is how real, published trails were replaced by
+// hardcoded sample entries on the homepage without anything visibly
+// "erroring": the fallback is silent by design, for a Supabase outage, not
+// for a 10MB row.
+//
+// vd_trail_summaries() (see supabase/migrations/20260913_trail_summaries_rpc.sql)
+// returns the same trails with analytics/gpx stripped — a 157x smaller
+// payload — for a caller that only renders a name, image, distance,
+// elevation, duration or difficulty and never a route chart or artwork.
+// Use this for list views (home page, "What's on") and keep getTrails() for
+// anything that renders RouteArtwork/RouteProfileChart or a trail's own
+// detail page.
+export async function getTrailSummaries(client: SupabaseClient = supabase): Promise<Trail[]> {
+  try {
+    const { data, error } = await client.rpc('vd_trail_summaries')
+    if (!error && Array.isArray(data)) return data as Trail[]
+  } catch {
+    // fall through to defaults
+  }
+  return DEFAULT_TRAILS
+}
+
+// A list-view read that still draws route artwork.
+//
+// /hikes' own listing (via ExploreCard) and its hero (HikesHero, fed the
+// same list as a prop) render a route silhouette from
+// analytics.routeArtworkSvg per trail — so, unlike getTrailSummaries(),
+// they can't drop `analytics` outright. They don't need the full-resolution
+// elevation/GPS profile behind it, though: analytics.points/sections/
+// waypoints and the raw `gpx` track are what made the row 10.2MB, and
+// nothing in this artwork just draws a pre-rendered <path>.
+//
+// vd_trail_list_with_artwork() (see
+// supabase/migrations/20260913_trail_list_artwork_and_by_id_rpc.sql) keeps
+// only analytics.routeArtworkSvg — 733KB for all 15 trails, confirmed at
+// 129ms to execute, versus the 10.2MB row that timed out.
+export async function getTrailsWithArtwork(client: SupabaseClient = supabase): Promise<Trail[]> {
+  try {
+    const { data, error } = await client.rpc('vd_trail_list_with_artwork')
+    if (!error && Array.isArray(data)) return data as Trail[]
+  } catch {
+    // fall through to defaults
+  }
+  return DEFAULT_TRAILS
+}
+
+// One trail, full fidelity, for a trail's own detail page.
+//
+// The detail page (app/hikes/[id]/page.tsx's resolveTrail(), and
+// HikeDetail.tsx's own trail-detail concerns) genuinely needs
+// analytics.points/statistics/waypoints/cruxes/slopeDistribution for its
+// elevation chart — but every existing caller got there by fetching the
+// whole 10.2MB `trails` row and finding one trail by id, the same query
+// that times out. vd_trail_by_id() does the lookup in the database instead:
+// one trail, matched by id or slug, never all fifteen. It also drops
+// `analytics.sections` and a few unused fields nothing client-side reads
+// (confirmed by grep) — over half of the worst-case trail's size for
+// nothing rendered — bringing that worst case from 2.38MB to 753KB.
+//
+// Returns null (not DEFAULT_TRAILS) on a miss or failure: a caller
+// resolving a specific id needs to know it didn't find that trail, not
+// silently receive an arbitrary sample one.
+export async function getTrailById(idOrSlug: string, client: SupabaseClient = supabase): Promise<Trail | null> {
+  try {
+    const { data, error } = await client.rpc('vd_trail_by_id', { p_id: idOrSlug })
+    if (!error && data) return data as Trail
+  } catch {
+    // fall through
+  }
+  return null
 }
 
 export async function saveTrails(trails: Trail[]): Promise<void> {

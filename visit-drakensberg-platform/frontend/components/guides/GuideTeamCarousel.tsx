@@ -1,10 +1,11 @@
 'use client'
 import Link from 'next/link'
 import { Swiper, SwiperSlide } from 'swiper/react'
-import { Pagination } from 'swiper/modules'
+import { Autoplay, Pagination } from 'swiper/modules'
 import 'swiper/css'
 import 'swiper/css/pagination'
 import { Star, UserCircle } from 'lucide-react'
+import { useSwiperAutoplay, CAROUSEL_SPEED_MS } from '@/lib/carousel-autoplay'
 import { GUIDE_TYPE_LABEL, guideTypeOf, type GuideProfile, type GuideType } from '@/lib/operators'
 
 const TYPE_CHIP: Record<GuideType, string> = {
@@ -70,13 +71,21 @@ function GuideCard({ g }: { g: GuideProfile }) {
  * guide is always showing — that peek is what says "there are more of us"
  * without needing arrows. Slides stretch to a common height so cards with and
  * without a speciality line still line up.
+ *
+ * The roster introduces itself: it advances on its own so every guide comes
+ * past without the visitor having to swipe, and stops the moment they reach
+ * for it. See lib/carousel-autoplay.ts.
  */
 export default function GuideTeamCarousel({ guides }: { guides: GuideProfile[] }) {
+  const autoplay = useSwiperAutoplay({ slideCount: guides.length })
+
   if (guides.length === 0) return null
 
   return (
     <Swiper
-      modules={[Pagination]}
+      modules={[Autoplay, Pagination]}
+      speed={CAROUSEL_SPEED_MS}
+      {...autoplay}
       spaceBetween={16}
       slidesPerView={1.3}
       breakpoints={{

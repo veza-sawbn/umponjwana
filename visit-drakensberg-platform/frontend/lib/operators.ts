@@ -1,4 +1,4 @@
-import { listEntities, getEntity, insertEntity, updateEntity } from './entities'
+import { listEntities, getEntity, getEntityByIdOrSlug, insertEntity, updateEntity } from './entities'
 import { getSupplierEntities, type SupplierEntity } from './supplier-entities'
 import type { GraphFields } from './graph-fields'
 import type { SupabaseClient } from '@supabase/supabase-js'
@@ -80,7 +80,7 @@ export const GUIDE_TYPE_LABEL: Record<GuideType, string> = {
 export const GUIDE_TYPE_HINT: Record<GuideType, string> = {
   certified: 'Registered guide leading day walks, tours and activities.',
   trainee:
-    'Internally trained staff not yet registered — the SA Tourism guide number is optional for a trainee.',
+    'Internally trained staff not yet registered. The SA Tourism guide number is optional for a trainee.',
   expedition_leader:
     'Registered guide who leads multi-day and summit expeditions. The summit and expedition fields below carry the most weight for this type.',
 }
@@ -137,8 +137,12 @@ export async function getDirectoryGuides(client?: SupabaseClient): Promise<Guide
   return (await getSupplierEntities<GuideProfile>('guides', undefined, client)).filter(g => g.status === 'verified')
 }
 
-export async function getGuideById(id: string, client?: SupabaseClient): Promise<GuideProfile | null> {
-  return client ? getEntity<GuideProfile>('supplier_guides', id, client) : getEntity<GuideProfile>('supplier_guides', id)
+/** Accepts either form of the public URL segment (`slug || id`) — see
+ *  getEntityByIdOrSlug(). */
+export async function getGuideById(idOrSlug: string, client?: SupabaseClient): Promise<GuideProfile | null> {
+  return client
+    ? getEntityByIdOrSlug<GuideProfile>('supplier_guides', idOrSlug, client)
+    : getEntityByIdOrSlug<GuideProfile>('supplier_guides', idOrSlug)
 }
 
 /** The operator a guide belongs to. */

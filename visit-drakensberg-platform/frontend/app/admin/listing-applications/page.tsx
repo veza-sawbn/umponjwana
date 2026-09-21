@@ -262,7 +262,7 @@ export default function AdminListingApplicationsPage() {
       setApplications(list => list.map(a => a.id === app.id ? { ...a, status: decision } : a))
 
       if (decision === 'approved') {
-        toast.success(data.created ? 'Approved — supplier account created and invited.' : 'Approved — existing account granted access.')
+        toast.success(data.created ? 'Approved. Supplier account created and invited.' : 'Approved. Existing account granted access.')
         if (Array.isArray(data.warnings) && data.warnings.length > 0) {
           data.warnings.forEach((w: string) => toast(w, { icon: '⚠️' }))
         }
@@ -282,7 +282,7 @@ export default function AdminListingApplicationsPage() {
         <div>
           <p className="font-sans text-[10px] tracking-[0.14em] uppercase text-gray-400 mb-1">Admin Console</p>
           <h1 className="font-display italic text-3xl text-[#000000]">Listing Applications</h1>
-          <p className="font-sans text-sm text-gray-500 mt-1">Submissions from /list-with-us — approve to create or unlock a supplier account.</p>
+          <p className="font-sans text-sm text-gray-500 mt-1">Submissions from /list-with-us. Approve one to create or unlock a supplier account.</p>
         </div>
         <button onClick={load} className="font-sans text-xs text-[#2d6a4f] hover:underline flex items-center gap-1.5">
           <RefreshCw size={12} /> Refresh

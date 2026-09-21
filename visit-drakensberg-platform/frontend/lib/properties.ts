@@ -1,5 +1,5 @@
 import { DEFAULT_REGIONS } from './regions'
-import { listEntities, getEntity, insertEntity, updateEntity, deleteEntity, newEntityId, listEntitiesByOwner } from './entities'
+import { listEntities, getEntityByIdOrSlug, insertEntity, updateEntity, deleteEntity, newEntityId, listEntitiesByOwner } from './entities'
 import type { GraphFields } from './graph-fields'
 import { slugify, uniqueSlug } from './slugify'
 import type { SupabaseClient } from '@supabase/supabase-js'
@@ -74,8 +74,13 @@ export async function getProperties(client?: SupabaseClient): Promise<Property[]
   return client ? listEntities<Property>(KIND, client) : listEntities<Property>(KIND)
 }
 
-export async function getPropertyById(id: string, client?: SupabaseClient): Promise<Property | null> {
-  return client ? getEntity<Property>(KIND, id, client) : getEntity<Property>(KIND, id)
+/** Accepts either form of the public URL segment (`slug || id`), so
+ *  /stays/champagne-sports-resort resolves as well as /stays/prop-<uuid>.
+ *  Callers holding a real id are unaffected — see getEntityByIdOrSlug(). */
+export async function getPropertyById(idOrSlug: string, client?: SupabaseClient): Promise<Property | null> {
+  return client
+    ? getEntityByIdOrSlug<Property>(KIND, idOrSlug, client)
+    : getEntityByIdOrSlug<Property>(KIND, idOrSlug)
 }
 
 export async function getPropertiesBySupplier(supplierId: string): Promise<Property[]> {

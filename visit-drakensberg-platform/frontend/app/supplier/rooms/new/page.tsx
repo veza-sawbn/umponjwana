@@ -184,7 +184,7 @@ export default function NewRoomPage() {
             <Field label="Property" required>
               <select value={form.propertyId} onChange={e => setField('propertyId', e.target.value)} className={inp}>
                 <option value="">Select property…</option>
-                {properties.length === 0 && <option disabled>No properties yet — add one first</option>}
+                {properties.length === 0 && <option disabled>No properties yet. Add one first</option>}
                 {properties.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
               </select>
             </Field>

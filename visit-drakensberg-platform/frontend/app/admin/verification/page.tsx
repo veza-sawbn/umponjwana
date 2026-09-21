@@ -263,7 +263,7 @@ export default function AdminVerificationPage() {
                     {application === undefined ? (
                       <p className="font-sans text-sm text-gray-400">Loading application…</p>
                     ) : application === null ? (
-                      <p className="font-sans text-sm text-gray-400">No company profile submitted yet — the supplier hasn&apos;t completed their public application (company details, licences, insurance, emergency procedures).</p>
+                      <p className="font-sans text-sm text-gray-400">No company profile submitted yet. The supplier hasn&apos;t completed their public application (company details, licences, insurance, emergency procedures).</p>
                     ) : (
                       <ApplicationDetails fields={application as unknown as Record<string, unknown>} />
                     )}

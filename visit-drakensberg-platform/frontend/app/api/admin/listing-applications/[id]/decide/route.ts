@@ -223,11 +223,11 @@ export async function POST(req: Request, { params }: { params: { id: string } })
       const { error: metaError } = await admin.auth.admin.updateUserById(existingProfile.id, {
         app_metadata: appMetadata,
       })
-      if (metaError) warnings.push('Approved, but the app-level role grant failed — sign-in may briefly show reduced access.')
+      if (metaError) warnings.push('Approved, but the app-level role grant failed. Sign-in may briefly show reduced access.')
 
       const { error: roleError } = await supabase.rpc('admin_set_role', { p_user: existingProfile.id, p_role: 'supplier' })
       if (roleError) {
-        warnings.push('Approved, but their profile role could not be set to supplier — they will not appear in Suppliers.')
+        warnings.push('Approved, but their profile role could not be set to supplier. They will not appear in Suppliers.')
       }
     }
   } else {
@@ -252,7 +252,7 @@ export async function POST(req: Request, { params }: { params: { id: string } })
     const { error: metaError } = await admin.auth.admin.updateUserById(supplierId, {
       app_metadata: { role: 'supplier' },
     })
-    if (metaError) warnings.push('Account created, but app-level role grant failed — sign-in may briefly show reduced access.')
+    if (metaError) warnings.push('Account created, but the app-level role grant failed. Sign-in may briefly show reduced access.')
 
     const { error: roleError } = await supabase.rpc('admin_set_role', { p_user: supplierId, p_role: 'supplier' })
     if (roleError) warnings.push('Account created, but the profile role could not be set.')
@@ -290,7 +290,7 @@ export async function POST(req: Request, { params }: { params: { id: string } })
   const { error: metaSyncError } = await admin.auth.admin.updateUserById(supplierId, {
     user_metadata: { supplier_type: supplierTypes.join(',') },
   })
-  if (metaSyncError) warnings.push('Approved, but the portal metadata sync failed — it will catch up on next login.')
+  if (metaSyncError) warnings.push('Approved, but the portal metadata sync failed. It will catch up on next login.')
 
   // Re-home the certificates and acceptances onto the account. Without this
   // they stay keyed to an application reference nobody looks at again, and the
@@ -338,7 +338,7 @@ export async function POST(req: Request, { params }: { params: { id: string } })
     type: 'approval',
     title: 'Your application is approved',
     body: created
-      ? 'Welcome to Visit Drakensberg — check your email to set a password, then sign in to set up your listing.'
+      ? 'Welcome to Visit Drakensberg. Check your email to set a password, then sign in to set up your listing.'
       : 'You can now sign in and set up your listing.',
     link: '/supplier',
   }, getSiteOrigin(req))

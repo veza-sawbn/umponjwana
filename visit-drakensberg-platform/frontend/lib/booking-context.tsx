@@ -136,7 +136,13 @@ export type BookingState = {
   shuttles: ShuttleOption[]
   /** Up to 8 most-recent destination searches — drives "previous searches" UX. */
   previousSearches: TripSearch[]
-  /** Listings the visitor has explicitly saved. */
+  /**
+   * DEPRECATED — not the site's saved listings. This never gained a consumer
+   * and lives only in this browser's cart blob. Saved listings ("favourites")
+   * are lib/saved-listings.ts + useSavedListings(), which persist per account
+   * and are what the heart buttons and /account/saved read and write. Kept
+   * only so an older cart in localStorage still parses.
+   */
   savedListings: TrackedListing[]
   /** Listings viewed in the current session — used for recency signals. */
   recentlyViewedListings: TrackedListing[]
@@ -151,9 +157,9 @@ type BookingActions = {
   addShuttle: (shuttle: ShuttleOption) => void
   removeShuttle: (id: string) => void
   updateShuttle: (id: string, patch: Partial<ShuttleOption>) => void
-  /** Save a listing to the visitor's saved list (de-duplicated by id). */
+  /** DEPRECATED — see savedListings above; use useSavedListings() instead. */
   saveListing: (listing: TrackedListing) => void
-  /** Remove a previously-saved listing. */
+  /** DEPRECATED — see savedListings above; use useSavedListings() instead. */
   removeSavedListing: (id: string) => void
   /** Record that the visitor viewed a listing (kept as last 20). */
   trackListingView: (listing: TrackedListing) => void

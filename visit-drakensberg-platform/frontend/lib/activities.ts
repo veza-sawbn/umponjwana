@@ -1,4 +1,4 @@
-import { listEntities, getEntity, insertEntity, updateEntity, deleteEntity, newEntityId, listEntitiesByOwner } from './entities'
+import { listEntities, getEntityByIdOrSlug, insertEntity, updateEntity, deleteEntity, newEntityId, listEntitiesByOwner } from './entities'
 import type { GraphFields } from './graph-fields'
 import { slugify, uniqueSlug } from './slugify'
 import type { Season, SeasonTopic } from './seasons'
@@ -85,6 +85,12 @@ export type Activity = {
   slotBookings?: Record<string, number>
   depositRequired: boolean
   depositPercent: string
+  /** The supplier drives guests themselves on this activity — a Sani Pass 4x4
+   *  run, a game drive, a guided tour by minibus. Ticking it on the supplier
+   *  form adds the 'Shuttle' supplier type (lib/supplier-types.ts), which is
+   *  what reveals the fleet tools: Transport Company, Vehicles, Drivers and
+   *  Transport Jobs. Absent on every activity saved before this existed. */
+  usesOwnVehicles?: boolean
   status: 'active' | 'draft'
   createdAt: string
   /** Which seasons this activity suits — powers the region "When to Go"
@@ -156,8 +162,12 @@ export async function getActivitiesBySupplier(supplierId: string): Promise<Activ
   return listEntitiesByOwner<Activity>(KIND, supplierId)
 }
 
-export async function getActivityById(id: string, client?: SupabaseClient): Promise<Activity | null> {
-  return client ? getEntity<Activity>(KIND, id, client) : getEntity<Activity>(KIND, id)
+/** Accepts either form of the public URL segment (`slug || id`) — see
+ *  getEntityByIdOrSlug(). */
+export async function getActivityById(idOrSlug: string, client?: SupabaseClient): Promise<Activity | null> {
+  return client
+    ? getEntityByIdOrSlug<Activity>(KIND, idOrSlug, client)
+    : getEntityByIdOrSlug<Activity>(KIND, idOrSlug)
 }
 
 // The public activity page (app/activities/[id]/page.tsx) is ISR-cached for

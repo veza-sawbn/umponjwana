@@ -5,7 +5,7 @@ import { CODE_OF_CONDUCT_SECTIONS, CODE_OF_CONDUCT_VERSION } from '@/lib/supplie
 export const metadata: Metadata = {
   title: 'Supplier Code of Conduct',
   description:
-    'What Visit Drakensberg expects of every business listed with us — guest safety, fair treatment of guests and workers, respect for communities and the mountain, and how to raise a concern.',
+    'What Visit Drakensberg expects of every business listed with us: guest safety, fair treatment of guests and workers, respect for communities and the mountain, and how to raise a concern.',
   alternates: { canonical: '/supplier-code-of-conduct' },
 }
 

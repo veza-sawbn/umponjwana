@@ -174,6 +174,24 @@ function ShuttlesPageContent() {
 
   function runSearch() {
     const wantsReturn = search.tripType === 'return'
+
+    // Carry the searched journey into the trip itself, not just into the
+    // shuttle leg. /checkout reads the party size and travel dates off the
+    // booking context, so without this a visitor who starts here reached
+    // checkout showing the default "2 guests" and no dates — their own
+    // answers, dropped on the way.
+    //
+    // Only fills what the trip does not already carry. A cart that already
+    // has a stay owns its dates and guest count: the stay's night count, and
+    // therefore its price, is derived from checkIn/checkOut, so overwriting
+    // them with a transfer date would silently re-price the accommodation.
+    const nextCheckIn = booking.checkIn || search.date
+    const nextCheckOut = booking.checkOut || (wantsReturn ? search.returnDate : '')
+    const nextGuests = booking.stay ? booking.guests : (search.passengers || booking.guests)
+    if (nextCheckIn !== booking.checkIn || nextCheckOut !== booking.checkOut || nextGuests !== booking.guests) {
+      booking.setSearch(booking.region, nextCheckIn, nextCheckOut, nextGuests)
+    }
+
     legIdsRef.current = legIdsRef.current ?? {
       outbound: `shuttle-${Date.now()}`,
       inbound: `shuttle-return-${Date.now()}`,
@@ -352,7 +370,7 @@ function ShuttlesPageContent() {
                   <span>
                     <span className="block font-display text-base text-forest">Add a return trip</span>
                     <span className="block font-sans text-xs text-forest/45 mt-0.5">
-                      Book the leg home — {trip.destination.address || 'your destination'} back to {trip.pickup.address || 'your pickup'} — in the same trip.
+                      Book the leg home in the same trip, from {trip.destination.address || 'your destination'} back to {trip.pickup.address || 'your pickup'}.
                     </span>
                   </span>
                 </button>
@@ -432,7 +450,7 @@ function ShuttlesPageContent() {
                 {ready
                   ? 'Your transfer is in your trip. Nothing is charged until you complete checkout.'
                   : eligibleCount === 0 || returnEligibleCount === 0
-                    ? 'No registered partner covers this route yet — our team will place the transfer with the best available operator after checkout.'
+                    ? 'No registered partner covers this route yet. Our team will place the transfer with the best available operator after checkout.'
                     : 'Choose an operator and vehicle for each leg to continue.'}
               </p>
             </aside>

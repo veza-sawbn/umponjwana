@@ -49,7 +49,7 @@ export async function generateMetadata({ params }: { params: { id: string } }): 
   const tour = await resolveTour(params.id)
   if (!tour) return { title: 'Tour Not Found' }
 
-  const title = tour.seoTitle || `${tour.name}${tour.trailName ? ` — ${tour.trailName}` : ''} | Visit Drakensberg`
+  const title = tour.seoTitle || `${tour.name}${tour.trailName ? `, ${tour.trailName}` : ''} | Visit Drakensberg`
   const description = buildDescription(tour)
   const canonical = `/tours/${tour.slug || tour.id}`
 

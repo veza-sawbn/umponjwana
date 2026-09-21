@@ -43,7 +43,7 @@ export default function ReportAConcernPage() {
 
   async function submit() {
     if (form.body.trim().length < 20) {
-      setError('Tell us what happened — a sentence or two at least, so we can act on it.')
+      setError('Please tell us what happened. A sentence or two is enough for us to act on it.')
       return
     }
     if (!form.isAnonymous && form.reporterEmail.trim() && !/^\S+@\S+\.\S+$/.test(form.reporterEmail.trim())) {
@@ -73,7 +73,7 @@ export default function ReportAConcernPage() {
           <h1 className="font-display italic text-4xl text-black mb-3">Report received</h1>
           <p className="font-sans text-sm text-gray-500 leading-relaxed mb-6">
             Your reference is{' '}
-            <span className="font-mono text-black tracking-wide">{done.reference}</span>. Write it down — if you
+            <span className="font-mono text-black tracking-wide">{done.reference}</span>. Please write it down. If you
             reported anonymously, it is the only way to refer back to this.
           </p>
           <p className="font-sans text-sm text-gray-500 leading-relaxed mb-10">
@@ -99,9 +99,9 @@ export default function ReportAConcernPage() {
             If something you have seen breaches our{' '}
             <Link href="/supplier-code-of-conduct" className="text-gold underline underline-offset-2">
               Supplier Code of Conduct
-            </Link>{' '}
-            — by a business listed with us, or by one of our own staff — tell us. You do not need an account, and you
-            can do this anonymously.
+            </Link>
+            , whether by a business listed with us or by one of our own staff, please tell us. You do not need an
+            account, and you can do this anonymously.
           </p>
         </div>
       </section>
@@ -147,7 +147,7 @@ export default function ReportAConcernPage() {
             <input
               value={form.aboutBusiness}
               onChange={e => set('aboutBusiness', e.target.value)}
-              placeholder="The name you know them by — it doesn’t have to be exact"
+              placeholder="The name you know them by. It doesn’t have to be exact"
               className={inputCls}
             />
           </div>
@@ -158,7 +158,7 @@ export default function ReportAConcernPage() {
               rows={7}
               value={form.body}
               onChange={e => set('body', e.target.value)}
-              placeholder="What you saw, roughly when, and who was involved. Dates and specifics help us act — but send it even if you only remember some of it."
+              placeholder="What you saw, roughly when, and who was involved. Dates and specifics help us act, but send it even if you only remember some of it."
               className={`${inputCls} resize-none`}
             />
           </div>

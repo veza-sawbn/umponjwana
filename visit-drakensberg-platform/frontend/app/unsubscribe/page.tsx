@@ -46,7 +46,7 @@ function UnsubscribeForm() {
         <h1 className="font-display italic text-3xl text-[#000000] mb-3">You&apos;re unsubscribed</h1>
         <p className="font-sans text-sm text-gray-500 mb-6">
           {email} won&apos;t receive marketing emails from Visit Drakensberg. Booking confirmations and other
-          trip-related messages for existing bookings will still be sent — those aren&apos;t marketing.
+          trip-related messages for existing bookings will still be sent, as those are not marketing.
         </p>
         <Link href="/" className="font-sans text-sm text-[#2d6a4f] hover:text-[#C9A96E] transition-colors">
           Return to Visit Drakensberg
@@ -76,7 +76,7 @@ function UnsubscribeForm() {
         {status === 'working' ? 'Unsubscribing…' : 'Unsubscribe'}
       </button>
       {status === 'error' && (
-        <p className="font-sans text-xs text-red-500 mt-4">Something went wrong — please try again.</p>
+        <p className="font-sans text-xs text-red-500 mt-4">Something went wrong. Please try again.</p>
       )}
     </div>
   )

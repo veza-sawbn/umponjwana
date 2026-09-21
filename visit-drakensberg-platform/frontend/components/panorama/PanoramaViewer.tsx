@@ -50,7 +50,7 @@ const PEAKS: Peak[] = [
     name: 'Sterkhorn',
     elevation: 3084,
     horizontalPosition: 38,
-    description: 'Afrikaans for "Strong Horn" — a challenging technical summit in the Central Berg.',
+    description: 'Afrikaans for "Strong Horn", a challenging technical summit in the Central Berg.',
     difficulty: 'expert',
   },
   {
@@ -64,7 +64,7 @@ const PEAKS: Peak[] = [
     name: 'The Sentinel',
     elevation: 3165,
     horizontalPosition: 53,
-    description: 'Guards the entrance to the Royal Natal amphitheatre — chain ladders required.',
+    description: 'Guards the entrance to the Royal Natal amphitheatre. Chain ladders required.',
     difficulty: 'moderate',
   },
   {

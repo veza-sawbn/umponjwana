@@ -121,7 +121,7 @@ export default function HikesHero({ trails }: { trails: Trail[] }) {
             inputId="hikes-notify-email"
             label="Email address for new trail alerts"
             buttonLabel="Notify me"
-            successMessage="You’re on the list — we’ll email you as new trails are added."
+            successMessage="You’re on the list. We’ll email you as new trails are added."
             tone="dark"
           />
         </div>

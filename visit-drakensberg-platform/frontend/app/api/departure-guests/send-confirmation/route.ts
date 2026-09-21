@@ -4,6 +4,7 @@ import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs'
 import { sendMail } from '@/lib/mailer'
 import {
   emailShell, ctaButton, detailTable, itineraryBlock, esc, sectionLabel, finePrint,
+  bodyHeading, checklist, factPanel, noticePanel, stepList,
   type EmailItineraryDay,
 } from '@/lib/email-layout'
 import { getDepartures, type DeparturePackage } from '@/lib/departures'
@@ -72,6 +73,14 @@ function addDaysIso(iso: string | null | undefined, days: number): string | null
   return d.toISOString().slice(0, 10)
 }
 
+// Only an absolute https:// image can be a hero: an email client has no base
+// URL to resolve a relative path against, and a http:// image is stripped or
+// warned about by most of them. A trail with anything else stored simply gets
+// the text-led confirmation it got before.
+function heroFrom(image: string | undefined, alt: string): { src: string; alt: string } | undefined {
+  return image?.startsWith('https://') ? { src: image, alt } : undefined
+}
+
 export async function POST(req: Request) {
   let body: { guestId?: string }
   try {
@@ -93,7 +102,7 @@ export async function POST(req: Request) {
     if (!guest) return NextResponse.json({ error: 'guest not found' }, { status: 404 })
     if (!guest.email) return NextResponse.json({ error: 'this guest has no email address on file' }, { status: 400 })
     if (!EMAIL_RE.test(guest.email)) {
-      return NextResponse.json({ error: `"${guest.email}" doesn't look like a valid email address — edit the guest's email and try again` }, { status: 400 })
+      return NextResponse.json({ error: `"${guest.email}" doesn't look like a valid email address. Edit the guest's email and try again` }, { status: 400 })
     }
 
     const [departures, tours, trails] = await Promise.all([
@@ -124,11 +133,42 @@ export async function POST(req: Request) {
     const tripName = tour?.name || departure.tour
     const operatorName = departure.supplierName || tour?.supplierName || 'Visit Drakensberg'
 
+    // Where to be, when, and who to call — the block a guest screenshots and
+    // opens again in a car park at 5am. Kept separate from the ledger below:
+    // the summary table answers "what did I buy", this answers "where do I go".
+    const meetingRows: [string, string][] = [
+      ...(tour?.meetingPoint ? ([['Meeting point', tour.meetingPoint]] as [string, string][]) : []),
+      ...(trail?.trailhead && trail.trailhead !== tour?.meetingPoint
+        ? ([['Trailhead', trail.trailhead]] as [string, string][]) : []),
+      ...(departure.guide || tour?.leadGuide
+        ? ([['Guide', departure.guide || tour?.leadGuide || '']] as [string, string][]) : []),
+    ]
+
+    // Everything the guest is told to do is something they can act on alone.
+    // Nothing here promises anything on the operator's behalf — we don't know
+    // what they send or when, and a confirmation email is the wrong place to
+    // invent a commitment for somebody else.
+    const nextSteps = [
+      `Check the details above against what you booked. If anything is wrong, tell ${operatorName} now rather than on the day.`,
+      'Put the departure date in your calendar, along with the meeting point.',
+      ...(trail?.what_to_bring?.length ? ['Work through the kit list below and replace anything worn out before you travel.'] : []),
+      `Contact ${operatorName} a few days beforehand to confirm the meeting time and the conditions expected.`,
+    ]
+
+    // A permit line only appears when the trail actually records one, and it
+    // stops short of saying who pays: the platform doesn't know whether this
+    // operator's rate includes it, and guessing would strand someone at a gate.
+    const permitNote = trail?.permit_required
+      ? `This route requires a permit${trail.permit_cost ? ` (around R${esc(String(trail.permit_cost))} per person)` : ''}.
+         Confirm with ${esc(operatorName)} whether your booking covers it before you travel.<br/><br/>`
+      : ''
+
     const html = emailShell({
       origin,
       eyebrow: 'Booking Confirmed',
       heading: tripName,
       preheader: `Your booking for ${tripName} on ${fmtDate(departure.date)} is confirmed.`,
+      hero: heroFrom(trail?.image, trail?.name ? `${trail.name}, Drakensberg` : tripName),
       bodyHtml: `
         <p style="margin:0 0 4px;">Dear ${esc(guest.name)},</p>
         <p style="margin:0 0 20px;">Your booking with <strong>${esc(operatorName)}</strong> is confirmed. Here are your trip details.</p>
@@ -137,21 +177,35 @@ export async function POST(req: Request) {
           ['Departure date', fmtDate(departure.date)],
           ['Guests', String(guest.seats)],
           ...(pkg ? ([['Rate', pkg.name]] as [string, string][]) : []),
-          ...(tour?.meetingPoint ? ([['Meeting point', tour.meetingPoint]] as [string, string][]) : []),
-          ...(departure.guide ? ([['Guide', departure.guide]] as [string, string][]) : []),
+          ...(trail?.difficulty ? ([['Grading', trail.difficulty]] as [string, string][]) : []),
         ])}
+        ${meetingRows.length > 0 ? factPanel(meetingRows, 'Where to be') : ''}
+        ${bodyHeading('What happens next')}
+        ${stepList(nextSteps)}
         ${itineraryDays.length > 0 ? `
           ${sectionLabel('Day-by-day itinerary')}
           ${itineraryBlock(itineraryDays)}
         ` : ''}
+        ${trail?.what_to_bring?.length ? `
+          ${bodyHeading('What to bring')}
+          ${checklist(trail.what_to_bring)}
+        ` : ''}
+        ${tour?.fitnessNotes ? `
+          ${bodyHeading('What this trip asks of you')}
+          <p style="margin:0;">${esc(tour.fitnessNotes)}</p>
+        ` : ''}
+        ${noticePanel('Before you travel', `${permitNote}Mountain weather turns quickly, and a route can
+          be changed or turned back for safety or access reasons. Follow your guide's decisions on the
+          day, and tell ${esc(operatorName)} in advance about any injury, medication or dietary
+          requirement that has changed since you booked.`, 'caution')}
         ${ctaButton(`${origin}/experiences/${departure.id}`, 'View this experience')}
         ${finePrint(`Keep this email for your records. If anything above doesn't look right,
-          get in touch with ${esc(operatorName)} directly.`)}`,
+          get in touch with ${esc(operatorName)} directly.${tour?.cancellation ? `<br/><br/>Cancellation: ${esc(tour.cancellation)}` : ''}`)}`,
     })
 
     const result = await sendMail({
       to: guest.email,
-      subject: `Booking confirmed — ${tripName}`,
+      subject: `Booking confirmed for ${tripName}`,
       html,
     })
 

@@ -55,7 +55,7 @@ export async function POST(req: Request) {
   }
 
   if (!isIkhokhaConfigured()) {
-    return NextResponse.json({ error: 'Online payment is not set up yet — please contact us to arrange payment.' }, { status: 503 })
+    return NextResponse.json({ error: 'Online payment is not set up yet. Please contact us to arrange payment.' }, { status: 503 })
   }
 
   // A customer paying from an emailed or pasted invoice link has no session.
@@ -158,8 +158,8 @@ export async function POST(req: Request) {
       amount: chargeAmount,
       currency: invoice.currency,
       description: tip > 0
-        ? `Invoice ${invoice.invoice_number} + gratuity — Visit Drakensberg`
-        : `Invoice ${invoice.invoice_number} — Visit Drakensberg`,
+        ? `Invoice ${invoice.invoice_number} + gratuity, Visit Drakensberg`
+        : `Invoice ${invoice.invoice_number}, Visit Drakensberg`,
       paymentReference: invoice.invoice_number,
       externalTransactionID,
       requesterUrl: origin,
@@ -169,7 +169,7 @@ export async function POST(req: Request) {
   } catch (e) {
     console.error('[ikhokha] create payment link failed:', e)
     return NextResponse.json(
-      { error: 'The payment provider did not respond — please try again shortly.', code: 'gateway_unreachable' },
+      { error: 'The payment provider did not respond. Please try again shortly.', code: 'gateway_unreachable' },
       { status: 502 },
     )
   }
@@ -183,7 +183,7 @@ export async function POST(req: Request) {
   if (!link.paylinkUrl || !link.paylinkID) {
     console.error('[ikhokha] createPaymentLink returned no paylinkUrl — raw response:', JSON.stringify(link))
     return NextResponse.json(
-      { error: 'iKhokha did not return a payment link — please try again shortly.', code: 'gateway_rejected' },
+      { error: 'iKhokha did not return a payment link. Please try again shortly.', code: 'gateway_rejected' },
       { status: 502 },
     )
   }
@@ -221,7 +221,7 @@ export async function POST(req: Request) {
       console.error('[ikhokha] tip requested but vd_payment_links.tip_amount is missing — run migration 20260806_activity_tips.sql')
       return NextResponse.json(
         {
-          error: 'Tips are not switched on for this site yet — please pay without a tip, or contact us to add one.',
+          error: 'Tips are not switched on for this site yet. Please pay without a tip, or contact us to add one.',
           code: 'tipping_not_migrated',
         },
         { status: 503 },
@@ -239,7 +239,7 @@ export async function POST(req: Request) {
     // to pay anyway.
     console.error('[ikhokha] failed to persist payment link:', insertError)
     return NextResponse.json(
-      { error: 'Could not start the payment — please try again shortly.', code: 'link_not_saved' },
+      { error: 'We could not start the payment. Please try again shortly.', code: 'link_not_saved' },
       { status: 500 },
     )
   }

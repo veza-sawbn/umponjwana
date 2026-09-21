@@ -1,5 +1,6 @@
 import { supabase } from './auth'
 import type { SupabaseClient } from '@supabase/supabase-js'
+import { imagePositionToCss } from './image-position'
 
 export type Subregion = { id: string; name: string; description: string }
 
@@ -16,6 +17,9 @@ export type Region = {
   name: string
   tagline: string
   heroImage: string
+  /** Focal point the hero crops around (lib/image-position.ts). Empty = centred,
+   *  which is what regions saved before this field existed keep doing. */
+  heroImagePosition?: string
   heroVideo: string
   overview: string
   highlights: string[]
@@ -47,7 +51,7 @@ export const DEFAULT_REGIONS: Region[] = [
     tagline: 'Royal Natal National Park · Amphitheatre',
     heroImage: 'https://images.unsplash.com/photo-1590098563548-8f14eed3a47f?w=1200&q=85',
     heroVideo: '',
-    overview: 'The Amphitheatre — a 5 km sheer basalt cliff — anchors the Northern Drakensberg. The Tugela River drops 948 metres over five falls here, making it the second highest waterfall on Earth. Royal Natal National Park offers some of the most dramatic scenery in Africa.',
+    overview: 'The Amphitheatre, a 5 km sheer basalt cliff, anchors the Northern Drakensberg. The Tugela River drops 948 metres over five falls here, making it the second highest waterfall on Earth. Royal Natal National Park offers some of the most dramatic scenery in Africa.',
     highlights: ['Tugela Falls Circuit', 'Amphitheatre via Chain Ladder', 'Policemans Helmet', 'Mont-aux-Sources'],
     gettingThere: '',
     gettingThereSections: [],
@@ -170,6 +174,7 @@ function normalizeRegion(region: Partial<Region> & { name: string; id?: string }
     name: region.name,
     tagline: region.tagline || '',
     heroImage: region.heroImage || '',
+    heroImagePosition: region.heroImagePosition ? imagePositionToCss(region.heroImagePosition) : '',
     heroVideo: region.heroVideo || '',
     overview: region.overview || '',
     highlights: region.highlights || [],

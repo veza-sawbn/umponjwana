@@ -99,7 +99,7 @@ function CompareContent() {
         ) : !trailId ? (
           <div className="py-20 text-center">
             <GitCompareArrows size={32} className="text-gray-300 mx-auto mb-4" />
-            <p className="font-sans text-sm text-gray-500 mb-6">Pick a hiking trail first — comparison works between departures of the same trail.</p>
+            <p className="font-sans text-sm text-gray-500 mb-6">Pick a hiking trail first. Comparison works between departures of the same trail.</p>
             <Link href="/hikes" className="border border-[#2d6a4f] text-[#2d6a4f] px-6 py-3 font-sans text-sm hover:bg-[#2d6a4f] hover:text-white transition-colors">
               Browse Hiking Trails
             </Link>

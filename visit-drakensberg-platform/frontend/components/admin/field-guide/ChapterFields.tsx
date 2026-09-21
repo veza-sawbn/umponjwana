@@ -79,7 +79,7 @@ export default function ChapterFields({
             {measuring ? (
               <span className="inline-flex items-center gap-1.5"><Loader2 size={10} className="animate-spin" /> Reading dimensions…</span>
             ) : chapter.main_media_width && chapter.main_media_height ? (
-              `${chapter.main_media_width}×${chapter.main_media_height} px — box reserved, no layout shift.`
+              `${chapter.main_media_width}×${chapter.main_media_height} px. Box reserved, no layout shift.`
             ) : (
               'A transparent PNG or WebP cut out from its background reads best against the paper.'
             )}

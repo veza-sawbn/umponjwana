@@ -1,11 +1,9 @@
 'use client'
-import { useEffect, useRef } from 'react'
+import { useRef } from 'react'
 import Link from 'next/link'
 import { Building2, MapPin, Star } from 'lucide-react'
+import { useAutoScrollCarousel } from '@/lib/carousel-autoplay'
 import type { OperatorProfile } from '@/lib/operators'
-
-const AUTO_SLIDE_MS = 3500
-const RESUME_AFTER_TOUCH_MS = 4000
 
 function SupplierCard({ o }: { o: OperatorProfile }) {
   return (
@@ -51,49 +49,25 @@ function SupplierCard({ o }: { o: OperatorProfile }) {
 /**
  * "Explore by Supplier" — a glimpse of each tour operator's profile.
  * On the mobile shell (below `lg`) this renders as a self-advancing
- * carousel that pauses while the visitor is actually touching it; at `lg`
- * and above it renders as a plain static grid instead, since auto-sliding
- * only makes sense on the narrow mobile viewport. Opening a card takes the
+ * carousel; at `lg` and above every supplier already fits in a static grid,
+ * so there is nothing left to advance through. Opening a card takes the
  * visitor to that supplier's full profile at /guides/operators/[id].
+ *
+ * The self-advancing half is the shared one (lib/carousel-autoplay.ts), so
+ * this reel keeps the same cadence as every other carousel on the site and
+ * inherits the same rules about holding still — while it is being touched,
+ * while it is off-screen, and for visitors who asked for reduced motion.
  */
 export default function SupplierCarousel({ operators }: { operators: OperatorProfile[] }) {
   const trackRef = useRef<HTMLDivElement>(null)
-  const pausedRef = useRef(false)
 
-  useEffect(() => {
-    const el = trackRef.current
-    if (!el || operators.length < 2) return
-
-    const pause = () => { pausedRef.current = true }
-    let resumeTimer: ReturnType<typeof setTimeout>
-    const scheduleResume = () => {
-      clearTimeout(resumeTimer)
-      resumeTimer = setTimeout(() => { pausedRef.current = false }, RESUME_AFTER_TOUCH_MS)
-    }
-    el.addEventListener('touchstart', pause, { passive: true })
-    el.addEventListener('touchend', scheduleResume, { passive: true })
-
-    const id = setInterval(() => {
-      if (pausedRef.current) return
-      const firstCard = el.firstElementChild as HTMLElement | null
-      const step = firstCard ? firstCard.offsetWidth + 16 : 256
-      const atEnd = el.scrollLeft + el.clientWidth >= el.scrollWidth - 8
-      el.scrollTo({ left: atEnd ? 0 : el.scrollLeft + step, behavior: 'smooth' })
-    }, AUTO_SLIDE_MS)
-
-    return () => {
-      clearInterval(id)
-      clearTimeout(resumeTimer)
-      el.removeEventListener('touchstart', pause)
-      el.removeEventListener('touchend', scheduleResume)
-    }
-  }, [operators.length])
+  useAutoScrollCarousel(trackRef, { itemCount: operators.length })
 
   if (operators.length === 0) return null
 
   return (
     <div>
-      {/* Mobile shell: auto-sliding carousel. The track bleeds to the screen
+      {/* Mobile shell: auto-advancing carousel. The track bleeds to the screen
           edge so the next card peeks past it, but scroll-padding keeps the
           snap position on the page gutter — without it, snapping swallows
           the padding and the first card sits flush against the edge, out
@@ -104,7 +78,7 @@ export default function SupplierCarousel({ operators }: { operators: OperatorPro
       >
         {operators.map(o => <SupplierCard key={o.id} o={o} />)}
       </div>
-      {/* Desktop: static grid, no auto-slide */}
+      {/* Desktop: static grid, nothing to advance through */}
       <div className="hidden lg:grid grid-cols-4 gap-6">
         {operators.map(o => <SupplierCard key={o.id} o={o} />)}
       </div>

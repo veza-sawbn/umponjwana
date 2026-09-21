@@ -1,6 +1,6 @@
 import type { Metadata } from 'next'
 import { notFound } from 'next/navigation'
-import { getTrails, type Trail, DEFAULT_TRAILS } from '@/lib/trails'
+import { getTrailById, type Trail } from '@/lib/trails'
 import { getProperties, type Property } from '@/lib/properties'
 import { getActivities, type Activity } from '@/lib/activities'
 import { publicSupabase } from '@/lib/supabase-public'
@@ -28,9 +28,12 @@ const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://visitdrakensberg.c
 // docs/destination-graph/PHASE_D.md.
 export const revalidate = 1800
 
+// Previously fetched every trail (the whole 10.2MB `trails` row) just to
+// .find() this one — the same query that times out at that size (see
+// lib/trails.ts's getTrailById()). One id/slug lookup in the database
+// instead, at full fidelity for the one trail this page renders.
 async function resolveTrail(id: string): Promise<Trail | null> {
-  const trails = await getTrails(publicSupabase).catch(() => DEFAULT_TRAILS)
-  return trails.find(t => t.id === id || t.slug === id) ?? null
+  return getTrailById(id, publicSupabase)
 }
 
 /**
@@ -87,7 +90,7 @@ export async function generateMetadata({ params }: { params: { id: string } }): 
   const trail = await resolveTrail(params.id)
   if (!trail) return { title: 'Trail Not Found' }
 
-  const title = trail.seoTitle || `${trail.name} — ${trail.region} | Visit Drakensberg`
+  const title = trail.seoTitle || `${trail.name}, ${trail.region} | Visit Drakensberg`
   const description = buildDescription(trail)
   const canonical = `/hikes/${trail.slug || trail.id}`
 

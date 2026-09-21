@@ -11,12 +11,16 @@ import {
   getPackages, addPackage, updatePackage, duplicatePackage, deletePackage,
   setPackageStatus, packageTotals, componentMargin,
   PACKAGE_STATUS_LABELS, COMPONENT_TYPE_LABELS, PACKAGE_CATEGORIES, PACKAGE_CATEGORY_LABELS,
-  GALLERY_COMPONENT_TYPES,
+  PACKAGE_PRICING_MODE_LABELS, GALLERY_COMPONENT_TYPES,
+  isGroupPriced, normalizePackagePricing, packageGroupSize, packageHeadlinePrice,
+  packagePricePerPerson, packagePriceUnit,
   type MarketplacePackage, type PackageComponent, type PackageComponentType, type PackageStatus,
+  type PackagePricingMode,
 } from '@/lib/packages'
 import { getAdminSuppliers, adminMediaSource, type AdminSupplier } from '@/lib/admin-supabase'
 import { getTrails, type Trail } from '@/lib/trails'
 import { MediaPicker, MediaGalleryPicker } from '@/components/media/MediaPicker'
+import { ImagePositionPicker } from '@/components/media/ImagePositionPicker'
 import { SeoPanel } from '@/components/admin/SeoPanel'
 import { formatMoney } from '@/lib/allocation'
 
@@ -46,6 +50,7 @@ type Draft = Omit<MarketplacePackage, 'id' | 'status' | 'createdAt' | 'updatedAt
 const EMPTY_DRAFT: Draft = {
   title: '', summary: '', description: '', image: '', region: '',
   durationNights: 2, maxGuests: 8, pricePerPerson: 0, originalPrice: undefined,
+  pricingMode: 'per_person', groupPrice: undefined, groupSize: undefined,
   tag: '', featured: false, categories: [], trailIds: [], components: [],
   packageStatus: 'draft', publishFrom: '', publishTo: '',
 }
@@ -188,6 +193,30 @@ export default function AdminPackagesPage() {
   const [saving, setSaving] = useState(false)
   const [showArchived, setShowArchived] = useState(false)
   const set = (k: keyof Draft, v: unknown) => setDraft(d => ({ ...d, [k]: v }))
+  const groupMode = isGroupPriced(draft)
+
+  // Switching pricing model carries the figures already captured across, so
+  // the admin never re-types them: a per-person package becomes a group at
+  // its current party size and implied total, and back again.
+  function setPricingMode(mode: PackagePricingMode) {
+    setDraft(d => {
+      if (mode === 'group') {
+        const groupSize = d.groupSize ?? Math.max(1, d.maxGuests || 1)
+        return {
+          ...d,
+          pricingMode: 'group',
+          groupSize,
+          groupPrice: d.groupPrice ?? (d.pricePerPerson > 0 ? d.pricePerPerson * groupSize : undefined),
+        }
+      }
+      return {
+        ...d,
+        pricingMode: 'per_person',
+        pricePerPerson: d.pricePerPerson || packagePricePerPerson(d),
+        maxGuests: Math.max(1, d.groupSize ?? d.maxGuests ?? 1),
+      }
+    })
+  }
 
   useEffect(() => {
     Promise.all([
@@ -219,15 +248,23 @@ export default function AdminPackagesPage() {
 
   async function save() {
     if (!draft.title.trim()) { toast.error('Package title is required.'); return }
+    if (groupMode) {
+      if (!draft.groupSize || draft.groupSize < 1) { toast.error('Group size is required for a group package.'); return }
+      if (!draft.groupPrice || draft.groupPrice <= 0) { toast.error('Group price is required for a group package.'); return }
+    }
+    // Reconciles group size with maxGuests and the derived per-person figure
+    // so every surface reading `pricePerPerson` stays correct — see
+    // normalizePackagePricing() in lib/packages.ts.
+    const payload = normalizePackagePricing(draft)
     setSaving(true)
     try {
       if (editing === 'new') {
-        const created = await addPackage(draft, adminId)
+        const created = await addPackage(payload, adminId)
         setPackages(ps => [created, ...ps])
         toast.success('Package created.')
       } else if (editing) {
-        await updatePackage(editing, draft)
-        setPackages(ps => ps.map(p => (p.id === editing ? { ...p, ...draft, status: draft.packageStatus === 'published' ? 'active' : 'draft' } : p)))
+        await updatePackage(editing, payload)
+        setPackages(ps => ps.map(p => (p.id === editing ? { ...p, ...payload, status: payload.packageStatus === 'published' ? 'active' : 'draft' } : p)))
         toast.success('Package saved.')
       }
       setEditing(null)
@@ -305,6 +342,16 @@ export default function AdminPackagesPage() {
                 <label className={labelCls}>Hero Image</label>
                 <MediaPicker value={draft.image} onChange={url => set('image', url)} source={adminMediaSource} />
               </div>
+              {draft.image && (
+                <div className="col-span-2">
+                  <label className={labelCls}>Hero Image Position</label>
+                  <ImagePositionPicker
+                    image={draft.image}
+                    value={draft.imagePosition ?? ''}
+                    onChange={position => set('imagePosition', position)}
+                  />
+                </div>
+              )}
               <div>
                 <label className={labelCls}>Region</label>
                 <input value={draft.region} onChange={e => set('region', e.target.value)} placeholder="e.g. Royal Natal" className={inputCls} />
@@ -313,16 +360,60 @@ export default function AdminPackagesPage() {
                 <label className={labelCls}>Duration (nights)</label>
                 <input type="number" min={0} value={draft.durationNights} onChange={e => set('durationNights', Math.max(0, +e.target.value))} className={inputCls} />
               </div>
-              <div>
-                <label className={labelCls}>Max Guests</label>
-                <input type="number" min={1} value={draft.maxGuests} onChange={e => set('maxGuests', Math.max(1, +e.target.value))} className={inputCls} />
+              <div className="col-span-2">
+                <label className={labelCls}>Pricing Model</label>
+                <div className="flex flex-wrap gap-2">
+                  {(Object.keys(PACKAGE_PRICING_MODE_LABELS) as PackagePricingMode[]).map(m => {
+                    const on = (draft.pricingMode ?? 'per_person') === m
+                    return (
+                      <button key={m} type="button" onClick={() => setPricingMode(m)}
+                        className={`font-sans text-xs px-3 py-1.5 border transition-colors ${on ? 'bg-[#2d6a4f] border-[#2d6a4f] text-white' : 'border-gray-200 text-gray-600 hover:border-[#2d6a4f]'}`}>
+                        {m === 'group' ? <Users size={11} className="inline mr-1 -mt-0.5" /> : null}{PACKAGE_PRICING_MODE_LABELS[m]}
+                      </button>
+                    )
+                  })}
+                </div>
+                <p className="font-sans text-xs text-gray-400 mt-1.5">
+                  {groupMode
+                    ? 'Sold as one unit at a flat rate — e.g. R16,000 for a group of 8. The group size is the guest limit for a booking.'
+                    : 'Guests each pay the per-person price; the total scales with the party size.'}
+                </p>
               </div>
+              {groupMode ? (
+                <>
+                  <div>
+                    <label className={labelCls}>Group Size (guests covered)</label>
+                    <input type="number" min={1} value={draft.groupSize ?? ''} placeholder="8"
+                      onChange={e => set('groupSize', e.target.value ? Math.max(1, Math.round(+e.target.value)) : undefined)} className={inputCls} />
+                  </div>
+                  <div>
+                    <label className={labelCls}>Group Price (R, total for the group)</label>
+                    <input type="number" min={0} value={draft.groupPrice ?? ''} placeholder="16000"
+                      onChange={e => set('groupPrice', e.target.value ? Math.max(0, +e.target.value) : undefined)} className={inputCls} />
+                  </div>
+                  <div className="col-span-2 bg-[#F7F5F2] border border-gray-200 px-4 py-3 flex items-center justify-between flex-wrap gap-2">
+                    <span className="font-sans text-xs text-gray-500">
+                      Guests see <span className="text-[#2d6a4f]">{formatMoney(draft.groupPrice ?? 0)}</span> {packagePriceUnit(draft)}
+                    </span>
+                    <span className="font-sans text-xs text-gray-400">
+                      works out to {formatMoney(packagePricePerPerson(draft))} per person
+                    </span>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div>
+                    <label className={labelCls}>Max Guests</label>
+                    <input type="number" min={1} value={draft.maxGuests} onChange={e => set('maxGuests', Math.max(1, +e.target.value))} className={inputCls} />
+                  </div>
+                  <div>
+                    <label className={labelCls}>Selling Price per Person (R)</label>
+                    <input type="number" value={draft.pricePerPerson || ''} onChange={e => set('pricePerPerson', +e.target.value || 0)} className={inputCls} />
+                  </div>
+                </>
+              )}
               <div>
-                <label className={labelCls}>Selling Price per Person (R)</label>
-                <input type="number" value={draft.pricePerPerson || ''} onChange={e => set('pricePerPerson', +e.target.value || 0)} className={inputCls} />
-              </div>
-              <div>
-                <label className={labelCls}>Original Price (optional, shows saving)</label>
+                <label className={labelCls}>Original {groupMode ? 'Group ' : ''}Price (optional, shows saving)</label>
                 <input type="number" value={draft.originalPrice ?? ''} onChange={e => set('originalPrice', e.target.value ? +e.target.value : undefined)} className={inputCls} />
               </div>
               <div>
@@ -396,7 +487,7 @@ export default function AdminPackagesPage() {
 
             {draft.components.length === 0 ? (
               <div className="bg-[#F7F5F2] border border-dashed border-gray-300 py-8 text-center">
-                <span className="font-sans text-xs text-gray-400">No components yet — assemble the package from accommodation, activities, trails, experiences, guides, transfers, restaurants, equipment and local experiences.</span>
+                <span className="font-sans text-xs text-gray-400">No components yet. Assemble the package from accommodation, activities, trails, experiences, guides, transfers, restaurants, equipment and local experiences.</span>
               </div>
             ) : (
               <div className="space-y-2">
@@ -474,7 +565,7 @@ export default function AdminPackagesPage() {
       ) : visible.length === 0 ? (
         <div className="bg-white border border-gray-200 py-20 text-center">
           <Package size={28} className="text-gray-300 mx-auto mb-3" />
-          <p className="font-sans text-sm text-gray-400">No packages yet — create the first curated itinerary.</p>
+          <p className="font-sans text-sm text-gray-400">No packages yet. Create the first curated itinerary.</p>
         </div>
       ) : (
         <div className="space-y-3">
@@ -495,7 +586,8 @@ export default function AdminPackagesPage() {
                       )}
                     </div>
                     <p className="font-sans text-xs text-gray-400">
-                      {p.region || 'No region'} · {p.durationNights} night{p.durationNights !== 1 ? 's' : ''} · <Users size={11} className="inline -mt-0.5" /> max {p.maxGuests} ·{' '}
+                      {p.region || 'No region'} · {p.durationNights} night{p.durationNights !== 1 ? 's' : ''} ·{' '}
+                      <Users size={11} className="inline -mt-0.5" /> {isGroupPriced(p) ? `group of ${packageGroupSize(p)}` : `max ${p.maxGuests}`} ·{' '}
                       {p.components.length} component{p.components.length !== 1 ? 's' : ''} from {new Set(p.components.map(c => c.supplierName).filter(Boolean)).size} supplier{new Set(p.components.map(c => c.supplierName).filter(Boolean)).size !== 1 ? 's' : ''}
                       {p.trailIds.length > 0 && ` · ${p.trailIds.length} trail${p.trailIds.length !== 1 ? 's' : ''}`}
                     </p>
@@ -515,7 +607,13 @@ export default function AdminPackagesPage() {
                     )}
                   </div>
                   <div className="text-right shrink-0">
-                    <p className="font-display italic text-xl text-[#2d6a4f]">{formatMoney(p.pricePerPerson)} <span className="font-sans text-[10px] text-gray-400">pp</span></p>
+                    <p className="font-display italic text-xl text-[#2d6a4f]">
+                      {formatMoney(packageHeadlinePrice(p))}{' '}
+                      <span className="font-sans text-[10px] text-gray-400">{isGroupPriced(p) ? `/ ${packageGroupSize(p)} guests` : 'pp'}</span>
+                    </p>
+                    {isGroupPriced(p) && (
+                      <p className="font-sans text-[10px] text-gray-400">{formatMoney(packagePricePerPerson(p))} per person</p>
+                    )}
                     <p className="font-sans text-[10px] text-gray-400">cost {formatMoney(t.cost)} · margin <span className={t.margin >= 0 ? 'text-emerald-600' : 'text-red-500'}>{formatMoney(t.margin)}</span></p>
                   </div>
                 </div>

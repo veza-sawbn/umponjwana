@@ -59,7 +59,7 @@ export const SUPPLIER_CATEGORIES: Record<SupplierCategory, {
   },
   local: {
     label: 'Local Operator',
-    description: 'Operates inside one valley or local destination — short-distance transport and local mobility.',
+    description: 'Operates inside one valley or local destination, handling short-distance transport and local mobility.',
     exampleBases: ['Royal Natal', 'Cathedral Peak', "Monk's Cowl", 'Giants Castle', 'Injisuthi'],
     typicalWork: ['Trailhead drops', 'Lodge shuttles', 'Local mobility'],
   },

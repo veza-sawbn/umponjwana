@@ -1,5 +1,6 @@
 import { supabase } from './auth'
 import type { SupabaseClient } from '@supabase/supabase-js'
+import { imagePositionToCss } from './image-position'
 
 export type Town = {
   id: string
@@ -11,9 +12,15 @@ export type Town = {
   gateway: string
   description: string
   image: string
+  /** Focal point the hero crops around (lib/image-position.ts). Empty =
+   *  centred, which is what rows saved before this field existed keep doing. */
+  imagePosition?: string
   highlights: string[]
   seoTitle: string
   seoDescription: string
+  /** Surfaced in the homepage "Top Attractions" section. Optional: towns
+   *  saved before this existed simply aren't featured. See lib/attractions.ts. */
+  featured?: boolean
   createdAt?: string
   updatedAt?: string
 }
@@ -50,7 +57,7 @@ export const DEFAULT_TOWNS: Town[] = [
   },
   {
     id: 'himeville', slug: 'himeville', regionSlug: 'south-berg', name: 'Himeville',
-    gateway: 'Southern Drakensberg — boutique',
+    gateway: 'Southern Drakensberg · boutique',
     description: 'A charming village with a restored fort, trout streams and boutique accommodation. A hidden gem.',
     image: 'https://images.unsplash.com/photo-1520250497591-112f2f40a3f4?w=900&q=80',
     highlights: [], seoTitle: 'Himeville | Visit Drakensberg', seoDescription: '',
@@ -85,9 +92,11 @@ function normalizeTown(town: Partial<Town> & { name: string; id?: string }): Tow
     gateway: town.gateway || '',
     description: town.description || '',
     image: town.image || '',
+    imagePosition: town.imagePosition ? imagePositionToCss(town.imagePosition) : '',
     highlights: town.highlights || [],
     seoTitle: town.seoTitle || `${town.name} | Visit Drakensberg`,
     seoDescription: town.seoDescription || '',
+    featured: town.featured ?? false,
     createdAt: town.createdAt,
     updatedAt: town.updatedAt,
   }

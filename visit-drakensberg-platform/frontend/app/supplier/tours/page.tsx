@@ -44,7 +44,7 @@ export default function ToursPage() {
       ) : tours.length === 0 ? (
         <div className="bg-white rounded-xl border border-black/8 py-16 text-center">
           <Mountain size={28} className="text-black/15 mx-auto mb-3" />
-          <p className="font-sans text-sm text-black/30">No tours yet — add your first tour to get started.</p>
+          <p className="font-sans text-sm text-black/30">No tours yet. Add your first tour to get started.</p>
         </div>
       ) : (
         <div className="grid gap-3">

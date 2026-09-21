@@ -233,7 +233,7 @@ export default function AdminTransportPage() {
       </section>
 
       {/* Requests needing attention + offered + active */}
-      <RequestGroup title={`Needs attention (${groups.attention.length})`} requests={groups.attention} emptyText="Nothing unassigned — the marketplace is covering demand."
+      <RequestGroup title={`Needs attention (${groups.attention.length})`} requests={groups.attention} emptyText="Nothing unassigned. The marketplace is covering demand."
         busy={busy} expanded={expanded} ranking={ranking} onToggle={toggleRanking} onAutoAssign={autoAssign} onReoffer={reoffer} onCancel={cancel} />
       <RequestGroup title={`Awaiting supplier acceptance (${groups.offered.length})`} requests={groups.offered} emptyText="No open offers."
         busy={busy} expanded={expanded} ranking={ranking} onToggle={toggleRanking} onAutoAssign={autoAssign} onReoffer={reoffer} onCancel={cancel} />

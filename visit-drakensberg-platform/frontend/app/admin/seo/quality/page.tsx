@@ -494,7 +494,7 @@ export default function QualityChecklistPage() {
             <div className="bg-white border border-gray-200 p-5 flex flex-wrap gap-3 items-center">
               <p className="font-sans text-sm text-gray-600 flex-1">
                 {result.readyToPublish && manualDone === result.manual.length
-                  ? '✓ All checks complete — ready to publish.'
+                  ? '✓ All checks complete. Ready to publish.'
                   : result.readyToPublish
                   ? `Automated checks passed. ${result.manual.length - manualDone} manual item${result.manual.length - manualDone !== 1 ? 's' : ''} remaining.`
                   : 'Fix the failed items before publishing.'}

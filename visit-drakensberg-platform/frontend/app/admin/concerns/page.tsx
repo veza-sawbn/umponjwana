@@ -72,7 +72,7 @@ export default function AdminConcernsPage() {
           <p className="font-sans text-[10px] tracking-[0.14em] uppercase text-gray-400 mb-1">Admin Console</p>
           <h1 className="font-display italic text-3xl text-[#000000]">Concerns</h1>
           <p className="font-sans text-sm text-gray-500 mt-1 max-w-2xl">
-            Reports from /report-a-concern — the channel the Supplier Code of Conduct points suppliers, their workers
+            Reports from /report-a-concern, the channel the Supplier Code of Conduct points suppliers, their workers
             and guests at. Anonymous reports carry no contact details by design.
           </p>
         </div>
@@ -146,7 +146,7 @@ export default function AdminConcernsPage() {
 
                     {concern.isAnonymous ? (
                       <p className="font-sans text-xs text-gray-400">
-                        Reported anonymously — no contact details were collected, so there is no way to ask follow-up
+                        Reported anonymously. No contact details were collected, so there is no way to ask follow-up
                         questions.
                       </p>
                     ) : (

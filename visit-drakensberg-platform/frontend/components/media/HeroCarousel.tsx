@@ -3,6 +3,8 @@
 import { useState, useEffect, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { optimizedImageUrl, viewportImageWidth } from '@/lib/image-url'
+import { usePrefersReducedMotion } from '@/lib/carousel-autoplay'
+import { imagePositionToCss } from '@/lib/image-position'
 
 // Shared with the homepage hero — a slow cross-fading, gently panning
 // full-bleed image carousel. Renders absolutely positioned by default, so
@@ -18,13 +20,21 @@ export default function HeroCarousel({
   alt = '',
   className = 'absolute inset-0',
   onIndexChange,
+  positions,
 }: {
   images: string[]
   alt?: string
   className?: string
   /** Fires with the slide index whenever it changes — lets a parent show its own "2 / 6" counter or dots in sync. */
   onIndexChange?: (index: number) => void
+  /**
+   * Focal points keyed by image URL (see lib/image-position.ts). A slide with
+   * no entry crops from its centre, which is what every caller got before
+   * this existed — so passing nothing changes nothing.
+   */
+  positions?: Record<string, string>
 }) {
+  const reduced = usePrefersReducedMotion()
   const [index, setIndex] = useState(0)
   const [loaded, setLoaded] = useState<Record<number, boolean>>({})
   const hasCycledRef = useRef(false)
@@ -58,13 +68,33 @@ export default function HeroCarousel({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [index, images, targetWidth])
 
+  // Advances on its own, but only while the tab is actually in front of the
+  // visitor: a slideshow left running in a background tab is pure waste (it
+  // decodes images nobody is looking at) and means coming back to a hero
+  // half a gallery further along than where it was left.
   useEffect(() => {
     if (images.length < 2) return
-    const id = setInterval(() => {
-      hasCycledRef.current = true
-      setIndex(i => (i + 1) % images.length)
-    }, HERO_SLIDE_SECONDS * 1000)
-    return () => clearInterval(id)
+    let timer: ReturnType<typeof setInterval> | undefined
+
+    const stop = () => {
+      if (timer) clearInterval(timer)
+      timer = undefined
+    }
+    const sync = () => {
+      stop()
+      if (document.hidden) return
+      timer = setInterval(() => {
+        hasCycledRef.current = true
+        setIndex(i => (i + 1) % images.length)
+      }, HERO_SLIDE_SECONDS * 1000)
+    }
+
+    sync()
+    document.addEventListener('visibilitychange', sync)
+    return () => {
+      stop()
+      document.removeEventListener('visibilitychange', sync)
+    }
   }, [images])
 
   if (images.length === 0) return null
@@ -72,6 +102,17 @@ export default function HeroCarousel({
   const panFromLeft = index % 2 === 0
   const isFirstSlide = !hasCycledRef.current
   const currentLoaded = Boolean(loaded[index])
+
+  // Reduced motion keeps the slideshow itself — there are no arrows here, so
+  // stopping it would put the rest of the gallery out of reach — but drops
+  // the slow ken-burns zoom and pan that carries it. The image just fades in,
+  // already sitting where it belongs.
+  const panStart = reduced
+    ? { scale: 1, x: 0, y: 0 }
+    : { scale: HERO_OVERSCALE, x: panFromLeft ? '-3%' : '3%', y: '-2%' }
+  const panEnd = reduced
+    ? { scale: 1, x: 0, y: 0 }
+    : { scale: HERO_OVERSCALE, x: panFromLeft ? '3%' : '-3%', y: '2%' }
 
   return (
     <AnimatePresence>
@@ -93,14 +134,16 @@ export default function HeroCarousel({
           src={optimizedImageUrl(images[index], { width: targetWidth })}
           alt={alt}
           className="w-full h-full object-cover"
+          // The ken-burns pan above animates transforms, which move the whole
+          // frame; this decides which part of the photo is inside that frame
+          // to begin with. The two compose rather than fight.
+          style={{ objectPosition: imagePositionToCss(positions?.[images[index]]) }}
           fetchPriority={isFirstSlide ? 'high' : 'auto'}
           loading={isFirstSlide ? 'eager' : 'lazy'}
           decoding="async"
           onLoad={() => setLoaded(prev => (prev[index] ? prev : { ...prev, [index]: true }))}
-          initial={{ scale: HERO_OVERSCALE, x: panFromLeft ? '-3%' : '3%', y: '-2%', opacity: 0 }}
-          animate={currentLoaded
-            ? { scale: HERO_OVERSCALE, x: panFromLeft ? '3%' : '-3%', y: '2%', opacity: 1 }
-            : { scale: HERO_OVERSCALE, x: panFromLeft ? '-3%' : '3%', y: '-2%', opacity: 0 }}
+          initial={{ ...panStart, opacity: 0 }}
+          animate={currentLoaded ? { ...panEnd, opacity: 1 } : { ...panStart, opacity: 0 }}
           transition={{
             default: { duration: HERO_SLIDE_SECONDS + HERO_FADE_SECONDS, ease: 'linear' },
             opacity: { duration: 0.6, ease: 'easeOut' },

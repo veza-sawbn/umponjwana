@@ -31,7 +31,7 @@ export default async function FieldGuideIndexPage() {
           Field Guides
         </h1>
         <p className="mt-6 font-sans text-[15px] md:text-base leading-[1.75] text-forest/65 max-w-2xl">
-          Species of the escarpment, drawn the way a naturalist meets them — the animal first, then the
+          Species of the escarpment, drawn the way a naturalist meets them: the animal first, then the
           detail that explains it, then the ground it lives on.
         </p>
       </section>

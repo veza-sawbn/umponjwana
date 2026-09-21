@@ -34,7 +34,7 @@ export const DEFAULT_TEMPLATES: MessageTemplate[] = [
   { id: 'tpl-thank-you', name: 'Thank You', category: 'Post-trip',
     body: 'Hi {{FirstName}}, thank you for travelling with Visit Drakensberg! We hope {{Destination}} was everything you hoped for. It was a pleasure arranging your trip.' },
   { id: 'tpl-review-request', name: 'Review Request', category: 'Post-trip',
-    body: 'Hi {{FirstName}}, we\'d love to hear about your trip! If you have a moment, a quick review really helps other travellers — and helps us keep improving.' },
+    body: 'Hi {{FirstName}}, we\'d love to hear about your trip! If you have a moment, a quick review really helps other travellers, and helps us keep improving.' },
   { id: 'tpl-trip-reminder', name: 'Trip Reminder', category: 'Bookings',
     body: 'Hi {{FirstName}}, your Drakensberg trip is almost here! Arrival is {{ArrivalDate}}. A reminder to pack layers, sun protection and broken-in hiking boots. Shout if you need anything.' },
   { id: 'tpl-cancellation', name: 'Cancellation Notice', category: 'Bookings',

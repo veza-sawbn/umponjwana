@@ -8,6 +8,7 @@ import { publicSupabase } from '@/lib/supabase-public'
 import { StayDistance } from '@/lib/stay-distance'
 import { regionsMatch } from '@/lib/regions'
 import { formatMoney } from '@/lib/allocation'
+import SaveButton from '@/components/ui/SaveButton'
 
 // Derived from the canonical activity-category vocabulary (lib/activities.ts)
 // so every category a supplier can tag is reachable via a public filter tab —
@@ -82,7 +83,10 @@ export default function ActivitiesPage() {
               {filtered.map((a) => {
                 const durationLabel = [a.durationH && `${a.durationH}h`, a.durationM && `${a.durationM}m`].filter(Boolean).join(' ') || ''
                 return (
-                  <Link key={a.id} href={`/activities/${a.id}`} className="group block">
+                  // The heart is a sibling of the Link, not a child — a
+                  // <button> inside an <a> is invalid HTML.
+                  <div key={a.id} className="relative">
+                  <Link href={`/activities/${a.id}`} className="group block">
                     <div className="relative overflow-hidden aspect-square mb-4 bg-[#1a1a2e]">
                       {a.photos?.[0] && (
                         <img
@@ -109,6 +113,17 @@ export default function ActivitiesPage() {
                       </span>
                     </div>
                   </Link>
+                  <SaveButton
+                    listing={{
+                      id: a.id,
+                      type: 'activity',
+                      title: a.name,
+                      location: a.meetingPoint || a.region || 'Drakensberg',
+                      price: a.pricePerPerson,
+                      image: a.photos?.[0],
+                    }}
+                  />
+                  </div>
                 )
               })}
             </div>

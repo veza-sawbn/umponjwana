@@ -4,9 +4,13 @@ import Image from 'next/image'
 import { useEffect, useState } from 'react'
 import { ArrowRight } from 'lucide-react'
 import Footer from '@/components/layout/Footer'
-import { getPublishedPackages, PACKAGE_CATEGORIES, PACKAGE_CATEGORY_LABELS, type PackageCategory } from '@/lib/packages'
+import {
+  getPublishedPackages, PACKAGE_CATEGORIES, PACKAGE_CATEGORY_LABELS,
+  packageHeadlinePrice, packagePricePerPerson, packagePriceUnit, type PackageCategory,
+} from '@/lib/packages'
 import { publicSupabase } from '@/lib/supabase-public'
 import { formatMoney } from '@/lib/allocation'
+import SaveButton from '@/components/ui/SaveButton'
 
 // Filter tabs mirror the vocabulary curated in the Package Builder
 // (/admin/packages) — see lib/packages.ts PACKAGE_CATEGORIES.
@@ -19,7 +23,9 @@ type PackageCard = {
   id: string
   title: string
   duration: string
-  price: number
+  price: number          // headline price, quoted in `priceUnit`
+  priceUnit: string      // 'per person' | 'for 8 guests' — see packagePriceUnit()
+  pricePerPerson: number // per-head equivalent, for saved listings
   originalPrice?: number
   location: string
   img: string
@@ -44,7 +50,9 @@ export default function PackagesPage() {
         id: p.id,
         title: p.title,
         duration: `${p.durationNights} night${p.durationNights !== 1 ? 's' : ''}`,
-        price: p.pricePerPerson,
+        price: packageHeadlinePrice(p),
+        priceUnit: packagePriceUnit(p),
+        pricePerPerson: packagePricePerPerson(p),
         originalPrice: p.originalPrice,
         location: p.region || 'Drakensberg',
         img: p.image || 'https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?w=900&q=80',
@@ -65,7 +73,7 @@ export default function PackagesPage() {
         <div className="max-w-[1440px] mx-auto">
           <p className="font-sans text-xs tracking-[0.2em] uppercase text-white/30 mb-3">Curated journeys</p>
           <h1 className="font-display text-5xl lg:text-6xl text-white leading-none mb-4">Packages</h1>
-          <p className="font-sans text-sm text-white/50">Complete Drakensberg experiences — stay, eat, explore, guided</p>
+          <p className="font-sans text-sm text-white/50">Complete Drakensberg experiences: stay, eat, explore, guided</p>
         </div>
       </section>
 
@@ -89,14 +97,17 @@ export default function PackagesPage() {
 
       <div className="max-w-[1440px] mx-auto px-6 lg:px-12 py-12">
         {!loading && cards.length === 0 && (
-          <p className="font-sans text-sm text-forest/40 py-16 text-center">No packages published yet — check back soon.</p>
+          <p className="font-sans text-sm text-forest/40 py-16 text-center">No packages published yet. Please check back soon.</p>
         )}
         {!loading && cards.length > 0 && filtered.length === 0 && (
-          <p className="font-sans text-sm text-forest/40 py-16 text-center">No packages in {TABS.find(t => t.slug === category)?.label} yet — try another category.</p>
+          <p className="font-sans text-sm text-forest/40 py-16 text-center">No packages in {TABS.find(t => t.slug === category)?.label} yet. Try another category.</p>
         )}
         <div className="grid lg:grid-cols-2 gap-8">
           {filtered.map((p) => (
-            <Link key={p.id} href={`/packages/${p.id}`} className="group bg-white border border-black/8 block hover:border-forest/30 transition-colors">
+            // The heart is a sibling of the Link, not a child — a <button>
+            // inside an <a> is invalid HTML.
+            <div key={p.id} className="relative">
+            <Link href={`/packages/${p.id}`} className="group bg-white border border-black/8 block hover:border-forest/30 transition-colors">
               <div className="relative overflow-hidden aspect-[16/9]">
                 <Image src={p.img} alt={p.title} fill loading="lazy" sizes="(max-width: 1024px) 100vw, 50vw"
                   className="object-cover transition-transform duration-700 group-hover:scale-104" />
@@ -123,7 +134,7 @@ export default function PackagesPage() {
                       <p className="font-sans text-xs text-forest/30 line-through">{formatMoney(p.originalPrice)}</p>
                     )}
                     <p className="font-display text-2xl text-forest">{formatMoney(p.price)}</p>
-                    <p className="font-sans text-xs text-forest/40">per person</p>
+                    <p className="font-sans text-xs text-forest/40">{p.priceUnit}</p>
                   </div>
                 </div>
 
@@ -143,6 +154,21 @@ export default function PackagesPage() {
                 </div>
               </div>
             </Link>
+            {/* Below the "Save Rx" discount flag when there is one — that
+                badge is a price saving, this is the saved-listings heart. */}
+            <SaveButton
+              className={p.originalPrice ? '!top-14 !right-4' : '!top-4 !right-4'}
+              listing={{
+                id: p.id,
+                type: 'package',
+                title: p.title,
+                location: p.location,
+                price: p.pricePerPerson,
+                image: p.img,
+                rating: p.rating,
+              }}
+            />
+            </div>
           ))}
         </div>
       </div>

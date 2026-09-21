@@ -7,6 +7,7 @@ import { SEASONS, SEASON_META, SEASON_TOPICS, SEASON_TOPIC_META, type Season, ty
 import { analyseGpxAsync, ROUTE_TYPES } from '@/lib/gpx'
 import RouteArtwork from '@/components/trails/RouteArtwork'
 import { MediaPicker, MediaGalleryPicker } from '@/components/media/MediaPicker'
+import { ImagePositionPicker } from '@/components/media/ImagePositionPicker'
 import { adminMediaSource } from '@/lib/admin-supabase'
 import { SeoPanel } from '@/components/admin/SeoPanel'
 import { RelationshipPicker, type RelatedItem } from '@/components/admin/RelatedEntityManager'
@@ -65,7 +66,7 @@ function GpxBuilder({ trail, onApply }: { trail: Trail; onApply: (patch: Partial
     setBusy(false)
   }
   return <div className="border-t border-gray-100 pt-6 space-y-4">
-    <div className="flex items-center justify-between gap-3"><div><label className={labelCls}>GPX Trail Builder</label><p className="font-sans text-xs text-gray-500">Upload, validate, recalculate analytics, detect cruxes and generate cached SVG route artwork. The route type and distance override above are applied during processing — change them and hit Recalculate analytics.</p></div>{trail.analytics && <button type="button" onClick={() => process(trail.gpx?.raw || '')} className="border border-[#2d6a4f] px-3 py-2 font-sans text-xs text-[#2d6a4f]">Recalculate analytics</button>}</div>
+    <div className="flex items-center justify-between gap-3"><div><label className={labelCls}>GPX Trail Builder</label><p className="font-sans text-xs text-gray-500">Upload, validate, recalculate analytics, detect cruxes and generate cached SVG route artwork. The route type and distance override above are applied during processing, so change them and hit Recalculate analytics.</p></div>{trail.analytics && <button type="button" onClick={() => process(trail.gpx?.raw || '')} className="border border-[#2d6a4f] px-3 py-2 font-sans text-xs text-[#2d6a4f]">Recalculate analytics</button>}</div>
     <input type="file" accept=".gpx,application/gpx+xml,application/xml,text/xml" onChange={e => { const f=e.target.files?.[0]; if (f) f.text().then(t => process(t, f.name)) }} className="block w-full text-sm text-gray-500 file:mr-4 file:border-0 file:bg-[#2d6a4f] file:px-4 file:py-2 file:text-sm file:text-white" />
     {message && <p className={`font-sans text-xs ${message.includes('Unable') || message.includes('Invalid') ? 'text-red-600' : 'text-[#2d6a4f]'}`}>{busy ? '⏳ ' : '✓ '}{message}</p>}
     {trail.analytics && <div className="grid md:grid-cols-3 gap-4">
@@ -160,7 +161,7 @@ function DaysEditor({ days, onChange }: { days: TrailDay[]; onChange: (days: Tra
       </div>
       {days.length === 0 && (
         <div className="bg-[#F7F5F2] border border-dashed border-gray-300 flex items-center justify-center py-6">
-          <span className="font-sans text-xs text-gray-400">No days added yet — click Add Day</span>
+          <span className="font-sans text-xs text-gray-400">No days added yet. Click Add Day</span>
         </div>
       )}
       <div className="space-y-3">
@@ -384,6 +385,17 @@ function TrailForm({ trail, onChange, onSave, onCancel, saveLabel, saving }: {
         <label className={labelCls}>Hero Image</label>
         <MediaPicker value={trail.image} onChange={url => onChange('image', url)} source={adminMediaSource} />
       </div>
+
+      {trail.image && (
+        <div>
+          <label className={labelCls}>Hero Image Position</label>
+          <ImagePositionPicker
+            image={trail.image}
+            value={trail.imagePosition ?? ''}
+            onChange={position => onChange('imagePosition', position)}
+          />
+        </div>
+      )}
 
       <GpxBuilder trail={trail} onApply={patch => Object.entries(patch).forEach(([field, value]) => onChange(field, value))} />
 

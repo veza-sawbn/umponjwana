@@ -69,7 +69,7 @@ function QueueRow({ doc, onReviewed }: { doc: ComplianceDocumentWithOwner; onRev
     try {
       const url = await complianceDocumentUrl(doc.storagePath)
       if (!url) {
-        toast.error('Could not open that document — it may have been removed from storage.')
+        toast.error('We could not open that document. It may have been removed from storage.')
         return
       }
       window.open(url, '_blank', 'noopener,noreferrer')
@@ -80,7 +80,7 @@ function QueueRow({ doc, onReviewed }: { doc: ComplianceDocumentWithOwner; onRev
 
   async function decide(status: ComplianceReviewStatus) {
     if (status === 'rejected' && !note.trim()) {
-      toast.error('Say why it was rejected — the operator needs to know what to send instead.')
+      toast.error('Say why it was rejected, so the operator knows what to send instead.')
       return
     }
     setBusy(true)
@@ -164,7 +164,7 @@ function QueueRow({ doc, onReviewed }: { doc: ComplianceDocumentWithOwner; onRev
         <input
           value={note}
           onChange={e => setNote(e.target.value)}
-          placeholder="Reviewer note — what is wrong, or what to send instead"
+          placeholder="Reviewer note: what is wrong, or what to send instead"
           className="mt-3 w-full border border-gray-200 px-3 py-2 font-sans text-xs text-black placeholder:text-gray-300 focus:outline-none focus:border-[#2d6a4f]"
         />
       )}
@@ -259,7 +259,7 @@ export default function AdminCompliancePage() {
             {docs.length === 0
               ? 'No compliance documents on file yet. They arrive when an operator applies, or when you add one on their behalf from an application.'
               : view === 'attention'
-                ? `Nothing needs attention — all ${docs.length} document${docs.length === 1 ? '' : 's'} on file are verified and current. Switch to All documents to see them.`
+                ? `Nothing needs attention. All ${docs.length} document${docs.length === 1 ? '' : 's'} on file are verified and current. Switch to All documents to see them.`
                 : 'Nothing to show.'}
           </p>
         </div>

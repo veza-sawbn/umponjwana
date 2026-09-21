@@ -39,7 +39,7 @@ const SECTIONS: { heading: string; body: string[] }[] = [
     body: [
       'Every business listed here is bound by our Supplier Agreement and Supplier Code of Conduct. Among other things, they warrant that their listings are accurate, that they will honour confirmed bookings at the listed price, and that they hold the licences and insurance their operation requires.',
       'Before a listing goes live our verification office checks that the operator holds either a current EDTEA tourism operator registration or membership of a Community Tourism Organisation. A supplier whose accreditation lapses may be suspended from public view.',
-      'If you believe a supplier has breached the Code — on safety, on how you or their staff were treated, or on how your information was used — report it at /report-a-concern. You may do so anonymously.',
+      'If you believe a supplier has breached the Code, whether on safety, on how you or their staff were treated, or on how your information was used, report it at /report-a-concern. You may do so anonymously.',
     ],
   },
   {

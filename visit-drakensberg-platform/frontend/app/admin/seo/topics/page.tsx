@@ -339,7 +339,7 @@ export default function TopicMapPage() {
       setEditingId(null)
       setForm(EMPTY_FORM)
     } catch {
-      setFormError('Failed to save — check your connection and try again.')
+      setFormError('Failed to save. Check your connection and try again.')
     } finally {
       setSaving(false)
     }
@@ -386,7 +386,7 @@ export default function TopicMapPage() {
         </div>
         <h1 className="font-display italic text-3xl text-[#000000]">Topic Map</h1>
         <p className="font-sans text-sm text-gray-500 mt-1">
-          One canonical entity per search topic. Supporting entities reinforce — they don't compete.
+          One canonical entity per search topic. Supporting entities reinforce it rather than compete with it.
           Feeds the cannibalisation detector.
         </p>
       </div>
@@ -430,7 +430,7 @@ export default function TopicMapPage() {
                   spellCheck={false}
                 />
                 <p className="font-sans text-[11px] text-gray-400 mt-1">
-                  Use the phrase as searchers type it — lowercase, no quotes.
+                  Use the phrase as searchers type it: lowercase, no quotes.
                 </p>
               </div>
 
@@ -498,7 +498,7 @@ export default function TopicMapPage() {
                 One topic = one canonical. If another entity claims the same topic, the cannibalisation detector flags it.
               </p>
               <p className="font-sans text-xs text-gray-500 leading-relaxed">
-                <strong className="text-gray-700">Supporting:</strong> pages that reinforce the canonical — related trail, region hub, article.
+                <strong className="text-gray-700">Supporting:</strong> pages that reinforce the canonical, such as a related trail, region hub or article.
                 These provide depth without competing for the same intent.
               </p>
             </div>

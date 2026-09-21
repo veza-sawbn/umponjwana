@@ -1,5 +1,6 @@
 import Link from 'next/link'
 import { SEASONS, SEASON_META } from '@/lib/seasons'
+import { objectPositionStyle } from '@/lib/image-position'
 
 /**
  * The region page's "When to Go" section — four season tiles linking to
@@ -13,7 +14,13 @@ import { SEASONS, SEASON_META } from '@/lib/seasons'
  * still visually distinguishing each season. See
  * docs/destination-graph/PHASE_I.md.
  */
-export default function SeasonMosaic({ regionSlug, heroImage }: { regionSlug: string; heroImage: string }) {
+export default function SeasonMosaic({ regionSlug, heroImage, heroImagePosition }: {
+  regionSlug: string
+  heroImage: string
+  /** The region's hero focal point — these tiles are 3:4, the tightest crop
+   *  the hero image gets anywhere, so a centred default loses the most here. */
+  heroImagePosition?: string
+}) {
   return (
     <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
       {SEASONS.map(season => {
@@ -28,6 +35,7 @@ export default function SeasonMosaic({ regionSlug, heroImage }: { regionSlug: st
               src={heroImage}
               alt=""
               className="absolute inset-0 w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+              style={objectPositionStyle(heroImagePosition)}
             />
             <div
               className="absolute inset-0"

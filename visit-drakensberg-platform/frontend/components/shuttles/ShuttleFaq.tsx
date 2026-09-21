@@ -18,7 +18,7 @@ const FAQS: { q: string; a: React.ReactNode }[] = [
   },
   {
     q: 'Who actually drives me?',
-    a: 'A registered Drakensberg transport operator that you pick yourself from the list of companies covering your route. Every one has been verified by our office — they hold either a current EDTEA tourism operator registration or membership of a Community Tourism Organisation, and they are bound by our Supplier Code of Conduct.',
+    a: 'A registered Drakensberg transport operator that you pick yourself from the list of companies covering your route. Every one has been verified by our office, and they hold either a current EDTEA tourism operator registration or membership of a Community Tourism Organisation, and they are bound by our Supplier Code of Conduct.',
   },
   {
     q: 'What if no operator covers my route?',
@@ -30,7 +30,7 @@ const FAQS: { q: string; a: React.ReactNode }[] = [
   },
   {
     q: 'How many passengers and how much luggage fit?',
-    a: 'Set your passenger count on the search form and only vehicles with enough seats for your party are offered, from sedans through to minibuses and coaches. Tell your operator about oversized luggage — bikes, boards, climbing kit — in the booking notes so they send the right vehicle.',
+    a: 'Set your passenger count on the search form and only vehicles with enough seats for your party are offered, from sedans through to minibuses and coaches. Note any oversized luggage, such as bikes, boards or climbing kit, in the booking notes so your operator sends the right vehicle.',
   },
   {
     q: 'Can I book a return trip at the same time?',
@@ -48,7 +48,7 @@ const FAQS: { q: string; a: React.ReactNode }[] = [
   },
   {
     q: 'When do I pay?',
-    a: 'Nothing is charged while you compare operators. The transfer joins your trip, and you pay at checkout in South African Rand — the service fee and VAT are shown before you confirm.',
+    a: 'Nothing is charged while you compare operators. The transfer joins your trip, and you pay at checkout in South African Rand. The service fee and VAT are shown before you confirm.',
   },
 ]
 
@@ -62,8 +62,8 @@ export function ShuttleFaq() {
           <p className="font-sans text-[10px] tracking-[0.2em] uppercase text-gold mb-3">Good to know</p>
           <h2 className="font-display text-3xl sm:text-4xl text-forest mb-3">Questions before you book</h2>
           <p className="font-sans text-sm text-forest/50">
-            Anything specific about your route — an early flight, a rough access road, oversized luggage — you can
-            raise directly with your operator once the transfer is in your trip.
+            Anything specific about your route, such as an early flight, a rough access road or oversized luggage,
+            you can raise directly with your operator once the transfer is in your trip.
           </p>
         </div>
 

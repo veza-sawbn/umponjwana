@@ -14,6 +14,8 @@ import { Check, Clock } from 'lucide-react'
 import type { Property } from '@/lib/properties'
 import { isRequestMode } from '@/lib/stay-requests'
 import { getRoomUnitsLeft, type Room } from '@/lib/rooms'
+import SaveButton from '@/components/ui/SaveButton'
+import type { SaveableListing } from '@/lib/saved-listings'
 import { formatMoney } from '@/lib/allocation'
 import ReadMoreText from '@/components/ui/ReadMoreText'
 
@@ -79,6 +81,18 @@ export default function StayDetail({ property, rooms: roomsData, id }: { propert
   // before any payment is taken (see lib/stay-requests.ts). Say so here,
   // before the guest builds a whole trip around it.
   const requestOnly = isRequestMode(property)
+
+  // The snapshot both hero save buttons write — one object so the mobile
+  // photo hero and the desktop band can never disagree about what got saved.
+  const savedListing: SaveableListing = {
+    id,
+    type: 'stay',
+    title: stay.title,
+    location: stay.location,
+    price: stay.price_from || null,
+    image: stay.images[0],
+    rating: stay.rating || undefined,
+  }
 
   const [heroSlide, setHeroSlide] = useState(0)
   const [selectedRoom, setSelectedRoom] = useState<any>(null)
@@ -155,6 +169,13 @@ export default function StayDetail({ property, rooms: roomsData, id }: { propert
             {heroSlide + 1} / {stay.images.length}
           </span>
         )}
+        {/* Under the slide counter when there is one — the desktop hero puts
+            the same control inline next to the rating instead. */}
+        <SaveButton
+          tone="dark"
+          className={stay.images.length > 1 ? '!top-16 !right-6' : '!top-6 !right-6'}
+          listing={savedListing}
+        />
       </section>
 
       {/* Hero header — sm and up (mobile uses the photo hero above instead). */}
@@ -174,6 +195,7 @@ export default function StayDetail({ property, rooms: roomsData, id }: { propert
                 <span>({stay.review_count} reviews)</span>
               </span>
             )}
+            <SaveButton variant="inline" tone="dark" listing={savedListing} />
           </div>
         </div>
       </section>
@@ -262,7 +284,7 @@ export default function StayDetail({ property, rooms: roomsData, id }: { propert
               {stay.rooms.length === 0 ? (
                 <div className="bg-white border border-gray-200 p-8 text-center">
                   <BedDouble size={24} className="text-gray-300 mx-auto mb-2" />
-                  <p className="font-sans text-sm text-gray-400">No rooms listed yet — contact the property directly.</p>
+                  <p className="font-sans text-sm text-gray-400">No rooms listed yet. Please contact the property directly.</p>
                 </div>
               ) : (
                 <div className={`space-y-4 ${!showRooms ? 'hidden lg:block' : ''}`}>
@@ -460,7 +482,7 @@ export default function StayDetail({ property, rooms: roomsData, id }: { propert
                       <label className="block font-sans text-[10px] tracking-[0.1em] uppercase text-gray-400 mb-1.5">Room</label>
                       <select value={selectedRoom?.id || ''} onChange={e => setSelectedRoom(stay.rooms.find((r: any) => r.id === e.target.value) || null)} className="w-full border border-gray-300 px-3 py-2.5 font-sans text-sm focus:outline-none bg-white">
                         <option value="">Select a room…</option>
-                        {stay.rooms.map((r: any) => <option key={r.id} value={r.id}>{r.name} — {formatMoney(r.price_per_night)}/night</option>)}
+                        {stay.rooms.map((r: any) => <option key={r.id} value={r.id}>{r.name} · {formatMoney(r.price_per_night)}/night</option>)}
                       </select>
                     </div>
                     {!showRooms && (
@@ -497,7 +519,7 @@ export default function StayDetail({ property, rooms: roomsData, id }: { propert
                 }}
                 className={`w-full py-3.5 font-sans text-sm font-medium transition-colors ${selectedRoom ? 'bg-[#2d6a4f] text-white hover:bg-[#235a3f]' : 'bg-gray-100 text-gray-400 cursor-not-allowed'}`}
               >
-                {selectedRoom ? (isSelectedStay ? <span className="flex items-center justify-center gap-2"><Check size={14} /> Stay Selected — View Trip</span> : 'Select & Browse Activities') : 'Select a Room First'}
+                {selectedRoom ? (isSelectedStay ? <span className="flex items-center justify-center gap-2"><Check size={14} /> Stay Selected · View Trip</span> : 'Select & Browse Activities') : 'Select a Room First'}
               </button>
               {isSelectedStay && (
                 <button onClick={() => router.push('/checkout/shuttle')} className="w-full mt-2 py-3 font-sans text-sm border border-[#2d6a4f] text-[#2d6a4f] hover:bg-[#2d6a4f] hover:text-white transition-colors">
@@ -510,7 +532,7 @@ export default function StayDetail({ property, rooms: roomsData, id }: { propert
                     <Clock size={12} className="text-[#2d6a4f] mt-0.5 shrink-0" />
                     <span>
                       <span className="text-[#2d6a4f] font-medium">Confirmed by the property.</span> You won&apos;t be
-                      charged when you book — they check these dates first, then you pay to confirm.
+                      charged when you book. They check these dates first, then you pay to confirm.
                     </span>
                   </p>
                 </div>

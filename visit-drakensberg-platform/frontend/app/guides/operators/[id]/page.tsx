@@ -22,7 +22,7 @@ export async function generateMetadata({ params }: { params: { id: string } }): 
   const operator = await resolveOperator(params.id)
   if (!operator) return { title: 'Operator Not Found' }
 
-  const title = operator.seoTitle || `${operator.companyName} — ${operator.location || 'Drakensberg'} Tour Operator | Visit Drakensberg`
+  const title = operator.seoTitle || `${operator.companyName}, ${operator.location || 'Drakensberg'} Tour Operator | Visit Drakensberg`
   const description = operator.seoDescription || operator.overview || `${operator.companyName}, a verified Drakensberg tour operator${operator.yearsOperating ? ` with ${operator.yearsOperating} years operating` : ''}.`
   const canonical = `/guides/operators/${operator.slug || operator.id}`
 

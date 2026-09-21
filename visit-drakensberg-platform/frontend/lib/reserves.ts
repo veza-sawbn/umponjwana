@@ -1,5 +1,6 @@
 import { supabase } from './auth'
 import type { SupabaseClient } from '@supabase/supabase-js'
+import { imagePositionToCss } from './image-position'
 
 export type ReservePeak = { id: string; name: string; elevation: number; difficulty: 'accessible' | 'moderate' | 'expert' }
 
@@ -13,6 +14,9 @@ export type Reserve = {
   tagline: string
   description: string
   image: string
+  /** Focal point the hero crops around (lib/image-position.ts). Empty =
+   *  centred, which is what rows saved before this field existed keep doing. */
+  imagePosition?: string
   viewpointName: string
   bestTime: string
   permits: string
@@ -20,6 +24,9 @@ export type Reserve = {
   peaks: ReservePeak[]
   seoTitle: string
   seoDescription: string
+  /** Surfaced in the homepage "Top Attractions" section. Optional: reserves
+   *  saved before this existed simply aren't featured. See lib/attractions.ts. */
+  featured?: boolean
   createdAt?: string
   updatedAt?: string
 }
@@ -51,7 +58,7 @@ export const DEFAULT_RESERVES: Reserve[] = [
       { id: 'p6', name: "Dragon's Back", elevation: 3017, difficulty: 'moderate' },
     ],
     seoTitle: 'uKhahlamba-Drakensberg Park | Visit Drakensberg',
-    seoDescription: 'Explore the uKhahlamba-Drakensberg Park — a UNESCO World Heritage Site of basalt cliffs, San rock art and highland wilderness.',
+    seoDescription: 'Explore the uKhahlamba-Drakensberg Park, a UNESCO World Heritage Site of basalt cliffs, San rock art and highland wilderness.',
   },
   {
     id: 'royal-natal',
@@ -61,7 +68,7 @@ export const DEFAULT_RESERVES: Reserve[] = [
     shortName: 'Royal Natal',
     tagline: 'Home of the Amphitheatre · Northern Drakensberg',
     description:
-      "Famous for the iconic Amphitheatre — a 5-kilometre curved basalt cliff wall rising 1,200 metres from the valley floor — Royal Natal National Park is arguably the most dramatic landscape in the Drakensberg. Tugela Falls, the world's second highest waterfall at 947 metres, plunges from the escarpment in five separate cascades. The park encompasses 8,094 hectares of pristine mountain terrain with exceptional hiking opportunities for all levels.",
+      "Famous for the iconic Amphitheatre, a 5-kilometre curved basalt cliff wall rising 1,200 metres from the valley floor, Royal Natal National Park is arguably the most dramatic landscape in the Drakensberg. Tugela Falls, the world's second highest waterfall at 947 metres, plunges from the escarpment in five separate cascades. The park encompasses 8,094 hectares of pristine mountain terrain with exceptional hiking opportunities for all levels.",
     image: 'https://images.unsplash.com/photo-1439853949212-36589f9df9d7?w=1400&q=85',
     viewpointName: 'Thendele Camp Viewpoint',
     bestTime: 'May–August (clear skies, dry). Wildflowers in spring (September–November).',
@@ -74,7 +81,7 @@ export const DEFAULT_RESERVES: Reserve[] = [
       { id: 'p4', name: 'Outer Tower', elevation: 3005, difficulty: 'expert' },
     ],
     seoTitle: 'Royal Natal National Park | Visit Drakensberg',
-    seoDescription: 'Explore Royal Natal National Park — home of the Amphitheatre and Tugela Falls, the second highest waterfall on Earth.',
+    seoDescription: 'Explore Royal Natal National Park, home of the Amphitheatre and Tugela Falls, the second highest waterfall on Earth.',
   },
   {
     id: 'giants-castle',
@@ -84,7 +91,7 @@ export const DEFAULT_RESERVES: Reserve[] = [
     shortName: "Giant's Castle",
     tagline: 'San Rock Art & Bearded Vultures · Central Drakensberg',
     description:
-      "Giant's Castle Reserve protects one of the Drakensberg's most significant San rock art sites — the Main Caves shelter contains over 550 individual paintings. The reserve is also the only place in South Africa where the endangered Bearded Vulture (Lammergeier) can be reliably seen, with a supplementary feeding hide drawing these magnificent birds from November to April. At 3,314 metres, Giant's Castle Peak dominates the reserve skyline.",
+      "Giant's Castle Reserve protects one of the Drakensberg's most significant San rock art sites. The Main Caves shelter contains over 550 individual paintings. The reserve is also the only place in South Africa where the endangered Bearded Vulture (Lammergeier) can be reliably seen, with a supplementary feeding hide drawing these magnificent birds from November to April. At 3,314 metres, Giant's Castle Peak dominates the reserve skyline.",
     image: 'https://images.unsplash.com/photo-1523805009345-7448845a9e53?w=1400&q=85',
     viewpointName: "Giant's Castle Main Camp Viewpoint",
     bestTime: 'November–April for Bearded Vulture feeding hide. June–August for summit hikes.',
@@ -106,10 +113,10 @@ export const DEFAULT_RESERVES: Reserve[] = [
     shortName: 'Injisuthi',
     tagline: 'Remote wilderness & Battle Cave · Northern Central Drakensberg',
     description:
-      'One of the most remote and least-visited of the major Drakensberg reserves, Injisuthi rewards those who seek it out with pristine wilderness, exceptional San rock art at Battle Cave (over 700 individual figures), and some of the best multi-day hiking in the range. The reserve encompasses the headwaters of the Injisuthi River and offers access to Champagne Castle from the north — a dramatic contrast to the southern approach.',
+      'One of the most remote and least-visited of the major Drakensberg reserves, Injisuthi rewards those who seek it out with pristine wilderness, exceptional San rock art at Battle Cave (over 700 individual figures), and some of the best multi-day hiking in the range. The reserve encompasses the headwaters of the Injisuthi River and offers access to Champagne Castle from the north, a dramatic contrast to the southern approach.',
     image: 'https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=1400&q=85',
     viewpointName: 'Injisuthi Camp Ridge',
-    bestTime: 'April–October. Very remote — carry all food and fuel. Cell coverage is non-existent.',
+    bestTime: 'April–October. Very remote, so carry all food and fuel. Cell coverage is non-existent.',
     permits: 'Ezemvelo KZN Wildlife permit. Battle Cave guided tour is mandatory R80/person. Book 3 months ahead in peak season.',
     facilities: ['Injisuthi Camp (chalets)', 'Campsite', 'Guided rock art tours', 'Environmental officer on site'],
     peaks: [
@@ -118,7 +125,7 @@ export const DEFAULT_RESERVES: Reserve[] = [
       { id: 'p3', name: 'Outer Tower', elevation: 3005, difficulty: 'expert' },
     ],
     seoTitle: 'Injisuthi | Visit Drakensberg',
-    seoDescription: 'Explore Injisuthi — remote wilderness, the San rock art of Battle Cave, and a northern approach to Champagne Castle.',
+    seoDescription: 'Explore Injisuthi: remote wilderness, the San rock art of Battle Cave, and a northern approach to Champagne Castle.',
   },
 ]
 
@@ -137,6 +144,7 @@ function normalizeReserve(reserve: Partial<Reserve> & { name: string; id?: strin
     tagline: reserve.tagline || '',
     description: reserve.description || '',
     image: reserve.image || '',
+    imagePosition: reserve.imagePosition ? imagePositionToCss(reserve.imagePosition) : '',
     viewpointName: reserve.viewpointName || '',
     bestTime: reserve.bestTime || '',
     permits: reserve.permits || '',
@@ -144,6 +152,7 @@ function normalizeReserve(reserve: Partial<Reserve> & { name: string; id?: strin
     peaks: reserve.peaks || [],
     seoTitle: reserve.seoTitle || `${reserve.name} | Visit Drakensberg`,
     seoDescription: reserve.seoDescription || '',
+    featured: reserve.featured ?? false,
     createdAt: reserve.createdAt,
     updatedAt: reserve.updatedAt,
   }

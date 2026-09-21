@@ -343,7 +343,7 @@ export default function OverlapPage() {
           </div>
           <h1 className="font-display italic text-2xl text-gray-900">Cannibalisation Detector</h1>
           <p className="font-sans text-sm text-gray-500 mt-0.5">
-            Entity pairs that compete for the same search intent — ranked by confidence.
+            Entity pairs that compete for the same search intent, ranked by confidence.
           </p>
         </div>
         {dismissedCount > 0 && (
@@ -562,7 +562,7 @@ export default function OverlapPage() {
                         <div className="flex items-start gap-2 p-3 bg-sky-50 border border-sky-200">
                           <Info size={14} className="text-sky-600 mt-0.5 shrink-0" />
                           <p className="font-sans text-xs text-sky-800">
-                            Low confidence — these entities share some terms but likely serve different intents.
+                            Low confidence. These entities share some terms but likely serve different intents.
                             Dismiss if they are correctly targeting different audiences.
                           </p>
                         </div>

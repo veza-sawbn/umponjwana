@@ -147,7 +147,7 @@ export default function AccountOrdersPage() {
     <div>
       <div className="mb-6">
         <h1 className="font-display italic text-3xl text-[#000000]">Orders & Invoices</h1>
-        <p className="font-sans text-sm text-gray-500 mt-1">Each trip is a single order with one invoice covering every service — accommodation, activities, transfers, permits and extras.</p>
+        <p className="font-sans text-sm text-gray-500 mt-1">Each trip is a single order with one invoice covering every service: accommodation, activities, transfers, permits and extras.</p>
       </div>
       <div className="space-y-3">
         {orders.map(o => <OrderCard key={o.id} order={o} />)}

@@ -332,7 +332,7 @@ export default function RouteProfileChart({ trail }: { trail: Trail }) {
 
       <p className="font-sans text-xs text-gray-400 mt-2">
         {view === 'elevation'
-          ? 'Drag the marker — or tap anywhere on the chart — to read elevation at any distance along the trail. Numbered points mark waypoints along the route.'
+          ? 'Drag the marker, or tap anywhere on the chart, to read elevation at any distance along the trail. Numbered points mark waypoints along the route.'
           : 'Pan and zoom to explore the route.'}
       </p>
     </div>

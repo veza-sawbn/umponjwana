@@ -17,6 +17,10 @@ export type EmailTemplate = {
   subject: string
   preheader: string
   htmlBody: string
+  /** Full-bleed image band above the body. Empty = no hero (migrations/20260918_email_template_hero.sql). */
+  heroImageUrl: string
+  /** Alt text for the hero. Not optional in practice — see that migration's header. */
+  heroImageAlt: string
   createdAt: string
   updatedAt: string
 }
@@ -40,6 +44,9 @@ export type EmailCampaign = {
 function rowToTemplate(r: any): EmailTemplate {
   return {
     id: r.id, name: r.name, subject: r.subject, preheader: r.preheader, htmlBody: r.html_body,
+    // Coalesced rather than read straight through: a template row written
+    // before the hero migration landed has no such key at all.
+    heroImageUrl: r.hero_image_url ?? '', heroImageAlt: r.hero_image_alt ?? '',
     createdAt: r.created_at, updatedAt: r.updated_at,
   }
 }
@@ -68,10 +75,17 @@ export async function getEmailTemplate(id: string): Promise<EmailTemplate | null
 
 export async function saveEmailTemplate(
   id: string | null,
-  patch: { name: string; subject: string; preheader: string; htmlBody: string },
+  patch: {
+    name: string; subject: string; preheader: string; htmlBody: string
+    heroImageUrl?: string; heroImageAlt?: string
+  },
 ): Promise<{ id: string | null; error: string | null }> {
   const { data: { user } } = await supabase.auth.getUser()
-  const row = { name: patch.name, subject: patch.subject, preheader: patch.preheader, html_body: patch.htmlBody, updated_at: new Date().toISOString() }
+  const row = {
+    name: patch.name, subject: patch.subject, preheader: patch.preheader, html_body: patch.htmlBody,
+    hero_image_url: patch.heroImageUrl ?? '', hero_image_alt: patch.heroImageAlt ?? '',
+    updated_at: new Date().toISOString(),
+  }
   if (id) {
     const { error } = await supabase.from('vd_email_templates').update(row).eq('id', id)
     return { id, error: error?.message ?? null }

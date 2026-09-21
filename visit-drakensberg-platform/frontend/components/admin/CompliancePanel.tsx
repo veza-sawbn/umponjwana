@@ -61,7 +61,7 @@ function DocumentRow({ doc, onReviewed }: { doc: ComplianceDocument; onReviewed:
     try {
       const url = await complianceDocumentUrl(doc.storagePath)
       if (!url) {
-        toast.error('Could not open that document — it may have been removed from storage.')
+        toast.error('We could not open that document. It may have been removed from storage.')
         return
       }
       window.open(url, '_blank', 'noopener,noreferrer')
@@ -73,7 +73,7 @@ function DocumentRow({ doc, onReviewed }: { doc: ComplianceDocument; onReviewed:
   async function decide(status: ComplianceReviewStatus) {
     if (status === 'rejected' && !note.trim()) {
       setNoteOpen(true)
-      toast.error('Say why it was rejected — the applicant needs to know what to send instead.')
+      toast.error('Say why it was rejected, so the applicant knows what to send instead.')
       return
     }
     setBusy(true)
@@ -145,7 +145,7 @@ function DocumentRow({ doc, onReviewed }: { doc: ComplianceDocument; onReviewed:
         <input
           value={note}
           onChange={e => setNote(e.target.value)}
-          placeholder="Reviewer note — what is wrong, or what to send instead"
+          placeholder="Reviewer note: what is wrong, or what to send instead"
           className="mt-3 w-full border border-gray-200 px-3 py-2 font-sans text-xs text-black placeholder:text-gray-300 focus:outline-none focus:border-[#2d6a4f]"
         />
       )}
@@ -195,7 +195,7 @@ function AddDocument({
         referenceNumber: reference.trim(),
         expiresOn: expiresOn || null,
       })
-      toast.success('Document added — it is on file as awaiting review.')
+      toast.success('Document added. It is on file as awaiting review.')
       setIssuer(''); setReference(''); setExpiresOn(''); setOpen(false)
       onAdded()
     } catch (e) {
@@ -342,7 +342,7 @@ export default function CompliancePanel({
         <div className="border border-red-200 bg-red-50 px-4 py-3 flex items-start gap-2.5">
           <AlertTriangle size={14} className="text-red-500 mt-0.5 shrink-0" />
           <p className="font-sans text-xs text-red-700 leading-relaxed">
-            {failed} Nothing below is a reliable picture of this operator — do not approve on it.
+            {failed} Nothing below is a reliable picture of this operator, so do not approve on it.
           </p>
         </div>
       )}
@@ -386,13 +386,13 @@ export default function CompliancePanel({
         <p className="font-sans text-xs font-semibold text-gray-700 mb-1.5">Documents accepted</p>
         {acceptances.length === 0 ? (
           <p className="font-sans text-xs text-orange-600">
-            No acceptance on file — this application predates the supplier documents, or the record failed to write.
+            No acceptance on file. This application predates the supplier documents, or the record failed to write.
           </p>
         ) : (
           <ul className="space-y-1">
             {acceptances.map(a => (
               <li key={a.id} className="font-sans text-xs text-gray-500">
-                {AGREEMENT_LABEL[a.document]} v{a.version} — accepted by {a.acceptedName || a.acceptedEmail || 'unknown'}
+                {AGREEMENT_LABEL[a.document]} v{a.version}, accepted by {a.acceptedName || a.acceptedEmail || 'unknown'}
                 {a.acceptedAt ? ` on ${new Date(a.acceptedAt).toLocaleDateString('en-ZA')}` : ''}
               </li>
             ))}

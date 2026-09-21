@@ -52,7 +52,7 @@ export async function POST(req: Request) {
     origin,
     eyebrow: line.supplier_name,
     heading: "You've been appointed to a booking",
-    preheader: `${line.title} — ${line.order_number}`,
+    preheader: `${line.title} · ${line.order_number}`,
     bodyHtml: `
       <p style="margin:0 0 4px;">Dear ${esc(line.assigned_name || 'there')},</p>
       <p style="margin:0 0 20px;">You've been appointed to deliver the booking below. Please confirm you're available.</p>
@@ -61,7 +61,7 @@ export async function POST(req: Request) {
 
   const { sent, error } = await sendMail({
     to: line.assigned_email,
-    subject: `You've been appointed — ${line.title}`,
+    subject: `You've been appointed to ${line.title}`,
     html,
   })
 

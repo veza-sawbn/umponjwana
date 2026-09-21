@@ -204,7 +204,7 @@ export default function StaffPage() {
               </thead>
               <tbody>
                 {!loading && departures.length === 0 && (
-                  <tr><td colSpan={5} className="px-4 py-10 text-center font-sans text-sm text-black/30">No upcoming departures — schedule one under Departures.</td></tr>
+                  <tr><td colSpan={5} className="px-4 py-10 text-center font-sans text-sm text-black/30">No upcoming departures. Schedule one under Departures.</td></tr>
                 )}
                 {departures.map((d, i) => (
                   <tr key={d.id} className={i < departures.length - 1 ? 'border-b border-black/5' : ''}>

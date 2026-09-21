@@ -41,7 +41,7 @@ export async function generateMetadata({ params }: { params: { slug: string } })
 
   const title = route.seoTitle || `${routeTitle(route)} Shuttle | Visit Drakensberg`
   const description = route.seoDescription
-    || `Fixed-price shuttle transfer from ${route.from} to ${route.to} — ${routeDurationLabel(route)}${route.distanceKm ? `, ${route.distanceKm} km` : ''}. Book a seat or request a private transfer.`
+    || `Fixed-price shuttle transfer from ${route.from} to ${route.to}, ${routeDurationLabel(route)}${route.distanceKm ? `, ${route.distanceKm} km` : ''}. Book a seat or request a private transfer.`
   const canonical = `/transport/${routeSlug(route)}`
 
   return {

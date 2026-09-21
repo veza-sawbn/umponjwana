@@ -25,24 +25,52 @@ export default function ShuttlePage() {
   const [supplierChoice, setSupplierChoice] = useState<ShuttleSupplierChoice | null>(null)
   const [eligibleCount, setEligibleCount] = useState<number | null>(null)
   const [meetAndGreet, setMeetAndGreet] = useState<MeetAndGreetDetails>({})
+  // Drop-off of the leg this page adopted, when it adopted one. A transfer
+  // booked on /shuttles can be headed somewhere that is neither the cart's
+  // stay nor its region, so re-deriving the destination below would quote a
+  // different route and rewrite the guest's drop-off on confirm.
+  const [adoptedDestination, setAdoptedDestination] = useState<GooglePlaceSelection | null>(null)
   const prefilled = useRef(false)
+  // The adopted leg's own party size, which prices the fare and is read
+  // while rendering — so state, not a ref.
+  const [adoptedPassengers, setAdoptedPassengers] = useState<number | null>(null)
+  // Fields of an adopted leg that this form has no input for and that only
+  // confirm() reads, held so rebuilding the leg does not quietly drop them:
+  // its pickup time, and its link back to an outbound leg when it is the
+  // return half of one.
+  const adoptedExtrasRef = useRef<{ time?: string; returnOfId?: string }>({})
   // Id of the cart shuttle being configured, when this page picked one up
   // for completion rather than starting a brand-new leg.
   const existingIdRef = useRef<string | null>(null)
 
-  // A suggested transfer already in the cart (from the trip banner) lands
-  // here for configuration: restore its route, partner and arrival details.
-  // Only the leg still missing a transport partner is picked up — other
-  // shuttles already added stay untouched and are configured individually
-  // from the trip page.
+  // A transfer already in the cart lands here for configuration rather than
+  // being ignored: restore its route, partner and arrival details.
+  //
+  // A leg still missing a transport partner is picked up first — that is the
+  // suggested transfer from the trip banner, the case this page exists for.
+  // Failing that we adopt the first leg the trip already has. Without that
+  // fallback a fully-configured transfer (one booked on /shuttles) matched
+  // nothing, so this page opened blank and confirming it called addShuttle()
+  // and billed the guest for a second copy of the transfer they had already
+  // chosen. Reachable by pressing Back from checkout, so it is not enough
+  // that /trip now routes around this page.
   useEffect(() => {
     if (!booking.hydrated || prefilled.current) return
     prefilled.current = true
-    const existing = booking.shuttles.find(s => !s.supplierId)
+    const existing = booking.shuttles.find(s => !s.supplierId) ?? booking.shuttles[0]
     if (!existing) return
     existingIdRef.current = existing.id
     setNeedsShuttle(true)
     setPickup({ address: existing.pickup ?? '', lat: existing.pickupLat, lng: existing.pickupLng })
+    if (existing.destination) {
+      setAdoptedDestination({
+        address: existing.destination,
+        lat: existing.destinationLat,
+        lng: existing.destinationLng,
+      })
+    }
+    adoptedExtrasRef.current = { time: existing.time, returnOfId: existing.returnOfId }
+    if (existing.passengers) setAdoptedPassengers(existing.passengers)
     if (existing.date) setDate(existing.date)
     if (existing.meetAndGreet) setMeetAndGreet(existing.meetAndGreet)
     if (existing.supplierId && existing.companyId && existing.companyName && existing.vehicleId && existing.vehicleName) {
@@ -59,11 +87,17 @@ export default function ShuttlePage() {
   }, [booking.hydrated])
 
   const stay = booking.stay
-  const destination: GooglePlaceSelection = stay
-    ? { address: stay.address || `${stay.title}, ${stay.region}, South Africa`, lat: stay.lat, lng: stay.lng }
-    : { address: booking.region ? `${booking.region}, Drakensberg, South Africa` : '' }
+  // An adopted leg keeps its own drop-off; only a brand-new transfer falls
+  // back to the stay (or, failing that, the trip's region).
+  const destination: GooglePlaceSelection = adoptedDestination
+    ?? (stay
+      ? { address: stay.address || `${stay.title}, ${stay.region}, South Africa`, lat: stay.lat, lng: stay.lng }
+      : { address: booking.region ? `${booking.region}, Drakensberg, South Africa` : '' })
 
-  const passengers = booking.guests || 2
+  // An adopted leg was quoted and priced for its own party size; the trip's
+  // guest count can differ (a cart with a stay keeps its own). Re-quoting on
+  // the wrong number would change the fare under the guest.
+  const passengers = adoptedPassengers || booking.guests || 2
 
   const { result, status } = useAutoDrivingDistance(
     { address: pickup.address, lat: pickup.lat, lng: pickup.lng },
@@ -80,6 +114,10 @@ export default function ShuttlePage() {
 
   function confirm() {
     if (needsShuttle === false) {
+      // Choosing self-drive over a transfer that is already in the trip means
+      // they no longer want it. Leaving it in the cart would bill them for a
+      // shuttle they just declined on this very screen.
+      if (existingIdRef.current) booking.removeShuttle(existingIdRef.current)
       router.push('/checkout')
       return
     }
@@ -90,9 +128,11 @@ export default function ShuttlePage() {
         pickup: { address: pickup.address, lat: pickup.lat, lng: pickup.lng },
         destination: { address: destination.address, lat: destination.lat, lng: destination.lng },
         date,
+        time: adoptedExtrasRef.current.time,
         passengers,
         result,
         supplier: supplierChoice ?? undefined,
+        returnOfId: adoptedExtrasRef.current.returnOfId,
       }),
       meetAndGreet,
     }

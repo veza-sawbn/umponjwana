@@ -522,7 +522,7 @@ export default function RelatedEntityManagerPage() {
                   )}
                   {saveResult === 'err' && (
                     <div className="flex items-center gap-1.5 text-red-600 font-sans text-sm">
-                      <AlertCircle size={14} /> Save failed — try again
+                      <AlertCircle size={14} /> Save failed. Try again
                     </div>
                   )}
                   <div className="flex-1" />

@@ -48,7 +48,7 @@ export default function AdminOverviewPage() {
       await setAdminSupplierVerified(id, true)
       await loadDashboard()
     } catch {
-      setError('Approval failed — check your admin permissions.')
+      setError('Approval failed. Check your admin permissions.')
     }
   }
 

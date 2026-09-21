@@ -579,7 +579,7 @@ export default function SeoGraphPage() {
                         </div>
                       ) : (
                         <p className="font-sans text-xs text-gray-400 italic">
-                          No explicit inbound links yet — only structural (listing page + region parent).
+                          No explicit inbound links yet, only structural ones (listing page and region parent).
                           {selected.kind !== 'region' && (
                             <> Use the <a href="/admin/trails" className="underline hover:text-[#2d6a4f]">trail editor</a> or the <a href="/admin/seo/orphans" className="underline hover:text-[#2d6a4f]">orphan report</a> to add links.</>
                           )}
@@ -607,7 +607,7 @@ export default function SeoGraphPage() {
                   ))}
                 </select>
                 <span className="font-sans text-xs text-gray-400 ml-auto">
-                  {indexRows.length} entities — click any row to view its tree
+                  {indexRows.length} entities. Click any row to view its tree
                 </span>
               </div>
 

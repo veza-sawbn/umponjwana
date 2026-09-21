@@ -61,7 +61,7 @@ function RatesFieldset({
         {trailDayCount > 0 && (
           <p className="font-sans text-xs text-black/40">
             &quot;{tour!.name}&quot;&apos;s trail has a {trailDayCount}-day itinerary. A freeform rate below can set its own
-            trip length; a rate linked to a pricing tier follows that tier&apos;s itinerary instead — edit it on the tour.
+            trip length; a rate linked to a pricing tier follows that tier&apos;s itinerary instead, which you edit on the tour.
           </p>
         )}
         <PackagesEditor packages={packages} onChange={onChangePackages} itineraryDayCount={trailDayCount} />
@@ -304,7 +304,7 @@ function GuestsModal({
               </select>
             </div>
           )}
-          <input value={form.notes} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))} placeholder="Notes — e.g. Wix booking reference (optional)" className={inp} />
+          <input value={form.notes} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))} placeholder="Notes, e.g. Wix booking reference (optional)" className={inp} />
           <label className="flex items-center gap-2 font-sans text-xs text-black/60 cursor-pointer">
             <input
               type="checkbox"
@@ -472,7 +472,7 @@ function DeparturesInner() {
                 className={inp}
               >
                 <option value="">Select tour…</option>
-                {tours.length === 0 && <option disabled>No active tours — create one first</option>}
+                {tours.length === 0 && <option disabled>No active tours. Create one first</option>}
                 {tours.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
               </select>
             </div>

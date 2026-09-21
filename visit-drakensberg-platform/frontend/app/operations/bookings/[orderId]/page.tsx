@@ -90,7 +90,7 @@ export default function BookingItineraryPage() {
       const { assigned, emailed } = await assignLineStaff(line.id, entry.kind, entry.id)
       toast.success(
         emailed
-          ? `${assigned.name} appointed — notified by email.`
+          ? `${assigned.name} appointed and notified by email.`
           : `${assigned.name} appointed, but the email could not be sent.`,
       )
       setAssigningLine(null)

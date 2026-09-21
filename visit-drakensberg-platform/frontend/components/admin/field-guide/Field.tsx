@@ -14,7 +14,7 @@ export function Label({ htmlFor, children, hint }: { htmlFor?: string; children:
       className="block font-sans text-[10px] tracking-[0.12em] uppercase text-gray-400 mb-1.5"
     >
       {children}
-      {hint && <span className="ml-1.5 normal-case tracking-normal text-gray-300">— {hint}</span>}
+      {hint && <span className="ml-1.5 normal-case tracking-normal text-gray-300">· {hint}</span>}
     </label>
   )
 }

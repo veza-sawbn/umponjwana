@@ -4,6 +4,8 @@ import { Mountain } from 'lucide-react'
 import type { Trail } from '@/lib/trails'
 import RouteArtwork from '@/components/trails/RouteArtwork'
 import { isOptimizableImageHost } from '@/lib/image-url'
+import SaveButton from '@/components/ui/SaveButton'
+import type { SaveableListing } from '@/lib/saved-listings'
 
 // Shared visual design for a "browse the Drakensberg" card — image with a
 // difficulty badge and optional route-artwork silhouette, an uppercase gold
@@ -22,6 +24,7 @@ export default function ExploreCard({
   topLeftBadge,
   bottomRightBadge,
   routeArtworkTrail,
+  saveListing,
 }: {
   href: string
   image?: string
@@ -34,8 +37,14 @@ export default function ExploreCard({
   topLeftBadge?: string
   bottomRightBadge?: string
   routeArtworkTrail?: Trail
+  /** Renders the heart overlay when given. Omit on a card for something that
+   *  isn't a saveable listing (a region tile, an editorial link). */
+  saveListing?: SaveableListing
 }) {
   return (
+    // The heart is a sibling of the Link, not a child: a <button> nested in
+    // an <a> is invalid HTML and confuses keyboard/screen-reader navigation.
+    <div className="relative">
     <Link href={href} className="group block">
       <div className="relative overflow-hidden aspect-[4/3] mb-4 bg-forest/10">
         {image ? (
@@ -83,5 +92,7 @@ export default function ExploreCard({
       <h3 className="font-display text-xl text-forest leading-snug mb-2 group-hover:text-sage transition-colors">{title}</h3>
       {meta}
     </Link>
+      {saveListing && <SaveButton listing={saveListing} />}
+    </div>
   )
 }

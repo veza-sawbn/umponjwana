@@ -292,7 +292,7 @@ function ExperienceSection({
               <Navigation size={11} />Meeting Point
             </p>
             <p className="font-sans text-sm text-gray-800 font-medium leading-relaxed">
-              {tour?.meetingPoint || 'Trailhead — confirmed by operator before departure'}
+              {tour?.meetingPoint || 'Trailhead, confirmed by operator before departure'}
             </p>
             {/* Meeting time placeholder — operators should confirm */}
             <div className="flex items-center gap-2 mt-2">

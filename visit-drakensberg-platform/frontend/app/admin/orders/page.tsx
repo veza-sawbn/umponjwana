@@ -95,7 +95,7 @@ function OrderDetail({ order, onChanged }: { order: MasterOrder; onChanged: () =
     if (!amount || amount <= 0) { toast.error('Enter a valid amount.'); return }
     try {
       await recordOrderPayment({ orderId: order.id, amount, type: payType, method: payMethod, reference: payRef })
-      toast.success('Payment recorded — receipt issued and ledger updated.')
+      toast.success('Payment recorded. Receipt issued and ledger updated.')
       setPayAmount(''); setPayRef('')
       await load(); onChanged()
     } catch (e) {
@@ -398,7 +398,7 @@ export default function AdminOrdersPage() {
         <div>
           <p className="font-sans text-[10px] tracking-[0.14em] uppercase text-gray-400 mb-1">Order Management</p>
           <h1 className="font-display italic text-2xl sm:text-3xl text-[#000000]">Master Orders</h1>
-          <p className="font-sans text-sm text-gray-500 mt-1">Every trip as a single order — line items, supplier allocations, invoice, payments and ledger.</p>
+          <p className="font-sans text-sm text-gray-500 mt-1">Every trip as a single order: line items, supplier allocations, invoice, payments and ledger.</p>
         </div>
         <button onClick={load} className="inline-flex items-center justify-center gap-2 border border-gray-200 px-4 py-3 sm:py-2 font-sans text-sm text-gray-600 hover:border-[#2d6a4f] hover:text-[#2d6a4f] transition-colors shrink-0">
           <RefreshCw size={14} /> Refresh

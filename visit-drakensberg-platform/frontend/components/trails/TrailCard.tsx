@@ -1,10 +1,10 @@
 'use client'
-import { useState } from 'react'
-import { Mountain, ArrowUp, Clock, Star, Heart } from 'lucide-react'
+import { Mountain, ArrowUp, Clock, Star } from 'lucide-react'
 import Link from 'next/link'
 import Image from 'next/image'
 import { motion } from 'framer-motion'
 import { isOptimizableImageHost } from '@/lib/image-url'
+import SaveButton from '@/components/ui/SaveButton'
 
 /* ─── Types ──────────────────────────────────────────────────────────────── */
 export interface Trail {
@@ -69,7 +69,6 @@ function StarRatingDisplay({ rating, count }: { rating: number; count: number })
 
 /* ─── Component ──────────────────────────────────────────────────────────── */
 export default function TrailCard({ trail }: TrailCardProps) {
-  const [saved, setSaved] = useState(false)
   const diff = DIFFICULTY[trail.difficulty]
 
   return (
@@ -118,18 +117,18 @@ export default function TrailCard({ trail }: TrailCardProps) {
           </span>
         )}
 
-        {/* Save / heart button */}
-        <motion.button
-          onClick={(e) => { e.preventDefault(); setSaved((s) => !s) }}
-          className="absolute top-3 right-3 w-8 h-8 rounded-full bg-white/90 backdrop-blur-sm flex items-center justify-center hover:bg-white transition-all shadow-sm"
-          aria-label={saved ? 'Remove from saved' : 'Save trail'}
-          whileTap={{ scale: 0.85 }}
-          transition={{ duration: 0.1 }}
-        >
-          <Heart
-            className={`h-4 w-4 transition-colors ${saved ? 'fill-red-500 text-red-500' : 'text-gray-400'}`}
-          />
-        </motion.button>
+        {/* Save / heart button — persists to the visitor's saved listings
+            (lib/saved-listings.ts), which is what /account/saved reads. */}
+        <SaveButton
+          listing={{
+            id: trail.id,
+            type: 'hike',
+            title: trail.name,
+            location: trail.area,
+            image: trail.image,
+            rating: trail.rating,
+          }}
+        />
       </div>
 
       {/* Content */}

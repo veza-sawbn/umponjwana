@@ -38,7 +38,7 @@ export async function generateMetadata({ params }: { params: { id: string } }): 
   const activity = await resolveActivity(params.id)
   if (!activity) return { title: 'Activity Not Found' }
 
-  const title = activity.seoTitle || `${activity.name} — ${activity.region || 'Drakensberg'} | Visit Drakensberg`
+  const title = activity.seoTitle || `${activity.name}, ${activity.region || 'Drakensberg'} | Visit Drakensberg`
   const description = buildDescription(activity)
   const canonical = `/activities/${activity.slug || activity.id}`
 
@@ -97,7 +97,7 @@ export default async function ActivityPage({ params }: { params: { id: string } 
       <JsonLd data={productJsonLd} />
       <JsonLd data={breadcrumbJsonLd} />
       <TrackView event="activity_view" properties={{ id: activity.id, name: activity.name, region: activity.region }} />
-      <ActivityDetail activityData={activity} id={params.id} />
+      <ActivityDetail activityData={activity} id={activity.id} />
     </>
   )
 }

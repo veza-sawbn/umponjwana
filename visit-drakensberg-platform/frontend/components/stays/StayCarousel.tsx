@@ -4,6 +4,8 @@ import Link from 'next/link'
 import Image from 'next/image'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { formatMoney } from '@/lib/allocation'
+import { useAutoScrollCarousel } from '@/lib/carousel-autoplay'
+import SaveButton from '@/components/ui/SaveButton'
 
 export type StayCard = {
   id: string
@@ -26,9 +28,16 @@ export type StayCard = {
  * page tall enough that finding one means a lot of vertical scrolling.
  * Native touch/trackpad scrolling works on any device; the arrow buttons are
  * a pointer-only convenience layered on top.
+ *
+ * The row also drifts a card at a time on its own, so a category shows more
+ * than the three or four stays that happen to fit — it holds still while the
+ * visitor is using it, and wraps back to the first stay at the end. See
+ * lib/carousel-autoplay.ts.
  */
 export default function StayCarousel({ stays }: { stays: StayCard[] }) {
   const trackRef = useRef<HTMLDivElement>(null)
+
+  useAutoScrollCarousel(trackRef, { itemCount: stays.length })
 
   function scrollByPage(direction: 1 | -1) {
     const el = trackRef.current
@@ -75,10 +84,11 @@ export default function StayCarousel({ stays }: { stays: StayCard[] }) {
 function StayTile({ stay }: { stay: StayCard }) {
   const discountedPrice = stay.discount ? Math.round(stay.price * (1 - stay.discount / 100)) : null
   return (
-    <Link
-      href={`/stays/${stay.id}`}
-      className="group block shrink-0 snap-start w-[260px] sm:w-[280px]"
-    >
+    // The heart sits outside the Link rather than inside it: a <button>
+    // nested in an <a> is invalid HTML and gives keyboard users a control
+    // that lives inside the thing it isn't meant to activate.
+    <div className="relative shrink-0 snap-start w-[260px] sm:w-[280px]">
+    <Link href={`/stays/${stay.id}`} className="group block">
       <div className="relative overflow-hidden aspect-[4/3] mb-4 bg-[#2d6a4f]/10">
         {stay.img ? (
           <Image src={stay.img} alt={stay.title} fill loading="lazy" sizes="280px"
@@ -133,5 +143,20 @@ function StayTile({ stay }: { stay: StayCard }) {
         </div>
       </div>
     </Link>
+      {/* Nudged below the discount flag when there is one, so the two don't
+          stack on top of each other in the same corner. */}
+      <SaveButton
+        className={stay.discount ? '!top-12' : ''}
+        listing={{
+          id: stay.id,
+          type: 'stay',
+          title: stay.title,
+          location: stay.location,
+          price: stay.price || null,
+          image: stay.img,
+          rating: stay.rating,
+        }}
+      />
+    </div>
   )
 }

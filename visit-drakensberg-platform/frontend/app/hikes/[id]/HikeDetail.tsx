@@ -4,13 +4,14 @@ import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import Footer from '@/components/layout/Footer'
 import { ArrowLeft, Mountain, Clock, TrendingUp, Users, Star, CheckCircle, ChevronRight, X, Bed, Zap } from 'lucide-react'
-import { getTrails, Trail, trailCategory } from '@/lib/trails'
+import { getTrailSummaries, Trail, trailCategory } from '@/lib/trails'
 import UpcomingDepartures from '@/components/tours/UpcomingDepartures'
 import TrailExperiences from '@/components/experiences/TrailExperiences'
 import { getDepartures } from '@/lib/departures'
 import { getTours } from '@/lib/tours'
 import { getExperiencesByTrail, type TrekkingExperience } from '@/lib/experiences'
 import { publicSupabase } from '@/lib/supabase-public'
+import { backgroundPositionStyle } from '@/lib/image-position'
 import type { TourDate } from '@/components/tours/UpcomingDepartures'
 import { CalendarPlus } from 'lucide-react'
 import RouteArtwork from '@/components/trails/RouteArtwork'
@@ -20,6 +21,7 @@ import type { Property } from '@/lib/properties'
 import type { Activity } from '@/lib/activities'
 import { formatMoney } from '@/lib/allocation'
 import ReadMoreText from '@/components/ui/ReadMoreText'
+import SaveButton from '@/components/ui/SaveButton'
 
 const DIFF_COLOR: Record<string, string> = { Easy: '#4A7251', Moderate: '#C9A96E', Hard: '#c0392b', Strenuous: '#c0392b', Extreme: '#7f1d1d' }
 const DIFF_BG: Record<string, string> = { Easy: '#4A725122', Moderate: '#C9A96E22', Hard: '#c0392b22', Strenuous: '#c0392b22', Extreme: '#7f1d1d22' }
@@ -66,7 +68,10 @@ export default function HikeDetail({
     // supplier content, and a signed-in admin or ops session would otherwise
     // read past the public RLS gate and offer a suspended supplier's
     // departures here. See lib/supabase-public.ts.
-    getTrails(publicSupabase).then(setAllTrails)
+    // Only ever used below for "Related Trails" — plain text (name, distance,
+    // difficulty), no image or artwork — so the lightweight summary read is
+    // enough. See lib/trails.ts's getTrailSummaries().
+    getTrailSummaries(publicSupabase).then(setAllTrails)
     Promise.all([getDepartures(publicSupabase), getTours(publicSupabase)]).then(([all, tours]) => {
       const activeTourIds = new Set(tours.filter(t => t.status === 'active').map(t => t.id))
       const today = new Date().toISOString().slice(0, 10)
@@ -113,8 +118,8 @@ export default function HikeDetail({
       <section className={`${headerBg} text-white py-20 px-6 lg:px-12 mt-16 relative overflow-hidden`}>
         {trail.image && (
           <div
-            className="absolute inset-0 bg-cover bg-center opacity-20"
-            style={{ backgroundImage: `url(${trail.image})` }}
+            className="absolute inset-0 bg-cover opacity-20"
+            style={{ backgroundImage: `url(${trail.image})`, ...backgroundPositionStyle(trail.imagePosition) }}
           />
         )}
         <div className="max-w-[1440px] mx-auto relative">
@@ -135,9 +140,22 @@ export default function HikeDetail({
               <h1 className="font-display italic text-5xl lg:text-6xl mb-4">{trail.name}</h1>
               <p className="font-sans text-sm text-white/60">Starting point: {trail.trailhead}</p>
             </div>
-            <span className="font-sans text-sm px-4 py-2 mt-2" style={{ color: DIFF_COLOR[diff], background: DIFF_BG[diff] }}>
-              {diff}
-            </span>
+            <div className="flex items-center gap-3 mt-2">
+              <SaveButton
+                variant="inline"
+                tone="dark"
+                listing={{
+                  id: trail.id,
+                  type: 'hike',
+                  title: trail.name,
+                  location: trail.region,
+                  image: trail.image,
+                }}
+              />
+              <span className="font-sans text-sm px-4 py-2" style={{ color: DIFF_COLOR[diff], background: DIFF_BG[diff] }}>
+                {diff}
+              </span>
+            </div>
           </div>
         </div>
       </section>
@@ -263,8 +281,8 @@ export default function HikeDetail({
                   {/* Hero image as first gallery cell if no dedicated gallery */}
                   {trail.gallery.length === 0 && trail.image && (
                     <div
-                      className="aspect-[4/3] bg-cover bg-center cursor-pointer col-span-3"
-                      style={{ backgroundImage: `url(${trail.image})` }}
+                      className="aspect-[4/3] bg-cover cursor-pointer col-span-3"
+                      style={{ backgroundImage: `url(${trail.image})`, ...backgroundPositionStyle(trail.imagePosition) }}
                       onClick={() => setLightboxImg(trail.image)}
                     />
                   )}
@@ -306,7 +324,7 @@ export default function HikeDetail({
                   {relatedProperties.map(p => (
                     <Link
                       key={p.id}
-                      href={`/stay/${p.slug || p.id}`}
+                      href={`/stays/${p.slug || p.id}`}
                       className="block bg-white border border-gray-200 hover:border-[#C9A96E] transition-colors group overflow-hidden"
                     >
                       {p.photos?.[0] && (

@@ -7,6 +7,7 @@ import Footer from '@/components/layout/Footer'
 import { getTowns, DEFAULT_TOWNS, type Town } from '@/lib/towns'
 import { getRegions, DEFAULT_REGIONS } from '@/lib/regions'
 import { publicSupabase } from '@/lib/supabase-public'
+import { objectPositionStyle } from '@/lib/image-position'
 import { getNearbyTrails, getNearbyStays } from '@/lib/modules'
 import RelatedTrailsModule from '@/components/modules/RelatedTrailsModule'
 import NearbyStaysModule from '@/components/modules/NearbyStaysModule'
@@ -122,7 +123,7 @@ export default async function TownPage({ params }: { params: { slug: string } })
             <div>
               {town.image && (
                 <div className="relative aspect-[16/9] overflow-hidden bg-forest/10 mb-8">
-                  <Image src={town.image} alt={town.name} fill priority sizes="(max-width: 1024px) 100vw, 66vw" className="object-cover" />
+                  <Image src={town.image} alt={town.name} fill priority sizes="(max-width: 1024px) 100vw, 66vw" className="object-cover" style={objectPositionStyle(town.imagePosition)} />
                 </div>
               )}
               {town.gateway && <p className="font-sans text-[10px] tracking-[0.2em] uppercase text-gold mb-2">{town.gateway}</p>}

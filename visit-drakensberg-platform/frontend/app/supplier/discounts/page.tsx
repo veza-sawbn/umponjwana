@@ -139,7 +139,7 @@ export default function DiscountsPage() {
           <thead><tr className="border-b border-black/6">{['Code', 'Discount', 'Listing', 'Valid Until', 'Uses', ''].map((h, i) => <th key={i} className="px-4 py-3 text-left font-sans text-xs font-semibold text-black/40 uppercase tracking-wider">{h}</th>)}</tr></thead>
           <tbody>
             {loading && <tr><td colSpan={6} className="px-4 py-10 text-center font-sans text-sm text-black/30">Loading…</td></tr>}
-            {!loading && rows.length === 0 && <tr><td colSpan={6} className="px-4 py-10 text-center font-sans text-sm text-black/30">No discounts yet — create a code to offer guests a deal.</td></tr>}
+            {!loading && rows.length === 0 && <tr><td colSpan={6} className="px-4 py-10 text-center font-sans text-sm text-black/30">No discounts yet. Create a code to offer guests a deal.</td></tr>}
             {rows.map((r, i) => (
               <tr key={r.id} className={i < rows.length - 1 ? 'border-b border-black/5' : ''}>
                 <td className="px-4 py-3 font-mono text-sm font-semibold text-black/80">{r.code}</td>

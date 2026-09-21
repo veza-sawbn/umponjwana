@@ -37,7 +37,7 @@ const SECTIONS: { heading: string; body: string[] }[] = [
   {
     heading: '5. Cookies and browser storage',
     body: [
-      'We set one kind of cookie: the session cookie that keeps you signed in. It is strictly necessary — without it you cannot stay logged in or reach your account. We set no advertising, tracking or analytics cookies of our own, and we run no third-party advertising or analytics tags.',
+      'We set one kind of cookie: the session cookie that keeps you signed in. It is strictly necessary, because without it you cannot stay logged in or reach your account. We set no advertising, tracking or analytics cookies of our own, and we run no third-party advertising or analytics tags.',
       'Your trip planning selections, cart and browsing measurements are kept in your browser’s local storage rather than in cookies. They stay on your device and you can clear them at any time through your browser settings.',
       'We use Google Maps for address search and for driving distances. Google may set its own cookies when it loads, and that is governed by Google’s privacy policy rather than ours. It loads when you type in an address field, and on pages that show you the driving distance from a stay you have selected. It does not load on pages that use neither.',
     ],

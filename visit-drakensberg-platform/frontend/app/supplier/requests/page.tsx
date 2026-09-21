@@ -298,7 +298,7 @@ export default function SupplierRequestsPage() {
         )}
 
         {r.status === 'awaiting_payment' && (
-          <p className="mt-3 font-sans text-xs text-blue-600 flex items-center gap-1.5"><Clock size={12} /> Customer accepted the quote — awaiting payment.</p>
+          <p className="mt-3 font-sans text-xs text-blue-600 flex items-center gap-1.5"><Clock size={12} /> Customer accepted the quote. Awaiting payment.</p>
         )}
         {r.status === 'confirmed' && (
           <p className="mt-3 font-sans text-xs text-emerald-600 flex items-center gap-1.5"><CheckCircle size={12} /> Paid and confirmed. Contact the customer to finalise logistics.</p>
@@ -314,7 +314,7 @@ export default function SupplierRequestsPage() {
         <h1 className="font-display italic text-2xl text-black/90">Custom Trip Requests</h1>
       </div>
       <p className="font-sans text-sm text-black/40 -mt-3">
-        Private-date requests from visitors. Confirm your guide's availability first, then give operational approval with a quote — or propose alternative dates, guide, pricing or itinerary.
+        Private-date requests from visitors. Confirm your guide's availability first, then give operational approval with a quote, or propose alternative dates, guide, pricing or itinerary.
       </p>
 
       {loading ? (

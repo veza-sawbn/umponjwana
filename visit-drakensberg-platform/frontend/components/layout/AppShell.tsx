@@ -5,6 +5,7 @@ import { useState } from 'react'
 import { usePathname } from 'next/navigation'
 import Navbar from '@/components/layout/Navbar'
 import { BookingProvider } from '@/lib/booking-context'
+import { SavedListingsProvider } from '@/lib/saved-listings-context'
 import BookingBar from '@/components/booking/BookingBar'
 import EditModeGate from '@/components/editor/EditModeGate'
 import AnalyticsProvider from '@/components/analytics/AnalyticsProvider'
@@ -25,13 +26,17 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   return (
     <QueryClientProvider client={queryClient}>
       <BookingProvider>
-        <EditModeGate>
-          <AnalyticsProvider />
-          {!isAdmin && <Navbar />}
-          {children}
-          {!isAdmin && <BookingBar />}
-          <Toaster position="top-right" toastOptions={{ duration: 4000 }} />
-        </EditModeGate>
+        {/* Wraps the portals too, not just the public site: /account/saved
+            reads the same store the heart buttons on /stays write to. */}
+        <SavedListingsProvider>
+          <EditModeGate>
+            <AnalyticsProvider />
+            {!isAdmin && <Navbar />}
+            {children}
+            {!isAdmin && <BookingBar />}
+            <Toaster position="top-right" toastOptions={{ duration: 4000 }} />
+          </EditModeGate>
+        </SavedListingsProvider>
       </BookingProvider>
     </QueryClientProvider>
   )
