@@ -779,8 +779,20 @@ harness caught it on the first run.
 
 ## Follow-up work
 
-One thing remains deliberately undone in code, plus the configuration steps in
+Two things remain deliberately undone in code, plus the configuration steps in
 the runbook.
+
+**The anonymous insert into `vd_listing_applications` is still open.** The
+captcha added after the September bot flood (`docs/security/TURNSTILE.md`)
+covers the wizard, because the wizard signs the applicant up first and Supabase
+gates that signup. It does not cover a client that skips the wizard and posts
+straight to PostgREST with the anon key — which is what
+`20260807_listing_applications.sql` warned about in its own header. Closing it
+properly means either routing the write through a server route that verifies a
+Turnstile token, or an RLS policy that requires an authenticated caller; the
+second changes when an application can be lodged relative to email
+confirmation, so it is a product decision as much as a security one and does
+not belong in a drive-by commit.
 
 **`isMissingTipColumn()` should go.** `app/api/payments/ikhokha/create/route.ts`
 pattern-matches PostgREST error strings to detect that
@@ -789,6 +801,12 @@ accordingly. With the migration ledger in place that crutch is no longer
 needed — but removing it changes behaviour on the payment path, and that
 belongs in its own change with its own testing rather than riding along in a
 security branch.
+
+**The Turnstile switch in Supabase** (☐): the widget, the tokens and the CSP
+all ship in this branch, but nothing is *enforced* until Authentication →
+Attack Protection is turned on with the secret key. `docs/security/TURNSTILE.md`
+has the order — site key to Vercel and redeploy first, Supabase switch second —
+because reversing it locks every visitor out of signing in.
 
 **The configuration the runbook lists** (☐ items): turn on PITR and record the
 plan's retention, point `scripts/backup-financials.sh` at storage the team

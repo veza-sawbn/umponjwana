@@ -36,6 +36,15 @@
  *   Content-Security-Policy.
  */
 
+/**
+ * Cloudflare Turnstile. It needs three directives, not one: the script comes
+ * from this origin, the challenge renders in an iframe from it, and the widget
+ * talks back to it. Miss any one of them and the captcha silently fails to
+ * appear the day the Report-Only policy is promoted — which, with Supabase
+ * captcha switched on, locks every visitor out of signing in.
+ */
+const TURNSTILE_HOST = 'https://challenges.cloudflare.com'
+
 /** Hosts the app genuinely talks to, for the Report-Only policy. */
 const CONNECT_SRC = [
   "'self'",
@@ -44,6 +53,7 @@ const CONNECT_SRC = [
   'https://api.mapbox.com',
   'https://events.mapbox.com',
   'https://maps.googleapis.com',
+  TURNSTILE_HOST,
 ]
 
 const IMG_SRC = [
@@ -72,13 +82,13 @@ export const REPORT_ONLY_CSP = [
   // 'unsafe-inline'/'unsafe-eval' are present deliberately: this is a
   // measurement policy, and a report stream full of violations the app cannot
   // avoid yet would drown the ones that matter.
-  "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://maps.googleapis.com",
+  `script-src 'self' 'unsafe-inline' 'unsafe-eval' https://maps.googleapis.com ${TURNSTILE_HOST}`,
   "style-src 'self' 'unsafe-inline'",
   `img-src ${IMG_SRC.join(' ')}`,
   "font-src 'self' data:",
   `connect-src ${CONNECT_SRC.join(' ')}`,
   "worker-src 'self' blob:",
-  "frame-src 'self'",
+  `frame-src 'self' ${TURNSTILE_HOST}`,
   "frame-ancestors 'self'",
   "form-action 'self'",
   "object-src 'none'",

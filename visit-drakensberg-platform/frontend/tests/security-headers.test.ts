@@ -97,6 +97,25 @@ describe('report-only CSP covers the hosts the app actually talks to', () => {
   it('restricts form submissions to our own origin', () => {
     expect(REPORT_ONLY_CSP).toContain("form-action 'self'")
   })
+
+  // Turnstile needs three directives, not one. Dropping any of them does not
+  // fail a build or a test elsewhere — it makes the captcha silently not
+  // appear the day this policy is promoted from Report-Only, and with Supabase
+  // captcha switched on, a captcha that does not appear locks every visitor
+  // out of signing in.
+  describe('Cloudflare Turnstile', () => {
+    const turnstile = 'https://challenges.cloudflare.com'
+    const directive = (name: string) =>
+      REPORT_ONLY_CSP.split(';').map(d => d.trim()).find(d => d.startsWith(`${name} `)) ?? ''
+
+    it.each(['script-src', 'frame-src', 'connect-src'])('allows %s from the widget origin', name => {
+      expect(directive(name)).toContain(turnstile)
+    })
+
+    it('keeps frame-src restrictive apart from that one host', () => {
+      expect(directive('frame-src')).toBe(`frame-src 'self' ${turnstile}`)
+    })
+  })
 })
 
 describe('capability URLs do not leak through Referer', () => {
