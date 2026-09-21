@@ -5,8 +5,17 @@ asyncpg==0.30.0
 alembic==1.14.0
 pydantic[email]==2.10.3
 pydantic-settings==2.6.1
-python-jose[cryptography]==3.3.0
+# python-jose 3.3.0 carries CVE-2024-33663 (algorithm confusion: a token
+# signed with an OpenSSH ECDSA public key is accepted as HMAC) and
+# CVE-2024-33664 (JWT bomb: a crafted JWE decompresses without bound, taking
+# the process down). Both fixed in 3.4.0. See audit finding M4.
+python-jose[cryptography]==3.4.0
+# passlib 1.7.4 is unmaintained and reads bcrypt.__about__.__version__, which
+# bcrypt 4.1 removed — so it raises at import time against a current bcrypt.
+# Pinning bcrypt keeps the existing hashes working; migrating off passlib is
+# tracked separately.
 passlib[bcrypt]==1.7.4
+bcrypt==4.0.1
 resend==2.4.0
 supabase==2.10.0
 upstash-redis==1.1.0

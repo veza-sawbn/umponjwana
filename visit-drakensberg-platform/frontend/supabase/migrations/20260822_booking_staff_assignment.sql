@@ -1,3 +1,4 @@
+-- @rollback: additive — forward-only; safe to leave in place if the deploy is rolled back
 -- ────────────────────────────────────────────────────────────────────────────
 -- Booking staff assignment
 --

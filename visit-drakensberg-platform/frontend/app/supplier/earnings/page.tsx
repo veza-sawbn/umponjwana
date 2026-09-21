@@ -7,10 +7,15 @@ import { getMyOrderLines, setLineFulfilment, type OrderLine } from '@/lib/orders
 import { getMySettlements, buildStatements, type Settlement, type SupplierStatement } from '@/lib/settlements'
 import { formatMoney } from '@/lib/allocation'
 
-// Supplier earnings portal. Row-level security guarantees the signed-in
-// supplier only ever receives their own order lines and settlements — no
-// other suppliers, no customer totals, no internal notes, no cross-supplier
-// commission or payout data.
+// Supplier earnings portal. Row-level security guarantees a supplier only
+// ever receives their own order lines and settlements — no other suppliers,
+// no customer totals, no internal notes, no cross-supplier commission or
+// payout data.
+//
+// RLS is not the whole story for an operations employee, who may be
+// authorised for several suppliers at once: both reads below scope explicitly
+// to the supplier this console has entered (lib/effective-supplier.ts), so
+// this page shows one supplier's money and not a union of several.
 
 const SETTLE_BADGE: Record<string, string> = {
   settled: 'bg-[#2d6a4f]/10 text-[#2d6a4f]',

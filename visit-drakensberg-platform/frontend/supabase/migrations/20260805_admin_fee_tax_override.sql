@@ -1,3 +1,4 @@
+-- @rollback: destructive — same delete-and-reinsert of vd_order_lines as 20260803
 -- Give staff final control over service fee and VAT on a manual invoice.
 --
 -- vd_create_order derives both from vd_finance_settings and ignores whatever

@@ -20,6 +20,7 @@
 --   6. Grandfathers existing suppliers as approved; new suppliers require
 --      admin approval before they can create listings.
 -- ============================================================================
+-- @rollback: destructive — deletes migrated blob keys from site_content after copying them into vd_entities
 
 -- ────────────────────────────────────────────────────────────────────────────
 -- 0. Prerequisites: profiles table + signup trigger (idempotent, matches

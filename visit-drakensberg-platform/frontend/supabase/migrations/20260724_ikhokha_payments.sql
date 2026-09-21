@@ -9,6 +9,7 @@
 -- vd_record_order_payment RPC (20260716_order_management.sql), which already
 -- treats a NULL auth.uid() (service-role / webhook context) as trusted.
 -- ============================================================================
+-- @rollback: additive — forward-only; safe to leave in place if the deploy is rolled back
 
 create table if not exists vd_payment_links (
   id                       text primary key,

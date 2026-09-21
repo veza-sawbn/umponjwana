@@ -26,6 +26,7 @@
 --      account, and allow anonymity, or the non-retaliation promise is
 --      hollow.
 -- ============================================================================
+-- @rollback: additive — forward-only; safe to leave in place if the deploy is rolled back
 
 
 -- ────────────────────────────────────────────────────────────────────────────

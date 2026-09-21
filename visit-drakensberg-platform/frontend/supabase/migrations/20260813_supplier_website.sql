@@ -5,6 +5,7 @@
 -- This migration adds the backing column and grants suppliers the ability
 -- to update their own website URL.
 -- ============================================================================
+-- @rollback: additive — forward-only; safe to leave in place if the deploy is rolled back
 
 alter table profiles
   add column if not exists website text;

@@ -31,6 +31,7 @@
 -- themself), and "Admins write all" only matches admins. Added here,
 -- mirroring the UPDATE policy's permission set exactly.
 -- ============================================================================
+-- @rollback: additive — forward-only; safe to leave in place if the deploy is rolled back
 
 -- ─── 1. vd_entities: ops-delegated delete ───────────────────────────────────
 drop policy if exists "Managed ops agents delete entities" on vd_entities;

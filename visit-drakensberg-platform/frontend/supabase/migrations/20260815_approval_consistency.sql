@@ -16,6 +16,7 @@
 -- This migration reconciles existing rows and installs a trigger so the two
 -- can never disagree again, whichever one a caller writes.
 -- ============================================================================
+-- @rollback: additive — forward-only; safe to leave in place if the deploy is rolled back
 
 -- ─── 1. Reconcile existing rows ─────────────────────────────────────────────
 -- Approved in either representation counts as approved: both paths express a

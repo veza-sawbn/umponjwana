@@ -23,6 +23,7 @@
 --    entirely locked to the very administrator who had just created it.
 --    This repairs existing rows carrying that dead key.
 -- ============================================================================
+-- @rollback: additive — forward-only; safe to leave in place if the deploy is rolled back
 
 -- ─── 1. Widen the INSERT policy to match UPDATE's inclusiveness ────────────
 drop policy if exists "Managed ops agents write entities" on vd_entities;

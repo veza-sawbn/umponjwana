@@ -13,6 +13,7 @@
 --      profiles ('verified') and published marketplace packages ('published')
 --      are browsable by anonymous visitors, like the rest of the live catalog.
 -- ============================================================================
+-- @rollback: additive — forward-only; safe to leave in place if the deploy is rolled back
 
 -- ────────────────────────────────────────────────────────────────────────────
 -- 1. vd_trip_requests

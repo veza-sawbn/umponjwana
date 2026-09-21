@@ -23,6 +23,7 @@
 --   - supplier cancels their stay order → the cancelled order excludes the
 --     parent booking from the count (see NOT EXISTS below)
 -- ============================================================================
+-- @rollback: additive — forward-only; safe to leave in place if the deploy is rolled back
 
 -- How many overlapping, still-active bookings hold this room for the range.
 create or replace function public.vd_room_booked_count(

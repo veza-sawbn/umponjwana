@@ -28,6 +28,7 @@
 -- this migration exists so a fresh environment (or `supabase db reset`)
 -- gets the same fix, and so the history shows it happened.
 -- ============================================================================
+-- @rollback: additive — forward-only; safe to leave in place if the deploy is rolled back
 
 alter view public.vd_ops_assignment_details    set (security_invoker = on);
 alter view public.vd_managed_suppliers_summary  set (security_invoker = on);

@@ -142,7 +142,12 @@ export default function ConsolidatedFinancialsPage() {
           <table className="w-full min-w-[820px]">
             <thead>
               <tr className="border-b border-gray-100">
-                {['Supplier', 'Bookings', 'Gross', 'Commission', 'Supplier Share', 'Unsettled', ''].map(h => (
+                {/* "Lines", not "Bookings". The value under it is r.lines —
+                    a count of vd_order_lines — and one booking routinely
+                    produces several. Labelled "Bookings" it overstated volume
+                    on every row, which is what "the operations page shows
+                    inaccurate bookings" turned out to mean. */}
+                {['Supplier', 'Lines', 'Gross', 'Commission', 'Supplier Share', 'Unsettled', ''].map(h => (
                   <th
                     key={h}
                     className="text-left px-5 py-3 font-sans text-[10px] tracking-[0.12em] uppercase text-gray-400"

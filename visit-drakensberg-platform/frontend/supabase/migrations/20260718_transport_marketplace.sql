@@ -19,6 +19,7 @@
 --   is tracked in the entity value as `fleetStatus`, so the row itself stays
 --   `active` and readable by the dispatch scorer.
 -- ============================================================================
+-- @rollback: additive — forward-only; safe to leave in place if the deploy is rolled back
 
 create table if not exists vd_transport_requests (
   id                    text primary key,

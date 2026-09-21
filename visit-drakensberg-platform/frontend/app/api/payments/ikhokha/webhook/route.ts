@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server'
 import { getPaymentLinkStatus } from '@/lib/ikhokha'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 import { getSiteOrigin } from '@/lib/origin'
+import { sendOrderReceipt } from '@/lib/receipts-server'
+import { alertEvent, EVENTS } from '@/lib/observability'
 import { notifyServer, notifyServerMany } from '@/lib/notify-server'
 
 export const dynamic = 'force-dynamic'
@@ -35,7 +37,13 @@ export async function POST(req: Request) {
   try {
     status = await getPaymentLinkStatus(paylinkID)
   } catch (e) {
-    console.error('[ikhokha webhook] status check failed:', e)
+    // The gateway is the only authority on whether this payment cleared, so
+    // failing to reach it means we cannot reconcile at all.
+    await alertEvent({
+      event: EVENTS.PAYMENT_GATEWAY_UNREACHABLE,
+      severity: 'error',
+      fields: { paylinkId: paylinkID, orderId: link.order_id, reason: e },
+    })
     return NextResponse.json({ ok: false }, { status: 502 })
   }
 
@@ -223,14 +231,45 @@ export async function POST(req: Request) {
     // Fire-and-forget the same receipt email + in-app notification a manual
     // payment gets, authenticating as a trusted internal caller since there's
     // no customer session here.
-    const origin = process.env.NEXT_PUBLIC_SITE_URL || new URL(req.url).origin
-    fetch(`${origin}/api/receipts/send`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${process.env.SUPABASE_SERVICE_ROLE_KEY}` },
-      body: JSON.stringify({ orderId: link.order_id, paymentId }),
-    }).catch(err => console.error('[ikhokha webhook] receipt email failed:', err))
+    // In-process, with the admin client this handler already holds (audit
+    // finding M8). This used to be a fetch() to our own /api/receipts/send
+    // carrying SUPABASE_SERVICE_ROLE_KEY as a bearer token — the one
+    // credential that bypasses RLS entirely — over the network on every
+    // confirmed payment, to an origin derived as `NEXT_PUBLIC_SITE_URL ||
+    // new URL(req.url).origin`. That fallback read the host from the INBOUND
+    // request, on an endpoint anyone can POST to, so with the env var unset a
+    // spoofed host sent the key wherever the caller liked.
+    //
+    // There is now no request, no token in flight and no origin to get wrong.
+    // Same move lib/notify-server.ts already made, for the same reason.
+    // Still fire-and-forget: a receipt that cannot be delivered must not fail
+    // the payment it is announcing.
+    sendOrderReceipt(admin, {
+      orderId: link.order_id,
+      paymentId: paymentId as string,
+      origin: getSiteOrigin(req),
+    }).then(result => {
+      if (result.error && result.error !== 'SMTP not configured') {
+        console.error('[ikhokha webhook] receipt email failed:', result.error)
+      }
+    }).catch(err => console.error('[ikhokha webhook] receipt email threw:', err))
   } catch (e) {
-    console.error('[ikhokha webhook] failed to record order payment:', e)
+    // THE alert this application most needed and did not have: iKhokha has
+    // taken the customer's money and we could not record it. The 500 below
+    // relies on iKhokha retrying, and until this line nobody was told that a
+    // paid order was sitting unpaid in our database.
+    await alertEvent({
+      event: EVENTS.PAYMENT_RECONCILIATION_FAILED,
+      severity: 'critical',
+      fields: {
+        paylinkId: paylinkID,
+        orderId: link.order_id,
+        invoiceId: link.invoice_id,
+        amount: link.amount,
+        currency: link.currency,
+        reason: e,
+      },
+    })
     // Roll back to pending so a retried webhook (or manual reconciliation) can complete it.
     await admin.from('vd_payment_links').update({ status: 'pending' }).eq('id', link.id)
     return NextResponse.json({ ok: false }, { status: 500 })

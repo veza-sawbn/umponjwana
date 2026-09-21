@@ -22,6 +22,7 @@
 -- customers opening their invoice from an emailed or pasted link without a
 -- session.
 -- ============================================================================
+-- @rollback: additive — forward-only; safe to leave in place if the deploy is rolled back
 
 alter table vd_invoices add column if not exists payment_declined_at timestamptz;
 

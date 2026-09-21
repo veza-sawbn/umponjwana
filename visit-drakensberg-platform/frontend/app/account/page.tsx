@@ -5,8 +5,7 @@ import Link from 'next/link'
 import toast from 'react-hot-toast'
 import { MapPin, Calendar, Users, CheckCircle, Clock, XCircle, Download, ChevronRight } from 'lucide-react'
 import { getBookingsByUser, updateBookingStatus, type SavedBooking } from '@/lib/bookings'
-import { getDepartures, releaseDepartureSeats } from '@/lib/departures'
-import { releaseActivityTimeslot } from '@/lib/activities'
+import { releaseBookingInventory } from '@/lib/inventory-holds'
 import { supabase } from '@/lib/auth'
 import { formatMoney } from '@/lib/allocation'
 import { holdDeadlineLabel, holdHasLapsed } from '@/lib/stay-requests'
@@ -152,16 +151,11 @@ export default function AccountBookingsPage() {
       : `Cancel booking ${b.reference}? Free cancellation applies until 48 hours before check-in.`)) return
     try {
       await updateBookingStatus(b.id, 'cancelled', { notifySuppliers: true })
-      // Release any tour departure seats and activity timeslots held by this booking.
-      const deps = await getDepartures()
-      await Promise.all([
-        ...b.addons
-          .filter(a => deps.some(d => d.id === a.id))
-          .map(a => releaseDepartureSeats(a.id, a.guests).catch(() => {})),
-        ...b.addons
-          .filter(a => a.activityId && a.timeslotId && a.date)
-          .map(a => releaseActivityTimeslot(a.activityId!, a.date!, a.timeslotId!, a.guests).catch(() => {})),
-      ])
+      // Release everything this booking holds — departure seats and activity
+      // timeslots alike. One server call that releases exactly the holds this
+      // booking took, instead of re-deriving them from the addons blob here
+      // and hoping the two agree (see lib/inventory-holds.ts).
+      await releaseBookingInventory(b.id)
       setBookings(prev => prev.map(x => x.id === b.id ? { ...x, status: 'cancelled' } : x))
       toast.success(withdrawing ? 'Request withdrawn.' : 'Booking cancelled. The suppliers have been notified.')
     } catch {

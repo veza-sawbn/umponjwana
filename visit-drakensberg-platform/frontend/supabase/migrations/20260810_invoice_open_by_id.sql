@@ -50,6 +50,7 @@
 -- the leaked bare URL does not match. Invoices that were never revoked — very
 -- nearly all of them — keep the short, unbreakable link.
 -- ============================================================================
+-- @rollback: additive — forward-only; safe to leave in place if the deploy is rolled back
 
 -- ────────────────────────────────────────────────────────────────────────────
 -- 0. Does this invoice still open on its own address?

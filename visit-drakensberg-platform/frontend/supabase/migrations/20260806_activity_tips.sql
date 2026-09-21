@@ -20,6 +20,7 @@
 -- line is added before the payment that settles it is recorded, so the
 -- invoice never shows a customer paying more than the document asks for.
 -- ============================================================================
+-- @rollback: additive — forward-only; safe to leave in place if the deploy is rolled back
 
 -- ────────────────────────────────────────────────────────────────────────────
 -- 1. Settings — tipping can be switched off, and the offered percentages are

@@ -38,21 +38,51 @@ async def lifespan(app: FastAPI):
     logger.info("Visit Drakensberg API shutting down")
 
 
+# The interactive docs publish the complete API surface — every admin route,
+# every schema, every parameter — and they were served unconditionally in
+# production (audit finding M4). They are a development tool, so they are
+# enabled only outside production now. Set ENVIRONMENT to anything but
+# "production" (or run locally) to get them back.
+_DOCS_ENABLED = settings.ENVIRONMENT.lower() != "production"
+
 app = FastAPI(
     title="Visit Drakensberg API",
     version="1.0.0",
     description="Backend API for the Visit Drakensberg tourism platform",
-    docs_url="/docs",
-    redoc_url="/redoc",
+    docs_url="/docs" if _DOCS_ENABLED else None,
+    redoc_url="/redoc" if _DOCS_ENABLED else None,
+    openapi_url="/openapi.json" if _DOCS_ENABLED else None,
     lifespan=lifespan,
 )
 
 # ---------------------------------------------------------------------------
 # CORS
 # ---------------------------------------------------------------------------
+def _allowed_origins() -> list[str]:
+    """Normalise FRONTEND_URL into something a browser Origin can match.
+
+    An Origin header is always ``scheme://host[:port]`` with no trailing
+    slash. FRONTEND_URL is configured by hand, and the repository's own
+    .env.example sets it to a bare ``umponjwana.vercel.app`` — no scheme —
+    which matches no Origin at all, silently disabling CORS rather than
+    enforcing it (audit finding L7). A trailing slash does the same.
+
+    Both forms are repaired here, and https is assumed for anything that is
+    not localhost, so a misconfiguration degrades to "the real origin works"
+    rather than to "nothing works" or, worse, to a wildcard.
+    """
+    raw = (settings.FRONTEND_URL or "").strip().rstrip("/")
+    if not raw:
+        return []
+    if not raw.startswith(("http://", "https://")):
+        scheme = "http" if raw.startswith(("localhost", "127.0.0.1")) else "https"
+        raw = f"{scheme}://{raw}"
+    return [raw]
+
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[settings.FRONTEND_URL],
+    allow_origins=_allowed_origins(),
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -93,4 +123,8 @@ async def health_check():
 
 @app.get("/", include_in_schema=False)
 async def root():
+    # Without the docs to redirect to in production, say so rather than
+    # bouncing the caller to a 404.
+    if not _DOCS_ENABLED:
+        return {"service": "visit-drakensberg-api", "status": "ok"}
     return RedirectResponse(url="/docs")

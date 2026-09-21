@@ -4,6 +4,7 @@ import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs'
 import { publicSupabase } from '@/lib/supabase-public'
 import { renderInvoicePdf, BUSINESS_DETAILS_DEFAULTS } from '@/lib/invoice-pdf'
 import type { Invoice, InvoiceCustomerOrder, Receipt } from '@/lib/invoices'
+import { rateLimit, rateLimitHeaders, callerKey } from '@/lib/rate-limit'
 
 export const dynamic = 'force-dynamic'
 
@@ -55,6 +56,18 @@ async function loadAuthed(id: string): Promise<Shared | null> {
 }
 
 export async function GET(req: Request, { params }: { params: { id: string } }) {
+  // @react-pdf/renderer lays the document out in-process, so each call costs
+  // real CPU on a serverless function — and the route is reachable without a
+  // session by design (the invoice URL is the credential). Budgeted per caller
+  // so one client cannot turn that into a cheap resource-exhaustion attack.
+  const limit = await rateLimit('invoicePdf', callerKey(req))
+  if (!limit.ok) {
+    return NextResponse.json(
+      { error: 'Too many requests. Please try again shortly.' },
+      { status: 429, headers: rateLimitHeaders(limit) },
+    )
+  }
+
   const id = decodeURIComponent(params.id)
   const token = new URL(req.url).searchParams.get('t')
 

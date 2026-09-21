@@ -5,8 +5,7 @@ import toast from 'react-hot-toast'
 import { CalendarDays, Search, Phone, Mail, Users, MessageSquare, XCircle, CheckCircle2, Clock, AlertTriangle } from 'lucide-react'
 import { getMyOrders, cancelOrderAsSupplier, type SupplierOrder } from '@/lib/booking-orders'
 import { getMyOrderLinesForBooking, setLineFulfilment, type OrderLine } from '@/lib/orders'
-import { getMyDepartures, releaseDepartureSeats } from '@/lib/departures'
-import { releaseActivityTimeslot } from '@/lib/activities'
+import { releaseBookingInventory } from '@/lib/inventory-holds'
 import { supabase } from '@/lib/auth'
 import { readManagedSupplierId } from '@/lib/effective-supplier'
 import { formatMoney } from '@/lib/allocation'
@@ -65,16 +64,9 @@ export default function BookingsPage() {
     if (!window.confirm(`Cancel your service on booking ${o.reference} for ${o.customerName}? The guest will be notified; the rest of their trip is unaffected.`)) return
     try {
       await cancelOrderAsSupplier(o)
-      // Free any tour departure seats and activity timeslots this order held.
-      const deps = await getMyDepartures()
-      await Promise.all([
-        ...o.items
-          .filter(i => deps.some(d => d.id === i.id))
-          .map(i => releaseDepartureSeats(i.id, i.guests).catch(() => {})),
-        ...o.items
-          .filter(i => i.activityId && i.timeslotId && i.date)
-          .map(i => releaseActivityTimeslot(i.activityId!, i.date!, i.timeslotId!, i.guests).catch(() => {})),
-      ])
+      // Free everything this booking holds — departure seats and activity
+      // timeslots alike — in one server call (see lib/inventory-holds.ts).
+      await releaseBookingInventory(o.bookingId)
       setOrders(prev => prev.map(x => x.id === o.id ? { ...x, status: 'cancelled' } : x))
       toast.success('Your service was cancelled and the guest notified.')
     } catch {

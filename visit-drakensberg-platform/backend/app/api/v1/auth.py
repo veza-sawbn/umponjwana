@@ -1,12 +1,14 @@
 from datetime import timedelta
 
 from fastapi import APIRouter, Depends, HTTPException, status, BackgroundTasks
+from fastapi.security import HTTPAuthorizationCredentials
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
 from app.core.config import settings
 from app.core.database import get_db, redis
 from app.core.security import (
+    bearer_scheme,
     get_password_hash,
     verify_password,
     create_access_token,
@@ -82,6 +84,14 @@ async def login(user_data: UserLogin, db: AsyncSession = Depends(get_db)):
 
 @router.post("/refresh", response_model=Token)
 async def refresh_token(token_data: TokenRefresh, db: AsyncSession = Depends(get_db)):
+    # A revoked refresh token used to keep working here: this endpoint never
+    # looked at the blacklist, so logging out bought nothing (finding M4).
+    if redis.get(f"blacklist:{token_data.refresh_token}"):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Token has been revoked",
+        )
+
     payload = verify_token(token_data.refresh_token, expected_type="refresh")
     user_id = payload.get("sub")
 
@@ -93,17 +103,44 @@ async def refresh_token(token_data: TokenRefresh, db: AsyncSession = Depends(get
     access_token = create_access_token({"sub": str(user.id), "role": user.role})
     new_refresh_token = create_refresh_token({"sub": str(user.id), "role": user.role})
 
+    # Rotation: the token just spent cannot be spent again. Without this, one
+    # stolen refresh token is a renewable seven-day session that the real
+    # user's own activity never invalidates.
+    redis.setex(
+        f"blacklist:{token_data.refresh_token}",
+        settings.REFRESH_TOKEN_EXPIRE_DAYS * 86400,
+        "rotated",
+    )
+
     return Token(access_token=access_token, refresh_token=new_refresh_token)
 
 
 @router.post("/logout", status_code=status.HTTP_204_NO_CONTENT)
 async def logout(
     token_data: TokenRefresh,
+    credentials: HTTPAuthorizationCredentials = Depends(bearer_scheme),
     current_user: User = Depends(get_current_user),
 ):
+    """Revoke this session.
+
+    Logging out used to revoke nothing at all (audit finding M4). It wrote
+    ``blacklist:<refresh_token>``, but ``get_current_user`` checks
+    ``blacklist:<access_token>`` — a different key — and ``/auth/refresh``
+    consulted the blacklist not at all. So after logging out, the access token
+    stayed valid for its full 30 minutes AND the "revoked" refresh token kept
+    minting new ones for seven days. Session revocation did not exist.
+
+    Both tokens are now blacklisted under the keys the code that reads them
+    actually looks at, each for its own remaining lifetime.
+    """
     redis.setex(
         f"blacklist:{token_data.refresh_token}",
         settings.REFRESH_TOKEN_EXPIRE_DAYS * 86400,
+        "revoked",
+    )
+    redis.setex(
+        f"blacklist:{credentials.credentials}",
+        settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
         "revoked",
     )
     return None

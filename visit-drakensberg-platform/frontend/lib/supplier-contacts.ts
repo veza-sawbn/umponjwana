@@ -1,4 +1,5 @@
 import { supabase } from './auth'
+import { getEffectiveSupplierId } from './effective-supplier'
 import { fetchAllRows } from './customers-admin'
 
 /* ────────────────────────────────────────────────────────────────────────────
@@ -50,10 +51,18 @@ function rowToContact(r: any): SupplierContact {
  *  row cap (1000 by default), same reasoning as the admin cross-supplier
  *  read in lib/admin-supplier-contacts.ts. */
 export async function getMyContacts(): Promise<SupplierContact[]> {
+  // Explicitly scoped, for the same reason getMyOrders() is: relying on RLS
+  // alone is correct for a supplier and wrong for an operations employee, who
+  // may be authorised for several suppliers at once and would get the union of
+  // their address books under whichever supplier the console says it entered.
+  // Every customer who has ever booked with any of them, attributed to one.
+  const supplierId = await getEffectiveSupplierId()
+  if (!supplierId) return []
   const rows = await fetchAllRows<any>(
     (from, to) => supabase
       .from('vd_supplier_contacts')
       .select('*')
+      .eq('supplier_id', supplierId)
       .order('last_booking_at', { ascending: false, nullsFirst: false })
       .range(from, to),
     'vd_supplier_contacts',
