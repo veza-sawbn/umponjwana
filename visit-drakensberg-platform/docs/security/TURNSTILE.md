@@ -29,12 +29,27 @@ the whole design:
 | `signUp` (`/auth/register`) | **Supabase** | Attack Protection setting |
 | `signUp` (`/list-with-us`, step 5) | **Supabase** | Attack Protection setting |
 | `POST /api/auth/request-password-reset` | **This repo** | `lib/turnstile-verify.ts` |
+| `POST /api/listing-applications` | **This repo** | `lib/turnstile-verify.ts` |
 
-The last row is the exception and the reason `TURNSTILE_SECRET_KEY` exists in
-the app's own environment at all: that route holds the **service-role** key,
-and GoTrue exempts service-role calls from captcha by design. Nothing in the
-Supabase dashboard will ever protect it, so it verifies the token itself
-against `siteverify`.
+The last two rows are the reason `TURNSTILE_SECRET_KEY` exists in the app's own
+environment at all. Both routes hold the **service-role** key, and GoTrue
+exempts service-role calls from captcha by design, so nothing in the Supabase
+dashboard will ever protect them; they verify the token themselves against
+`siteverify`.
+
+### The wizard spends two tokens
+
+A token is redeemable **once**. `/list-with-us` needs two in a row: Supabase
+redeems the first on `signUp`, and `POST /api/listing-applications` needs an
+unspent one. So `submit()` calls `turnstile.refresh()` between the two steps,
+which resets the widget and resolves with the next token. A managed widget
+re-solves without interaction, so this normally settles in under a second; if
+Cloudflare decides the visitor must click something, `refresh()` rejects on a
+15-second timeout rather than hanging the submit, and the applicant is asked to
+complete the check and press Submit again with the form still filled in.
+
+The widget is shown whether or not the applicant is signed in. Signing in
+skips the `signUp` but not the route.
 
 ### What is *not* gated, and why that is fine
 
@@ -49,13 +64,19 @@ sent, and getting one sent now requires passing the captcha on
 
 ### What this does not cover
 
-The direct anonymous `insert` into `vd_listing_applications` from
-`lib/listing-applications.ts`. A browser that skips the wizard and posts
-straight to PostgREST is not signing up, so no captcha is in its path. The
-wizard's own traffic is covered (it signs up first), but the endpoint itself
-still needs either a server route that verifies a token before writing, or an
-RLS policy that requires an authenticated caller. **Open item** — tracked in
-`SECURITY_AUDIT_2026-09.md` under follow-up work.
+The anonymous storage `INSERT` into `media/listing-applications/…`, opened by
+the same 2026-08-07 migration and covered by the same warning. Photos are
+uploaded while the applicant is still filling the form, so closing it means
+routing uploads through a server route that verifies a token — a larger change
+than the application write, and the bucket's own limits (50 MB per object, an
+allowed-MIME list, and `20260913_media_bucket_no_active_content.sql`) still
+apply. **Open item** — tracked in `SECURITY_AUDIT_2026-09.md` under follow-up
+work.
+
+The direct `insert` into `vd_listing_applications` **was** the other half of
+this and is now closed: the table no longer accepts anonymous inserts at all
+(`20260921_listing_applications_server_only.sql`), so the route is the only
+way in and its captcha is not skippable.
 
 ## Configuration
 
@@ -131,6 +152,18 @@ all three.
 |---|---|
 | `frontend/lib/turnstile.ts` | Site key, script URL, `captchaOptions()`, `isTurnstileEnabled()` |
 | `frontend/lib/turnstile-verify.ts` | Server-side `siteverify`, fail-closed |
-| `frontend/components/security/Turnstile.tsx` | The widget: explicit render, managed reset |
+| `frontend/components/security/Turnstile.tsx` | The widget: explicit render, `reset()` and `refresh()` |
+| `frontend/app/api/listing-applications/route.ts` | The only way into `vd_listing_applications` |
+| `frontend/lib/listing-application-intake.ts` | Server-owned id/status/timestamp, size ceiling |
+| `frontend/supabase/migrations/20260921_…_server_only.sql` | Drops the anonymous insert policy |
 | `frontend/tests/turnstile.test.ts` | The contract the forms depend on |
 | `frontend/tests/turnstile-verify.test.ts` | Including the fail-closed behaviour |
+| `frontend/tests/listing-application-intake.test.ts` | What the client no longer decides |
+| `frontend/supabase/tests/listing_application_intake_test.sql` | That anon really cannot insert |
+
+## Deploying the listing-application change
+
+`20260921_listing_applications_server_only.sql` makes the old client-side
+insert fail. **Deploy the frontend first**, confirm a test application lands,
+and only then run the migration — a build that still performs the direct
+insert loses every application submitted in between.

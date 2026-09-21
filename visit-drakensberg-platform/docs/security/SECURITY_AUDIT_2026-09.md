@@ -782,17 +782,19 @@ harness caught it on the first run.
 Two things remain deliberately undone in code, plus the configuration steps in
 the runbook.
 
-**The anonymous insert into `vd_listing_applications` is still open.** The
-captcha added after the September bot flood (`docs/security/TURNSTILE.md`)
-covers the wizard, because the wizard signs the applicant up first and Supabase
-gates that signup. It does not cover a client that skips the wizard and posts
-straight to PostgREST with the anon key — which is what
-`20260807_listing_applications.sql` warned about in its own header. Closing it
-properly means either routing the write through a server route that verifies a
-Turnstile token, or an RLS policy that requires an authenticated caller; the
-second changes when an application can be lodged relative to email
-confirmation, so it is a product decision as much as a security one and does
-not belong in a drive-by commit.
+**The anonymous storage upload is still open.**
+`20260807_listing_applications.sql` opened two unauthenticated write endpoints
+under one warning. The table insert is now closed —
+`20260921_listing_applications_server_only.sql` drops the public policy, and
+`POST /api/listing-applications` is the only way in, behind a verified
+Turnstile token, a rate limit and a server-owned id, status and timestamp. The
+storage `INSERT` into `media/listing-applications/…` is not. Photos are
+uploaded while the applicant is still filling the form, so closing it means
+routing uploads through a server route that verifies a token — a larger change
+than the application write, and one that should not ride along with it. The
+bucket's own limits still apply (50 MB per object, an allowed-MIME list, and
+`20260913_media_bucket_no_active_content.sql`), so the exposure is bucket
+volume rather than content.
 
 **`isMissingTipColumn()` should go.** `app/api/payments/ikhokha/create/route.ts`
 pattern-matches PostgREST error strings to detect that

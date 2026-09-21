@@ -1,0 +1,63 @@
+-- ============================================================================
+-- Listing applications: server-only intake
+--
+-- Closes the endpoint 20260807_listing_applications.sql warned about in its
+-- own header, a month before the warning came true:
+--
+--   "It is still an unauthenticated write endpoint: a bot that finds it can
+--    fill the bucket. Put the platform behind a rate limit / captcha before
+--    this sees real traffic."
+--
+-- On 2026-09-20 the table held 144 applications, 109 of them scripted.
+--
+-- WHAT THE OLD POLICY ACTUALLY ALLOWED
+--
+--   create policy "Anyone can apply to list" on vd_listing_applications
+--     for insert with check (status = 'new');
+--
+-- `status = 'new'` stops a caller self-approving on the way in, and that is
+-- all it stops. Any holder of the anon key — which ships in every page of the
+-- site — could insert rows at whatever rate PostgREST would take them, with an
+-- id and a timestamp of its choosing and a `value` blob of any size, without
+-- ever loading the form. The captcha added on 2026-09-21 covers the wizard,
+-- because the wizard signs the applicant up first and Supabase gates that
+-- signup; it does nothing about a client that skips the wizard, which is
+-- precisely what a scripted run does.
+--
+-- Dropping the policy leaves no INSERT policy for anon or authenticated, so
+-- RLS denies the write by default. The service role is not subject to RLS, so
+-- POST /api/listing-applications keeps working — and it is now the only way
+-- in. That route verifies a Turnstile token against Cloudflare, rate limits
+-- per caller and per contact address, and owns the id, status and timestamp
+-- itself (see app/api/listing-applications/route.ts and
+-- lib/listing-application-intake.ts).
+--
+-- ┌────────────────────────────────────────────────────────────────────────┐
+-- │ DEPLOY THE FRONTEND FIRST. This migration makes the old client-side    │
+-- │ insert fail. A build that still performs it — anything before the      │
+-- │ commit that added /api/listing-applications — loses every application  │
+-- │ submitted between this migration running and that deploy going live.   │
+-- │ Order: deploy, confirm a test application lands, then run this.        │
+-- └────────────────────────────────────────────────────────────────────────┘
+--
+-- NOT CHANGED HERE: the anonymous storage INSERT into
+-- media/listing-applications/… from the same 2026-08-07 migration. It is the
+-- other half of the same warning and it is still open. Photos are collected
+-- while the applicant is still filling the form, so closing it means routing
+-- uploads through a server route that verifies a token — a larger change than
+-- this one, and one that should not ride along with it. Tracked in
+-- docs/security/SECURITY_AUDIT_2026-09.md under follow-up work.
+-- ============================================================================
+-- @rollback: drop policy if exists "Applications are lodged server-side only" on vd_listing_applications; create policy "Anyone can apply to list" on vd_listing_applications for insert with check (status = 'new');
+
+drop policy if exists "Anyone can apply to list" on vd_listing_applications;
+
+-- Documentary only, and deliberately so. Permissive policies are OR'd, so this
+-- adds nothing to enforcement — the denial comes from there being no policy
+-- that permits the insert. What it buys is that the rule is VISIBLE: in \d+
+-- and in the Supabase policy list this table now reads "applications are
+-- lodged server-side only" instead of showing an absence somebody has to
+-- notice and correctly interpret. The admin policy below it still allows staff
+-- inserts, because OR.
+create policy "Applications are lodged server-side only" on vd_listing_applications
+  for insert with check (false);
