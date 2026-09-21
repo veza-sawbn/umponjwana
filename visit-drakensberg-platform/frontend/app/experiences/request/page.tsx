@@ -18,6 +18,7 @@ import {
   type OperatorProfile, type GuideProfile,
 } from '@/lib/operators'
 import { createTripRequest, TRIP_STATUS_LABELS } from '@/lib/custom-trips'
+import { publicSupabase } from '@/lib/supabase-public'
 
 // "Book on Custom Dates" journey: instead of joining a scheduled departure the
 // visitor requests a private trip. The platform matches available guides and
@@ -93,7 +94,7 @@ function RequestContent() {
   useEffect(() => {
     if (!guideParam) { setRequestedGuide(null); setRequestedGuideOperator(null); return }
     let cancelled = false
-    getGuideById(guideParam).then(async g => {
+    getGuideById(guideParam, publicSupabase).then(async g => {
       if (cancelled || !g) return
       setRequestedGuide(g)
       const op = await getOperatorForGuide(g)
@@ -112,7 +113,12 @@ function RequestContent() {
     if (!trail) { setMatches([]); return }
     let cancelled = false
     async function match(selected: Trail) {
-      const [operators, tours] = await Promise.all([getOperators(), getTours()])
+      // The visitor's operator picker must offer exactly the operators the
+      // public can see — read through a session it would offer a suspended
+      // one and then take a booking request against them.
+      const [operators, tours] = await Promise.all([
+        getOperators(publicSupabase), getTours(publicSupabase),
+      ])
       const trailTours = tours.filter(t => t.trailId === selected.id && t.status === 'active')
       const operatorIdsOnTrail = new Set(trailTours.map(t => t.supplierId).filter(Boolean))
       const profiledSupplierIds = new Set(operators.map(o => o.supplierId))
@@ -138,7 +144,7 @@ function RequestContent() {
         const runsTrail = op.supplierId !== '' && operatorIdsOnTrail.has(op.supplierId)
         const inRegion = op.operatingRegions.includes(selected.region)
         if (!runsTrail && !inRegion) continue
-        const guides = await getGuidesByOperator(op)
+        const guides = await getGuidesByOperator(op, publicSupabase)
         results.push({ operator: op, guides, runsTrail, inRegion })
       }
       results.sort((a, b) => Number(b.runsTrail) - Number(a.runsTrail) || Number(b.inRegion) - Number(a.inRegion))

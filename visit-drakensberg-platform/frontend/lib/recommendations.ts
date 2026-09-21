@@ -2,6 +2,7 @@ import { getActivities, type Activity } from './activities'
 import { getDepartures, type Departure } from './departures'
 import { getProperties, type Property } from './properties'
 import { getRoomsByProperty } from './rooms'
+import { publicSupabase } from './supabase-public'
 
 // Context-aware recommendation engine. Inputs are the visitor's real
 // context (region, travel dates, current cart, past bookings); output is a
@@ -54,9 +55,13 @@ export async function getRecommendations(ctx: RecommendationContext, limit = 6):
   const today = new Date().toISOString().slice(0, 10)
 
   const [activities, departures, properties] = await Promise.all([
-    getActivities().catch(() => [] as Activity[]),
-    getDepartures().catch(() => [] as Departure[]),
-    getProperties().catch(() => [] as Property[]),
+    // Every caller of this engine (/trip, /plan, /account/recommendations)
+    // recommends something bookable, so it reads the catalog as the public
+    // sees it — a suspended supplier's product must not be recommended to
+    // anyone, least of all to staff, whose session would otherwise surface it.
+    getActivities(publicSupabase).catch(() => [] as Activity[]),
+    getDepartures(publicSupabase).catch(() => [] as Departure[]),
+    getProperties(publicSupabase).catch(() => [] as Property[]),
   ])
 
   const recs: Recommendation[] = []
@@ -126,7 +131,7 @@ export async function getRecommendations(ctx: RecommendationContext, limit = 6):
 /** Min room price per property — used to decorate stay recommendations. */
 export async function getStayPrice(propertyId: string): Promise<number | null> {
   try {
-    const rooms = await getRoomsByProperty(propertyId)
+    const rooms = await getRoomsByProperty(propertyId, publicSupabase)
     if (rooms.length === 0) return null
     return Math.min(...rooms.map(r => r.basePrice))
   } catch {

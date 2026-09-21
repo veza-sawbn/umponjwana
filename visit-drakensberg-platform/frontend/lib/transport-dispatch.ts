@@ -1,4 +1,6 @@
+import type { SupabaseClient } from '@supabase/supabase-js'
 import { newEntityId } from './entities'
+import { publicSupabase } from './supabase-public'
 import { notify } from './notifications'
 import type { SavedBooking } from './bookings'
 import { formatMoney } from '@/lib/allocation'
@@ -206,11 +208,29 @@ export function scoreCompany(
   }
 }
 
-/** Load every transport company with its fleet and rank them for a request. */
-export async function rankSuppliers(input: DispatchInput): Promise<{ tripClass: TripClass; candidates: ScoredCandidate[] }> {
+/**
+ * Load every listable transport company with its fleet and rank them for a trip.
+ *
+ * Reads through publicSupabase, never the caller's session. Suspension is
+ * enforced by RLS on vd_entities (vd_owner_is_listable, see
+ * 20260906_suspension_hides_listings.sql) and the policies that grant a
+ * privileged reader more are OR-combined with it — so ranking through an
+ * admin's or the supplier's own session would offer a suspended operator to
+ * the customer, and `company.status` cannot catch that: suspending a supplier
+ * leaves their transport_company row 'active' by design. This is the read
+ * behind the customer's shuttle picker, so getting it wrong sells a transfer
+ * from an operator who is off the site.
+ *
+ * Admin dispatch views that genuinely need the full marketplace pass their
+ * own client.
+ */
+export async function rankSuppliers(
+  input: DispatchInput,
+  client: SupabaseClient = publicSupabase,
+): Promise<{ tripClass: TripClass; candidates: ScoredCandidate[] }> {
   const tripClass = classifyTrip(input.distanceKm, input.pickup, input.dropoff)
-  const companies = await getTransportCompanies()
-  const fleets = await Promise.all(companies.map(c => getFleet(c.supplierId)))
+  const companies = await getTransportCompanies(client)
+  const fleets = await Promise.all(companies.map(c => getFleet(c.supplierId, client)))
 
   const rates = companies.map(c => c.ratePerKm).filter(r => r > 0).sort((a, b) => a - b)
   const medianRatePerKm = rates.length ? rates[Math.floor(rates.length / 2)] : 10
@@ -261,6 +281,8 @@ export async function createTransportRequest(params: {
     pickup: params.pickup, dropoff: params.dropoff, date: params.date, time: params.time,
     passengers: params.passengers, distanceKm: params.distanceKm, quotedPrice: params.quotedPrice,
   }
+  // Same public view as the picker: a suspended operator must not be offered
+  // the job either.
   const { tripClass, candidates } = await rankSuppliers(input)
   const now = new Date().toISOString()
 
@@ -345,21 +367,33 @@ export async function createTransportRequest(params: {
  */
 export async function createTransportRequestForBooking(booking: SavedBooking): Promise<TransportRequest[]> {
   if (booking.shuttles.length === 0) return []
-  const companies = await getTransportCompanies()
+  const companies = await getTransportCompanies(publicSupabase)
 
   return Promise.all(booking.shuttles.map(shuttle => {
     // The customer picked a supplier + vehicle during the booking journey —
     // route the job straight to them.
+    //
+    // …but only if that company is still listable. The choice was made
+    // earlier and has been carried in the cart ever since, so the operator
+    // may have been suspended in between; `companies` is the public view, so
+    // a company missing from it is one the customer could no longer pick
+    // today. Honouring the stale preselection would hand the job to a
+    // suspended operator — and it would do so silently, because the
+    // preselected path skips ranking altogether. Dropping it falls through to
+    // rankSuppliers(), which reads the same public view and simply offers the
+    // leg to whoever is actually live.
     let preselected: PreselectedSupplier | undefined
     if (shuttle.supplierId && shuttle.companyId && shuttle.companyName) {
       const company = companies.find(c => c.id === shuttle.companyId)
-      preselected = {
-        supplierId: shuttle.supplierId,
-        companyId: shuttle.companyId,
-        companyName: shuttle.companyName,
-        category: company?.category ?? 'regional',
-        vehicleId: shuttle.vehicleId,
-        vehicleName: shuttle.vehicleName,
+      if (company) {
+        preselected = {
+          supplierId: shuttle.supplierId,
+          companyId: shuttle.companyId,
+          companyName: shuttle.companyName,
+          category: company.category,
+          vehicleId: shuttle.vehicleId,
+          vehicleName: shuttle.vehicleName,
+        }
       }
     }
 

@@ -10,6 +10,7 @@ import {
 import { rankSuppliers, type ScoredCandidate } from '@/lib/transport-dispatch'
 import type { ShuttleSupplierChoice } from '@/lib/shuttle-service'
 import { formatMoney } from '@/lib/allocation'
+import { publicSupabase } from '@/lib/supabase-public'
 
 // The supplier step of the booking journey: once the route is known, the
 // customer picks which registered transport company — and which of its
@@ -56,7 +57,13 @@ export function TransportSupplierPicker({
   useEffect(() => {
     let cancelled = false
     setLoading(true)
-    rankSuppliers({ pickup, dropoff, date, passengers, distanceKm, quotedPrice: 0 })
+    // publicSupabase explicitly, though rankSuppliers defaults to it: this is
+    // the read that decides which operators a customer can buy a transfer
+    // from, so the intent belongs at the call site. Through the visitor's own
+    // session an admin or the operator themselves would be offered suspended
+    // companies — their transport_company row stays 'active' when the account
+    // is suspended, so only the owner check in RLS catches it.
+    rankSuppliers({ pickup, dropoff, date, passengers, distanceKm, quotedPrice: 0 }, publicSupabase)
       .then(({ candidates: ranked }) => {
         if (cancelled) return
         const eligible = ranked.filter(c => c.eligible)

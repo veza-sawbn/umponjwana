@@ -312,14 +312,17 @@ export function driverAvailable(d: TransportDriver): boolean {
   return (d.dutyStatus ?? 'available') === 'available' && d.status !== 'inactive'
 }
 
-export async function getSupplierVehicles(supplierId: string): Promise<TransportVehicle[]> {
-  return getSupplierEntities<TransportVehicle>('vehicles', supplierId)
+export async function getSupplierVehicles(supplierId: string, client?: SupabaseClient): Promise<TransportVehicle[]> {
+  return getSupplierEntities<TransportVehicle>('vehicles', supplierId, client)
 }
 
-export async function getFleet(supplierId: string): Promise<{ vehicles: TransportVehicle[]; drivers: TransportDriver[] }> {
+// Optional client for the same reason getTransportCompanies() takes one: the
+// customer-facing shuttle picker must read a company's fleet the way the
+// public sees it, not through whatever session the visitor happens to hold.
+export async function getFleet(supplierId: string, client?: SupabaseClient): Promise<{ vehicles: TransportVehicle[]; drivers: TransportDriver[] }> {
   const [vehicles, drivers] = await Promise.all([
-    getSupplierEntities<TransportVehicle>('vehicles', supplierId),
-    getSupplierEntities<TransportDriver>('drivers', supplierId),
+    getSupplierEntities<TransportVehicle>('vehicles', supplierId, client),
+    getSupplierEntities<TransportDriver>('drivers', supplierId, client),
   ])
   return { vehicles, drivers }
 }
