@@ -100,10 +100,11 @@ export default function ListWithUsPage() {
   // Whether the visitor already has a session (skip signUp on submit).
   const [isSignedIn, setIsSignedIn] = useState(false)
   // Turnstile. This is the form the September 2026 flood came through — 144
-  // applications, 109 of them scripted — and the signUp on submit is what the
-  // captcha actually gates, at Supabase. Someone already signed in has been
-  // through it once and does not sign up again, so the widget is only shown
-  // and only required when there is no session.
+  // applications, 109 of them scripted. Two things on this page need a token
+  // and a token is redeemable once, so submit() spends one on the signup and
+  // asks the widget for a second for the application itself. Required whether
+  // or not there is a session: a signed-in applicant skips the signup but
+  // still has to get past POST /api/listing-applications.
   const [captchaToken, setCaptchaToken] = useState('')
   const turnstile = useRef<TurnstileHandle>(null)
 
@@ -414,13 +415,16 @@ export default function ListWithUsPage() {
       setError('Please confirm you are authorised to list this business and accept the supplier documents.')
       return
     }
-    if (!isSignedIn && captchaBlocked(captchaToken)) {
+    if (captchaBlocked(captchaToken)) {
       setError(TURNSTILE_PENDING_MESSAGE)
       return
     }
 
     setSubmitting(true)
     setError('')
+    // The token the application itself is submitted with. It starts as the one
+    // on screen and is replaced after the signup, which redeems it.
+    let applicationToken = captchaToken
     try {
       // ── Step 1: create the supplier account if not already signed in ──────
       // role: 'supplier' is the one elevated value a signup payload may ask
@@ -453,6 +457,20 @@ export default function ListWithUsPage() {
             return
           }
           throw signUpError
+        }
+
+        // Supabase has just redeemed the token. POST /api/listing-applications
+        // needs an unspent one, and replaying this would be refused as already
+        // used — so ask the widget for the next one. A managed widget
+        // re-solves without interaction; if Cloudflare wants a click instead,
+        // refresh() times out rather than hanging, and the applicant gets a
+        // message they can act on with the form still filled in.
+        try {
+          applicationToken = (await turnstile.current?.refresh()) ?? ''
+        } catch {
+          setError('The security check needs completing again before we can submit this. Please complete it below and press Submit.')
+          setSubmitting(false)
+          return
         }
       }
 
@@ -494,7 +512,7 @@ export default function ListWithUsPage() {
         activities: activitiesShown
           ? form.activities.filter(a => a.name.trim()).map(a => ({ ...a, name: a.name.trim() }))
           : [],
-      }, applicationRef)
+      }, applicationRef, applicationToken)
       // Both keys go: leaving REF_KEY behind would attach the next
       // application's certificates to this one's reference.
       try {
@@ -1332,15 +1350,16 @@ export default function ListWithUsPage() {
               v{CODE_OF_CONDUCT_VERSION}.
             </p>
 
-            {!isSignedIn && (
-              <Turnstile
-                ref={turnstile}
-                action="listing-application"
-                onToken={setCaptchaToken}
-                onError={() => setError(TURNSTILE_FAILED_MESSAGE)}
-                className="pt-1"
-              />
-            )}
+            {/* Shown whether or not there is a session: a signed-in applicant
+                skips the signup but still has to get past the application
+                route, which is now the only way into the table. */}
+            <Turnstile
+              ref={turnstile}
+              action="listing-application"
+              onToken={setCaptchaToken}
+              onError={() => setError(TURNSTILE_FAILED_MESSAGE)}
+              className="pt-1"
+            />
           </div>
         )}
 
@@ -1362,7 +1381,7 @@ export default function ListWithUsPage() {
               Continue to {STEPS[step + 1]} <ArrowRight size={14} />
             </button>
           ) : (
-            <button onClick={submit} disabled={submitting || (!isSignedIn && captchaBlocked(captchaToken))}
+            <button onClick={submit} disabled={submitting || captchaBlocked(captchaToken)}
               className="flex items-center gap-2 bg-[#C9A96E] text-black px-6 py-3 font-sans text-sm font-medium hover:bg-[#b8935a] transition-colors disabled:opacity-50">
               {submitting ? <><Loader2 size={14} className="animate-spin" /> Submitting…</> : 'Submit application'}
             </button>

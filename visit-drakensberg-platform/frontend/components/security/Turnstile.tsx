@@ -87,6 +87,23 @@ function loadTurnstileScript(): Promise<void> {
 export type TurnstileHandle = {
   /** Discard the spent/failed token and ask the widget for a new one. */
   reset: () => void
+  /**
+   * Reset and resolve with the NEXT token.
+   *
+   * For the one flow that needs two tokens in a row: the list-with-us wizard
+   * signs the applicant up (Supabase redeems token #1) and then posts the
+   * application to our own route (which needs an unspent token #2). Replaying
+   * the first would be refused as already-redeemed.
+   *
+   * A managed widget re-solves without interaction, so this normally settles
+   * in well under a second. If Cloudflare decides this visitor must click
+   * something, it rejects on timeout instead of hanging the submit, and the
+   * caller says so in words the applicant can act on.
+   *
+   * Resolves with '' when no site key is configured, so callers do not need
+   * to branch on it.
+   */
+  refresh: (timeoutMs?: number) => Promise<string>
 }
 
 export type TurnstileProps = {
@@ -115,6 +132,22 @@ const Turnstile = forwardRef<TurnstileHandle, TurnstileProps>(function Turnstile
   onTokenRef.current = onToken
   onErrorRef.current = onError
 
+  // A refresh() waiting on the next token. Settled by the widget's callback
+  // below, or by the timeout refresh() arms.
+  const pendingRef = useRef<{
+    resolve: (token: string) => void
+    reject: (reason: Error) => void
+    timer: ReturnType<typeof setTimeout>
+  } | null>(null)
+
+  const settlePending = (token: string) => {
+    const pending = pendingRef.current
+    if (!pending) return
+    pendingRef.current = null
+    clearTimeout(pending.timer)
+    pending.resolve(token)
+  }
+
   useImperativeHandle(ref, () => ({
     reset() {
       onTokenRef.current('')
@@ -122,7 +155,40 @@ const Turnstile = forwardRef<TurnstileHandle, TurnstileProps>(function Turnstile
         window.turnstile.reset(widgetIdRef.current)
       }
     },
+    refresh(timeoutMs = 15_000) {
+      if (!isTurnstileEnabled()) return Promise.resolve('')
+      if (!widgetIdRef.current || !window.turnstile) {
+        return Promise.reject(new Error('Turnstile is not ready'))
+      }
+      // Only one in flight: a second refresh abandons the first rather than
+      // leaving a promise nothing will ever settle.
+      if (pendingRef.current) {
+        clearTimeout(pendingRef.current.timer)
+        pendingRef.current.reject(new Error('Superseded by a newer security check'))
+        pendingRef.current = null
+      }
+      onTokenRef.current('')
+      const promise = new Promise<string>((resolve, reject) => {
+        const timer = setTimeout(() => {
+          pendingRef.current = null
+          reject(new Error('The security check timed out'))
+        }, timeoutMs)
+        pendingRef.current = { resolve, reject, timer }
+      })
+      window.turnstile.reset(widgetIdRef.current)
+      return promise
+    },
   }), [])
+
+  // Nothing should be left waiting on a widget that has gone away.
+  useEffect(() => () => {
+    const pending = pendingRef.current
+    if (pending) {
+      pendingRef.current = null
+      clearTimeout(pending.timer)
+      pending.reject(new Error('The security check was interrupted'))
+    }
+  }, [])
 
   useEffect(() => {
     if (!isTurnstileEnabled()) return
@@ -135,7 +201,10 @@ const Turnstile = forwardRef<TurnstileHandle, TurnstileProps>(function Turnstile
           sitekey: TURNSTILE_SITE_KEY,
           action,
           theme,
-          callback: (token: string) => onTokenRef.current(token),
+          callback: (token: string) => {
+            onTokenRef.current(token)
+            settlePending(token)
+          },
           'error-callback': () => {
             onTokenRef.current('')
             onErrorRef.current?.()

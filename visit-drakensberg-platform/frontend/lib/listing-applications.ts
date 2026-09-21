@@ -380,91 +380,71 @@ export function normalizeListingApplication(raw: Record<string, unknown>): Omit<
 /**
  * Short, sayable handle for the applicant to quote when they follow up.
  *
- * Exported because the reference is now needed *before* the application is
+ * Exported because the reference is needed *before* the application is
  * submitted: accreditation certificates upload into
  * compliance/applications/<reference>/… while the applicant is still filling
- * the form, so the form mints the reference up front and hands it back here.
+ * the form, so the form mints the reference up front and hands it back on
+ * submit. Defined in lib/listing-application-intake.ts so the server can mint
+ * one too, without importing the browser Supabase client.
  */
-export function newApplicationReference(): string {
-  const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789' // no I/O/0/1
-  let tail = ''
-  for (let i = 0; i < 6; i++) tail += alphabet[Math.floor(Math.random() * alphabet.length)]
-  return `LP-${tail}`
-}
-
-function newId(): string {
-  return typeof crypto !== 'undefined' && 'randomUUID' in crypto
-    ? `lapp-${crypto.randomUUID()}`
-    : `lapp-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`
-}
+export { newApplicationReference } from './listing-application-intake'
 
 /**
  * Lodge an application. Resolves with the stored row so the success screen can
- * show the reference; throws with a readable message if the write is refused
- * (most often because the migration has not been run yet).
+ * show the reference; throws with a readable message if the write is refused.
+ *
+ * THIS USED TO INSERT DIRECTLY, AND THAT WAS THE HOLE
+ *   `supabase.from(TABLE).insert(...)` with the anon key, guarded by nothing
+ *   but an RLS clause saying `status = 'new'`. It meant the client chose the
+ *   primary key, the timestamp and the whole `value` blob, and — far worse —
+ *   that anything able to reach PostgREST could lodge applications without
+ *   ever loading this form. In September 2026 something did: 144 applications,
+ *   109 of them scripted.
+ *
+ *   The write now goes through POST /api/listing-applications, which verifies
+ *   a Turnstile token, rate limits per caller and per address, and owns the id
+ *   and status itself. The table no longer accepts anonymous inserts at all
+ *   (20260921_listing_applications_server_only.sql), so this is not a
+ *   politeness the caller can decline.
  */
 export async function submitListingApplication(
   draft: ListingApplicationDraft,
   /** The reference the form already uploaded compliance documents against. */
   reference?: string,
+  /** Turnstile token from the widget on the last step. */
+  captchaToken?: string,
 ): Promise<ListingApplication> {
-  const application: ListingApplication = {
+  const res = await fetch('/api/listing-applications', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      application: { ...draft, reference },
+      captchaToken,
+    }),
+  })
+
+  if (!res.ok) {
+    let message = 'Could not submit your application. Please try again.'
+    try {
+      const data = await res.json()
+      if (data?.error) message = data.error
+    } catch { /* non-JSON error page; keep the generic message */ }
+    throw new Error(message)
+  }
+
+  const stored = await res.json() as { id: string; reference: string; contactEmail: string }
+
+  // The server owns the id, the reference and the timestamp, so the record
+  // handed back to the success screen is built from what it stored — not from
+  // what this function hoped it would store.
+  return {
     ...draft,
-    id: newId(),
-    reference: reference || newApplicationReference(),
+    id: stored.id,
+    reference: stored.reference,
+    contactEmail: stored.contactEmail,
     status: 'new',
     createdAt: new Date().toISOString(),
   }
-
-  const row = {
-    id: application.id,
-    reference: application.reference,
-    status: application.status,
-    // The mirrored name is whatever the applicant calls the thing they are
-    // listing: a stay has a property name, everyone else is known by their
-    // trading name.
-    property_name: application.stay.propertyName || application.tradingName,
-    contact_email: application.contactEmail,
-    region: application.region,
-    value: application,
-  }
-
-  // Mirror columns added by migrations later than the table itself:
-  // commission_tier (20260808), accreditation_type / accreditation_ref
-  // (20260905). Deploys and migrations do not land in lockstep, so a build
-  // carrying these can reach a database that has not run those migrations —
-  // and this form is live with real applicants. Every one of them only helps
-  // the review queue sort and filter; the authoritative copy is inside
-  // `value`. So mirror them when the columns are there, and fall back to the
-  // JSON-only row when any is missing, rather than losing an application over
-  // a column nothing depends on.
-  const mirrors = {
-    commission_tier: application.commissionTier,
-    accreditation_type: application.compliance.accreditationKind || null,
-    accreditation_ref: application.compliance.accreditationNumber || null,
-  }
-  let { error } = await supabase.from(TABLE).insert({ ...row, ...mirrors })
-  if (error && Object.keys(mirrors).some(col => isMissingColumn(error!.message, col))) {
-    ({ error } = await supabase.from(TABLE).insert(row))
-  }
-
-  if (error) {
-    const message = String(error.message || '')
-    if (/relation .* does not exist|could not find the table/i.test(message)) {
-      throw new Error(
-        'Listing applications are not set up yet. Run supabase/migrations/20260807_listing_applications.sql in the Supabase SQL editor.',
-      )
-    }
-    throw new Error(message || 'Could not submit your application. Please try again.')
-  }
-
-  return application
-}
-
-/** PostgREST reports an unknown column either from its schema cache or straight from Postgres. */
-function isMissingColumn(message: string | undefined, column: string): boolean {
-  const m = String(message || '')
-  return m.includes(column) && /could not find|does not exist|schema cache/i.test(m)
 }
 
 export const PHOTO_MAX_BYTES = 8 * 1024 * 1024
