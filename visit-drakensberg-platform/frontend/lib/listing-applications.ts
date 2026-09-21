@@ -1,4 +1,5 @@
 import { supabase } from './auth'
+import { requestUploadUrl, putToSignedUrl } from './applicant-upload'
 
 // Public "list with us" applications (see
 // supabase/migrations/20260807_listing_applications.sql).
@@ -451,37 +452,30 @@ export const PHOTO_MAX_BYTES = 8 * 1024 * 1024
 export const PHOTO_MAX_COUNT = 8
 
 /**
- * Upload one application photo to media/listing-applications/… and return its
- * public URL. Open to anonymous applicants by design — see the storage policy
- * in 20260807_listing_applications.sql for what that does and does not allow.
+ * Upload one application photo and return its public URL.
+ *
+ * The write used to go straight to storage with the anon key, under a policy
+ * that checked only the first path segment — so anything holding that key
+ * could fill the bucket, from anywhere, without loading this form. It now goes
+ * through a signed upload URL that the server issues only to a caller holding
+ * a valid upload grant, and the server picks the path.
+ *
+ * The limits below are re-checked server-side; these are here so the applicant
+ * finds out before the file leaves their phone.
  */
-export async function uploadApplicationPhoto(file: File): Promise<string> {
+export async function uploadApplicationPhoto(file: File, reference: string): Promise<string> {
   if (!file.type.startsWith('image/')) {
     throw new Error(`${file.name} is not an image.`)
   }
   if (file.size > PHOTO_MAX_BYTES) {
     throw new Error(`${file.name} is larger than ${PHOTO_MAX_BYTES / 1024 / 1024} MB.`)
   }
-  const ext = (file.name.split('.').pop() || 'jpg').toLowerCase().replace(/[^a-z0-9]/g, '') || 'jpg'
-  const path = `listing-applications/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`
-  const { error } = await supabase.storage.from('media').upload(path, file, {
-    contentType: file.type || undefined,
-    cacheControl: '31536000',
-  })
-  if (error) {
-    const message = String((error as { message?: string })?.message || '')
-    if (/row-level security|not authoriz/i.test(message)) {
-      throw new Error(
-        'Photo uploads aren’t enabled yet. Run supabase/migrations/20260807_listing_applications.sql in the Supabase SQL editor.',
-      )
-    }
-    if (/bucket.*not.*found/i.test(message)) {
-      throw new Error('Storage bucket "media" does not exist. Run supabase/migrations/20260719_media_storage.sql first.')
-    }
-    throw new Error(message || 'Upload failed.')
-  }
-  const { data } = supabase.storage.from('media').getPublicUrl(path)
-  return data.publicUrl
+
+  const signed = await requestUploadUrl({ kind: 'photo', reference, file })
+  await putToSignedUrl('media', signed, file)
+
+  if (!signed.publicUrl) throw new Error('Upload failed.')
+  return signed.publicUrl
 }
 
 type Row = { value: Record<string, unknown>; status: string; created_at: string }

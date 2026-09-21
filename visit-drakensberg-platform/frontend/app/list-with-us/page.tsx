@@ -10,6 +10,7 @@ import {
 import Footer from '@/components/layout/Footer'
 import { supabase } from '@/lib/auth'
 import { captchaOptions } from '@/lib/turnstile'
+import { requestUploadGrant, NeedsUploadGrantError } from '@/lib/applicant-upload'
 import { getRegionNames } from '@/lib/regions'
 import { PROPERTY_REGIONS, PROPERTY_TYPES, PROPERTY_AMENITIES } from '@/lib/properties'
 import { ACTIVITY_CATEGORIES, ACTIVITY_DIFFICULTIES, ACTIVITY_INCLUSIONS } from '@/lib/activities'
@@ -108,9 +109,48 @@ export default function ListWithUsPage() {
   const [captchaToken, setCaptchaToken] = useState('')
   const turnstile = useRef<TurnstileHandle>(null)
 
+  // A second, separate widget on step 1, whose token is traded for the upload
+  // grant. Separate rather than shared because the step-5 widget does not
+  // exist while the applicant is on step 1 uploading photos, and because both
+  // tokens are spent on different things.
+  const grantTurnstile = useRef<TurnstileHandle>(null)
+  const [grantState, setGrantState] = useState<'idle' | 'ready' | 'failed'>('idle')
+
   const set = useCallback(<K extends keyof Draft>(key: K, value: Draft[K]) => {
     setForm(f => ({ ...f, [key]: value }))
   }, [])
+
+  // Trade the step-1 token for the upload grant as soon as the widget solves,
+  // so the photo control on step 2 just works rather than stopping to ask.
+  const onGrantToken = useCallback(async (token: string) => {
+    if (!token || !applicationRef) return
+    try {
+      await requestUploadGrant(applicationRef, token)
+      setGrantState('ready')
+    } catch {
+      // Not fatal: the application itself submits without attachments, and
+      // saying so is better than blocking someone whose certificate upload
+      // would have failed anyway.
+      setGrantState('failed')
+    }
+  }, [applicationRef])
+
+  // An upload that comes back "needs a grant" means the two-hour window
+  // lapsed while the form was open. Ask the widget for a fresh token and
+  // trade it, rather than making the applicant reload and lose the draft.
+  const renewGrant = useCallback(async (): Promise<boolean> => {
+    if (!applicationRef) return false
+    try {
+      const token = await grantTurnstile.current?.refresh()
+      if (!token) return false
+      await requestUploadGrant(applicationRef, token)
+      setGrantState('ready')
+      return true
+    } catch {
+      setGrantState('failed')
+      return false
+    }
+  }, [applicationRef])
 
   // A validation message names a field; once that field is being edited the
   // message is stale, so it clears on the next keystroke rather than sitting
@@ -236,21 +276,31 @@ export default function ListWithUsPage() {
     }
     setUploadingDoc(slot)
     setError('')
+    const send = () => uploadComplianceDocument({
+      file,
+      applicationRef,
+      docType: slot === 'accreditation'
+        ? (form.compliance.accreditationKind === 'cto' ? 'cto_membership' : 'edtea_registration')
+        : 'public_liability_insurance',
+      issuer: slot === 'accreditation' ? form.compliance.accreditationIssuer : form.compliance.insurer,
+      referenceNumber: slot === 'accreditation'
+        ? form.compliance.accreditationNumber
+        : form.compliance.insurancePolicyNumber,
+      expiresOn: slot === 'accreditation'
+        ? form.compliance.accreditationExpiry || null
+        : form.compliance.insuranceExpiry || null,
+    })
     try {
-      const doc = await uploadComplianceDocument({
-        file,
-        applicationRef,
-        docType: slot === 'accreditation'
-          ? (form.compliance.accreditationKind === 'cto' ? 'cto_membership' : 'edtea_registration')
-          : 'public_liability_insurance',
-        issuer: slot === 'accreditation' ? form.compliance.accreditationIssuer : form.compliance.insurer,
-        referenceNumber: slot === 'accreditation'
-          ? form.compliance.accreditationNumber
-          : form.compliance.insurancePolicyNumber,
-        expiresOn: slot === 'accreditation'
-          ? form.compliance.accreditationExpiry || null
-          : form.compliance.insuranceExpiry || null,
-      })
+      let doc
+      try {
+        doc = await send()
+      } catch (e) {
+        // The two-hour grant lapsed while the form sat open. Renew it and try
+        // once more rather than making someone who has filled in four steps
+        // reload and start again.
+        if (!(e instanceof NeedsUploadGrantError) || !(await renewGrant())) throw e
+        doc = await send()
+      }
       setForm(f => ({
         ...f,
         compliance: slot === 'accreditation'
@@ -258,7 +308,11 @@ export default function ListWithUsPage() {
           : { ...f.compliance, insuranceDocId: doc.id, insuranceFileName: file.name },
       }))
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'That upload failed. Please try again.')
+      setError(
+        e instanceof NeedsUploadGrantError
+          ? 'The security check has expired. Go back to the first step, complete it again, then retry this upload.'
+          : e instanceof Error ? e.message : 'That upload failed. Please try again.',
+      )
     } finally {
       setUploadingDoc(null)
     }
@@ -729,6 +783,36 @@ export default function ListWithUsPage() {
                 })}
               </div>
             </div>
+
+            {/* The security check that unlocks uploading.
+                It sits here, on the first step, rather than next to the photo
+                and certificate controls on steps 2 and 3, because a Turnstile
+                token is redeemable once: a challenge per file would mean eight
+                of them for someone simply attaching pictures of their lodge.
+                Solving it once trades the token for a two-hour grant scoped to
+                this application (lib/upload-grant.ts), and the uploads carry
+                that instead. */}
+            <div className="bg-white border border-gray-200 p-6 lg:p-8 space-y-3">
+              <CardHead title="Security check"
+                sub="A quick check that you're a person, so you can attach photos and certificates." />
+              <Turnstile
+                ref={grantTurnstile}
+                action="listing-upload-grant"
+                onToken={onGrantToken}
+                onError={() => setGrantState('failed')}
+              />
+              {grantState === 'ready' && (
+                <p className="font-sans text-xs text-[#2d6a4f]">
+                  Done — you can attach photos and certificates on the next steps.
+                </p>
+              )}
+              {grantState === 'failed' && (
+                <p className="font-sans text-xs text-red-500">
+                  The security check didn&apos;t complete. Reload the page and try again — you can
+                  still submit without attachments if it keeps failing.
+                </p>
+              )}
+            </div>
           </>
         )}
 
@@ -764,7 +848,8 @@ export default function ListWithUsPage() {
               </div>
               <div>
                 <label className={labelCls}>Photos</label>
-                <PhotoUploader photos={form.photos} onChange={photos => set('photos', photos)} />
+                <PhotoUploader photos={form.photos} onChange={photos => set('photos', photos)}
+                  applicationRef={applicationRef} onNeedsGrant={renewGrant} />
               </div>
             </div>
 
@@ -1570,7 +1655,14 @@ function TierLadder({ selected, onSelect }: { selected: string; onSelect: (id: s
  * 20260807_listing_applications.sql), so what is stored on the application is
  * a list of URLs — which also means an in-progress draft survives a reload.
  */
-function PhotoUploader({ photos, onChange }: { photos: string[]; onChange: (photos: string[]) => void }) {
+function PhotoUploader({ photos, onChange, applicationRef, onNeedsGrant }: {
+  photos: string[]
+  onChange: (photos: string[]) => void
+  /** Every object now lands under this application's own prefix, server-side. */
+  applicationRef: string
+  /** Renew a lapsed upload grant. Resolves false when it could not be renewed. */
+  onNeedsGrant: () => Promise<boolean>
+}) {
   const fileRef = useRef<HTMLInputElement>(null)
   const [dragging, setDragging] = useState(false)
   const [busy, setBusy] = useState(0)
@@ -1589,9 +1681,20 @@ function PhotoUploader({ photos, onChange }: { photos: string[]; onChange: (phot
     const uploaded: string[] = []
     for (const file of batch) {
       try {
-        uploaded.push(await uploadApplicationPhoto(file))
+        try {
+          uploaded.push(await uploadApplicationPhoto(file, applicationRef))
+        } catch (e) {
+          // Grant lapsed mid-batch: renew once and retry this file, so a long
+          // session does not silently drop the rest of the photos.
+          if (!(e instanceof NeedsUploadGrantError) || !(await onNeedsGrant())) throw e
+          uploaded.push(await uploadApplicationPhoto(file, applicationRef))
+        }
       } catch (e) {
-        setUploadError(e instanceof Error ? e.message : 'Upload failed.')
+        setUploadError(
+          e instanceof NeedsUploadGrantError
+            ? 'The security check has expired. Go back to the first step, complete it again, then retry.'
+            : e instanceof Error ? e.message : 'Upload failed.',
+        )
       } finally {
         setBusy(b => b - 1)
       }
