@@ -2,13 +2,23 @@ name: Security tests
 
 # The repository had no CI at all when the September 2026 security audit ran
 # (finding M6), so the regression tests that audit added would only have been
-# run by whoever remembered to. This runs all three suites on every push and
-# pull request.
+# run by whoever remembered to.
+#
+# TRIGGER SCOPE
+#   This began as `push: branches: ['**']`, which on a repository carrying 103
+#   branches meant four jobs per push to every one of them — most of which
+#   nobody was looking at, and none of which gates anything. Pull requests are
+#   where these tests have to pass, plus the default branch so a merge that
+#   breaks something is caught even if it arrived without a PR.
+#
+#   workflow_dispatch is here so a suite can be run by hand against a branch
+#   without opening a PR first.
 
 on:
   push:
-    branches: ['**']
+    branches: [claude/wizardly-mayer-leonph, main, master]
   pull_request:
+  workflow_dispatch:
 
 defaults:
   run:
