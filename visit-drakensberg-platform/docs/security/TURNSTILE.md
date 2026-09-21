@@ -116,9 +116,44 @@ Two keys, from Cloudflare dashboard → Turnstile → your widget.
 The secret key must never appear in this repository, in a commit, or behind a
 `NEXT_PUBLIC_` prefix.
 
-The widget's **Hostname Management** list in the Cloudflare dashboard must
-include every host the widget renders on. For preview deploys that means
-adding the Vercel preview domain, or the widget refuses to render there.
+## Preview deployments — use Cloudflare's test keys
+
+A Turnstile widget only works on the hostnames in its **Hostname Management**
+list. A widget registered for `visitdrakensberg.com` therefore fails on **every
+Vercel preview URL**, because each deployment gets its own hostname
+(`umponjwana-<hash>-<scope>.vercel.app`). The widget calls `error-callback`
+with **110200, "unknown domain"**, and the form reports it.
+
+Adding preview hostnames one at a time does not work — the hash changes on
+every deploy — and allow-listing `vercel.app` wholesale would let any site on
+that domain use your site key.
+
+Cloudflare publishes **test keys that pass on any hostname**, which is exactly
+what this is for. In Vercel → Settings → Environment Variables, set these for
+the **Preview** environment only (leave Production on the real keys):
+
+| Variable | Preview value | Behaviour |
+|---|---|---|
+| `NEXT_PUBLIC_TURNSTILE_SITE_KEY` | `1x00000000000000000000AA` | always passes, widget visible |
+| `TURNSTILE_SECRET_KEY` | `1x0000000000000000000000000000000AA` | always passes validation |
+
+Both must change together: a production secret rejects the dummy token the
+test sitekey produces, and vice versa. The dummy token is the literal string
+`XXXX.DUMMY.TOKEN.XXXX`.
+
+Other test keys, when you want to exercise the failure paths:
+`2x00000000000000000000AB` always fails, `3x00000000000000000000FF` forces an
+interactive challenge, and secret `3x0000000000000000000000000000000AA`
+returns "token already spent".
+
+**This does not test that the captcha blocks anything.** A preview with test
+keys proves the wiring — widget renders, token travels, routes accept it, the
+upload grant is issued. Proving a bot is actually stopped needs the real keys
+on the production hostname.
+
+The alternative, if you want a preview that exercises the real challenge:
+assign a stable preview domain in Vercel (a branch alias such as
+`preview.visitdrakensberg.com`) and add that one hostname to the widget.
 
 ## Turning it on — the order matters
 

@@ -10,7 +10,7 @@ import { trackEvent, AnalyticsEvent } from '@/lib/analytics'
 import { safeRedirectPath } from '@/lib/safe-redirect'
 import Turnstile, {
   captchaBlocked,
-  TURNSTILE_FAILED_MESSAGE,
+  turnstileErrorMessage,
   type TurnstileHandle,
 } from '@/components/security/Turnstile'
 
@@ -153,7 +153,7 @@ export default function LoginPage() {
               ref={turnstile}
               action="login"
               onToken={setCaptchaToken}
-              onError={() => setAuthError(TURNSTILE_FAILED_MESSAGE)}
+              onError={code => setAuthError(turnstileErrorMessage(code))}
               className="flex justify-center"
             />
 

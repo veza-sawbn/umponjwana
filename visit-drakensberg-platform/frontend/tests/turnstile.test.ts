@@ -1,5 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import {
+  turnstileErrorMessage,
+  TURNSTILE_FAILED_MESSAGE,
   TURNSTILE_HOST,
   TURNSTILE_SCRIPT_URL,
   TURNSTILE_TOKEN_TTL_MS,
@@ -83,5 +85,37 @@ describe('the widget origin', () => {
     // the DOM once on script load and would never find it.
     expect(TURNSTILE_SCRIPT_URL).toContain('render=explicit')
     expect(TURNSTILE_SCRIPT_URL.startsWith(TURNSTILE_HOST)).toBe(true)
+  })
+})
+
+describe('turnstileErrorMessage — the code is the diagnosis', () => {
+  it('names the domain problem, which is the one that actually bites', () => {
+    // 110200 is "unknown domain": the host is not on the widget's Hostname
+    // Management list. Every Vercel preview has its own hostname, so a widget
+    // registered for the production domain fails on all of them — and the
+    // message used to say only "didn't complete, reload and try again", which
+    // sends people reloading a page that was never going to work.
+    const message = turnstileErrorMessage('110200')
+    expect(message).toContain('110200')
+    expect(message).toContain('Hostname Management')
+    expect(message).toContain('test sitekey')
+  })
+
+  it('treats the whole 110xxx family as sitekey/domain configuration', () => {
+    expect(turnstileErrorMessage('110100')).toContain('not set up for this domain')
+  })
+
+  it('distinguishes a script that never loaded', () => {
+    const message = turnstileErrorMessage('script_load_failed')
+    expect(message).toContain('could not load')
+    expect(message).toMatch(/ad blocker/i)
+  })
+
+  it('still quotes an unrecognised code rather than swallowing it', () => {
+    expect(turnstileErrorMessage('300030')).toContain('300030')
+  })
+
+  it('falls back to the generic message when Cloudflare gave no code', () => {
+    expect(turnstileErrorMessage(undefined)).toBe(TURNSTILE_FAILED_MESSAGE)
   })
 })

@@ -5,6 +5,14 @@ import {
   TURNSTILE_HOST,
   TURNSTILE_SITE_KEY,
   isTurnstileEnabled,
+  SCRIPT_LOAD_FAILED,
+} from '@/lib/turnstile'
+
+// Re-exported so a form imports the widget and its wording from one place.
+export {
+  turnstileErrorMessage,
+  TURNSTILE_PENDING_MESSAGE,
+  TURNSTILE_FAILED_MESSAGE,
 } from '@/lib/turnstile'
 
 /**
@@ -76,7 +84,7 @@ function loadTurnstileScript(): Promise<void> {
       // Let a later mount try again — this is usually a blocked request or a
       // dropped connection, not a permanent state.
       scriptPromise = null
-      reject(new Error('Turnstile script failed to load'))
+      reject(new Error(SCRIPT_LOAD_FAILED))
     }
     document.head.appendChild(script)
   })
@@ -111,8 +119,13 @@ export type TurnstileProps = {
   action: string
   /** Called with a fresh token, and with '' whenever the current one dies. */
   onToken: (token: string) => void
-  /** Called when the widget or its script fails, for a human-readable message. */
-  onError?: () => void
+  /**
+   * Called with Cloudflare's error code when the widget or its script fails.
+   * Pass it to turnstileErrorMessage() rather than writing your own text —
+   * the code is what tells a misconfigured deployment apart from a visitor
+   * with a flaky connection.
+   */
+  onError?: (code?: string) => void
   theme?: 'light' | 'dark' | 'auto'
   className?: string
 }
@@ -205,9 +218,13 @@ const Turnstile = forwardRef<TurnstileHandle, TurnstileProps>(function Turnstile
             onTokenRef.current(token)
             settlePending(token)
           },
-          'error-callback': () => {
+          'error-callback': (code?: string) => {
             onTokenRef.current('')
-            onErrorRef.current?.()
+            // Logged as well as surfaced: the code is the whole diagnosis, and
+            // the person who can act on it is usually looking at a console
+            // rather than at the form.
+            console.warn('[turnstile] error-callback', code)
+            onErrorRef.current?.(code)
           },
           'expired-callback': () => {
             // ~300s after issue. Clear the parent's copy first so a submit
@@ -221,8 +238,8 @@ const Turnstile = forwardRef<TurnstileHandle, TurnstileProps>(function Turnstile
           'timeout-callback': () => onTokenRef.current(''),
         })
       })
-      .catch(() => {
-        if (!cancelled) onErrorRef.current?.()
+      .catch((err: unknown) => {
+        if (!cancelled) onErrorRef.current?.(err instanceof Error ? err.message : undefined)
       })
 
     return () => {
@@ -239,14 +256,6 @@ const Turnstile = forwardRef<TurnstileHandle, TurnstileProps>(function Turnstile
 })
 
 export default Turnstile
-
-/**
- * The message to show when a form is blocked on the captcha. One place, so the
- * three forms do not drift into three different wordings for the same state.
- */
-export const TURNSTILE_PENDING_MESSAGE = 'Please complete the security check below.'
-export const TURNSTILE_FAILED_MESSAGE =
-  'The security check could not be completed. Refresh the page and try again.'
 
 /**
  * Should the submit button be held? Only when the widget is actually

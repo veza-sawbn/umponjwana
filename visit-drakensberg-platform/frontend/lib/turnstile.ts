@@ -88,3 +88,52 @@ export function captchaOptions(token?: string | null): { captchaToken?: string }
 export function isTokenStale(issuedAt: number, now: number = Date.now()): boolean {
   return now - issuedAt >= TURNSTILE_TOKEN_TTL_MS
 }
+
+/* ── What a failure should say ───────────────────────────────────────────── */
+
+/**
+ * The message to show when a form is blocked on the captcha. One place, so the
+ * four forms do not drift into four wordings for the same state.
+ */
+export const TURNSTILE_PENDING_MESSAGE = 'Please complete the security check below.'
+export const TURNSTILE_FAILED_MESSAGE =
+  'The security check could not be completed. Refresh the page and try again.'
+
+/** Not a Cloudflare code — ours, for "the script never loaded at all". */
+export const SCRIPT_LOAD_FAILED = 'script_load_failed'
+
+/**
+ * Turn Cloudflare's error code into something the reader can act on.
+ *
+ * WHY THIS EXISTS
+ *   The widget component used to drop the code its `error-callback` receives
+ *   and show one sentence for every failure: "the security check could not be
+ *   completed, refresh the page and try again." That sentence is wrong for the
+ *   most common failure there is.
+ *
+ *   110200 is "unknown domain" — the host serving the page is not on the
+ *   widget's Hostname Management list in the Cloudflare dashboard. Every
+ *   Vercel preview deployment gets its own hostname, so a widget registered
+ *   for the production domain fails on every single preview URL, forever, and
+ *   the old message sent whoever hit it away to reload a page that was never
+ *   going to work. Cloudflare publishes test sitekeys that pass on any
+ *   hostname precisely for this; see docs/security/TURNSTILE.md.
+ */
+export function turnstileErrorMessage(code?: string): string {
+  if (code === SCRIPT_LOAD_FAILED) {
+    return 'The security check could not load. Check your connection or any ad blocker, then reload the page.'
+  }
+  // 110200 unknown domain, and its neighbours in the same family are all
+  // sitekey or domain problems: wrong key, invalid key, domain not allowed.
+  if (code && code.startsWith('110')) {
+    return `The security check is not set up for this domain (Cloudflare error ${code}). `
+      + 'Add this hostname to the widget in Cloudflare \u2192 Turnstile \u2192 Hostname Management, '
+      + 'or use a test sitekey on preview deployments.'
+  }
+  // Anything else still carries its code: an unrecognised one is worth
+  // reporting verbatim rather than flattening into "something went wrong".
+  if (code) {
+    return `The security check could not be completed (Cloudflare error ${code}). Reload the page and try again.`
+  }
+  return TURNSTILE_FAILED_MESSAGE
+}

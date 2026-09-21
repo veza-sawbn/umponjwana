@@ -8,7 +8,7 @@ import { z } from 'zod';
 import { resetPassword } from '@/lib/auth';
 import Turnstile, {
   captchaBlocked,
-  TURNSTILE_FAILED_MESSAGE,
+  turnstileErrorMessage,
   type TurnstileHandle,
 } from '@/components/security/Turnstile';
 
@@ -122,7 +122,7 @@ export default function ForgotPasswordPage() {
                   ref={turnstile}
                   action="password-reset"
                   onToken={setCaptchaToken}
-                  onError={() => setAuthError(TURNSTILE_FAILED_MESSAGE)}
+                  onError={code => setAuthError(turnstileErrorMessage(code))}
                   className="flex justify-center"
                 />
 

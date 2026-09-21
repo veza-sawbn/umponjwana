@@ -27,6 +27,7 @@ import {
 import { uploadComplianceDocument, expiryState, COMPLIANCE_MAX_BYTES } from '@/lib/compliance'
 import Turnstile, {
   captchaBlocked,
+  turnstileErrorMessage,
   TURNSTILE_FAILED_MESSAGE,
   TURNSTILE_PENDING_MESSAGE,
   type TurnstileHandle,
@@ -115,6 +116,15 @@ export default function ListWithUsPage() {
   // tokens are spent on different things.
   const grantTurnstile = useRef<TurnstileHandle>(null)
   const [grantState, setGrantState] = useState<'idle' | 'ready' | 'failed'>('idle')
+  // WHY THIS IS A MESSAGE AND NOT A BOOLEAN
+  //   Two completely different things land on "failed" here — the Turnstile
+  //   widget itself erroring (wrong domain for the sitekey, script blocked),
+  //   and our own grant route refusing the token it produced (no secret key,
+  //   no service-role key, rate limited). They have different fixes and
+  //   different owners, and a single sentence covering both sent somebody
+  //   reloading a preview deployment that was never going to work. Whatever
+  //   actually failed now says so.
+  const [grantError, setGrantError] = useState('')
 
   const set = useCallback(<K extends keyof Draft>(key: K, value: Draft[K]) => {
     setForm(f => ({ ...f, [key]: value }))
@@ -127,11 +137,14 @@ export default function ListWithUsPage() {
     try {
       await requestUploadGrant(applicationRef, token)
       setGrantState('ready')
-    } catch {
+      setGrantError('')
+    } catch (e) {
       // Not fatal: the application itself submits without attachments, and
       // saying so is better than blocking someone whose certificate upload
-      // would have failed anyway.
+      // would have failed anyway. The widget solved, so this is our end —
+      // report what the route said rather than blaming the security check.
       setGrantState('failed')
+      setGrantError(e instanceof Error ? e.message : 'Could not enable uploads.')
     }
   }, [applicationRef])
 
@@ -145,9 +158,11 @@ export default function ListWithUsPage() {
       if (!token) return false
       await requestUploadGrant(applicationRef, token)
       setGrantState('ready')
+      setGrantError('')
       return true
-    } catch {
+    } catch (e) {
       setGrantState('failed')
+      setGrantError(e instanceof Error ? e.message : 'Could not renew the upload permission.')
       return false
     }
   }, [applicationRef])
@@ -808,8 +823,8 @@ export default function ListWithUsPage() {
               )}
               {grantState === 'failed' && (
                 <p className="font-sans text-xs text-red-500">
-                  The security check didn&apos;t complete. Reload the page and try again — you can
-                  still submit without attachments if it keeps failing.
+                  {grantError || TURNSTILE_FAILED_MESSAGE}{' '}
+                  You can still submit your application without attachments.
                 </p>
               )}
             </div>
@@ -1442,7 +1457,7 @@ export default function ListWithUsPage() {
               ref={turnstile}
               action="listing-application"
               onToken={setCaptchaToken}
-              onError={() => setError(TURNSTILE_FAILED_MESSAGE)}
+              onError={code => setError(turnstileErrorMessage(code))}
               className="pt-1"
             />
           </div>

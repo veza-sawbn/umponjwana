@@ -9,7 +9,7 @@ import { signUp, supabase } from '@/lib/auth'
 import { trackEvent, AnalyticsEvent } from '@/lib/analytics'
 import Turnstile, {
   captchaBlocked,
-  TURNSTILE_FAILED_MESSAGE,
+  turnstileErrorMessage,
   type TurnstileHandle,
 } from '@/components/security/Turnstile'
 
@@ -152,7 +152,7 @@ export default function RegisterPage() {
               ref={turnstile}
               action="signup"
               onToken={setCaptchaToken}
-              onError={() => setAuthError(TURNSTILE_FAILED_MESSAGE)}
+              onError={code => setAuthError(turnstileErrorMessage(code))}
               className="flex justify-center"
             />
 
