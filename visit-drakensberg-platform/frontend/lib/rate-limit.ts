@@ -80,6 +80,19 @@ export const RATE_LIMITS = {
    * should not close the supplier pipeline too.
    */
   listingApplication: { limit: 5, windowSeconds: 3600 },
+  /**
+   * Trading a solved captcha for a two-hour upload grant. Tight, because each
+   * one is a bearer capability and an applicant needs exactly one.
+   */
+  listingUploadGrant: { limit: 10, windowSeconds: 3600 },
+  /**
+   * Signed upload URLs for an applicant's photos and certificates. Budgeted
+   * per caller AND per grant, so one solved challenge does not yield an
+   * unbounded number of objects. PHOTO_MAX_COUNT is 8 and there are a handful
+   * of certificate types, with retries — 40 an hour covers a real applicant
+   * having a bad time with their phone camera.
+   */
+  listingUpload: { limit: 40, windowSeconds: 3600 },
 } as const satisfies Record<string, RateLimitRule>
 
 // ── In-process fallback ─────────────────────────────────────────────────────
