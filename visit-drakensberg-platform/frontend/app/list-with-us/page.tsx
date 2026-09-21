@@ -9,6 +9,7 @@ import {
 } from 'lucide-react'
 import Footer from '@/components/layout/Footer'
 import { supabase } from '@/lib/auth'
+import { captchaOptions } from '@/lib/turnstile'
 import { getRegionNames } from '@/lib/regions'
 import { PROPERTY_REGIONS, PROPERTY_TYPES, PROPERTY_AMENITIES } from '@/lib/properties'
 import { ACTIVITY_CATEGORIES, ACTIVITY_DIFFICULTIES, ACTIVITY_INCLUSIONS } from '@/lib/activities'
@@ -23,6 +24,12 @@ import {
   type ApplicationActivity, type ListingApplicationDraft, type AccreditationKind,
 } from '@/lib/listing-applications'
 import { uploadComplianceDocument, expiryState, COMPLIANCE_MAX_BYTES } from '@/lib/compliance'
+import Turnstile, {
+  captchaBlocked,
+  TURNSTILE_FAILED_MESSAGE,
+  TURNSTILE_PENDING_MESSAGE,
+  type TurnstileHandle,
+} from '@/components/security/Turnstile'
 import { recordBothAcceptances, SUPPLIER_TERMS_VERSION, CODE_OF_CONDUCT_VERSION } from '@/lib/supplier-agreement'
 
 // Public front door for every kind of operator — stays, activities, guided
@@ -92,6 +99,13 @@ export default function ListWithUsPage() {
   const [confirmPassword, setConfirmPassword] = useState('')
   // Whether the visitor already has a session (skip signUp on submit).
   const [isSignedIn, setIsSignedIn] = useState(false)
+  // Turnstile. This is the form the September 2026 flood came through — 144
+  // applications, 109 of them scripted — and the signUp on submit is what the
+  // captcha actually gates, at Supabase. Someone already signed in has been
+  // through it once and does not sign up again, so the widget is only shown
+  // and only required when there is no session.
+  const [captchaToken, setCaptchaToken] = useState('')
+  const turnstile = useRef<TurnstileHandle>(null)
 
   const set = useCallback(<K extends keyof Draft>(key: K, value: Draft[K]) => {
     setForm(f => ({ ...f, [key]: value }))
@@ -400,6 +414,10 @@ export default function ListWithUsPage() {
       setError('Please confirm you are authorised to list this business and accept the supplier documents.')
       return
     }
+    if (!isSignedIn && captchaBlocked(captchaToken)) {
+      setError(TURNSTILE_PENDING_MESSAGE)
+      return
+    }
 
     setSubmitting(true)
     setError('')
@@ -418,10 +436,15 @@ export default function ListWithUsPage() {
               role: 'supplier',
               supplier_type: form.supplierTypes.join(','),
             },
+            ...captchaOptions(captchaToken),
           },
         })
         if (signUpError) {
           const msg = signUpError.message.toLowerCase()
+          // Either way out of this branch burns the captcha token: Supabase
+          // redeems it before it looks at the email, so the retry the message
+          // below asks for needs a fresh challenge.
+          turnstile.current?.reset()
           if (msg.includes('already registered') || msg.includes('already been registered')) {
             setError(
               'This email address already has an account. Sign in first, then return here to submit your application. If you forgot your password, use the "Forgot password" link on the sign-in page.',
@@ -1308,6 +1331,16 @@ export default function ListWithUsPage() {
               Recorded as accepted: Supplier Agreement v{SUPPLIER_TERMS_VERSION}, Code of Conduct
               v{CODE_OF_CONDUCT_VERSION}.
             </p>
+
+            {!isSignedIn && (
+              <Turnstile
+                ref={turnstile}
+                action="listing-application"
+                onToken={setCaptchaToken}
+                onError={() => setError(TURNSTILE_FAILED_MESSAGE)}
+                className="pt-1"
+              />
+            )}
           </div>
         )}
 
@@ -1329,7 +1362,7 @@ export default function ListWithUsPage() {
               Continue to {STEPS[step + 1]} <ArrowRight size={14} />
             </button>
           ) : (
-            <button onClick={submit} disabled={submitting}
+            <button onClick={submit} disabled={submitting || (!isSignedIn && captchaBlocked(captchaToken))}
               className="flex items-center gap-2 bg-[#C9A96E] text-black px-6 py-3 font-sans text-sm font-medium hover:bg-[#b8935a] transition-colors disabled:opacity-50">
               {submitting ? <><Loader2 size={14} className="animate-spin" /> Submitting…</> : 'Submit application'}
             </button>

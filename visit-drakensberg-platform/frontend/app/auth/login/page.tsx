@@ -1,5 +1,5 @@
 'use client'
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useForm } from 'react-hook-form'
@@ -8,6 +8,11 @@ import { z } from 'zod'
 import { signIn, supabase } from '@/lib/auth'
 import { trackEvent, AnalyticsEvent } from '@/lib/analytics'
 import { safeRedirectPath } from '@/lib/safe-redirect'
+import Turnstile, {
+  captchaBlocked,
+  TURNSTILE_FAILED_MESSAGE,
+  type TurnstileHandle,
+} from '@/components/security/Turnstile'
 
 const schema = z.object({
   email: z.string().email('Enter a valid email'),
@@ -18,6 +23,8 @@ type Form = z.infer<typeof schema>
 export default function LoginPage() {
   const router = useRouter()
   const [authError, setAuthError] = useState<string | null>(null)
+  const [captchaToken, setCaptchaToken] = useState('')
+  const turnstile = useRef<TurnstileHandle>(null)
   const { register, handleSubmit, formState: { errors, isSubmitting } } = useForm<Form>({
     resolver: zodResolver(schema),
   })
@@ -25,7 +32,7 @@ export default function LoginPage() {
   const onSubmit = async (data: Form) => {
     setAuthError(null)
     try {
-      const result = await signIn(data.email, data.password)
+      const result = await signIn(data.email, data.password, captchaToken)
       let role = result?.user?.app_metadata?.role ?? result?.user?.user_metadata?.role
       let staffRole = result?.user?.app_metadata?.staff_role ?? result?.user?.user_metadata?.staff_role
 
@@ -70,6 +77,10 @@ export default function LoginPage() {
       window.location.assign(targetPath)
     } catch (err: unknown) {
       setAuthError(err instanceof Error ? err.message : 'Sign in failed')
+      // The token was spent on the attempt that just failed — a second submit
+      // with the same one is refused by Supabase for a reason that has nothing
+      // to do with the password, so hand the visitor a fresh challenge.
+      turnstile.current?.reset()
     }
   }
 
@@ -138,9 +149,17 @@ export default function LoginPage() {
               {errors.password && <p className="font-sans text-xs text-red-500 mt-1.5">{errors.password.message}</p>}
             </div>
 
+            <Turnstile
+              ref={turnstile}
+              action="login"
+              onToken={setCaptchaToken}
+              onError={() => setAuthError(TURNSTILE_FAILED_MESSAGE)}
+              className="flex justify-center"
+            />
+
             <button
               type="submit"
-              disabled={isSubmitting}
+              disabled={isSubmitting || captchaBlocked(captchaToken)}
               className="w-full bg-forest text-white py-3.5 font-sans text-sm hover:bg-sage transition-colors disabled:opacity-50 mt-2"
             >
               {isSubmitting ? 'Signing in…' : 'Sign in'}

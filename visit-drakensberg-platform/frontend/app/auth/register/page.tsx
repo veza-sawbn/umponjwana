@@ -1,5 +1,5 @@
 'use client'
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useForm } from 'react-hook-form'
@@ -7,6 +7,11 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { signUp, supabase } from '@/lib/auth'
 import { trackEvent, AnalyticsEvent } from '@/lib/analytics'
+import Turnstile, {
+  captchaBlocked,
+  TURNSTILE_FAILED_MESSAGE,
+  type TurnstileHandle,
+} from '@/components/security/Turnstile'
 
 const schema = z.object({
   fullName: z.string().min(2, 'At least 2 characters'),
@@ -22,6 +27,8 @@ type Form = z.infer<typeof schema>
 export default function RegisterPage() {
   const router = useRouter()
   const [authError, setAuthError] = useState<string | null>(null)
+  const [captchaToken, setCaptchaToken] = useState('')
+  const turnstile = useRef<TurnstileHandle>(null)
   const { register, handleSubmit, watch, formState: { errors, isSubmitting } } = useForm<Form>({
     resolver: zodResolver(schema),
     defaultValues: { role: 'visitor', marketingConsent: false },
@@ -32,7 +39,7 @@ export default function RegisterPage() {
   const onSubmit = async (data: Form) => {
     setAuthError(null)
     try {
-      await signUp(data.email, data.password, data.fullName, data.role)
+      await signUp(data.email, data.password, data.fullName, data.role, captchaToken)
       // Consent + funnel tracking never block account creation on failure —
       // both are awaited (not fire-and-forget) purely so the hard navigation
       // right after doesn't tear the page down mid-request and silently
@@ -50,6 +57,10 @@ export default function RegisterPage() {
       window.location.assign(data.role === 'supplier' ? '/supplier' : '/account')
     } catch (err: unknown) {
       setAuthError(err instanceof Error ? err.message : 'Registration failed')
+      // Single-use token, already spent. "That email is already registered" is
+      // the common landing here, and the retry after it must not fail for a
+      // second, unrelated reason.
+      turnstile.current?.reset()
     }
   }
 
@@ -137,7 +148,15 @@ export default function RegisterPage() {
               </span>
             </label>
 
-            <button type="submit" disabled={isSubmitting}
+            <Turnstile
+              ref={turnstile}
+              action="signup"
+              onToken={setCaptchaToken}
+              onError={() => setAuthError(TURNSTILE_FAILED_MESSAGE)}
+              className="flex justify-center"
+            />
+
+            <button type="submit" disabled={isSubmitting || captchaBlocked(captchaToken)}
               className="w-full bg-forest text-white py-3.5 font-sans text-sm hover:bg-sage transition-colors disabled:opacity-50 mt-2">
               {isSubmitting ? 'Creating account…' : 'Create account'}
             </button>

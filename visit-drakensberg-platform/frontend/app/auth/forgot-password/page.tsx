@@ -1,11 +1,16 @@
 'use client';
 
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import Link from 'next/link';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { resetPassword } from '@/lib/auth';
+import Turnstile, {
+  captchaBlocked,
+  TURNSTILE_FAILED_MESSAGE,
+  type TurnstileHandle,
+} from '@/components/security/Turnstile';
 
 const schema = z.object({
   email: z.string().email('Please enter a valid email address'),
@@ -17,6 +22,8 @@ export default function ForgotPasswordPage() {
   const [sent, setSent] = useState(false);
   const [sentEmail, setSentEmail] = useState('');
   const [authError, setAuthError] = useState<string | null>(null);
+  const [captchaToken, setCaptchaToken] = useState('');
+  const turnstile = useRef<TurnstileHandle>(null);
 
   const {
     register,
@@ -27,12 +34,13 @@ export default function ForgotPasswordPage() {
   const onSubmit = async (data: FormData) => {
     setAuthError(null);
     try {
-      await resetPassword(data.email);
+      await resetPassword(data.email, captchaToken);
       setSentEmail(data.email);
       setSent(true);
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Something went wrong. Please try again.';
       setAuthError(message);
+      turnstile.current?.reset();
     }
   };
 
@@ -68,7 +76,11 @@ export default function ForgotPasswordPage() {
                 Back to Login
               </Link>
               <button
-                onClick={() => setSent(false)}
+                // The widget unmounted when this screen replaced the form, and
+                // the token it produced was spent on the email we just sent.
+                // Clearing it means the form that comes back is gated on a
+                // fresh challenge rather than on a token that no longer works.
+                onClick={() => { setCaptchaToken(''); setSent(false); }}
                 className="mt-3 text-sm text-gray-500 underline"
               >
                 Try a different email
@@ -106,9 +118,17 @@ export default function ForgotPasswordPage() {
                   )}
                 </div>
 
+                <Turnstile
+                  ref={turnstile}
+                  action="password-reset"
+                  onToken={setCaptchaToken}
+                  onError={() => setAuthError(TURNSTILE_FAILED_MESSAGE)}
+                  className="flex justify-center"
+                />
+
                 <button
                   type="submit"
-                  disabled={isSubmitting}
+                  disabled={isSubmitting || captchaBlocked(captchaToken)}
                   className="w-full bg-[#2D6A4F] text-white py-3 rounded-xl font-semibold text-sm hover:bg-[#245a42] transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                 >
                   {isSubmitting ? (
