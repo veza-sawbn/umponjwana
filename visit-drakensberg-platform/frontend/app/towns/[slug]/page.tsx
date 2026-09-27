@@ -13,6 +13,7 @@ import RelatedTrailsModule from '@/components/modules/RelatedTrailsModule'
 import NearbyStaysModule from '@/components/modules/NearbyStaysModule'
 import TrackView from '@/components/analytics/TrackView'
 import JsonLd from '@/components/seo/JsonLd'
+import { ogImages } from '@/lib/seo'
 
 // New route — same rationale as app/nature-reserves/[slug]/page.tsx: Town
 // already had slug + seoTitle + seoDescription with admin CRUD, but no
@@ -61,7 +62,7 @@ export async function generateMetadata({ params }: { params: { slug: string } })
       title,
       description,
       url: `${SITE_URL}${canonical}`,
-      images: town.image ? [{ url: town.image }] : undefined,
+      images: ogImages(town.image),
     },
     twitter: { card: 'summary_large_image', title, description },
   }

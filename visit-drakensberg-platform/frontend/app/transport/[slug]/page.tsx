@@ -8,6 +8,7 @@ import { getMyTransportCompany } from '@/lib/transport'
 import { publicSupabase } from '@/lib/supabase-public'
 import { formatMoney } from '@/lib/allocation'
 import JsonLd from '@/components/seo/JsonLd'
+import { ogImages } from '@/lib/seo'
 
 // New route — closes SEO audit G17: named shuttle routes were real supplier
 // data (app/supplier/routes/*) with no public detail page, so search never
@@ -52,8 +53,8 @@ export async function generateMetadata({ params }: { params: { slug: string } })
     description,
     alternates: { canonical },
     robots: route.status === 'active' ? undefined : { index: false, follow: false },
-    openGraph: { title, description, url: `${SITE_URL}${canonical}` },
-    twitter: { card: 'summary', title, description },
+    openGraph: { title, description, url: `${SITE_URL}${canonical}`, images: ogImages() },
+    twitter: { card: 'summary_large_image', title, description },
   }
 }
 

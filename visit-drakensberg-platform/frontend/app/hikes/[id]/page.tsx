@@ -7,6 +7,7 @@ import { publicSupabase } from '@/lib/supabase-public'
 import HikeDetail from './HikeDetail'
 import TrackView from '@/components/analytics/TrackView'
 import JsonLd from '@/components/seo/JsonLd'
+import { ogImages } from '@/lib/seo'
 
 // Server shell — same pattern as app/regions/[slug]/page.tsx. Trail has no
 // seoTitle/seoDescription populated yet (GraphFields fields exist but
@@ -102,7 +103,7 @@ export async function generateMetadata({ params }: { params: { id: string } }): 
       title,
       description,
       url: `${SITE_URL}${canonical}`,
-      images: trail.image ? [{ url: trail.image }] : undefined,
+      images: ogImages(trail.image),
     },
     twitter: { card: 'summary_large_image', title, description },
   }

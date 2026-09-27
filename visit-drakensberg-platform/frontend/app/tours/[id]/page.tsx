@@ -7,6 +7,7 @@ import { getNearbyStays, type NearbyStayResult } from '@/lib/modules'
 import TourDetail from './TourDetail'
 import TrackView from '@/components/analytics/TrackView'
 import JsonLd from '@/components/seo/JsonLd'
+import { ogImages } from '@/lib/seo'
 
 // Server shell — same pattern as the other converted detail routes. Tours
 // have no dedicated getTourById() (no such helper existed), so this
@@ -58,8 +59,8 @@ export async function generateMetadata({ params }: { params: { id: string } }): 
     description,
     alternates: { canonical },
     robots: tour.status === 'active' ? undefined : { index: false, follow: false },
-    openGraph: { title, description, url: `${SITE_URL}${canonical}` },
-    twitter: { card: 'summary', title, description },
+    openGraph: { title, description, url: `${SITE_URL}${canonical}`, images: ogImages() },
+    twitter: { card: 'summary_large_image', title, description },
   }
 }
 

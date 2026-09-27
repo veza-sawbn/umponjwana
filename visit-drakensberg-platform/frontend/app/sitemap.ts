@@ -9,6 +9,7 @@ import { getPackages } from '@/lib/packages'
 import { getTours } from '@/lib/tours'
 import { getRoutes, routeSlug } from '@/lib/transport-routes'
 import { publicSupabase } from '@/lib/supabase-public'
+import { getPublishedPosts } from '@/lib/blog-posts'
 
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://visitdrakensberg.com'
 
@@ -51,15 +52,20 @@ const STATIC_ROUTES = [
   { path: '/terms', priority: 0.2 },
 ]
 
-// Editorial article slugs defined in app/mydrakensberg/[slug]/page.tsx
+// The hardcoded fallback articles in app/mydrakensberg/[slug]/page.tsx (its
+// ARTICLES map). Only these three have bodies there. Three more slugs used to
+// be listed here, but they only ever appeared as "related" links and exist
+// nowhere, so the sitemap was sending crawlers to 404s. Published CMS posts
+// (blog_posts) are added from the database below.
 const STORY_SLUGS = [
   'san-bushmen-rock-art-giants-castle',
   'tugela-falls-chain-ladder-guide',
   'bearded-vulture-lammergeier',
-  'zulu-cuisine-foothills',
-  'battle-of-isandlwana-history',
-  'conservation-umdoni-wetlands',
 ]
+
+// Rebuilt hourly rather than frozen at deploy time, so a newly published
+// listing, trail or story reaches search engines without a redeploy.
+export const revalidate = 3600
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const now = new Date()
@@ -69,7 +75,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   // DEFAULT_* content the live pages themselves fall back to on a read
   // failure, so the sitemap never silently drops URLs that the site is
   // still actually serving.
-  const [regions, reserves, towns, trails, properties, activities, packages, tours, routes] = await Promise.all([
+  const [regions, reserves, towns, trails, properties, activities, packages, tours, routes, posts] = await Promise.all([
     getRegions(publicSupabase).catch(() => DEFAULT_REGIONS),
     getReserves(publicSupabase).catch(() => DEFAULT_RESERVES),
     getTowns(publicSupabase).catch(() => DEFAULT_TOWNS),
@@ -79,7 +85,13 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     getPackages(publicSupabase).catch(() => []),
     getTours(publicSupabase).catch(() => []),
     getRoutes(publicSupabase).catch(() => []),
+    getPublishedPosts(publicSupabase).catch(() => []),
   ])
+
+  const storyUrls = new Map<string, Date>(STORY_SLUGS.map(slug => [slug, now]))
+  for (const p of posts) {
+    storyUrls.set(p.slug, new Date(p.updated_at || p.published_at || now))
+  }
 
   return [
     ...STATIC_ROUTES.map(r => ({
@@ -88,9 +100,9 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       changeFrequency: 'weekly' as const,
       priority: r.priority,
     })),
-    ...STORY_SLUGS.map(slug => ({
+    ...Array.from(storyUrls, ([slug, lastModified]) => ({
       url: `${SITE_URL}/mydrakensberg/${slug}`,
-      lastModified: now,
+      lastModified,
       changeFrequency: 'monthly' as const,
       priority: 0.5,
     })),

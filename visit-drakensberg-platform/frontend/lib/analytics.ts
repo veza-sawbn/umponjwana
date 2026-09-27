@@ -141,7 +141,7 @@ function ensureSession(): Promise<string> {
       sessionStorage.setItem(SESSION_LAST_ACTIVE_KEY, String(now))
       return data as string
     } catch (e) {
-      console.error('[analytics] session init failed:', e)
+      logTrackingFailure('session init failed:', e)
       return existingId || ''
     } finally {
       sessionReady = null
@@ -151,8 +151,17 @@ function ensureSession(): Promise<string> {
   return sessionReady
 }
 
+// Tracking is best-effort, and in production it fails routinely for reasons
+// that aren't bugs: ad blockers, privacy extensions, dropped mobile
+// connections. Logging those as console errors put a red error in every such
+// visitor's console on every page view, burying real ones. Kept visible in
+// development, where a failure does mean something is wrong.
+function logTrackingFailure(...args: unknown[]) {
+  if (process.env.NODE_ENV !== 'production') console.warn('[analytics]', ...args)
+}
+
 /** Central event tracker — see the module docblock. Safe to call from any
- *  client component; failures are logged, never thrown, so a tracking hiccup
+ *  client component; failures are swallowed (logged in dev), never thrown, so a tracking hiccup
  *  can't break the page it's called from. */
 export async function trackEvent(
   eventName: string,
@@ -169,9 +178,9 @@ export async function trackEvent(
       p_properties: properties,
       p_page_url: pageUrl ?? window.location.pathname,
     })
-    if (error) console.error('[analytics] track failed:', eventName, error)
+    if (error) logTrackingFailure('track failed:', eventName, error)
   } catch (e) {
-    console.error('[analytics] track threw:', eventName, e)
+    logTrackingFailure('track threw:', eventName, e)
   }
 }
 

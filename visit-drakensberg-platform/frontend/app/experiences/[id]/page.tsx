@@ -4,6 +4,7 @@ import { getExperienceById, type TrekkingExperience } from '@/lib/experiences'
 import { publicSupabase } from '@/lib/supabase-public'
 import ExperienceDetail from './ExperienceDetail'
 import JsonLd from '@/components/seo/JsonLd'
+import { ogImages } from '@/lib/seo'
 
 // Server shell — same pattern as the other converted detail routes. An
 // experience is a derived/composite view (Departure + Tour + Trail +
@@ -59,8 +60,8 @@ export async function generateMetadata({ params }: { params: { id: string } }): 
     // passed or sold out — noindex rather than delete, so direct links
     // (email confirmations, etc.) keep working.
     robots: (isPast || exp.spacesAvailable === 0) ? { index: false, follow: true } : undefined,
-    openGraph: { title, description, url: `${SITE_URL}${canonical}` },
-    twitter: { card: 'summary', title, description },
+    openGraph: { title, description, url: `${SITE_URL}${canonical}`, images: ogImages() },
+    twitter: { card: 'summary_large_image', title, description },
   }
 }
 

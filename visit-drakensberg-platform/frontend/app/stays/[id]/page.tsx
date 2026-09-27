@@ -7,6 +7,7 @@ import StayDetail from './StayDetail'
 import TrackView from '@/components/analytics/TrackView'
 import { formatMoney } from '@/lib/allocation'
 import JsonLd from '@/components/seo/JsonLd'
+import { ogImages } from '@/lib/seo'
 
 // Server shell — same pattern as the other converted detail routes. Property
 // has no seoTitle/seoDescription populated yet, so title/description are
@@ -65,7 +66,7 @@ export async function generateMetadata({ params }: { params: { id: string } }): 
       title,
       description,
       url: `${SITE_URL}${canonical}`,
-      images: property.photos?.[0] ? [{ url: property.photos[0] }] : undefined,
+      images: ogImages(property.photos?.[0]),
     },
     twitter: { card: 'summary_large_image', title, description },
   }

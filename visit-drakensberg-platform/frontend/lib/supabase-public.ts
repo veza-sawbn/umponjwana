@@ -27,4 +27,16 @@ import { createClient } from '@supabase/supabase-js'
 export const publicSupabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://placeholder.supabase.co',
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'placeholder-anon-key',
+  {
+    // Session-less by design (see above), so it keeps no session and uses its
+    // own storage key. In the browser it otherwise shared the default key with
+    // lib/auth.ts's client, which logged a "Multiple GoTrueClient instances"
+    // warning on every public page and left two clients refreshing one token.
+    auth: {
+      persistSession: false,
+      autoRefreshToken: false,
+      detectSessionInUrl: false,
+      storageKey: 'sb-public-anon',
+    },
+  },
 )

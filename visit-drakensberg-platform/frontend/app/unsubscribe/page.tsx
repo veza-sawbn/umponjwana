@@ -76,7 +76,11 @@ function UnsubscribeForm() {
         {status === 'working' ? 'Unsubscribing…' : 'Unsubscribe'}
       </button>
       {status === 'error' && (
-        <p className="font-sans text-xs text-red-500 mt-4">Something went wrong. Please try again.</p>
+        <p role="alert" className="font-sans text-xs text-red-500 mt-4">
+          We couldn&apos;t update your email preferences just now. Please try again in a minute, or email{' '}
+          <a href="mailto:hello@visitdrakensberg.com" className="underline">hello@visitdrakensberg.com</a>{' '}
+          and we&apos;ll unsubscribe you by hand.
+        </p>
       )}
     </div>
   )

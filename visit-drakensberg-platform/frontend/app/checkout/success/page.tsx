@@ -10,6 +10,7 @@ import { getBookingById, type SavedBooking } from '@/lib/bookings'
 import { ensureOrderForBooking } from '@/lib/orders'
 import { holdDeadlineLabel, holdHasLapsed, paymentWindowLabel } from '@/lib/stay-requests'
 import { formatMoney, formatRate } from '@/lib/allocation'
+import PageLoader from '@/components/ui/PageLoader'
 
 function fmt(iso: string) {
   if (!iso) return '—'
@@ -78,9 +79,7 @@ function SuccessInner() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-[#F7F5F2] flex items-center justify-center">
-        <div className="w-8 h-8 border-2 border-[#2d6a4f] border-t-transparent rounded-full animate-spin" />
-      </div>
+      <PageLoader fullScreen label="Confirming your booking" />
     )
   }
 
@@ -404,9 +403,7 @@ function SuccessInner() {
 export default function BookingSuccessPage() {
   return (
     <Suspense fallback={
-      <div className="min-h-screen bg-[#F7F5F2] flex items-center justify-center">
-        <div className="w-8 h-8 border-2 border-[#2d6a4f] border-t-transparent rounded-full animate-spin" />
-      </div>
+      <PageLoader fullScreen label="Confirming your booking" />
     }>
       <SuccessInner />
     </Suspense>

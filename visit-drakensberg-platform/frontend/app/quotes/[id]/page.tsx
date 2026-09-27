@@ -7,6 +7,7 @@ import { getQuoteById, acceptQuote, declineQuote, type Quote } from '@/lib/quote
 import { getSiteContent, SITE_CONTENT_DEFAULTS } from '@/lib/site-content'
 import { formatMoney } from '@/lib/allocation'
 import Logo from '@/components/Logo'
+import PageLoader from '@/components/ui/PageLoader'
 
 type BusinessDetails = typeof SITE_CONTENT_DEFAULTS.business_details
 
@@ -61,7 +62,7 @@ export default function QuotePage() {
   }
 
   if (loading) {
-    return <div className="min-h-screen bg-[#F7F5F2] flex items-center justify-center pt-24 font-sans text-sm text-gray-400">Loading quote…</div>
+    return <PageLoader fullScreen label="Loading your quote" />
   }
   if (!quote) {
     return (

@@ -1,10 +1,11 @@
 import type { Metadata } from 'next'
+import { withSocial } from '@/lib/seo'
 
-export const metadata: Metadata = {
+export const metadata: Metadata = withSocial({
   title: 'Shuttle Routes',
   description: 'Fixed-price shuttle routes between Drakensberg towns, trailheads and valleys, run by verified transport partners. Book a seat or request a private transfer.',
   alternates: { canonical: '/transport' },
-}
+})
 
 export default function SectionLayout({ children }: { children: React.ReactNode }) {
   return children

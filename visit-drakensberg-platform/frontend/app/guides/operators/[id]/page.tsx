@@ -4,6 +4,7 @@ import { getOperatorById, type OperatorProfile } from '@/lib/operators'
 import { publicSupabase } from '@/lib/supabase-public'
 import OperatorDetail from './OperatorDetail'
 import JsonLd from '@/components/seo/JsonLd'
+import { ogImages } from '@/lib/seo'
 
 // Server shell — same pattern as the other converted detail routes.
 // See docs/destination-graph/PHASE_B.md.
@@ -35,7 +36,7 @@ export async function generateMetadata({ params }: { params: { id: string } }): 
       title,
       description,
       url: `${SITE_URL}${canonical}`,
-      images: operator.logo ? [{ url: operator.logo }] : undefined,
+      images: ogImages(operator.logo),
     },
     twitter: { card: 'summary_large_image', title, description },
   }

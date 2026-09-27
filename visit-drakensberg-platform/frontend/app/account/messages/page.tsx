@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { MessageCircle, Send, MapPin, ChevronRight, Inbox } from 'lucide-react'
 import { getThreadsByCustomer, sendMessage, type MessageThread } from '@/lib/messages'
 import { supabase } from '@/lib/auth'
+import PageLoader from '@/components/ui/PageLoader'
 
 function timeAgo(iso: string) {
   const s = Math.floor((Date.now() - new Date(iso).getTime()) / 1000)
@@ -211,9 +212,7 @@ export default function AccountMessagesPage() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center py-20">
-        <div className="w-6 h-6 border-2 border-[#2d6a4f] border-t-transparent rounded-full animate-spin" />
-      </div>
+      <PageLoader label="Loading your messages" />
     )
   }
 

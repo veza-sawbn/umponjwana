@@ -10,6 +10,7 @@ import { getTrails, type Trail } from '@/lib/trails'
 import { resolveLivePackages } from '@/components/tours/PackageEditor'
 import Logo from '@/components/Logo'
 import { formatMoney } from '@/lib/allocation'
+import PageLoader from '@/components/ui/PageLoader'
 
 // Printable trip itinerary — a proper travel document, not a screen dump:
 // trip summary, guest details, accommodation, a chronological day-by-day
@@ -145,7 +146,7 @@ export default function PrintableItineraryPage() {
   const schedule = useMemo(() => booking ? buildSchedule(booking, departures, tours, trails) : [], [booking, departures, tours, trails])
 
   if (loading) {
-    return <div className="min-h-screen bg-[#F7F5F2] flex items-center justify-center pt-24 font-sans text-sm text-gray-400">Preparing your itinerary…</div>
+    return <PageLoader fullScreen label="Preparing your itinerary" />
   }
   if (!booking) {
     return (

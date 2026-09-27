@@ -1,10 +1,8 @@
 import PlanContent from './PlanContent'
 
-export const metadata = {
-  title: 'Plan Your Trip | Visit Drakensberg',
-  description: 'Everything you need to plan the perfect Drakensberg trip.',
-}
-
+// Title, description and canonical come from app/plan/layout.tsx. This page
+// used to set its own title with " | Visit Drakensberg" already on the end,
+// which the root title template then suffixed a second time.
 export default function PlanPage() {
   return <PlanContent />
 }

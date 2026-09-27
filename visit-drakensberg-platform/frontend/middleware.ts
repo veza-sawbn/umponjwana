@@ -30,6 +30,15 @@ const MAINTENANCE_EXEMPT_ROUTES = [
   '/list-with-us', '/privacy',
 ]
 
+// True when `pathname` is `route` itself or a page beneath it. A bare
+// startsWith() also matched sibling routes that merely share the prefix:
+// '/supplier' caught the public /supplier-terms and /supplier-code-of-conduct
+// pages, so every signed-out visitor (and every crawler following the
+// sitemap) was bounced to /auth/login instead of reading them.
+function isUnder(pathname: string, route: string): boolean {
+  return pathname === route || pathname.startsWith(route + '/')
+}
+
 export async function middleware(req: NextRequest) {
   // `res` must be passed through so auth-helpers can refresh the session cookie.
   const res = NextResponse.next()
@@ -167,7 +176,7 @@ export async function middleware(req: NextRequest) {
     }
   }
 
-  const isProtected = PROTECTED_ROUTES.some(r => pathname.startsWith(r))
+  const isProtected = PROTECTED_ROUTES.some(r => isUnder(pathname, r))
 
   if (isProtected && !session) {
     const loginUrl = new URL('/auth/login', req.url)
@@ -181,7 +190,7 @@ export async function middleware(req: NextRequest) {
   }
 
   if (session) {
-    if (ADMIN_ROUTES.some(r => pathname.startsWith(r)) && !isStaff) {
+    if (ADMIN_ROUTES.some(r => isUnder(pathname, r)) && !isStaff) {
       return redirectTo('/account')
     }
 
@@ -189,7 +198,7 @@ export async function middleware(req: NextRequest) {
     // /admin visit to their own environment. This covers the post-invite
     // landing (redirectTo was set to /admin) as well as direct visits.
     // Full platform admins are not redirected — they use the whole console.
-    if (ADMIN_ROUTES.some(r => pathname.startsWith(r)) && staffRole === 'operations' && role !== 'admin') {
+    if (ADMIN_ROUTES.some(r => isUnder(pathname, r)) && staffRole === 'operations' && role !== 'admin') {
       return redirectTo('/operations')
     }
 
@@ -197,7 +206,7 @@ export async function middleware(req: NextRequest) {
     // may look in (they manage the layer), but nobody else gets past here.
     // The environment itself re-checks ops_role client-side, and every query
     // is gated by RLS — this is the coarse routing guard only.
-    if (OPERATIONS_ROUTES.some(r => pathname.startsWith(r))) {
+    if (OPERATIONS_ROUTES.some(r => isUnder(pathname, r))) {
       if (role !== 'admin' && staffRole !== 'operations') {
         return redirectTo('/account')
       }
@@ -208,7 +217,7 @@ export async function middleware(req: NextRequest) {
     // also enter supplier routes IF they have at least one active management
     // assignment — the DB-level RLS policies verify the specific supplier they
     // are trying to access, so URL manipulation still cannot bypass security.
-    if (SUPPLIER_ROUTES.some(r => pathname.startsWith(r))) {
+    if (SUPPLIER_ROUTES.some(r => isUnder(pathname, r))) {
       const isSupplierOrAdmin = ['supplier', 'admin'].includes(role as string)
       const isOpsWithAssignments =
         staffRole === 'operations' &&
@@ -263,5 +272,5 @@ export async function middleware(req: NextRequest) {
 export const config = {
   // Run on every page so maintenance mode can gate public routes too, while
   // skipping static assets, API routes and Next internals.
-  matcher: ['/((?!_next/static|_next/image|api|favicon.ico|.*\\..*).*)'],
+  matcher: ['/((?!_next/static|_next/image|api|favicon.ico|icon|apple-icon|opengraph-image|twitter-image|.*\\..*).*)'],
 }

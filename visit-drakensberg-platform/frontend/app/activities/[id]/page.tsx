@@ -5,6 +5,7 @@ import { publicSupabase } from '@/lib/supabase-public'
 import ActivityDetail from './ActivityDetail'
 import TrackView from '@/components/analytics/TrackView'
 import JsonLd from '@/components/seo/JsonLd'
+import { ogImages } from '@/lib/seo'
 
 // Server shell — same pattern as app/regions/[slug]/page.tsx and
 // app/hikes/[id]/page.tsx. Activity has no seoTitle/seoDescription
@@ -54,7 +55,7 @@ export async function generateMetadata({ params }: { params: { id: string } }): 
       title,
       description,
       url: `${SITE_URL}${canonical}`,
-      images: activity.photos?.[0] ? [{ url: activity.photos[0] }] : undefined,
+      images: ogImages(activity.photos?.[0]),
     },
     twitter: { card: 'summary_large_image', title, description },
   }

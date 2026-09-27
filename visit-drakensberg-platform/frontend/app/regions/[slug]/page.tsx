@@ -20,6 +20,7 @@ import { objectPositionStyle } from '@/lib/image-position'
 import TrackView from '@/components/analytics/TrackView'
 import { formatMoney } from '@/lib/allocation'
 import JsonLd from '@/components/seo/JsonLd'
+import { ogImages } from '@/lib/seo'
 
 // Pure server component — same shape as app/nature-reserves/[slug]/page.tsx.
 // Previously this was a server shell (this file) handing off to
@@ -105,7 +106,7 @@ export async function generateMetadata({ params }: { params: { slug: string } })
       title,
       description,
       url: `${SITE_URL}${canonical}`,
-      images: region.heroImage ? [{ url: region.heroImage }] : undefined,
+      images: ogImages(region.heroImage),
     },
     twitter: {
       card: 'summary_large_image',

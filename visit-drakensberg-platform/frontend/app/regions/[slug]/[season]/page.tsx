@@ -11,6 +11,7 @@ import { publicSupabase } from '@/lib/supabase-public'
 import { objectPositionStyle } from '@/lib/image-position'
 import SeasonTopicSection from '@/components/modules/SeasonTopicSection'
 import JsonLd from '@/components/seo/JsonLd'
+import { ogImages } from '@/lib/seo'
 
 // New route — the page each tile in the region page's "When to Go" mosaic
 // links to. Pure server component, same shape as every other converted
@@ -51,7 +52,7 @@ export async function generateMetadata(
       title,
       description,
       url: `${SITE_URL}${canonical}`,
-      images: region.heroImage ? [{ url: region.heroImage }] : undefined,
+      images: ogImages(region.heroImage),
     },
     twitter: { card: 'summary_large_image', title, description },
   }

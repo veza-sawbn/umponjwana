@@ -1,13 +1,14 @@
 import type { Metadata } from 'next'
 import LegalDocument from '@/components/legal/LegalDocument'
 import { SUPPLIER_TERMS_SECTIONS, SUPPLIER_TERMS_VERSION } from '@/lib/supplier-agreement'
+import { withSocial } from '@/lib/seo'
 
-export const metadata: Metadata = {
+export const metadata: Metadata = withSocial({
   title: 'Supplier Agreement',
   description:
     'The commercial agreement between Visit Drakensberg and the businesses listed on it, covering accreditation, commission, settlement, listing accuracy and guest data.',
   alternates: { canonical: '/supplier-terms' },
-}
+})
 
 export default function SupplierTermsPage() {
   return (

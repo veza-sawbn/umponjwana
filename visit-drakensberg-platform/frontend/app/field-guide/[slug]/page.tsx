@@ -3,6 +3,7 @@ import { notFound } from 'next/navigation'
 import Footer from '@/components/layout/Footer'
 import LayeredFieldGuide from '@/components/field-guide/LayeredFieldGuide'
 import { getPublishedFieldGuide } from '@/lib/field-guide'
+import { ogImages } from '@/lib/seo'
 
 // Published snapshots change only when someone presses Publish in the
 // console, so this matches the revalidation the rest of the CMS-backed public
@@ -38,7 +39,7 @@ export async function generateMetadata({ params }: { params: { slug: string } })
       description,
       type: 'article',
       url: `${SITE_URL}/field-guide/${guide.page.slug}`,
-      images: cover ? [cover] : undefined,
+      images: cover ? [cover] : ogImages(),
     },
   }
 }

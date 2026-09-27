@@ -5,6 +5,7 @@ import { publicSupabase } from '@/lib/supabase-public'
 import GuideDetail from './GuideDetail'
 import TrackView from '@/components/analytics/TrackView'
 import JsonLd from '@/components/seo/JsonLd'
+import { ogImages } from '@/lib/seo'
 
 // Server shell — same pattern as the other converted detail routes. Guide
 // profiles are always linked to their supplier (tour operator); the
@@ -37,7 +38,7 @@ export async function generateMetadata({ params }: { params: { id: string } }): 
       title,
       description,
       url: `${SITE_URL}${canonical}`,
-      images: guide.portrait ? [{ url: guide.portrait }] : undefined,
+      images: ogImages(guide.portrait),
     },
     twitter: { card: 'summary_large_image', title, description },
   }

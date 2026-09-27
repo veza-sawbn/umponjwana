@@ -19,6 +19,7 @@ import {
   openWaiver, submitWaiver, WAIVER_FIELD_LABELS,
   type OpenWaiver,
 } from '@/lib/waivers'
+import PageLoader from '@/components/ui/PageLoader'
 
 const inp = 'w-full font-sans text-sm border border-black/15 rounded-lg px-3 py-2.5 outline-none focus:border-[#2d6a4f] bg-white'
 const lbl = 'block font-sans text-xs tracking-[0.08em] uppercase text-black/40 mb-1.5'
@@ -199,9 +200,7 @@ export default function WaiverSigningPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-[#F7F5F2] flex items-center justify-center px-6">
-        <p className="font-sans text-sm text-black/30">Loading your waiver…</p>
-      </div>
+      <PageLoader fullScreen label="Loading your waiver" />
     )
   }
 

@@ -3,17 +3,18 @@ import Link from 'next/link'
 import { ArrowRight, Leaf } from 'lucide-react'
 import Footer from '@/components/layout/Footer'
 import { getFieldGuideIndex } from '@/lib/field-guide'
+import { withSocial } from '@/lib/seo'
 
 export const revalidate = 3600
 
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://visitdrakensberg.com'
 
-export const metadata: Metadata = {
-  title: 'Field Guides | Visit Drakensberg',
+export const metadata: Metadata = withSocial({
+  title: 'Field Guides',
   description:
     'Illustrated field guides to the flora and wildlife of the Drakensberg escarpment, drawn layer by layer as you read.',
   alternates: { canonical: `${SITE_URL}/field-guide` },
-}
+})
 
 export default async function FieldGuideIndexPage() {
   let guides: Awaited<ReturnType<typeof getFieldGuideIndex>> = []

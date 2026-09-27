@@ -1,0 +1,904 @@
+'use client'
+import { useState, useEffect, useMemo } from 'react'
+import Link from 'next/link'
+import SafeImage from '@/components/ui/SafeImage'
+import toast from 'react-hot-toast'
+import { ArrowRight, ChevronDown, X } from 'lucide-react'
+import { supabase } from '@/lib/auth'
+import { publicSupabase } from '@/lib/supabase-public'
+import { motion, AnimatePresence } from 'framer-motion'
+import { Swiper, SwiperSlide } from 'swiper/react'
+import { Autoplay } from 'swiper/modules'
+import 'swiper/css'
+import SearchBar from '@/components/search/SearchBar'
+import HeroCarousel from '@/components/media/HeroCarousel'
+import { useSwiperAutoplay, CAROUSEL_SPEED_MS } from '@/lib/carousel-autoplay'
+import Footer from '@/components/layout/Footer'
+import { getAllSiteContent, SITE_CONTENT_DEFAULTS, type HomeCard } from '@/lib/site-content'
+import { useSiteSection } from '@/lib/use-site-section'
+import { objectPositionStyle } from '@/lib/image-position'
+import { staggerContainer, staggerChild, fadeUp } from '@/lib/motion'
+import { useEditMode } from '@/lib/edit-mode-context'
+import Editable from '@/components/editor/Editable'
+import EditableSection from '@/components/editor/EditableSection'
+import EditableCard from '@/components/editor/EditableCard'
+import { getTrailSummaries, type Trail } from '@/lib/trails'
+import { getFeaturedAttractions, ATTRACTION_KIND_LABEL, type Attraction } from '@/lib/attractions'
+import { getUpcomingExperiences, type TrekkingExperience } from '@/lib/experiences'
+import { getSupplierEntities } from '@/lib/supplier-entities'
+import { getActivities, type Activity } from '@/lib/activities'
+import { trackEvent, AnalyticsEvent } from '@/lib/analytics'
+import { getPublishedPosts, type BlogPost } from '@/lib/blog-posts'
+import {
+  getPublishedPackages, isGroupPriced, packageGroupSize, packageHeadlinePrice,
+  type MarketplacePackage,
+} from '@/lib/packages'
+import { formatMoney } from '@/lib/allocation'
+
+/* ─── Data ─────────────────────────────────────────────────────────────────── */
+
+const DIFF_COLOR: Record<string, string> = {
+  Easy: '#4A7251',
+  Moderate: '#C9A96E',
+  Strenuous: '#c0392b',
+  Hard: '#c0392b',
+}
+
+type PublicEvent = {
+  id: string
+  supplierId: string
+  title: string
+  event_type: 'event' | 'special'
+  location: string
+  starts_at: string
+  ends_at?: string
+  ticket_price: number
+  is_published: boolean
+}
+
+// No image field exists on the real supplier event record — a colour stands
+// in for a fake photo, same treatment as the full /events listing.
+const EVENT_TYPE_BG: Record<PublicEvent['event_type'], string> = {
+  event: '#1a1a2e',
+  special: '#2d6a4f',
+}
+
+type MiniListItemData = {
+  id: string
+  href: string
+  title: string
+  meta: string
+  badgeLabel: string
+  badgeColor: string
+  img?: string
+}
+
+function fmtShortDate(iso: string) {
+  return new Date(iso).toLocaleDateString('en-ZA', { day: 'numeric', month: 'short' })
+}
+
+/** Hidden cards render dimmed inside the editor and not at all on the live site. */
+function useVisibleCards(cards: HomeCard[], inEditor: boolean) {
+  return inEditor ? cards : cards.filter(c => c.visible !== false)
+}
+
+function cardDimClass(card: HomeCard, inEditor: boolean) {
+  return inEditor && card.visible === false ? 'opacity-35' : ''
+}
+
+/**
+ * Mobile-only presentation of the Regions section — a swipeable Swiper
+ * carousel rendering the same RegionCardBody as the desktop grid it
+ * replaces below the `sm` breakpoint. Looping needs enough cards to feel
+ * like a loop rather than glitch, so it falls back to a plain (still
+ * swipeable) row. Auto-advances on the shared house cadence — paused on
+ * touch/drag, off-screen, and while the visual editor is open so it doesn't
+ * fight admin clicks — and resumes afterwards. See lib/carousel-autoplay.ts.
+ */
+function RegionsCarousel({ regions, inEditor }: { regions: HomeCard[]; inEditor: boolean }) {
+  const canLoop = regions.length > 2
+  const autoplay = useSwiperAutoplay({ slideCount: regions.length, enabled: !inEditor })
+
+  // The wrapper hides this at `sm` and up, but a CSS-hidden Swiper still
+  // initialises, autoplays off-screen and (measured at zero width) logs a
+  // loop warning on every desktop visit. So Swiper mounts only below `sm`.
+  // Before hydration, and on desktop where it's hidden anyway, the same cards
+  // render as a native scroll-snap row with the carousel's geometry.
+  const [isMobile, setIsMobile] = useState(false)
+  useEffect(() => {
+    const query = window.matchMedia('(max-width: 639px)')
+    const update = () => setIsMobile(query.matches)
+    update()
+    query.addEventListener('change', update)
+    return () => query.removeEventListener('change', update)
+  }, [])
+
+  if (!isMobile) {
+    return (
+      <div className="flex gap-3 overflow-x-auto snap-x snap-mandatory pb-1 [scrollbar-width:none]">
+        {regions.map((r, index) => (
+          <div key={r.id} className={`shrink-0 basis-[87%] snap-start ${cardDimClass(r, inEditor)}`}>
+            <EditableCard contentKey="home_cards" fieldKey="regions" index={index} label={String(r.name ?? 'Region Card')}>
+              <RegionCardBody region={r} />
+            </EditableCard>
+          </div>
+        ))}
+      </div>
+    )
+  }
+
+  return (
+    <Swiper
+      modules={[Autoplay]}
+      loop={canLoop}
+      speed={CAROUSEL_SPEED_MS}
+      {...autoplay}
+      slidesPerView={1.15}
+      spaceBetween={12}
+      grabCursor
+      className="!pb-1"
+    >
+      {regions.map((r, index) => (
+        <SwiperSlide key={r.id} className={`h-auto self-stretch ${cardDimClass(r, inEditor)}`}>
+          <EditableCard contentKey="home_cards" fieldKey="regions" index={index} label={String(r.name ?? 'Region Card')}>
+            <RegionCardBody region={r} />
+          </EditableCard>
+        </SwiperSlide>
+      ))}
+    </Swiper>
+  )
+}
+
+/* ─── Hero ───────────────────────────────────────────────────────────────────── */
+
+function HeroSection({ hero }: { hero: typeof SITE_CONTENT_DEFAULTS.hero }) {
+  const editMode = useEditMode()
+  const headline = editMode?.getValue('hero', 'headline', hero.headline) ?? hero.headline
+  const subheadline = editMode?.getValue('hero', 'subheadline', hero.subheadline) ?? hero.subheadline
+  const locationLabel = editMode?.getValue('hero', 'location_label', hero.location_label) ?? hero.location_label
+  const imageUrl = String(editMode?.getValue('hero', 'image_url', hero.image_url) ?? hero.image_url)
+  const carouselImages = (editMode?.getValue('hero', 'images', hero.images) ?? hero.images) as string[]
+  const overlayOpacity = Number(editMode?.getValue('hero', 'overlay_opacity', hero.overlay_opacity) ?? hero.overlay_opacity)
+  // Which part of the photo the hero crops around. This hero is the most
+  // aggressive crop on the site — near-square on a phone, a wide letterbox on
+  // a desktop — so a centred crop routinely loses the subject.
+  const imagePosition = String(editMode?.getValue('hero', 'image_position', hero.image_position) ?? hero.image_position)
+  const carouselPositions = (editMode?.getValue('hero', 'image_positions', hero.image_positions) ?? hero.image_positions) as Record<string, string>
+
+  return (
+    <EditableSection id="hero" label="Hero" className="relative h-[80vh] min-h-[480px] lg:h-screen lg:min-h-[600px] flex flex-col">
+      <div className="absolute inset-0 bg-slate-900">
+        {hero.video_url ? (
+          <video src={hero.video_url} autoPlay muted loop playsInline className="w-full h-full object-cover" />
+        ) : carouselImages.length > 1 ? (
+          <HeroCarousel images={carouselImages} positions={carouselPositions} />
+        ) : (
+          <Editable section="hero" fieldKey="image_url" value={imageUrl} label="Background Image" type="image">
+            <SafeImage
+              src={imageUrl}
+              alt="Drakensberg mountains"
+              fill
+              priority
+              sizes="100vw"
+              className="object-cover"
+              style={objectPositionStyle(imagePosition)}
+            />
+          </Editable>
+        )}
+        <div
+          className="absolute inset-0 bg-gradient-to-b from-black/50 via-black/20 to-black/60"
+          style={{ opacity: overlayOpacity / 100 + 0.3 }}
+        />
+      </div>
+
+      <motion.div
+        className="relative flex-1 flex flex-col justify-end pb-20 pt-[102px] lg:pt-0 px-6 lg:px-20 max-w-[1440px] mx-auto w-full"
+        variants={staggerContainer(0.12, 0.2)}
+        initial="hidden"
+        animate="show"
+      >
+        <Editable section="hero" fieldKey="location_label" value={locationLabel} label="Location Label" type="text">
+          <motion.p variants={fadeUp} className="font-sans text-xs tracking-[0.2em] uppercase text-gold mb-4">
+            {locationLabel}
+          </motion.p>
+        </Editable>
+        <Editable section="hero" fieldKey="headline" value={headline} label="Headline" type="textarea">
+          <motion.h1 variants={fadeUp} className="font-display text-4xl sm:text-7xl lg:text-8xl text-white leading-[0.9] mb-6 max-w-3xl" style={{ whiteSpace: 'pre-line' }}>
+            {headline}
+          </motion.h1>
+        </Editable>
+        <Editable section="hero" fieldKey="subheadline" value={subheadline} label="Subheadline" type="textarea">
+          <motion.p variants={fadeUp} className="font-sans text-base text-white/70 max-w-md mb-10 font-light leading-relaxed">
+            {subheadline}
+          </motion.p>
+        </Editable>
+        <motion.div variants={fadeUp} className="w-full">
+          <SearchBar />
+        </motion.div>
+      </motion.div>
+
+      <div className="absolute bottom-6 left-1/2 -translate-x-1/2 flex flex-col items-center gap-1 text-white/40">
+        <ChevronDown className="w-5 h-5 animate-bounce-slow" />
+      </div>
+    </EditableSection>
+  )
+}
+
+/* ─── Regions ────────────────────────────────────────────────────────────────── */
+
+// Shared by the mobile carousel and the desktop grid so both render the
+// exact same card — only the surrounding layout differs.
+function RegionCardBody({ region: r }: { region: HomeCard }) {
+  return (
+    <Link href={String(r.href || '/regions')} className="group block">
+      <div className="relative overflow-hidden aspect-[4/3] mb-4">
+        <SafeImage
+          src={String(r.img)}
+          alt={String(r.name)}
+          fill
+          loading="lazy"
+          sizes="(max-width: 640px) 90vw, 31vw"
+          className="object-cover transition-transform duration-500 group-hover:scale-105"
+          style={{ willChange: 'transform' }}
+        />
+      </div>
+      <p className="font-sans text-[10px] tracking-[0.15em] uppercase text-gold mb-1">{r.subtitle}</p>
+      <h3 className="font-display text-2xl text-forest mb-2">{r.name}</h3>
+      <p className="font-sans text-sm text-forest/55 leading-relaxed">{r.desc}</p>
+    </Link>
+  )
+}
+
+/* ─── Journeys ───────────────────────────────────────────────────────────────── */
+
+function JourneyCardBody({ pkg }: { pkg: MarketplacePackage }) {
+  const nights = pkg.durationNights
+  return (
+    <Link href={`/packages/${pkg.id}`} className="group block bg-white border border-black/8 hover:border-forest/30 transition-colors h-full">
+      <div className="relative overflow-hidden aspect-[4/3]">
+        <SafeImage
+          src={pkg.image || 'https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?w=900&q=80'}
+          alt={pkg.title}
+          fill
+          loading="lazy"
+          sizes="(max-width: 640px) 88vw, (max-width: 1024px) 45vw, 30vw"
+          className="object-cover transition-transform duration-500 group-hover:scale-105"
+          style={{ willChange: 'transform' }}
+        />
+        {pkg.tag && (
+          <span className="absolute top-3 left-3 font-sans text-[10px] tracking-[0.15em] uppercase bg-gold text-forest px-2.5 py-1">
+            {pkg.tag}
+          </span>
+        )}
+      </div>
+      <div className="p-5">
+        <p className="font-sans text-[10px] tracking-[0.15em] uppercase text-gold mb-1">
+          {pkg.region || 'Drakensberg'} · {nights} night{nights !== 1 ? 's' : ''}
+        </p>
+        <h3 className="font-display text-xl text-forest mb-2 group-hover:text-sage transition-colors">{pkg.title}</h3>
+        <div className="flex items-center justify-between pt-3 border-t border-black/6">
+          <span>
+            {pkg.originalPrice && (
+              <span className="font-sans text-xs text-forest/30 line-through mr-1.5">{formatMoney(pkg.originalPrice)}</span>
+            )}
+            <span className="font-display text-lg text-forest">{formatMoney(packageHeadlinePrice(pkg))}</span>
+            <span className="font-sans text-xs text-forest/40"> {isGroupPriced(pkg) ? `/ ${packageGroupSize(pkg)} guests` : 'pp'}</span>
+          </span>
+          <span className="font-sans text-xs text-forest group-hover:text-gold transition-colors inline-flex items-center gap-1">
+            View <ArrowRight className="w-3 h-3" />
+          </span>
+        </div>
+      </div>
+    </Link>
+  )
+}
+
+/**
+ * Curated-journeys carousel — a promotional showcase of published packages,
+ * always presented as a Swiper carousel (unlike Regions, which only swaps
+ * to a carousel on mobile) since it's meant to read as a scrolling reel of
+ * deals rather than a fixed grid. Peeks progressively more of the next
+ * card as the viewport widens. Auto-advances on the shared house cadence
+ * (paused on touch/drag, off-screen, and while the visual editor is open)
+ * and resumes afterwards. See lib/carousel-autoplay.ts.
+ */
+function JourneysCarousel({ journeys }: { journeys: MarketplacePackage[] }) {
+  const editMode = useEditMode()
+  const inEditor = Boolean(editMode)
+  // Swiper needs ceil(slidesPerView) + 1 slides to loop: 5 at the 3.2-up
+  // desktop breakpoint. With 4 it logged a loop warning and disabled itself.
+  const canLoop = journeys.length > 4
+  const autoplay = useSwiperAutoplay({ slideCount: journeys.length, enabled: !inEditor })
+
+  return (
+    <Swiper
+      modules={[Autoplay]}
+      loop={canLoop}
+      speed={CAROUSEL_SPEED_MS}
+      {...autoplay}
+      spaceBetween={20}
+      grabCursor
+      slidesPerView={1.15}
+      breakpoints={{
+        640: { slidesPerView: 2.15 },
+        1024: { slidesPerView: 3.2 },
+      }}
+      className="!pb-1"
+    >
+      {journeys.map(pkg => (
+        <SwiperSlide key={pkg.id} className="h-auto self-stretch">
+          <JourneyCardBody pkg={pkg} />
+        </SwiperSlide>
+      ))}
+    </Swiper>
+  )
+}
+
+/* ─── What's on — offer-style cards ──────────────────────────────────────────
+   A single scrolling reel of "current offers" (scheduled hikes, events &
+   specials, experiences all mixed together) — image, a dark corner ribbon
+   for the category, and a clean card footer, the same anatomy as the
+   Curated Journeys cards below, just reusable across three source types. */
+
+function OfferCardBody({ item }: { item: MiniListItemData }) {
+  return (
+    <Link href={item.href} className="group block bg-white border border-black/8 hover:border-forest/30 transition-colors h-full">
+      <div className="relative overflow-hidden aspect-[4/3] bg-mist">
+        {/* The category colour always sits underneath, so a listing with no
+            photo — and one whose photo fails to load — shows the same
+            deliberate block rather than an empty frame. */}
+        <div className="absolute inset-0" style={{ background: item.badgeColor }} />
+        <SafeImage src={item.img} alt={item.title} fill loading="lazy"
+          sizes="(max-width: 640px) 88vw, (max-width: 1024px) 45vw, 30vw"
+          className="object-cover transition-transform duration-500 group-hover:scale-105"
+          style={{ willChange: 'transform' }} />
+        <span className="absolute top-3 left-3 font-sans text-[10px] tracking-[0.15em] uppercase bg-black/55 text-white px-2.5 py-1">
+          {item.badgeLabel}
+        </span>
+      </div>
+      <div className="p-5">
+        <h3 className="font-display text-xl text-forest mb-2 leading-snug line-clamp-2 group-hover:text-sage transition-colors">{item.title}</h3>
+        <div className="flex items-center justify-between pt-3 border-t border-black/6">
+          <span className="font-sans text-xs text-forest/50 truncate">{item.meta}</span>
+          <span className="font-sans text-xs text-forest group-hover:text-gold transition-colors inline-flex items-center gap-1 shrink-0 ml-3">
+            View <ArrowRight className="w-3 h-3" />
+          </span>
+        </div>
+      </div>
+    </Link>
+  )
+}
+
+/**
+ * "What's on" carousel — same Swiper treatment as Curated Journeys below
+ * (peek-next-card, grab-to-drag, gentle autoplay) so the two reels feel
+ * like one design language rather than two different components.
+ */
+function OffersCarousel({ items }: { items: MiniListItemData[] }) {
+  const editMode = useEditMode()
+  const inEditor = Boolean(editMode)
+  // Swiper needs ceil(slidesPerView) + 1 slides to loop: 5 at the 3.2-up
+  // desktop breakpoint. With 4 it logged a loop warning and disabled itself.
+  const canLoop = items.length > 4
+  const autoplay = useSwiperAutoplay({ slideCount: items.length, enabled: !inEditor })
+
+  return (
+    <Swiper
+      modules={[Autoplay]}
+      loop={canLoop}
+      speed={CAROUSEL_SPEED_MS}
+      {...autoplay}
+      spaceBetween={20}
+      grabCursor
+      slidesPerView={1.15}
+      breakpoints={{
+        640: { slidesPerView: 2.15 },
+        1024: { slidesPerView: 3.2 },
+      }}
+      className="!pb-1"
+    >
+      {items.map(item => (
+        <SwiperSlide key={item.id} className="h-auto self-stretch">
+          <OfferCardBody item={item} />
+        </SwiperSlide>
+      ))}
+    </Swiper>
+  )
+}
+
+/* ─── Component ─────────────────────────────────────────────────────────────── */
+
+export default function HomeContent() {
+  const [hero, setHero] = useState(SITE_CONTENT_DEFAULTS.hero)
+  const [promos, setPromos] = useState(SITE_CONTENT_DEFAULTS.promotions)
+  const hs = useSiteSection('home_sections') as unknown as Record<string, string>
+  const cards = useSiteSection('home_cards')
+  const layout = useSiteSection('home_layout')
+  const editMode = useEditMode()
+  const inEditor = Boolean(editMode)
+  const [promoBannerDismissed, setPromoBannerDismissed] = useState(false)
+  const [trails, setTrails] = useState<Trail[]>([])
+  const [attractions, setAttractions] = useState<Attraction[]>([])
+  const [scheduledHikes, setScheduledHikes] = useState<TrekkingExperience[]>([])
+  const [upcomingEvents, setUpcomingEvents] = useState<PublicEvent[]>([])
+  const [featuredActivities, setFeaturedActivities] = useState<Activity[]>([])
+  const [newsletterEmail, setNewsletterEmail] = useState('')
+  const [subscribing, setSubscribing] = useState(false)
+  const [stories, setStories] = useState<BlogPost[]>([])
+  const [journeys, setJourneys] = useState<MarketplacePackage[]>([])
+
+  const trailImageById = useMemo(() => new Map(trails.map(t => [t.id, t.image])), [trails])
+
+  const categories = useVisibleCards(cards.categories ?? [], inEditor)
+  const regions = useVisibleCards(cards.regions ?? [], inEditor)
+
+  async function subscribeNewsletter(e: React.FormEvent) {
+    e.preventDefault()
+    const email = newsletterEmail.trim().toLowerCase()
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      toast.error('Please enter a valid email address.')
+      return
+    }
+    setSubscribing(true)
+    try {
+      const { error } = await supabase.from('vd_newsletter_subscribers').insert({ email })
+      // 23505 = already subscribed; treat as success.
+      if (error && error.code !== '23505') throw error
+      // Record explicit marketing consent (§22) and the funnel event (§3) —
+      // best-effort, never blocks the subscribe confirmation the visitor sees.
+      supabase.rpc('vd_set_consent', {
+        p_email: email, p_consent_type: 'marketing_email', p_granted: true, p_source: 'newsletter_footer',
+      }).then(({ error: consentError }) => { if (consentError) console.error('[newsletter] consent record failed:', consentError) })
+      trackEvent(AnalyticsEvent.NEWSLETTER_SIGNUP, { source: 'home_footer' })
+      toast.success('You’re on the list. See you in the next dispatch.')
+      setNewsletterEmail('')
+    } catch {
+      toast.error('Subscription failed. Please try again later.')
+    } finally {
+      setSubscribing(false)
+    }
+  }
+
+  useEffect(() => {
+    getAllSiteContent().then(content => {
+      setHero(content.hero)
+      setPromos(content.promotions)
+    })
+    // Public, session-less client for all of the below: this is anonymous
+    // catalogue data every visitor sees, and it must not depend on the
+    // visitor's (possibly stale/broken) auth session — see lib/supabase-public.ts.
+    // Only ever read for .id/.image (trailImageById below) and .name/.region
+    // (inside getUpcomingExperiences) — the lightweight summary read is
+    // enough. See lib/trails.ts's getTrailSummaries().
+    getTrailSummaries(publicSupabase)
+      .then(all => setTrails(all.filter(t => t.status === 'published')))
+      .catch(() => setTrails([]))
+    getFeaturedAttractions(publicSupabase)
+      .then(setAttractions)
+      .catch(() => setAttractions([]))
+    getUpcomingExperiences(publicSupabase)
+      .then(exps => setScheduledHikes(exps.slice(0, 3)))
+      .catch(() => setScheduledHikes([]))
+    getSupplierEntities<any>('events', undefined, publicSupabase)
+      .then((all: PublicEvent[]) => {
+        const now = new Date().toISOString()
+        setUpcomingEvents(
+          all
+            .filter(e => e.is_published && (e.ends_at || e.starts_at) >= now)
+            .sort((a, b) => a.starts_at.localeCompare(b.starts_at))
+            .slice(0, 3),
+        )
+      })
+      .catch(() => setUpcomingEvents([]))
+    getActivities(publicSupabase)
+      .then(all => setFeaturedActivities(all.filter(a => a.status === 'active').slice(0, 3)))
+      .catch(() => setFeaturedActivities([]))
+    getPublishedPosts()
+      .then(posts => setStories(posts.slice(0, 3)))
+      .catch(() => setStories([]))
+    getPublishedPackages()
+      .then(all => setJourneys([...all].sort((a, b) => Number(b.featured) - Number(a.featured)).slice(0, 8)))
+      .catch(() => setJourneys([]))
+  }, [])
+
+  /* ── Reorderable sections ── */
+
+  const statsSection = (
+    <EditableSection key="stats" id="stats" label="Stats Strip" className="bg-forest text-white">
+      <motion.div
+        className="max-w-[1440px] mx-auto px-6 lg:px-12 py-10 grid grid-cols-2 md:grid-cols-4 gap-8"
+        variants={staggerContainer(0.07)}
+        initial="hidden"
+        whileInView="show"
+        viewport={{ once: true, margin: '-60px' }}
+      >
+        {[1, 2, 3, 4].map((i) => (
+          <motion.div key={i} variants={staggerChild}>
+            <Editable section="home_sections" fieldKey={`stat_${i}_value`} value={hs[`stat_${i}_value`]} label={`Stat ${i} Value`} type="text">
+              <p className="font-display text-3xl text-gold">{hs[`stat_${i}_value`]}</p>
+            </Editable>
+            <Editable section="home_sections" fieldKey={`stat_${i}_label`} value={hs[`stat_${i}_label`]} label={`Stat ${i} Label`} type="text">
+              <p className="font-sans text-xs text-white/40 mt-1 tracking-wide uppercase">{hs[`stat_${i}_label`]}</p>
+            </Editable>
+          </motion.div>
+        ))}
+      </motion.div>
+    </EditableSection>
+  )
+
+  const categoriesSection = (
+    <EditableSection key="categories" id="categories" label="Categories" className="bg-mist">
+      <div className="max-w-[1440px] mx-auto px-6 lg:px-12 py-20">
+        <div className="mb-10">
+          <Editable section="home_sections" fieldKey="categories_eyebrow" value={hs.categories_eyebrow} label="Categories Eyebrow" type="text">
+            <p className="font-sans text-xs tracking-[0.2em] uppercase text-forest/40 mb-2">{hs.categories_eyebrow}</p>
+          </Editable>
+          <Editable section="home_sections" fieldKey="categories_heading" value={hs.categories_heading} label="Categories Heading" type="text">
+            <h2 className="font-display text-4xl text-forest">{hs.categories_heading}</h2>
+          </Editable>
+        </div>
+        <motion.div
+          className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3"
+          variants={staggerContainer(0.06)}
+          initial="hidden"
+          whileInView="show"
+          viewport={{ once: true, margin: '-80px' }}
+        >
+          {categories.map((cat, index) => (
+            <motion.div key={cat.id} variants={staggerChild} whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }} transition={{ duration: 0.2, ease: [0, 0, 0.2, 1] }} className={cardDimClass(cat, inEditor)}>
+              <EditableCard contentKey="home_cards" fieldKey="categories" index={index} label={String(cat.label ?? 'Category Card')}>
+                <Link href={String(cat.href || '/')} className="group relative overflow-hidden aspect-[3/4] block">
+                  <SafeImage
+                    src={String(cat.img)}
+                    alt={String(cat.label)}
+                    fill
+                    loading="lazy"
+                    sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 20vw"
+                    className="object-cover transition-transform duration-500 group-hover:scale-105"
+                    style={{ willChange: 'transform' }}
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/10 to-transparent" />
+                  <span className="absolute bottom-4 left-4 font-display text-xl text-white">{cat.label}</span>
+                </Link>
+              </EditableCard>
+            </motion.div>
+          ))}
+        </motion.div>
+      </div>
+    </EditableSection>
+  )
+
+  const regionsSection = (
+    <EditableSection key="regions" id="regions" label="Regions" className="bg-white">
+      <div className="max-w-[1440px] mx-auto px-6 lg:px-12 py-20">
+        <div className="flex items-end justify-between mb-10">
+          <div>
+            <Editable section="home_sections" fieldKey="regions_eyebrow" value={hs.regions_eyebrow} label="Regions Eyebrow" type="text">
+              <p className="font-sans text-xs tracking-[0.2em] uppercase text-forest/40 mb-2">{hs.regions_eyebrow}</p>
+            </Editable>
+            <Editable section="home_sections" fieldKey="regions_heading" value={hs.regions_heading} label="Regions Heading" type="text">
+              <h2 className="font-display text-4xl text-forest">{hs.regions_heading}</h2>
+            </Editable>
+          </div>
+          <Link href="/regions" className="hidden sm:flex items-center gap-2 font-sans text-sm text-forest/50 hover:text-forest transition-colors">
+            All regions <ArrowRight className="w-4 h-4" />
+          </Link>
+        </div>
+
+        {/* Tablet/desktop: static grid */}
+        <motion.div
+          className="hidden sm:grid sm:grid-cols-3 gap-6"
+          variants={staggerContainer(0.08)}
+          initial="hidden"
+          whileInView="show"
+          viewport={{ once: true, margin: '-80px' }}
+        >
+          {regions.map((r, index) => (
+            <motion.div key={r.id} variants={staggerChild} className={cardDimClass(r, inEditor)}>
+              <EditableCard contentKey="home_cards" fieldKey="regions" index={index} label={String(r.name ?? 'Region Card')}>
+                <RegionCardBody region={r} />
+              </EditableCard>
+            </motion.div>
+          ))}
+        </motion.div>
+
+        {/* Mobile: swipeable carousel */}
+        <div className="sm:hidden">
+          <RegionsCarousel regions={regions} inEditor={inEditor} />
+        </div>
+      </div>
+    </EditableSection>
+  )
+
+  const storiesSection = (
+    <EditableSection key="stories" id="stories" label="Stories" className="bg-white">
+      <div className="max-w-[1440px] mx-auto px-6 lg:px-12 py-20">
+        <div className="flex items-end justify-between mb-10">
+          <div>
+            <Editable section="home_sections" fieldKey="stories_eyebrow" value={hs.stories_eyebrow} label="Stories Eyebrow" type="text">
+              <p className="font-sans text-xs tracking-[0.2em] uppercase text-forest/40 mb-2">{hs.stories_eyebrow}</p>
+            </Editable>
+            <Editable section="home_sections" fieldKey="stories_heading" value={hs.stories_heading} label="Stories Heading" type="text">
+              <h2 className="font-display text-4xl text-forest">{hs.stories_heading}</h2>
+            </Editable>
+          </div>
+          <Link href="/mydrakensberg" className="hidden sm:flex items-center gap-2 font-sans text-sm text-forest/50 hover:text-forest transition-colors">
+            All stories <ArrowRight className="w-4 h-4" />
+          </Link>
+        </div>
+
+        {stories.length === 0 ? (
+          <p className="font-sans text-sm text-forest/40 py-6">
+            No stories published yet. Publish one under Admin → Blog & Content.
+          </p>
+        ) : (
+          <motion.div
+            className="grid md:grid-cols-3 gap-8"
+            variants={staggerContainer(0.08)}
+            initial="hidden"
+            whileInView="show"
+            viewport={{ once: true, margin: '-80px' }}
+          >
+            {stories.map(s => (
+              <motion.div key={s.id} variants={staggerChild} whileHover={{ y: -3 }} transition={{ duration: 0.2, ease: [0, 0, 0.2, 1] }}>
+                <Link href={`/mydrakensberg/${s.slug}`} className="group block">
+                  <div className="relative overflow-hidden aspect-[3/2] mb-4 bg-forest/5">
+                    {s.featured_image && (
+                      <SafeImage src={s.featured_image} alt={s.title} fill loading="lazy" sizes="(max-width: 768px) 100vw, 33vw" className="object-cover transition-transform duration-500 group-hover:scale-105" style={{ willChange: 'transform' }} />
+                    )}
+                  </div>
+                  <p className="font-sans text-[10px] tracking-[0.15em] uppercase text-gold mb-2">
+                    {s.category}{s.published_at ? ` · ${new Date(s.published_at).toLocaleDateString('en-ZA', { month: 'long', year: 'numeric' })}` : ''}
+                  </p>
+                  <h3 className="font-display text-xl text-forest leading-snug group-hover:text-sage transition-colors">{s.title}</h3>
+                </Link>
+              </motion.div>
+            ))}
+          </motion.div>
+        )}
+      </div>
+    </EditableSection>
+  )
+
+  // "Top Attractions" — an editorial pick, not a slice of the catalogue.
+  //
+  // This replaces a "Top Trails" band that rendered the first four published
+  // trails and ignored the trail's own "Featured on Homepage" flag, so that
+  // checkbox in Admin → Hiking Trails did nothing. Worse, when getTrails()
+  // fell back to DEFAULT_TRAILS (an unreachable Supabase, missing env vars)
+  // the band listed trails like tugela-falls and giants-castle that are not
+  // in the live catalogue at all — and /hikes/[id], reading successfully
+  // server-side, 404'd on every one of them.
+  //
+  // Now the rows are exactly what an admin ticked, across trails, nature
+  // reserves and towns (lib/attractions.ts), and every href points at a
+  // record that was actually read from the store it links into.
+  const attractionsSection = (
+    <EditableSection key="attractions" id="attractions" label="Top Attractions" className="bg-forest">
+      <div className="max-w-[1440px] mx-auto px-6 lg:px-12 py-20">
+        <div className="flex items-end justify-between mb-10">
+          <div>
+            <Editable section="home_sections" fieldKey="attractions_eyebrow" value={hs.attractions_eyebrow} label="Attractions Eyebrow" type="text">
+              <p className="font-sans text-xs tracking-[0.2em] uppercase text-white/30 mb-2">{hs.attractions_eyebrow}</p>
+            </Editable>
+            <Editable section="home_sections" fieldKey="attractions_heading" value={hs.attractions_heading} label="Attractions Heading" type="text">
+              <h2 className="font-display text-4xl text-white">{hs.attractions_heading}</h2>
+            </Editable>
+          </div>
+          <Link href="/plan" className="hidden sm:flex items-center gap-2 font-sans text-sm text-white/40 hover:text-white transition-colors">
+            Plan your trip <ArrowRight className="w-4 h-4" />
+          </Link>
+        </div>
+
+        {attractions.length === 0 ? (
+          <p className="font-sans text-sm text-white/30 py-8">
+            Nothing featured yet. Tick &ldquo;Featured on Homepage&rdquo; on a trail, nature reserve or town in the admin console.
+          </p>
+        ) : (
+          <div className="divide-y divide-white/10">
+            {attractions.slice(0, 6).map((a, i) => (
+              <Link key={`${a.kind}:${a.id}`} href={a.href} className="group flex items-center justify-between py-5 hover:pl-2 transition-all duration-200">
+                <div className="flex items-center gap-6 min-w-0">
+                  <span className="font-sans text-2xl text-white/15 font-light tabular-nums w-8 shrink-0">{String(i + 1).padStart(2, '0')}</span>
+                  <div className="min-w-0">
+                    <h3 className="font-display text-lg text-white group-hover:text-gold transition-colors truncate">{a.name}</h3>
+                    <p className="font-sans text-xs text-white/35 mt-0.5 truncate">{a.meta}</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-4 shrink-0 ml-4">
+                  {/* A trail's difficulty is the useful badge; for a reserve or
+                      town it is the kind, so a visitor knows what they'd open. */}
+                  {a.difficulty ? (
+                    <span
+                      className="font-sans text-xs px-2.5 py-1 hidden sm:inline"
+                      style={{ color: DIFF_COLOR[a.difficulty] ?? '#4A7251', background: (DIFF_COLOR[a.difficulty] ?? '#4A7251') + '22' }}
+                    >
+                      {a.difficulty}
+                    </span>
+                  ) : (
+                    <span className="font-sans text-xs px-2.5 py-1 text-white/50 bg-white/10 hidden sm:inline">
+                      {ATTRACTION_KIND_LABEL[a.kind]}
+                    </span>
+                  )}
+                  <ArrowRight className="w-4 h-4 text-white/20 group-hover:text-gold transition-colors" />
+                </div>
+              </Link>
+            ))}
+          </div>
+        )}
+      </div>
+    </EditableSection>
+  )
+
+  const scheduledHikeItems: MiniListItemData[] = scheduledHikes.map(e => ({
+    id: e.id,
+    href: `/experiences/${e.id}`,
+    title: e.title,
+    meta: `${fmtShortDate(e.departureDate)} · ${e.durationDays} day${e.durationDays !== 1 ? 's' : ''}`,
+    badgeLabel: e.difficulty || 'Hike',
+    badgeColor: DIFF_COLOR[e.difficulty] || '#4A7251',
+    img: trailImageById.get(e.trailId),
+  }))
+
+  const eventItems: MiniListItemData[] = upcomingEvents.map(ev => ({
+    id: ev.id,
+    href: '/events',
+    title: ev.title,
+    meta: `${fmtShortDate(ev.starts_at)}${ev.location ? ' · ' + ev.location : ''}`,
+    badgeLabel: ev.event_type === 'special' ? 'Special' : 'Event',
+    badgeColor: EVENT_TYPE_BG[ev.event_type],
+  }))
+
+  const activityItems: MiniListItemData[] = featuredActivities.map(a => ({
+    id: a.id,
+    href: `/activities/${a.id}`,
+    title: a.name,
+    meta: `${a.category}${a.pricePerPerson ? ' · ' + formatMoney(a.pricePerPerson) : ''}`,
+    badgeLabel: a.category || 'Experience',
+    badgeColor: '#C9A96E',
+    img: a.photos?.[0],
+  }))
+
+  // One mixed reel — hikes, events/specials and experiences together — in
+  // whichever order each list already comes in (soonest-first per source).
+  const offerItems: MiniListItemData[] = [...scheduledHikeItems, ...eventItems, ...activityItems]
+
+  const experiencesSection = (
+    <EditableSection key="experiences" id="experiences" label="Events & Experiences" className="bg-white">
+      <div className="max-w-[1440px] mx-auto px-6 lg:px-12 py-20">
+        <div className="flex items-end justify-between gap-6 mb-10">
+          <div>
+            <Editable section="home_sections" fieldKey="experiences_eyebrow" value={hs.experiences_eyebrow} label="Experiences Eyebrow" type="text">
+              <p className="font-sans text-xs tracking-[0.2em] uppercase text-forest/40 mb-2">{hs.experiences_eyebrow}</p>
+            </Editable>
+            <Editable section="home_sections" fieldKey="experiences_heading" value={hs.experiences_heading} label="Experiences Heading" type="text">
+              <h2 className="font-display text-4xl text-forest">{hs.experiences_heading}</h2>
+            </Editable>
+          </div>
+          <div className="hidden sm:flex items-center gap-5 font-sans text-sm text-forest/50 shrink-0 mb-1">
+            <Link href="/hikes" className="hover:text-forest transition-colors">Hikes</Link>
+            <Link href="/events" className="hover:text-forest transition-colors">Events</Link>
+            <Link href="/activities" className="hover:text-forest transition-colors flex items-center gap-1.5">
+              Experiences <ArrowRight className="w-3.5 h-3.5" />
+            </Link>
+          </div>
+        </div>
+
+        {offerItems.length === 0 ? (
+          <p className="font-sans text-sm text-forest/35 py-6">New hikes, events and experiences will appear here once they're scheduled.</p>
+        ) : (
+          <OffersCarousel items={offerItems} />
+        )}
+      </div>
+    </EditableSection>
+  )
+
+  const journeysSection = (
+    <EditableSection key="journeys" id="journeys" label="Curated Journeys" className="bg-white">
+      <div className="max-w-[1440px] mx-auto px-6 lg:px-12 py-20">
+        <div className="flex items-end justify-between mb-10">
+          <div>
+            <Editable section="home_sections" fieldKey="journeys_eyebrow" value={hs.journeys_eyebrow} label="Journeys Eyebrow" type="text">
+              <p className="font-sans text-xs tracking-[0.2em] uppercase text-forest/40 mb-2">{hs.journeys_eyebrow}</p>
+            </Editable>
+            <Editable section="home_sections" fieldKey="journeys_heading" value={hs.journeys_heading} label="Journeys Heading" type="text">
+              <h2 className="font-display text-4xl text-forest">{hs.journeys_heading}</h2>
+            </Editable>
+          </div>
+          <Link href="/packages" className="hidden sm:flex items-center gap-2 font-sans text-sm text-forest/50 hover:text-forest transition-colors">
+            All packages <ArrowRight className="w-4 h-4" />
+          </Link>
+        </div>
+
+        {journeys.length === 0 ? (
+          <p className="font-sans text-sm text-forest/40 py-8">No packages published yet. Please check back soon.</p>
+        ) : (
+          <JourneysCarousel journeys={journeys} />
+        )}
+      </div>
+    </EditableSection>
+  )
+
+  const newsletterSection = (
+    <EditableSection key="newsletter" id="newsletter" label="Newsletter" className="bg-mist">
+      <div className="max-w-[1440px] mx-auto px-6 lg:px-12 py-20">
+        <div className="max-w-xl">
+          <Editable section="home_sections" fieldKey="newsletter_eyebrow" value={hs.newsletter_eyebrow} label="Newsletter Eyebrow" type="text">
+            <p className="font-sans text-xs tracking-[0.2em] uppercase text-forest/40 mb-3">{hs.newsletter_eyebrow}</p>
+          </Editable>
+          <Editable section="home_sections" fieldKey="newsletter_heading" value={hs.newsletter_heading} label="Newsletter Heading" type="text">
+            <h2 className="font-display text-4xl text-forest mb-4">{hs.newsletter_heading}</h2>
+          </Editable>
+          <Editable section="home_sections" fieldKey="newsletter_body" value={hs.newsletter_body} label="Newsletter Body" type="textarea">
+            <p className="font-sans text-sm text-forest/55 mb-8 leading-relaxed">
+              {hs.newsletter_body}
+            </p>
+          </Editable>
+          <form className="flex gap-0 max-w-md" onSubmit={subscribeNewsletter}>
+            <label htmlFor="newsletter-email" className="sr-only">Email address</label>
+            <input
+              id="newsletter-email"
+              type="email"
+              required
+              value={newsletterEmail}
+              onChange={(e) => setNewsletterEmail(e.target.value)}
+              placeholder="Your email address"
+              className="flex-1 px-4 py-3 bg-white border border-black/10 font-sans text-sm text-forest placeholder:text-forest/30 focus:outline-none focus:border-forest transition-colors"
+            />
+            <button
+              type="submit"
+              disabled={subscribing}
+              className="px-6 py-3 bg-forest text-white font-sans text-sm hover:bg-sage transition-colors whitespace-nowrap disabled:opacity-60"
+            >
+              {subscribing ? 'Subscribing…' : 'Subscribe'}
+            </button>
+          </form>
+        </div>
+      </div>
+    </EditableSection>
+  )
+
+  const reorderable: Record<string, React.ReactNode> = {
+    stats: statsSection,
+    categories: categoriesSection,
+    regions: regionsSection,
+    experiences: experiencesSection,
+    stories: storiesSection,
+    attractions: attractionsSection,
+    journeys: journeysSection,
+    newsletter: newsletterSection,
+  }
+
+  // Render in the admin-configured order; unknown/missing ids fall back to the
+  // default order so newly added sections always appear.
+  const configured = (layout.section_order ?? []).filter(id => id in reorderable)
+  const missing = Object.keys(reorderable).filter(id => !configured.includes(id))
+  const orderedSections = [...configured, ...missing].map(id => reorderable[id])
+
+  return (
+    <main className="bg-mist min-h-screen">
+
+      {/* ── Promo Banner (admin-controlled) ── */}
+      {promos.enabled && !promoBannerDismissed && (
+        <div className="fixed top-0 inset-x-0 z-50 flex items-center justify-between px-6 py-2.5 font-sans text-sm text-white" style={{ backgroundColor: promos.banner_color }}>
+          <span />
+          <Link href={promos.banner_link} className="hover:underline">{promos.banner_text}</Link>
+          <button onClick={() => setPromoBannerDismissed(true)} className="text-white/60 hover:text-white">
+            <X size={14} />
+          </button>
+        </div>
+      )}
+
+      {/* ── Hero ── */}
+      <HeroSection hero={hero} />
+
+      {/* ── Reorderable sections ── */}
+      {orderedSections}
+
+      {/* ── Footer ── */}
+      <EditableSection id="footer" label="Footer">
+        <Footer />
+      </EditableSection>
+    </main>
+  )
+}

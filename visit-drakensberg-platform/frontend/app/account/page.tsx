@@ -9,6 +9,7 @@ import { releaseBookingInventory } from '@/lib/inventory-holds'
 import { supabase } from '@/lib/auth'
 import { formatMoney } from '@/lib/allocation'
 import { holdDeadlineLabel, holdHasLapsed } from '@/lib/stay-requests'
+import PageLoader from '@/components/ui/PageLoader'
 
 const STATUS_STYLE: Record<string, string> = {
   confirmed: 'bg-[#2d6a4f]/10 text-[#2d6a4f]',
@@ -165,9 +166,7 @@ export default function AccountBookingsPage() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center py-20">
-        <div className="w-6 h-6 border-2 border-[#2d6a4f] border-t-transparent rounded-full animate-spin" />
-      </div>
+      <PageLoader label="Loading your account" />
     )
   }
 

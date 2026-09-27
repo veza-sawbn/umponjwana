@@ -10,6 +10,8 @@ import BookingBar from '@/components/booking/BookingBar'
 import EditModeGate from '@/components/editor/EditModeGate'
 import AnalyticsProvider from '@/components/analytics/AnalyticsProvider'
 
+const PORTAL_ROOTS = ['/admin', '/supplier', '/operations', '/account']
+
 export default function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
   // Portal shells (admin/supplier/operations/account) render their own
@@ -18,7 +20,11 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   // top of it. /account in particular is the visitor's own dashboard: its
   // sidebar already covers account navigation, so it doesn't need the
   // public Navbar's mega-menu of every destination page on the site too.
-  const isAdmin = pathname.startsWith('/admin') || pathname.startsWith('/supplier') || pathname.startsWith('/operations') || pathname.startsWith('/account') || pathname === '/maintenance'
+  //
+  // Matched as whole path segments: a bare startsWith('/supplier') also caught
+  // the public /supplier-terms and /supplier-code-of-conduct pages and left
+  // them with no site navigation at all.
+  const isAdmin = PORTAL_ROOTS.some(r => pathname === r || pathname.startsWith(r + '/')) || pathname === '/maintenance'
   const [queryClient] = useState(() => new QueryClient({
     defaultOptions: { queries: { staleTime: 60 * 1000 } },
   }))

@@ -5,6 +5,21 @@ import { securityHeaders } from './security-headers.mjs'
 // below — otherwise every trail/region/property photo uploaded to Storage
 // would hit next/image's "hostname not configured" error, which crashes
 // the whole page it's on, not just that one photo.
+// Canonical production host, e.g. visitdrakensberg.com. Used to send the
+// production deploy's own *.vercel.app alias to the real domain (below).
+let siteHostname
+try {
+  siteHostname = new URL(process.env.NEXT_PUBLIC_SITE_URL || '').hostname
+} catch {
+  siteHostname = null
+}
+
+// Vercel preview/branch deploys. Everything they serve gets
+// X-Robots-Tag: noindex, so a shared preview link never ends up in Google
+// competing with the real site. Unset outside Vercel, so local and other
+// hosts are unaffected.
+const isPreviewDeploy = !!process.env.VERCEL_ENV && process.env.VERCEL_ENV !== 'production'
+
 let supabaseHostname
 try {
   supabaseHostname = new URL(process.env.NEXT_PUBLIC_SUPABASE_URL || '').hostname
@@ -73,11 +88,42 @@ const nextConfig = {
     NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL,
     NEXT_PUBLIC_SITE_URL: process.env.NEXT_PUBLIC_SITE_URL,
   },
+  // No browser source maps in production (Next's default, pinned here so it
+  // isn't switched on by accident): they would publish the full original
+  // source of every client component.
+  productionBrowserSourceMaps: false,
+  // The codebase has no console.log/debug calls today; this keeps a stray one
+  // from shipping to visitors' consoles. error/warn/info are kept: the server
+  // logs (lib/observability.ts) are written with console.info.
+  compiler: {
+    removeConsole: process.env.NODE_ENV === 'production' ? { exclude: ['error', 'warn', 'info'] } : false,
+  },
   async headers() {
-    return securityHeaders()
+    return [
+      ...securityHeaders(),
+      ...(isPreviewDeploy
+        ? [{ source: '/:path*', headers: [{ key: 'X-Robots-Tag', value: 'noindex, nofollow' }] }]
+        : []),
+    ]
   },
   async redirects() {
     return [
+      // The production deploy also answers on its <project>.vercel.app alias.
+      // That copy is indexable (it IS production), so it competes with the
+      // real domain as a duplicate. Send it to the canonical host. Only when
+      // the canonical host is a custom domain, never when NEXT_PUBLIC_SITE_URL
+      // is itself a vercel.app address, which would redirect to itself.
+      // /api and /auth are left alone: Vercel Cron and payment webhooks call
+      // the deployment URL and do not follow redirects, and an auth callback
+      // must finish on the origin that holds its PKCE cookie.
+      ...(process.env.VERCEL_ENV === 'production' && siteHostname && !siteHostname.endsWith('.vercel.app')
+        ? [{
+            source: '/:path((?!api/|auth/).*)',
+            has: [{ type: 'host', value: '.+\\.vercel\\.app' }],
+            destination: `https://${siteHostname}/:path`,
+            permanent: true,
+          }]
+        : []),
       {
         // The listing journey started out stays-only and lived at
         // /list-your-property. It now covers activities, tours, transport and

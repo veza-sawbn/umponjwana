@@ -1,11 +1,12 @@
 import type { Metadata } from 'next'
 import Footer from '@/components/layout/Footer'
+import { withSocial } from '@/lib/seo'
 
-export const metadata: Metadata = {
+export const metadata: Metadata = withSocial({
   title: 'Privacy Policy',
   description: 'How Visit Drakensberg collects, uses and protects your personal information.',
   alternates: { canonical: '/privacy' },
-}
+})
 
 const SECTIONS: { heading: string; body: string[] }[] = [
   {

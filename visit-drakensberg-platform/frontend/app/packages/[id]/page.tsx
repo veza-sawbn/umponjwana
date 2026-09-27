@@ -4,6 +4,7 @@ import { getPackageById, packageHeadlinePrice, type MarketplacePackage } from '@
 import { publicSupabase } from '@/lib/supabase-public'
 import PackageDetail from './PackageDetail'
 import JsonLd from '@/components/seo/JsonLd'
+import { ogImages } from '@/lib/seo'
 
 // Server shell — same pattern as the other converted detail routes. Only a
 // genuinely missing package 404s server-side; an existing-but-unpublished
@@ -48,7 +49,7 @@ export async function generateMetadata({ params }: { params: { id: string } }): 
       title,
       description,
       url: `${SITE_URL}${canonical}`,
-      images: pkg.image ? [{ url: pkg.image }] : undefined,
+      images: ogImages(pkg.image),
     },
     twitter: { card: 'summary_large_image', title, description },
   }

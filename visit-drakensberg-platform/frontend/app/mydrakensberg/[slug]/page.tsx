@@ -7,6 +7,7 @@ import { Clock, ArrowLeft, MapPin, Mountain, Bird, ChefHat, Sword, Leaf, ArrowRi
 import { publicSupabase } from '@/lib/supabase-public'
 import { getPostBySlug, getRelatedPosts, parseBody, estimateReadTime } from '@/lib/blog-posts'
 import JsonLd from '@/components/seo/JsonLd'
+import { ogImages } from '@/lib/seo'
 
 export const revalidate = 3600
 
@@ -148,7 +149,7 @@ export async function generateMetadata({ params }: { params: { slug: string } })
       description,
       url: canonical,
       type: 'article',
-      ...(image ? { images: [{ url: image }] } : {}),
+      images: ogImages(image),
     },
     twitter: { card: 'summary_large_image', title, description },
   }
@@ -205,7 +206,16 @@ export default async function ArticleDetailPage({ params }: { params: { slug: st
       publishedAt: dbPost.published_at,
     }
   } else {
-    article = { ...hardcoded!, publishedAt: null }
+    // Some hardcoded "related" links name articles that were never written;
+    // only link to ones that exist here or as a published CMS post.
+    const published = new Set(
+      (await getRelatedPosts(params.slug, publicSupabase).catch(() => [])).map(r => r.slug),
+    )
+    article = {
+      ...hardcoded!,
+      relatedArticles: hardcoded!.relatedArticles.filter(r => ARTICLES[r.slug] || published.has(r.slug)),
+      publishedAt: null,
+    }
   }
 
   const canonical = `${SITE_URL}/mydrakensberg/${article.slug}`

@@ -23,6 +23,7 @@ import {
 import SupplierMessageBlock from '@/components/messaging/SupplierMessageBlock'
 import { resolveLivePackages } from '@/components/tours/PackageEditor'
 import { formatMoney, formatRate } from '@/lib/allocation'
+import PageLoader from '@/components/ui/PageLoader'
 
 /* ── helpers ────────────────────────────────────────────── */
 function fmtLong(iso: string) {
@@ -578,9 +579,7 @@ function ItineraryInner() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center py-20">
-        <div className="w-6 h-6 border-2 border-[#2d6a4f] border-t-transparent rounded-full animate-spin" />
-      </div>
+      <PageLoader label="Loading your itinerary" />
     )
   }
 
@@ -850,9 +849,7 @@ function ItineraryInner() {
 export default function ItineraryPage() {
   return (
     <Suspense fallback={
-      <div className="flex items-center justify-center py-20">
-        <div className="w-6 h-6 border-2 border-[#2d6a4f] border-t-transparent rounded-full animate-spin" />
-      </div>
+      <PageLoader label="Loading your itinerary" />
     }>
       <ItineraryInner />
     </Suspense>
