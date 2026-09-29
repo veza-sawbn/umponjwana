@@ -2,7 +2,6 @@ import type { Metadata } from 'next'
 import { notFound } from 'next/navigation'
 import { getGuideById, type GuideProfile } from '@/lib/operators'
 import { publicSupabase } from '@/lib/supabase-public'
-import { splitGuideName } from '@/lib/guide-profile'
 import GuideDetail from './GuideDetail'
 import TrackView from '@/components/analytics/TrackView'
 import JsonLd from '@/components/seo/JsonLd'
@@ -54,7 +53,6 @@ export default async function GuidePage({ params }: { params: { id: string } }) 
     '@context': 'https://schema.org',
     '@type': 'Person',
     name: guide.name,
-    alternateName: splitGuideName(guide.name, guide.knownAs).knownAs || undefined,
     description: guide.seoDescription || guide.bio || undefined,
     image: guide.portrait || undefined,
     url: canonicalUrl,
