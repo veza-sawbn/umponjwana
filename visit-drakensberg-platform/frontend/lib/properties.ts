@@ -121,6 +121,9 @@ export async function updateProperty(id: string, updates: Partial<Property>): Pr
 }
 
 export async function deleteProperty(id: string): Promise<void> {
-  await deleteEntity(KIND, id)
+  // Revalidate *before* deleting — /api/revalidate/stay verifies ownership
+  // by looking the property up in vd_entities, which a call made after the
+  // delete would find gone, silently skipping the cache bust.
   revalidateStayPage(id)
+  await deleteEntity(KIND, id)
 }
