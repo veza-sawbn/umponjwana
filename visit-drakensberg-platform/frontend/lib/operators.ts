@@ -1,6 +1,7 @@
 import { listEntities, getEntity, getEntityByIdOrSlug, insertEntity, updateEntity } from './entities'
 import { getSupplierEntities, type SupplierEntity } from './supplier-entities'
 import type { GraphFields } from './graph-fields'
+import type { BioSection } from './guide-profile'
 import type { SupabaseClient } from '@supabase/supabase-js'
 
 // Supplier directory: Tour Operator → Guide Team → Guide Profile.
@@ -51,6 +52,14 @@ export type GuideProfile = SupplierEntity & {
   specialisations?: string
   highestSummit?: string
   completedExpeditions?: number
+  /** Nickname shown under the name, e.g. Charlie. See splitGuideName(). */
+  knownAs?: string
+  /** Title over the biography; the page shows "Biography" when blank. */
+  bioHeadline?: string
+  /** One short line shown large within the biography. */
+  bioHighlight?: string
+  /** Headed blocks after the introduction (`bio`). See lib/guide-profile.ts. */
+  bioSections?: BioSection[]
   // Optional so rows saved before this field existed still read as
   // 'certified' — see GUIDE_TYPE_LABEL and guideTypeOf() below.
   guideType?: GuideType
