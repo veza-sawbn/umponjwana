@@ -21,6 +21,7 @@
 -- links to the live listing, and a stale snapshot shows a slightly old price,
 -- not a wrong page.
 -- ============================================================================
+-- @rollback: additive — forward-only; safe to leave in place if the deploy is rolled back
 
 
 create table if not exists public.vd_saved_listings (

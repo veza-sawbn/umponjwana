@@ -166,6 +166,20 @@ async function saveReserves(reserves: Reserve[]) {
   if (error) throw error
 }
 
+// /nature-reserves/[slug] is ISR-cached for an hour, so an admin's edit
+// wouldn't reach visitors until that cache window happened to expire.
+// Best-effort and non-blocking — a failed revalidate (e.g. offline) still
+// leaves the save itself intact, just stale until the cache naturally
+// expires. Same pattern as lib/activities.ts's revalidateActivityPage.
+function revalidateReservePage(slug: string): void {
+  if (typeof fetch !== 'function' || !slug) return
+  fetch('/api/revalidate/reserve', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ slug }),
+  }).catch(() => {})
+}
+
 // Accepts an optional Supabase client so Server Components can pass a
 // session-less client (lib/supabase-public.ts) — see lib/regions.ts's
 // getRegions() for the same pattern. Existing callers are unaffected.
@@ -185,7 +199,9 @@ export async function getReservesByRegion(regionSlug: string): Promise<Reserve[]
 
 export async function saveAllReserves(reserves: Reserve[]): Promise<void> {
   const now = new Date().toISOString()
-  await saveReserves(reserves.map(r => normalizeReserve({ ...r, updatedAt: r.updatedAt ?? now })))
+  const normalized = reserves.map(r => normalizeReserve({ ...r, updatedAt: r.updatedAt ?? now }))
+  await saveReserves(normalized)
+  for (const r of normalized) revalidateReservePage(r.slug)
 }
 
 export async function createReserve(data: Omit<Reserve, 'id' | 'slug' | 'createdAt' | 'updatedAt'>): Promise<Reserve> {
@@ -193,6 +209,7 @@ export async function createReserve(data: Omit<Reserve, 'id' | 'slug' | 'created
   const now = new Date().toISOString()
   const item = normalizeReserve({ ...data, createdAt: now, updatedAt: now })
   await saveReserves([...all.filter(r => r.slug !== item.slug), item])
+  revalidateReservePage(item.slug)
   return item
 }
 
@@ -202,10 +219,13 @@ export async function updateReserve(id: string, data: Omit<Reserve, 'id' | 'slug
   const updated = normalizeReserve({ ...data, id, slug: previous?.slug, createdAt: previous?.createdAt, updatedAt: new Date().toISOString() })
   const next = previous ? all.map(r => r.id === id ? updated : r) : [...all, updated]
   await saveReserves(next)
+  revalidateReservePage(updated.slug)
   return updated
 }
 
 export async function deleteReserve(id: string): Promise<void> {
   const all = await getReserves()
+  const removed = all.find(r => r.id === id)
   await saveReserves(all.filter(r => r.id !== id))
+  if (removed) revalidateReservePage(removed.slug)
 }

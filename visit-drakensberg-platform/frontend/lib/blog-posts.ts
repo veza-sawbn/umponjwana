@@ -112,6 +112,21 @@ export async function getAllPostsAdmin(client: SupabaseClient): Promise<BlogPost
   return (data ?? []) as unknown as BlogPost[]
 }
 
+// The public blog page (app/mydrakensberg/[slug]/page.tsx) is ISR-cached
+// for an hour, so an admin's edit wouldn't reach visitors until that cache
+// window happened to expire. Best-effort and non-blocking — a failed
+// revalidate (e.g. offline) still leaves the save itself intact, just
+// stale until the cache naturally expires. Same pattern as
+// lib/activities.ts's revalidateActivityPage.
+function revalidateBlogPostPage(slug: string): void {
+  if (typeof fetch !== 'function' || !slug) return
+  fetch('/api/revalidate/blog-post', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ slug }),
+  }).catch(() => {})
+}
+
 export async function upsertPost(
   post: Partial<BlogPost> & { slug: string; title: string },
   client: SupabaseClient,
@@ -125,7 +140,9 @@ export async function upsertPost(
     .select(BLOG_SELECT)
     .single()
   if (error) throw error
-  return data as unknown as BlogPost
+  const saved = data as unknown as BlogPost
+  revalidateBlogPostPage(saved.slug)
+  return saved
 }
 
 export async function setPostStatus(
@@ -135,11 +152,16 @@ export async function setPostStatus(
 ): Promise<void> {
   const patch: Record<string, unknown> = { status, updated_at: new Date().toISOString() }
   if (status === 'published') patch.published_at = patch.updated_at
-  const { error } = await client.from('blog_posts').update(patch).eq('id', id)
+  const { data, error } = await client.from('blog_posts').update(patch).eq('id', id).select('slug').maybeSingle()
   if (error) throw error
+  if (data?.slug) revalidateBlogPostPage(data.slug)
 }
 
 export async function deletePost(id: string, client: SupabaseClient): Promise<void> {
+  // Read the slug back before deleting — the row (and its slug) won't be
+  // queryable afterwards to revalidate its now-gone page.
+  const { data: existing } = await client.from('blog_posts').select('slug').eq('id', id).maybeSingle()
   const { error } = await client.from('blog_posts').delete().eq('id', id)
   if (error) throw error
+  if (existing?.slug) revalidateBlogPostPage(existing.slug)
 }
