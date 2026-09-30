@@ -30,6 +30,7 @@
 -- as before, so an unapproved supplier gains screens, not the ability to
 -- publish through them.
 -- ============================================================================
+-- @rollback: additive — forward-only; safe to leave in place if the deploy is rolled back
 
 create or replace function public.vd_add_supplier_type(p_supplier_id uuid, p_type text)
 returns boolean
