@@ -27,6 +27,7 @@
 -- nothing for a trail's own detail page, which still reads the full row via
 -- getTrails() for its elevation chart and route artwork.
 -- ============================================================================
+-- @rollback: additive — forward-only; safe to leave in place if the deploy is rolled back
 
 create or replace function public.vd_trail_summaries()
 returns jsonb
