@@ -332,4 +332,16 @@ export async function saveTrails(trails: Trail[]): Promise<void> {
     { key: 'trails', value: { items: trails }, updated_at: new Date().toISOString() },
     { onConflict: 'key' }
   )
+  revalidateTrailPages()
+}
+
+// /hikes/[id] is ISR-cached for 30 minutes, so an admin's edit wouldn't
+// reach visitors until that cache window happened to expire. Best-effort
+// and non-blocking — a failed revalidate (e.g. offline) still leaves the
+// save itself intact, just stale until the cache naturally expires. Bulk
+// (no specific slug — see the route's own header comment for why), unlike
+// lib/regions.ts's revalidateRegionPage and friends.
+function revalidateTrailPages(): void {
+  if (typeof fetch !== 'function') return
+  fetch('/api/revalidate/trail', { method: 'POST' }).catch(() => {})
 }

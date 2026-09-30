@@ -93,6 +93,23 @@ export function guideTypeOf(guide: { guideType?: string }): GuideType {
 
 const KIND = 'operator_profile'
 
+// Both /guides/operators/[id] (operator profiles) and /guides/[id] (guide
+// profiles) are ISR-cached for up to 30 minutes, so a supplier's edit
+// wouldn't reach visitors until that cache window happened to expire.
+// Best-effort and non-blocking — a failed revalidate (e.g. offline) still
+// leaves the save itself intact, just stale until the cache naturally
+// expires. Exported (not just used by saveOperatorProfile below) because
+// guide create/edit/delete happens directly in app/supplier/guides/**,
+// which has no lib wrapper of its own to hook this into.
+export function revalidateGuidePage(kind: 'operator' | 'guide', id: string, slug?: string): void {
+  if (typeof fetch !== 'function' || !id) return
+  fetch('/api/revalidate/guide', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ kind, id, slug }),
+  }).catch(() => {})
+}
+
 export function operatorProfileId(supplierId: string): string {
   return `opr-${supplierId}`
 }
@@ -119,10 +136,14 @@ export async function saveOperatorProfile(
   const existing = await getEntity<OperatorProfile>(KIND, id)
   if (existing) {
     await updateEntity(KIND, id, { ...data, supplierId })
-    return { ...existing, ...data, id, supplierId }
+    const updated = { ...existing, ...data, id, supplierId }
+    revalidateGuidePage('operator', id, updated.slug)
+    return updated
   }
   const profile: OperatorProfile = { ...data, id, supplierId, createdAt: new Date().toISOString() }
-  return insertEntity(KIND, profile)
+  const saved = await insertEntity(KIND, profile)
+  revalidateGuidePage('operator', saved.id, saved.slug)
+  return saved
 }
 
 /** Verified guides for one operator. */

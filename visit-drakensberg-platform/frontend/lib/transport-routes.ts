@@ -32,6 +32,21 @@ export type Route = SupplierEntity & {
 
 const ENTITY = 'routes'
 
+// The public route page (app/transport/[slug]/page.tsx) is ISR-cached for
+// up to 30 minutes, so a supplier's edit wouldn't reach visitors until that
+// cache window happened to expire. Best-effort and non-blocking — a failed
+// revalidate (e.g. offline) still leaves the save itself intact, just
+// stale until the cache naturally expires. Same pattern as
+// lib/activities.ts's revalidateActivityPage.
+function revalidateTransportRoutePage(id: string): void {
+  if (typeof fetch !== 'function' || !id) return
+  fetch('/api/revalidate/transport-route', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ id }),
+  }).catch(() => {})
+}
+
 export async function getRoutes(client?: SupabaseClient): Promise<Route[]> {
   return getSupplierEntities<Route>(ENTITY, undefined, client)
 }
@@ -56,14 +71,21 @@ export async function addRoute(r: Omit<Route, 'id' | 'createdAt'>): Promise<Rout
   // routes yet (app/supplier/routes/new/page.tsx doesn't), so this is
   // currently the only source of a route slug.
   const slug = r.slug || uniqueSlug(slugify(`${r.from}-to-${r.to}`), (await getRoutes()).map(e => e.slug || e.id))
-  return addSupplierEntity<Route>(ENTITY, { ...r, slug })
+  const saved = await addSupplierEntity<Route>(ENTITY, { ...r, slug })
+  revalidateTransportRoutePage(saved.id)
+  return saved
 }
 
 export async function updateRoute(id: string, patch: Partial<Route>): Promise<void> {
-  return updateSupplierEntity<Route>(ENTITY, id, patch)
+  await updateSupplierEntity<Route>(ENTITY, id, patch)
+  revalidateTransportRoutePage(id)
 }
 
 export async function deleteRoute(id: string): Promise<void> {
+  // Revalidate *before* deleting — the endpoint verifies ownership by
+  // looking the entity up in vd_entities, which a call made after the
+  // delete would find gone, silently skipping the cache bust.
+  revalidateTransportRoutePage(id)
   return deleteSupplierEntity(ENTITY, id)
 }
 

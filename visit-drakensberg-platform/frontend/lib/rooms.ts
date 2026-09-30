@@ -30,6 +30,22 @@ export type Room = {
 
 const KIND = 'room'
 
+// A room has no public page of its own — its price/details render on its
+// parent property's /stays/[id] page, which is ISR-cached for up to 5
+// minutes (app/stays/[id]/page.tsx). Without this, a supplier's room-price
+// edit sits correctly in the database but the public page keeps serving its
+// last-generated snapshot until that window happens to lapse. Best-effort
+// and non-blocking, same pattern as lib/properties.ts's revalidateStayPage
+// (which this calls directly, since it's the same cache key: the property id).
+function revalidateStayPage(propertyId: string): void {
+  if (typeof fetch !== 'function' || !propertyId) return
+  fetch('/api/revalidate/stay', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ id: propertyId }),
+  }).catch(() => {})
+}
+
 export async function getRoomsBySupplier(supplierId: string): Promise<Room[]> {
   // Owner-scoped at the database. Filtering listEntities() in JS would still
   // ship every other supplier's rooms to the browser, and would key on the
@@ -48,15 +64,24 @@ export async function getRoomById(id: string): Promise<Room | null> {
 
 export async function addRoom(r: Omit<Room, 'id' | 'createdAt'>): Promise<Room> {
   const room: Room = { ...r, id: newEntityId('room'), createdAt: new Date().toISOString() }
-  return insertEntity(KIND, room)
+  const saved = await insertEntity(KIND, room)
+  revalidateStayPage(saved.propertyId)
+  return saved
 }
 
 export async function updateRoom(id: string, updates: Partial<Room>): Promise<void> {
   await updateEntity(KIND, id, updates)
+  // `updates` usually won't carry `propertyId` (the edit form never touches
+  // it) — read it back rather than assuming the patch is enough, same as
+  // lib/activities.ts's updateActivity reads back the slug it needs.
+  const propertyId = updates.propertyId ?? (await getRoomById(id))?.propertyId
+  if (propertyId) revalidateStayPage(propertyId)
 }
 
 export async function deleteRoom(id: string): Promise<void> {
+  const room = await getRoomById(id)
   await deleteEntity(KIND, id)
+  if (room?.propertyId) revalidateStayPage(room.propertyId)
 }
 
 /**

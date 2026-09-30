@@ -25,6 +25,7 @@
 --
 -- Purely additive: no existing table, function or policy is touched.
 -- ============================================================================
+-- @rollback: additive — forward-only; safe to leave in place if the deploy is rolled back
 
 -- ────────────────────────────────────────────────────────────────────────────
 -- 1. vd_directory_contacts — one row per establishment.

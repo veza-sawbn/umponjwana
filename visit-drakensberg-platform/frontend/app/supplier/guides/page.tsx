@@ -6,7 +6,7 @@ import { Users, Plus, Mountain, Star, CheckCircle, Clock, XCircle, User, Pencil 
 import { supabase } from '@/lib/auth'
 import { effectiveSupplierId } from '@/lib/effective-supplier'
 import {
-  GUIDE_TYPES, GUIDE_TYPE_LABEL, GUIDE_TYPE_HINT, guideTypeOf, type GuideProfile, type GuideType,
+  GUIDE_TYPES, GUIDE_TYPE_LABEL, GUIDE_TYPE_HINT, guideTypeOf, revalidateGuidePage, type GuideProfile, type GuideType,
 } from '@/lib/operators'
 import {
   getSupplierEntities, addSupplierEntity, deleteSupplierEntity, type SupplierEntity,
@@ -73,6 +73,7 @@ export default function GuidesPage() {
         guideType: form.guideType,
         rating: 0, tours: 0, status: 'pending', blocked: [],
       } as unknown as Omit<Guide, 'id' | 'createdAt'>)
+      revalidateGuidePage('guide', saved.id, saved.slug)
       setGuides(g => [...g, saved])
       setForm({ name: '', email: '', guideNo: '', speciality: '', languages: '', qualifications: '', yearsExperience: '', highestSummit: '', completedExpeditions: '', portrait: '', bio: '', guideType: 'certified' })
       setAdding(false)
@@ -84,8 +85,13 @@ export default function GuidesPage() {
 
   async function remove(id: string) {
     const prev = guides
+    const removed = guides.find(g => g.id === id)
     setGuides(gs => gs.filter(x => x.id !== id))
     try {
+      // Revalidate *before* deleting — the endpoint verifies ownership by
+      // looking the entity up in vd_entities, which a call made after the
+      // delete would find gone, silently skipping the cache bust.
+      revalidateGuidePage('guide', id, removed?.slug)
       await deleteSupplierEntity(ENTITY, id)
     } catch {
       setGuides(prev)

@@ -5,7 +5,7 @@ import toast from 'react-hot-toast'
 import { ChevronLeft, CheckCircle, Clock, XCircle } from 'lucide-react'
 import { getSupplierEntity, updateSupplierEntity } from '@/lib/supplier-entities'
 import {
-  GUIDE_TYPES, GUIDE_TYPE_LABEL, GUIDE_TYPE_HINT, guideTypeOf, type GuideProfile, type GuideType,
+  GUIDE_TYPES, GUIDE_TYPE_LABEL, GUIDE_TYPE_HINT, guideTypeOf, revalidateGuidePage, type GuideProfile, type GuideType,
 } from '@/lib/operators'
 import { supplierMediaSource } from '@/lib/supplier-media'
 import { MediaPicker } from '@/components/media/MediaPicker'
@@ -88,6 +88,7 @@ export default function EditGuidePage() {
         bio: form.bio.trim(),
         guideType: form.guideType,
       })
+      revalidateGuidePage('guide', id)
       toast.success('Guide updated.')
       router.push('/supplier/guides')
     } catch (e) {

@@ -171,6 +171,21 @@ const KIND = 'package'
 
 const publicStatus = (s: PackageStatus): 'active' | 'draft' => (s === 'published' ? 'active' : 'draft')
 
+// The public package page (app/packages/[id]/page.tsx) is ISR-cached for up
+// to 5 minutes, so an admin's edit wouldn't reach visitors until that cache
+// window happened to expire. Best-effort and non-blocking — a failed
+// revalidate (e.g. offline) still leaves the save itself intact, just
+// stale until the cache naturally expires. Same pattern as
+// lib/activities.ts's revalidateActivityPage.
+function revalidatePackagePage(id: string, slug?: string): void {
+  if (typeof fetch !== 'function' || !id) return
+  fetch('/api/revalidate/package', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ id, slug }),
+  }).catch(() => {})
+}
+
 /** Pricing model of a package — legacy rows without the field are per-person. */
 export function packagePricingMode(pkg: Pick<MarketplacePackage, 'pricingMode'>): PackagePricingMode {
   return pkg.pricingMode === 'group' ? 'group' : 'per_person'
@@ -285,7 +300,9 @@ export async function addPackage(
     supplierId: adminId,
     createdAt: new Date().toISOString(),
   }
-  return insertEntity(KIND, item)
+  const saved = await insertEntity(KIND, item)
+  revalidatePackagePage(saved.id, saved.slug)
+  return saved
 }
 
 export async function updatePackage(id: string, patch: Partial<MarketplacePackage>): Promise<void> {
@@ -293,6 +310,7 @@ export async function updatePackage(id: string, patch: Partial<MarketplacePackag
     ? { ...patch, status: publicStatus(patch.packageStatus) }
     : patch
   await updateEntity(KIND, id, { ...withStatus, updatedAt: new Date().toISOString() })
+  revalidatePackagePage(id, patch.slug)
 }
 
 export async function setPackageStatus(id: string, packageStatus: PackageStatus): Promise<void> {
@@ -314,4 +332,5 @@ export async function duplicatePackage(id: string, adminId: string): Promise<Mar
 
 export async function deletePackage(id: string): Promise<void> {
   await deleteEntity(KIND, id)
+  revalidatePackagePage(id)
 }
