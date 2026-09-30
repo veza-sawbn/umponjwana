@@ -5,6 +5,7 @@ import Footer from '@/components/layout/Footer'
 import { CalendarDays, MapPin, Ticket, Star, Filter, Check, Loader2 } from 'lucide-react'
 import { useBooking } from '@/lib/booking-context'
 import { getSupplierEntities } from '@/lib/supplier-entities'
+import { isEventUpcoming } from '@/lib/upcoming'
 import { formatMoney } from '@/lib/allocation'
 
 interface PublicEvent {
@@ -42,13 +43,12 @@ export default function EventsPage() {
   useEffect(() => {
     getSupplierEntities<any>(ENTITY)
       .then((all: PublicEvent[]) => {
-        const now = new Date().toISOString()
         setEvents(
           all
             // RLS already hides drafts from the public, but a supplier
             // browsing this page while signed in would otherwise see their
             // own unpublished events too — filter defensively.
-            .filter(e => e.is_published && (e.ends_at || e.starts_at) >= now)
+            .filter(e => e.is_published && isEventUpcoming(e))
             .sort((a, b) => a.starts_at.localeCompare(b.starts_at)),
         )
       })

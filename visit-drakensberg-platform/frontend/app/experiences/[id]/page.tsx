@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 import { notFound } from 'next/navigation'
 import { getExperienceById, type TrekkingExperience } from '@/lib/experiences'
 import { publicSupabase } from '@/lib/supabase-public'
+import { isOnOrAfterToday } from '@/lib/upcoming'
 import ExperienceDetail from './ExperienceDetail'
 import JsonLd from '@/components/seo/JsonLd'
 
@@ -49,7 +50,7 @@ export async function generateMetadata({ params }: { params: { id: string } }): 
   const title = `${exp.title}, ${formatDateShort(exp.departureDate)} | Visit Drakensberg`
   const description = `${exp.durationDays} day${exp.durationDays !== 1 ? 's' : ''} guided departure on ${exp.trailName || 'the trail'} with ${exp.operator}, departing ${formatDateShort(exp.departureDate)}. ${exp.description || ''}`.trim().slice(0, 160)
   const canonical = `/experiences/${exp.id}`
-  const isPast = new Date(exp.departureDate) < new Date()
+  const isPast = !isOnOrAfterToday(exp.departureDate)
 
   return {
     title: { absolute: title },
