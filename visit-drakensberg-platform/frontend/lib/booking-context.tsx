@@ -26,10 +26,11 @@ export type BookingAddon = {
   // missing packageId as "show every authored day", same as before this
   // field existed.
   packageId?: string
-  // Adult/child party breakdown for a `type: 'activity'` addon booked on an
-  // activity with a configured child rate (lib/activities.ts). Absent for
-  // every other addon type and for activities with no child rate — `guests`
-  // alone is the party size there, same as before these fields existed.
+  // Adult/child party breakdown for an `activity` addon (lib/activities.ts)
+  // or a `hike`/`tour` addon (lib/tours.ts) booked on a product with a
+  // configured child rate. Absent for every other addon and for products
+  // with no child rate — `guests` alone is the party size there, same as
+  // before these fields existed.
   adults?: number
   children?: number
   // Which ActivityTimeslot (lib/activities.ts) this addon reserved, and the
@@ -58,6 +59,11 @@ export type BookingStay = {
   id: string
   title: string
   region: string
+  // Effective nightly price actually charged — for a room with a configured
+  // child rate (lib/rooms.ts) this already includes the per-child surcharge,
+  // so every existing `price_per_night * nights` total calculation across
+  // the cart/checkout pipeline keeps working unchanged. adults/children
+  // below are display-only.
   price_per_night: number
   roomId?: string
   roomName?: string
@@ -65,6 +71,10 @@ export type BookingStay = {
   address?: string
   lat?: string
   lng?: string
+  /** Party breakdown when the selected room has a configured child rate.
+   *  Absent otherwise — display-only, same shape as BookingAddon's. */
+  adults?: number
+  children?: number
 }
 
 export type ShuttleOption = {
