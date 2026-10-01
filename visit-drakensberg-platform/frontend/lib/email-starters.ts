@@ -19,12 +19,13 @@
 // copy of the same markup is the exact drift this whole file set exists to
 // prevent. The route that serves these is app/api/admin/campaigns/starters.
 //
-// There is no merge-tag engine. Nothing substitutes {{first_name}} or any
-// other token on the way out — the only "send" that exists today is a dry run
-// (see supabase/migrations/20260825_email_campaign_foundation.sql). So the copy
-// below is finished, sendable prose, and the handful of decisions left to the
-// editor are marked in square brackets, which are visible in the live preview
-// and impossible to mistake for something the system will fill in.
+// Personalisation tags ({{first_name}}, {{offer}}…) are filled per recipient
+// by lib/email-merge-tags.ts, but the starters deliberately don't lean on
+// them: the copy below is finished, sendable prose, and the handful of
+// decisions left to the editor are marked in square brackets, which are
+// visible in the live preview and impossible to mistake for something the
+// system will fill in. An editor who wants a tag adds one from the template
+// form's tag bar.
 
 import {
   bodyHeading, checklist, closingBand, ctaButton, divider, factPanel,

@@ -1,9 +1,10 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Loader2, Save, Trash2, Sparkles } from 'lucide-react'
 import { saveEmailTemplate, deleteEmailTemplate, type EmailTemplate } from '@/lib/email-campaigns-admin'
+import { CONTACT_MERGE_TAGS, buildMergeValues, renderMergeTags } from '@/lib/email-merge-tags'
 
 const inputClass = 'w-full bg-white border border-gray-200 px-4 py-2.5 font-sans text-sm text-[#000000] placeholder:text-gray-300 focus:outline-none focus:border-[#2d6a4f] transition-colors'
 const labelClass = 'font-sans text-xs tracking-[0.1em] uppercase text-gray-400 block mb-2'
@@ -35,6 +36,25 @@ export default function EmailTemplateForm({ template }: { template: EmailTemplat
   const [saving, setSaving] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [error, setError] = useState('')
+  const bodyRef = useRef<HTMLTextAreaElement>(null)
+  const subjectRef = useRef<HTMLInputElement>(null)
+  const [lastFocused, setLastFocused] = useState<'subject' | 'body'>('body')
+
+  /** Drops a merge tag at the caret of whichever field was last focused. */
+  function insertTag(key: string) {
+    const tag = `{{${key}}}`
+    const el = lastFocused === 'subject' ? subjectRef.current : bodyRef.current
+    const current = lastFocused === 'subject' ? subject : htmlBody
+    const set = lastFocused === 'subject' ? setSubject : setHtmlBody
+    const start = el?.selectionStart ?? current.length
+    const end = el?.selectionEnd ?? current.length
+    set(current.slice(0, start) + tag + current.slice(end))
+    requestAnimationFrame(() => {
+      if (!el) return
+      el.focus()
+      el.setSelectionRange(start + tag.length, start + tag.length)
+    })
+  }
 
   // Only offered on a new template. Dropping a starter over a template someone
   // has already written would be a one-click way to lose their work, and the
@@ -51,7 +71,18 @@ export default function EmailTemplateForm({ template }: { template: EmailTemplat
     const t = setTimeout(() => {
       fetch('/api/admin/campaigns/preview', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ subject, preheader, htmlBody, heroImageUrl, heroImageAlt }),
+        // Rendered against a sample contact so tags read as a real greeting
+        // here; the campaign builder previews against actual recipients.
+        body: JSON.stringify((() => {
+          const v = buildMergeValues(null)
+          return {
+            subject: renderMergeTags(subject, v, { html: false }),
+            preheader: renderMergeTags(preheader, v, { html: false }),
+            htmlBody: renderMergeTags(htmlBody, v, { html: true }),
+            heroImageUrl,
+            heroImageAlt: renderMergeTags(heroImageAlt, v, { html: false }),
+          }
+        })()),
       }).then(r => r.json()).then(d => setPreviewHtml(d.html ?? '')).catch(() => {})
     }, 400)
     return () => clearTimeout(t)
@@ -106,7 +137,7 @@ export default function EmailTemplateForm({ template }: { template: EmailTemplat
             </p>
             <p className="font-sans text-xs text-gray-500 mb-3">
               House editorial structures, already in Visit Drakensberg branding. Everything in square
-              brackets is yours to replace — nothing is filled in automatically on send.
+              brackets is yours to replace by hand. Only <code>{'{{tags}}'}</code> are filled in per recipient.
             </p>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
               {starters.map(s => (
@@ -126,7 +157,7 @@ export default function EmailTemplateForm({ template }: { template: EmailTemplat
         </div>
         <div>
           <label className={labelClass}>Subject Line</label>
-          <input value={subject} onChange={e => setSubject(e.target.value)} placeholder="Your next Drakensberg adventure awaits" className={inputClass} />
+          <input ref={subjectRef} onFocus={() => setLastFocused('subject')} value={subject} onChange={e => setSubject(e.target.value)} placeholder="Your next Drakensberg adventure awaits" className={inputClass} />
         </div>
         <div>
           <label className={labelClass}>Preheader (inbox preview text)</label>
@@ -153,10 +184,25 @@ export default function EmailTemplateForm({ template }: { template: EmailTemplat
         )}
         <div>
           <label className={labelClass}>Body (HTML)</label>
-          <textarea value={htmlBody} onChange={e => setHtmlBody(e.target.value)} rows={16}
-            placeholder="<p>Hi there,</p><p>The berg is calling...</p>"
+          <div className="flex flex-wrap items-center gap-1.5 mb-2">
+            <span className="font-sans text-xs text-gray-400 mr-1">Insert into {lastFocused}:</span>
+            {CONTACT_MERGE_TAGS.map(t => (
+              <button key={t.key} type="button" title={`${t.label}, e.g. ${t.sample}`}
+                onMouseDown={e => e.preventDefault()} onClick={() => insertTag(t.key)}
+                className="font-mono text-[11px] text-gray-600 bg-[#F7F5F2] border border-gray-200 px-2 py-0.5 hover:border-[#2d6a4f] hover:text-[#2d6a4f]">
+                {`{{${t.key}}}`}
+              </button>
+            ))}
+          </div>
+          <textarea ref={bodyRef} onFocus={() => setLastFocused('body')} value={htmlBody} onChange={e => setHtmlBody(e.target.value)} rows={16}
+            placeholder="<p>Hi {{first_name|there}},</p><p>The berg is calling...</p>"
             className={`${inputClass} font-mono text-xs leading-relaxed`} />
-          <p className="font-sans text-xs text-gray-400 mt-2">Rendered inside the standard Visit Drakensberg branded shell. This box is just the content that goes inside it.</p>
+          <p className="font-sans text-xs text-gray-400 mt-2">
+            Rendered inside the standard Visit Drakensberg branded shell. This box is just the content that goes inside it.
+            Tags are filled from each recipient&apos;s profile; add a fallback for anyone missing a value, e.g.{' '}
+            <code>{'{{first_name|there}}'}</code>. Campaign-specific values such as <code>{'{{offer}}'}</code> are set on the campaign.
+            The preview here uses a sample contact.
+          </p>
         </div>
 
         <div className="flex gap-3 pt-2">

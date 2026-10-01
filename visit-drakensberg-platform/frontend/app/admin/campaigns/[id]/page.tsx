@@ -1,14 +1,16 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useParams } from 'next/navigation'
 import Link from 'next/link'
 import { ArrowLeft, Loader2, Send, Pause, Play, XCircle, Eye, AlertTriangle, Users, FileText } from 'lucide-react'
 import {
   getEmailCampaign, getEmailTemplate, getAudienceSegmentOptions, getConsentedAudienceCount,
-  dryRunSendCampaign, setCampaignStatus, type EmailCampaign, type EmailTemplate,
+  getConsentedRecipientCount, getCampaignContacts,
+  dryRunSendCampaign, setCampaignStatus, type EmailCampaign, type EmailTemplate, type CampaignContact,
 } from '@/lib/email-campaigns-admin'
 import type { SegmentCount } from '@/lib/customers-admin'
+import PersonalisedPreview from '@/components/admin/campaigns/PersonalisedPreview'
 
 const STATUS_LABEL: Record<EmailCampaign['status'], string> = {
   draft: 'Draft', scheduled: 'Scheduled', dry_run_sent: 'Dry Run Sent', sent: 'Sent', paused: 'Paused', cancelled: 'Cancelled',
@@ -32,7 +34,8 @@ export default function EmailCampaignDetailPage() {
   const [template, setTemplate] = useState<EmailTemplate | null>(null)
   const [segments, setSegments] = useState<SegmentCount[]>([])
   const [liveAudienceCount, setLiveAudienceCount] = useState<number | null>(null)
-  const [previewHtml, setPreviewHtml] = useState<string | null>(null)
+  const [contacts, setContacts] = useState<CampaignContact[]>([])
+  const [showPreview, setShowPreview] = useState(false)
   const [loading, setLoading] = useState(true)
   const [sending, setSending] = useState(false)
   const [confirmSend, setConfirmSend] = useState(false)
@@ -45,29 +48,28 @@ export default function EmailCampaignDetailPage() {
     const c = await getEmailCampaign(id)
     setCampaign(c)
     if (c) {
-      const [t, segs, count] = await Promise.all([
+      const [t, segs, count, people] = await Promise.all([
         c.templateId ? getEmailTemplate(c.templateId) : Promise.resolve(null),
         getAudienceSegmentOptions(),
-        getConsentedAudienceCount(c.audienceSegmentId),
+        c.audienceMode === 'manual' ? getConsentedRecipientCount(c.recipientUserIds) : getConsentedAudienceCount(c.audienceSegmentId),
+        getCampaignContacts(),
       ])
-      setTemplate(t); setSegments(segs); setLiveAudienceCount(count)
+      setTemplate(t); setSegments(segs); setLiveAudienceCount(count); setContacts(people)
     }
     setLoading(false)
   }
   useEffect(() => { load() }, [params?.id])
 
-  async function loadPreview() {
-    if (!template) return
-    const res = await fetch('/api/admin/campaigns/preview', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        subject: template.subject, preheader: template.preheader, htmlBody: template.htmlBody,
-        heroImageUrl: template.heroImageUrl, heroImageAlt: template.heroImageAlt,
-      }),
-    })
-    const data = await res.json()
-    setPreviewHtml(data.html ?? '')
-  }
+  // Who "Preview as" offers: the hand-picked list, or a sample of the segment.
+  const previewRecipients = useMemo(() => {
+    if (!campaign) return []
+    if (campaign.audienceMode === 'manual') {
+      const picked = new Set(campaign.recipientUserIds)
+      return contacts.filter(c => picked.has(c.id))
+    }
+    const pool = campaign.audienceSegmentId ? contacts.filter(c => c.segmentIds.includes(campaign.audienceSegmentId!)) : contacts
+    return pool.slice(0, 25)
+  }, [campaign, contacts])
 
   async function handleSend() {
     if (!campaign) return
@@ -93,8 +95,12 @@ export default function EmailCampaignDetailPage() {
     </div>
   )
 
-  const segmentName = segments.find(s => s.id === campaign.audienceSegmentId)?.name ?? 'All marketing-consented customers'
+  const segmentName = campaign.audienceMode === 'manual'
+    ? `${campaign.recipientUserIds.length.toLocaleString()} hand-picked contact${campaign.recipientUserIds.length === 1 ? '' : 's'}`
+    : segments.find(s => s.id === campaign.audienceSegmentId)?.name ?? 'All marketing-consented customers'
   const sendable = ['draft', 'scheduled'].includes(campaign.status) && !!campaign.templateId
+    && (campaign.audienceMode !== 'manual' || campaign.recipientUserIds.length > 0)
+  const mergeEntries = Object.entries(campaign.mergeValues)
 
   return (
     <div className="p-4 sm:p-6 lg:p-8">
@@ -153,7 +159,9 @@ export default function EmailCampaignDetailPage() {
               )
             ) : (
               <p className="font-sans text-sm text-gray-400">
-                {!campaign.templateId ? 'Add a template before sending.' : `This campaign is ${STATUS_LABEL[campaign.status].toLowerCase()} and can't be sent.`}
+                {!campaign.templateId ? 'Add a template before sending.'
+                  : campaign.audienceMode === 'manual' && campaign.recipientUserIds.length === 0 ? 'Pick at least one contact before sending.'
+                  : `This campaign is ${STATUS_LABEL[campaign.status].toLowerCase()} and can't be sent.`}
               </p>
             )}
           </div>
@@ -166,12 +174,12 @@ export default function EmailCampaignDetailPage() {
                 <p className="font-sans text-sm font-medium">{template.name}</p>
                 <p className="font-sans text-xs text-gray-400 mt-1">{template.subject}</p>
                 <div className="flex gap-3 mt-4">
-                  <button onClick={loadPreview} className="inline-flex items-center gap-1.5 font-sans text-xs text-[#2d6a4f] hover:underline"><Eye size={12} /> Preview</button>
+                  <button onClick={() => setShowPreview(v => !v)} className="inline-flex items-center gap-1.5 font-sans text-xs text-[#2d6a4f] hover:underline"><Eye size={12} /> {showPreview ? 'Hide preview' : 'Preview personalised'}</button>
                   <Link href={`/admin/campaigns/templates/${template.id}/edit`} className="font-sans text-xs text-gray-400 hover:text-[#2d6a4f]">Edit template</Link>
                 </div>
-                {previewHtml && (
-                  <div className="mt-4 border border-gray-200 bg-[#F7F5F2] h-[480px] overflow-hidden">
-                    <iframe srcDoc={previewHtml} title="Email preview" className="w-full h-full border-0" sandbox="" />
+                {showPreview && (
+                  <div className="mt-4">
+                    <PersonalisedPreview template={template} recipients={previewRecipients} mergeValues={campaign.mergeValues} height={520} />
                   </div>
                 )}
               </div>
@@ -192,7 +200,28 @@ export default function EmailCampaignDetailPage() {
                 ? `${campaign.audienceCountSnapshot.toLocaleString()} at send time`
                 : liveAudienceCount === null ? 'Calculating…' : `${liveAudienceCount.toLocaleString()} currently consented`}
             </p>
+            {campaign.audienceMode === 'manual' && previewRecipients.length > 0 && (
+              <ul className="mt-3 space-y-1 max-h-48 overflow-y-auto">
+                {previewRecipients.map(c => (
+                  <li key={c.id} className="font-sans text-xs text-gray-600 truncate">{c.fullName} <span className="text-gray-400">· {c.email}</span></li>
+                ))}
+              </ul>
+            )}
           </div>
+
+          {mergeEntries.length > 0 && (
+            <div className="bg-white border border-gray-200 p-6">
+              <h2 className="font-display italic text-lg text-[#000000] mb-4">Campaign Details</h2>
+              <dl className="space-y-2">
+                {mergeEntries.map(([k, v]) => (
+                  <div key={k}>
+                    <dt className="font-mono text-[11px] text-gray-400">{`{{${k}}}`}</dt>
+                    <dd className="font-sans text-sm text-gray-700 break-words">{v || <span className="text-gray-300">(empty)</span>}</dd>
+                  </div>
+                ))}
+              </dl>
+            </div>
+          )}
 
           {/* Schedule + notes */}
           <div className="bg-white border border-gray-200 p-6 space-y-4">

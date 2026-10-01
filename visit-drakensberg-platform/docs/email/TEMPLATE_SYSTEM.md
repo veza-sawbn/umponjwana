@@ -100,11 +100,36 @@ from the blocks above and served to the admin form by
 rather than stored as literal HTML in a client module, so there is never a
 second copy of the markup to drift.
 
-**There is no merge-tag engine.** Nothing substitutes `{{first_name}}` on the
-way out; the only send that exists today is a dry run. The starters therefore
-carry finished prose with the editorial decisions marked in square brackets,
-which are visible in the live preview and cannot be mistaken for something the
-system will fill in.
+**Personalisation (merge tags).** `frontend/lib/email-merge-tags.ts` fills
+`{{tag}}` placeholders in a template's subject, preheader, body and hero alt
+text. Two sources feed it:
+
+- **Contact tags**, read from each recipient's CRM record: `first_name`,
+  `last_name`, `full_name`, `email`, `city`, `country`,
+  `favourite_destination`, `favourite_activity`, `interests`, `trip_count`,
+  `upcoming_travel`, `lifecycle_stage`.
+- **Campaign details**, set on the campaign itself
+  (`vd_email_campaigns.merge_values`), e.g. `{{offer}}`, `{{promo_code}}`,
+  `{{deadline}}`. Change one and every recipient's email changes with it.
+
+`{{first_name|there}}` renders `there` for a contact with no first name. A tag
+nothing fills is left in place verbatim, so a typo shows up in the preview
+rather than vanishing. Values are HTML-escaped in the body. The campaign
+builder previews the email as any chosen recipient and warns about unknown or
+blank tags. The only send that exists today is still a dry run; a real ESP send
+must render each recipient through the same `renderMergeTags()`.
+
+The starters still carry finished prose with editorial decisions marked in
+square brackets, which are visible in the live preview and cannot be mistaken
+for something the system will fill in.
+
+**Audience.** A campaign targets either a segment (all marketing-consented
+customers, or one segment) or a hand-picked list of contacts
+(`audience_mode = 'manual'`, `recipient_user_ids`). The picker lists only
+consented customers, and the send intersects a manual list with
+`marketing_consent` again, so a contact who withdraws consent after being
+picked is not sent to. See
+`frontend/supabase/migrations/20261001_campaign_manual_recipients.sql`.
 
 The pack's two transactional templates are not starters, because a campaign's
 audience is marketing-consented by construction and a booking confirmation
