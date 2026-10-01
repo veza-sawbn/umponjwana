@@ -110,6 +110,20 @@ async function saveTowns(towns: Town[]) {
   if (error) throw error
 }
 
+// /towns/[slug] is ISR-cached for an hour, so an admin's edit wouldn't
+// reach visitors until that cache window happened to expire. Best-effort
+// and non-blocking — a failed revalidate (e.g. offline) still leaves the
+// save itself intact, just stale until the cache naturally expires. Same
+// pattern as lib/activities.ts's revalidateActivityPage.
+function revalidateTownPage(slug: string): void {
+  if (typeof fetch !== 'function' || !slug) return
+  fetch('/api/revalidate/town', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ slug }),
+  }).catch(() => {})
+}
+
 // Accepts an optional Supabase client so Server Components can pass a
 // session-less client (lib/supabase-public.ts) — see lib/regions.ts's
 // getRegions() for the same pattern. Existing callers are unaffected.
@@ -129,7 +143,9 @@ export async function getTownsByRegion(regionSlug: string): Promise<Town[]> {
 
 export async function saveAllTowns(towns: Town[]): Promise<void> {
   const now = new Date().toISOString()
-  await saveTowns(towns.map(t => normalizeTown({ ...t, updatedAt: t.updatedAt ?? now })))
+  const normalized = towns.map(t => normalizeTown({ ...t, updatedAt: t.updatedAt ?? now }))
+  await saveTowns(normalized)
+  for (const t of normalized) revalidateTownPage(t.slug)
 }
 
 export async function createTown(data: Omit<Town, 'id' | 'slug' | 'createdAt' | 'updatedAt'>): Promise<Town> {
@@ -137,6 +153,7 @@ export async function createTown(data: Omit<Town, 'id' | 'slug' | 'createdAt' | 
   const now = new Date().toISOString()
   const item = normalizeTown({ ...data, createdAt: now, updatedAt: now })
   await saveTowns([...all.filter(t => t.slug !== item.slug), item])
+  revalidateTownPage(item.slug)
   return item
 }
 
@@ -146,10 +163,13 @@ export async function updateTown(id: string, data: Omit<Town, 'id' | 'slug' | 'c
   const updated = normalizeTown({ ...data, id, slug: previous?.slug, createdAt: previous?.createdAt, updatedAt: new Date().toISOString() })
   const next = previous ? all.map(t => t.id === id ? updated : t) : [...all, updated]
   await saveTowns(next)
+  revalidateTownPage(updated.slug)
   return updated
 }
 
 export async function deleteTown(id: string): Promise<void> {
   const all = await getTowns()
+  const removed = all.find(t => t.id === id)
   await saveTowns(all.filter(t => t.id !== id))
+  if (removed) revalidateTownPage(removed.slug)
 }
