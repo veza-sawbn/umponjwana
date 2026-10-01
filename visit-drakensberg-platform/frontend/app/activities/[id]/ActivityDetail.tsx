@@ -12,6 +12,7 @@ import type { Activity } from '@/lib/activities'
 import { timeslotsForDate, slotRemaining } from '@/lib/activities'
 import { formatMoney } from '@/lib/allocation'
 import ReadMoreText from '@/components/ui/ReadMoreText'
+import SaveButton from '@/components/ui/SaveButton'
 
 function mapActivityToView(a: Activity) {
   const durationParts = []
@@ -116,10 +117,22 @@ export default function ActivityDetail({ activityData, id }: { activityData: Act
           </Link>
           <span className="inline-block font-sans text-[10px] tracking-[0.14em] uppercase bg-[#C9A96E]/20 text-[#C9A96E] px-3 py-1.5 mb-4">{activity.category}</span>
           <h1 className="font-display italic text-5xl lg:text-6xl mb-4">{activity.title}</h1>
-          <div className="flex flex-wrap gap-5 font-sans text-sm text-white/60">
+          <div className="flex flex-wrap items-center gap-5 font-sans text-sm text-white/60">
             {activity.location && <span className="flex items-center gap-1.5"><MapPin size={14} />{activity.location}</span>}
             {activity.duration && <span className="flex items-center gap-1.5"><Clock size={14} />{activity.duration}</span>}
             {activity.group_size && <span className="flex items-center gap-1.5"><Users size={14} />{activity.group_size}</span>}
+            <SaveButton
+              variant="inline"
+              tone="dark"
+              listing={{
+                id,
+                type: 'activity',
+                title: activity.title,
+                location: activity.location || undefined,
+                price: activity.price_per_person || null,
+                image: activityData.photos?.[0],
+              }}
+            />
           </div>
         </div>
       </section>
@@ -203,13 +216,13 @@ export default function ActivityDetail({ activityData, id }: { activityData: Act
                     {!date ? (
                       <p className="font-sans text-xs text-gray-400">Choose a date first.</p>
                     ) : dayTimeslots.length === 0 ? (
-                      <p className="font-sans text-xs text-amber-600">No timeslots run on this date — try another day.</p>
+                      <p className="font-sans text-xs text-amber-600">No timeslots run on this date. Please try another day.</p>
                     ) : (
                       <select value={timeslotId} onChange={e => setTimeslotId(e.target.value)} className="w-full border border-gray-300 px-3 py-2.5 font-sans text-sm focus:outline-none">
                         <option value="">Select a time…</option>
                         {dayTimeslots.map(t => {
                           const left = slotRemaining(activityData, date, t.id)
-                          return <option key={t.id} value={t.id} disabled={left <= 0}>{t.time}{left <= 0 ? ' — Fully booked' : ` — ${left} seat${left === 1 ? '' : 's'} left`}</option>
+                          return <option key={t.id} value={t.id} disabled={left <= 0}>{t.time}{left <= 0 ? ' · Fully booked' : ` · ${left} seat${left === 1 ? '' : 's'} left`}</option>
                         })}
                       </select>
                     )}
@@ -287,7 +300,7 @@ export default function ActivityDetail({ activityData, id }: { activityData: Act
               </button>
               {isAdded && (
                 <p className="font-sans text-xs text-center text-[#2d6a4f] mt-2">
-                  Saved to your trip — continue exploring
+                  Saved to your trip. Continue exploring
                 </p>
               )}
               <p className="font-sans text-xs text-center text-gray-400 mt-2">Free cancellation up to 48 hours before</p>

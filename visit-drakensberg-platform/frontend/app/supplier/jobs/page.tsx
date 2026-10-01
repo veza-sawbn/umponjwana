@@ -19,8 +19,8 @@ import {
 
 const STATUS_LABEL: Record<string, string> = {
   offered: 'New opportunity',
-  accepted: 'Accepted — assign a driver',
-  driver_assigned: 'Driver assigned — ready to go',
+  accepted: 'Accepted, assign a driver',
+  driver_assigned: 'Driver assigned, ready to go',
   in_progress: 'Trip in progress',
   completed: 'Completed',
   cancelled: 'Cancelled',
@@ -104,7 +104,7 @@ export default function TransportJobsPage() {
         <div className="flex items-center gap-3"><Route size={20} className="text-[#C9A96E]" /><h1 className="font-display italic text-2xl text-black/90">Transport Jobs</h1></div>
         <div className="bg-white rounded-xl border border-black/8 p-6 max-w-xl">
           <p className="font-sans text-sm text-black/60 mb-4">
-            Register your transport company first — booking opportunities are matched to registered companies by
+            Register your transport company first. Booking opportunities are matched to registered companies by
             category, region, fleet availability, reliability and price.
           </p>
           <Link href="/supplier/transport" className="inline-flex items-center gap-2 rounded-lg bg-[#C9A96E] px-4 py-2 font-sans text-sm text-white hover:bg-[#b8965d]">
@@ -154,7 +154,7 @@ export default function TransportJobsPage() {
                   disabled={!vehicle || busy === request.id}
                   onClick={() => vehicle && run(request.id, () => acceptTransportRequest(request, company, vehicle))}
                   className="flex items-center gap-1.5 rounded-lg bg-emerald-600 px-4 py-2 font-sans text-xs text-white hover:bg-emerald-700 disabled:opacity-50">
-                  <Check size={13} /> Accept — reserve vehicle
+                  <Check size={13} /> Accept and reserve vehicle
                 </button>
                 <button
                   disabled={busy === request.id}
@@ -208,7 +208,7 @@ export default function TransportJobsPage() {
                     disabled={busy === request.id}
                     onClick={() => run(request.id, () => completeTrip(request, company))}
                     className="flex items-center gap-1.5 rounded-lg bg-emerald-600 px-4 py-2 font-sans text-xs text-white hover:bg-emerald-700 disabled:opacity-50">
-                    <Check size={13} /> Complete trip — free vehicle
+                    <Check size={13} /> Complete trip and free vehicle
                   </button>
                 )}
               </div>
@@ -271,7 +271,7 @@ function MeetAndGreetSummary({ request }: { request: TransportRequest }) {
   if (!details || Object.values(details).every(v => !v)) return null
   return (
     <div className="rounded-lg bg-[#F7F5F2] px-4 py-3">
-      <p className="font-sans text-[11px] uppercase tracking-wide text-black/35 mb-1.5">Meet & greet — passenger tracking</p>
+      <p className="font-sans text-[11px] uppercase tracking-wide text-black/35 mb-1.5">Meet & greet passenger tracking</p>
       <div className="flex flex-wrap gap-x-5 gap-y-1 font-sans text-xs text-black/60">
         {details.flightNumber && (
           <span className="flex items-center gap-1">

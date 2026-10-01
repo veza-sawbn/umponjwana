@@ -14,6 +14,7 @@
 -- supplier's portal — it never appears on /supplier/requests and none of
 -- the guide/quote/decline actions there can run for it.
 -- ============================================================================
+-- @rollback: additive — forward-only; safe to leave in place if the deploy is rolled back
 
 drop policy if exists "Managed ops agents read requests"   on vd_trip_requests;
 drop policy if exists "Managed ops agents update requests" on vd_trip_requests;

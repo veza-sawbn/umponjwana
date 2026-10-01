@@ -1,3 +1,4 @@
+-- @rollback: additive — forward-only; safe to leave in place if the deploy is rolled back
 -- Run this in the Supabase SQL editor.
 --
 -- Verified supplier guides must be publicly visible: the guide rosters on

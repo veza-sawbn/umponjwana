@@ -118,7 +118,7 @@ export default function RedirectsPage() {
       setForm(EMPTY_FORM)
       await load()
     } catch {
-      setFormError('Failed to save redirect — check your connection and try again.')
+      setFormError('Failed to save redirect. Check your connection and try again.')
     } finally {
       setSaving(false)
     }
@@ -162,7 +162,7 @@ export default function RedirectsPage() {
         </div>
         <h1 className="font-display italic text-3xl text-[#000000]">Redirect Manager</h1>
         <p className="font-sans text-sm text-gray-500 mt-1">
-          301/302 redirects served by the platform middleware — no deploy required.
+          301/302 redirects served by the platform middleware, with no deploy required.
         </p>
       </div>
 
@@ -311,7 +311,7 @@ export default function RedirectsPage() {
               <p className={labelCls}>How it works</p>
               <p className="font-sans text-xs text-gray-500 leading-relaxed">
                 Redirects are matched by exact path and served by the Next.js middleware before any page renders.
-                No deploy needed — changes take effect within seconds.
+                No deploy needed. Changes take effect within seconds.
               </p>
               <p className="font-sans text-xs text-gray-500 leading-relaxed">
                 <strong className="text-gray-700">Chain collapse:</strong> if <code className="font-mono text-[11px]">B→C</code> exists

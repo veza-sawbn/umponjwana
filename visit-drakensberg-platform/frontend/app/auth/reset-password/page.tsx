@@ -168,7 +168,7 @@ export default function ResetPasswordPage() {
             <p className="font-sans text-xs tracking-[0.2em] uppercase text-forest/40 mb-2">Link expired</p>
             <h1 className="font-display text-3xl text-forest mb-4">This link is no longer valid</h1>
             <p className="font-sans text-sm text-forest/60 leading-relaxed mb-8">
-              This link has expired or has already been used. Request a new one and try again — new links are valid for 60 minutes.
+              This link has expired or has already been used. Request a new one and try again. New links are valid for 60 minutes.
             </p>
             <Link
               href="/auth/forgot-password"

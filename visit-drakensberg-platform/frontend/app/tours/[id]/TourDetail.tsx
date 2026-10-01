@@ -7,11 +7,14 @@ import {
   ArrowLeft, Mountain, Clock, Users, CheckCircle, Calendar, Shield, Star,
 } from 'lucide-react'
 import { getDepartures, type Departure } from '@/lib/departures'
+import { todayISO } from '@/lib/upcoming'
+import { publicSupabase } from '@/lib/supabase-public'
 import type { Tour } from '@/lib/tours'
 import type { NearbyStayResult } from '@/lib/modules'
 import NearbyStaysModule from '@/components/modules/NearbyStaysModule'
 import { formatMoney } from '@/lib/allocation'
 import ReadMoreText from '@/components/ui/ReadMoreText'
+import SaveButton from '@/components/ui/SaveButton'
 
 const DIFF_COLOR: Record<string, string> = { Easy: '#4A7251', Moderate: '#C9A96E', Strenuous: '#c0392b', Extreme: '#7f1d1d' }
 
@@ -35,8 +38,11 @@ export default function TourDetail({ tour, nearbyStays }: { tour: Tour; nearbySt
   const [departures, setDepartures] = useState<Departure[]>([])
 
   useEffect(() => {
-    const today = new Date().toISOString().slice(0, 10)
-    getDepartures().then(all =>
+    const today = todayISO()
+    // publicSupabase (session-less) — matches the server shell's own read, so
+    // a signed-in admin or ops session sees the same bookable departures a
+    // visitor does, not a suspended supplier's. See lib/supabase-public.ts.
+    getDepartures(publicSupabase).then(all =>
       setDepartures(all.filter(d => d.tourId === tour.id && d.date >= today && d.status !== 'full').sort((a, b) => a.date.localeCompare(b.date)))
     )
   }, [tour.id])
@@ -64,9 +70,23 @@ export default function TourDetail({ tour, nearbyStays }: { tour: Tour; nearbySt
                 ) : null}
               </div>
             </div>
-            <span className="font-sans text-sm px-4 py-2 mt-2" style={{ color: diffColor, background: diffColor + '22' }}>
-              {diff}
-            </span>
+            <div className="flex items-center gap-3 mt-2">
+              <SaveButton
+                variant="inline"
+                tone="dark"
+                listing={{
+                  id: tour.id,
+                  type: 'tour',
+                  title: tour.name,
+                  location: tour.trailName || 'Drakensberg',
+                  price: tour.pricePerPerson,
+                  rating: tour.rating || undefined,
+                }}
+              />
+              <span className="font-sans text-sm px-4 py-2" style={{ color: diffColor, background: diffColor + '22' }}>
+                {diff}
+              </span>
+            </div>
           </div>
         </div>
       </section>
@@ -155,7 +175,7 @@ export default function TourDetail({ tour, nearbyStays }: { tour: Tour; nearbySt
                 </div>
               ) : (
                 <p className="font-sans text-sm text-gray-500 bg-white border border-gray-200 p-5">
-                  No scheduled departures right now — request custom dates and the operator will check availability.
+                  No scheduled departures right now. Request custom dates and the operator will check availability.
                 </p>
               )}
             </div>

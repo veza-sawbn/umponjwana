@@ -287,7 +287,7 @@ export default function AdminSEOPage() {
       setOverridesSaved(true)
       setTimeout(() => setOverridesSaved(false), 2000)
     } catch {
-      setOverridesError('Failed to save — check your connection and try again.')
+      setOverridesError('Failed to save. Check your connection and try again.')
     } finally {
       setOverridesSaving(false)
     }
@@ -461,7 +461,7 @@ export default function AdminSEOPage() {
                   <div>
                     <p className="font-display italic text-lg text-[#000000] mb-0.5">Orphan Page Detector</p>
                     <p className="font-sans text-sm text-gray-500">
-                      Find entities with few or no inbound links — the first signal a page is hard to discover.
+                      Find entities with few or no inbound links, the first signal that a page is hard to discover.
                     </p>
                   </div>
                   <Link
@@ -489,7 +489,7 @@ export default function AdminSEOPage() {
                   <div>
                     <p className="font-display italic text-lg text-[#000000] mb-0.5">Redirect Manager</p>
                     <p className="font-sans text-sm text-gray-500">
-                      Add 301/302 redirects served by middleware — chains collapsed, loops rejected automatically.
+                      Add 301/302 redirects served by middleware. Chains are collapsed and loops rejected automatically.
                     </p>
                   </div>
                   <Link
@@ -545,7 +545,7 @@ export default function AdminSEOPage() {
                   <div>
                     <p className="font-display italic text-lg text-[#000000] mb-0.5">Content Brief Generator</p>
                     <p className="font-sans text-sm text-gray-500">
-                      Template-driven briefs for new pages — required sections, SEO copy, and internal link suggestions.
+                      Template-driven briefs for new pages: required sections, SEO copy, and internal link suggestions.
                     </p>
                   </div>
                   <Link
@@ -573,7 +573,7 @@ export default function AdminSEOPage() {
                   <div>
                     <p className="font-display italic text-lg text-[#000000] mb-0.5">Internal Link Suggestions</p>
                     <p className="font-sans text-sm text-gray-500">
-                      Get ranked link targets for any page — region proximity, name similarity, and keyword overlap.
+                      Get ranked link targets for any page, using region proximity, name similarity and keyword overlap.
                     </p>
                   </div>
                   <Link

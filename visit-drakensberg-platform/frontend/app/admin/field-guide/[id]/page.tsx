@@ -409,7 +409,7 @@ export default function AdminFieldGuideEditor({ params }: { params: { id: string
                     <div className="px-2 py-2 flex items-center gap-1">
                       <button
                         onClick={() => patchChapter(chapter.id, { is_enabled: !chapter.is_enabled })}
-                        title={chapter.is_enabled ? 'Enabled — appears when published' : 'Disabled — left out of the published page'}
+                        title={chapter.is_enabled ? 'Enabled, appears when published' : 'Disabled, left out of the published page'}
                         className="p-1 text-gray-400 hover:text-[#2d6a4f] transition-colors shrink-0"
                       >
                         {chapter.is_enabled ? <Eye size={13} /> : <EyeOff size={13} />}

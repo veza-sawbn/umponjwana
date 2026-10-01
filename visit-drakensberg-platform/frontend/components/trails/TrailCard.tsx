@@ -1,8 +1,10 @@
 'use client'
-import { useState } from 'react'
-import { Mountain, ArrowUp, Clock, Star, Heart } from 'lucide-react'
+import { Mountain, ArrowUp, Clock, Star } from 'lucide-react'
 import Link from 'next/link'
+import Image from 'next/image'
 import { motion } from 'framer-motion'
+import { isOptimizableImageHost } from '@/lib/image-url'
+import SaveButton from '@/components/ui/SaveButton'
 
 /* ─── Types ──────────────────────────────────────────────────────────────── */
 export interface Trail {
@@ -67,7 +69,6 @@ function StarRatingDisplay({ rating, count }: { rating: number; count: number })
 
 /* ─── Component ──────────────────────────────────────────────────────────── */
 export default function TrailCard({ trail }: TrailCardProps) {
-  const [saved, setSaved] = useState(false)
   const diff = DIFFICULTY[trail.difficulty]
 
   return (
@@ -79,11 +80,26 @@ export default function TrailCard({ trail }: TrailCardProps) {
     >
       {/* Image */}
       <div className="relative aspect-[4/3] overflow-hidden">
-        <img
-          src={trail.image}
-          alt={trail.name}
-          className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
-        />
+        {isOptimizableImageHost(trail.image) ? (
+          <Image
+            src={trail.image}
+            alt={trail.name}
+            fill
+            loading="lazy"
+            sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
+            className="object-cover transition-transform duration-500 group-hover:scale-105"
+          />
+        ) : (
+          // Host next/image isn't configured for (see next.config.mjs) —
+          // fall back to a plain <img> instead of crashing the whole page.
+          <img
+            src={trail.image}
+            alt={trail.name}
+            loading="lazy"
+            decoding="async"
+            className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+          />
+        )}
         {/* Gradient for badge legibility */}
         <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent pointer-events-none" />
 
@@ -101,18 +117,18 @@ export default function TrailCard({ trail }: TrailCardProps) {
           </span>
         )}
 
-        {/* Save / heart button */}
-        <motion.button
-          onClick={(e) => { e.preventDefault(); setSaved((s) => !s) }}
-          className="absolute top-3 right-3 w-8 h-8 rounded-full bg-white/90 backdrop-blur-sm flex items-center justify-center hover:bg-white transition-all shadow-sm"
-          aria-label={saved ? 'Remove from saved' : 'Save trail'}
-          whileTap={{ scale: 0.85 }}
-          transition={{ duration: 0.1 }}
-        >
-          <Heart
-            className={`h-4 w-4 transition-colors ${saved ? 'fill-red-500 text-red-500' : 'text-gray-400'}`}
-          />
-        </motion.button>
+        {/* Save / heart button — persists to the visitor's saved listings
+            (lib/saved-listings.ts), which is what /account/saved reads. */}
+        <SaveButton
+          listing={{
+            id: trail.id,
+            type: 'hike',
+            title: trail.name,
+            location: trail.area,
+            image: trail.image,
+            rating: trail.rating,
+          }}
+        />
       </div>
 
       {/* Content */}

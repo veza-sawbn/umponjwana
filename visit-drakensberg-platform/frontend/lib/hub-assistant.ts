@@ -59,10 +59,10 @@ function firstName(name: string) {
 const INTENT_REPLY: Record<Intent, { template?: string; reply: (name: string) => string }> = {
   availability: { template: 'tpl-greeting', reply: n => `Hi ${n}, thanks for your enquiry! Could you confirm your preferred travel dates and group size so I can check availability and put together some options for you?` },
   pricing: { template: 'tpl-quote-followup', reply: n => `Hi ${n}, happy to help with pricing. If you can share your dates, number of travellers and what you'd like to include (stays, hikes, activities), I'll build a tailored quote for you.` },
-  booking: { template: 'tpl-booking-confirmation', reply: n => `Wonderful, ${n}! I'll get everything ready to confirm. I'll send an invoice with the deposit — once that's paid I'll lock in your accommodation and activities and share your itinerary.` },
+  booking: { template: 'tpl-booking-confirmation', reply: n => `Wonderful, ${n}! I'll get everything ready to confirm. I'll send an invoice with the deposit, and once that's paid I'll lock in your accommodation and activities and share your itinerary.` },
   payment: { template: 'tpl-payment-reminder', reply: n => `Hi ${n}, thanks for checking in on payment. I'll send a secure payment link and your latest invoice with the outstanding balance so you can settle whenever you're ready.` },
   amendment: { template: undefined, reply: n => `Hi ${n}, no problem at all — I can look into changing that for you. Could you confirm exactly what you'd like to adjust and your new preferred dates? I'll check availability and let you know any difference in cost.` },
-  complaint: { template: undefined, reply: n => `Hi ${n}, I'm really sorry to hear this and I want to put it right. Let me look into it straight away — could you share a little more detail so I can resolve it as quickly as possible?` },
+  complaint: { template: undefined, reply: n => `Hi ${n}, I'm really sorry to hear this and I want to put it right. Let me look into it straight away. Could you share a little more detail so I can resolve it as quickly as possible?` },
   general: { template: 'tpl-greeting', reply: n => `Hi ${n}, thank you for getting in touch with Visit Drakensberg! How can I help you plan your trip?` },
 }
 

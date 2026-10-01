@@ -72,7 +72,7 @@ export default function MediaPage() {
       </div>
 
       <p className="font-sans text-xs text-black/30 -mt-4">
-        These are your own uploads — pick from them anywhere you'd normally paste an image URL, for your properties, rooms, activities and guide profiles.
+        These are your own uploads. Pick from them anywhere you'd normally paste an image URL, for your properties, rooms, activities and guide profiles.
       </p>
 
       <input

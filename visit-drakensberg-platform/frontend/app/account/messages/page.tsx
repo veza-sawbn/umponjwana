@@ -115,7 +115,7 @@ function ConversationPanel({
       {/* Messages */}
       <div className="flex-1 overflow-y-auto px-5 py-5 space-y-4">
         {thread.messages.length === 0 && (
-          <p className="font-sans text-sm text-gray-400 text-center py-8">No messages yet — start the conversation below.</p>
+          <p className="font-sans text-sm text-gray-400 text-center py-8">No messages yet. Start the conversation below.</p>
         )}
         {thread.messages.map(msg => (
           <div

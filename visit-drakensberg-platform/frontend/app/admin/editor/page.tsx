@@ -17,6 +17,7 @@ import {
 } from '@/lib/editor-schema'
 import { adminMediaSource } from '@/lib/admin-supabase'
 import { MediaPicker } from '@/components/media/MediaPicker'
+import { ImagePositionPicker } from '@/components/media/ImagePositionPicker'
 import type { EditFieldConfig } from '@/lib/edit-mode-context'
 
 /* ─── Types ────────────────────────────────────────────────────────────────── */
@@ -375,7 +376,7 @@ export default function AdminEditorPage() {
           <span className="font-sans text-[11px] text-white/30 whitespace-nowrap hidden md:inline">
             {draftStatus === 'saving' && 'Saving draft…'}
             {draftStatus === 'saved' && (unsavedCount > 0 ? `Draft saved · ${unsavedCount} change${unsavedCount === 1 ? '' : 's'} pending publish` : 'All changes published')}
-            {draftStatus === 'error' && <span className="text-red-400">Draft save failed — check your connection</span>}
+            {draftStatus === 'error' && <span className="text-red-400">Draft save failed. Check your connection</span>}
           </span>
         </div>
 
@@ -542,7 +543,7 @@ export default function AdminEditorPage() {
                               ? 'text-gold' : 'text-white/35 hover:text-white/70'
                           }`}
                         >
-                          {f.type === 'image' ? <ImageIcon className="w-3 h-3 shrink-0" /> : <Type className="w-3 h-3 shrink-0" />}
+                          {f.type === 'image' || f.type === 'position' ? <ImageIcon className="w-3 h-3 shrink-0" /> : <Type className="w-3 h-3 shrink-0" />}
                           <span className="truncate">{f.label}</span>
                         </button>
                       ))}
@@ -765,6 +766,7 @@ function SectionInspector({
                   value={sectionValue(section.contentKey!, f.key)}
                   min={f.min}
                   max={f.max}
+                  image={f.imageKey ? String(sectionValue(section.contentKey!, f.imageKey) ?? '') : undefined}
                   onChange={v => applyChange(section.contentKey!, f.key, v)}
                   compact
                 />
@@ -972,11 +974,13 @@ function CardInspector({ collection, index, card, total, onField, onAction, onCl
 
 /* ─── Input component ──────────────────────────────────────────────────────── */
 
-function EditInput({ type, value, min, max, onChange, compact }: {
+function EditInput({ type, value, min, max, image, onChange, compact }: {
   type: string
   value: string | number
   min?: number
   max?: number
+  /** `position` fields only: the image the focal point applies to. */
+  image?: string
   onChange: (v: string | number) => void
   compact?: boolean
 }) {
@@ -989,6 +993,15 @@ function EditInput({ type, value, min, max, onChange, compact }: {
   if (type === 'image') return (
     <MediaPicker value={String(value ?? '')} onChange={url => onChange(url)} source={adminMediaSource} />
   )
+
+  if (type === 'position') {
+    // Nothing to aim at until a background image is chosen; the section's
+    // image field sits directly above this one in the inspector.
+    if (!image) return (
+      <p className="font-sans text-[11px] text-gray-400">Choose a background image first.</p>
+    )
+    return <ImagePositionPicker image={image} value={String(value ?? '')} onChange={onChange} />
+  }
 
   if (type === 'range') return (
     <div className="space-y-2">

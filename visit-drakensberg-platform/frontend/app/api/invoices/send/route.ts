@@ -3,7 +3,7 @@ import { cookies } from 'next/headers'
 import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs'
 import { sendMail } from '@/lib/mailer'
 import { formatMoney as money } from '@/lib/allocation'
-import { emailShell, ctaButton, detailTable, esc, getFeaturedExperiences, type FeaturedExperience } from '@/lib/email-layout'
+import { emailShell, ctaButton, detailTable, esc, finePrint } from '@/lib/email-layout'
 
 export const dynamic = 'force-dynamic'
 
@@ -31,7 +31,6 @@ function invoiceHtml(o: {
   issuedAt: string
   invoiceUrl: string
   origin: string
-  featured: FeaturedExperience[]
 }) {
   const settled = o.balance <= 0
   const trip = o.tripName ? ` for ${esc(o.tripName)}` : ''
@@ -41,14 +40,13 @@ function invoiceHtml(o: {
     eyebrow: `Invoice ${o.invoiceNumber}`,
     heading: 'Your invoice',
     preheader: settled
-      ? `Invoice ${o.invoiceNumber} — fully paid, no payment due.`
-      : `Invoice ${o.invoiceNumber} — ${money(o.balance, o.currency)} outstanding.`,
-    featured: o.featured,
+      ? `Invoice ${o.invoiceNumber} is fully paid, with no payment due.`
+      : `Invoice ${o.invoiceNumber} has ${money(o.balance, o.currency)} outstanding.`,
     bodyHtml: `
       <p style="margin:0 0 4px;">Dear ${esc(o.customerName || 'traveller')},</p>
       <p style="margin:0 0 20px;">
         ${settled
-          ? `Here is invoice <strong>${esc(o.invoiceNumber)}</strong>${trip}. It is fully paid — no further payment is due.`
+          ? `Here is invoice <strong>${esc(o.invoiceNumber)}</strong>${trip}. It is fully paid, so no further payment is due.`
           : `Here is invoice <strong>${esc(o.invoiceNumber)}</strong>${trip}, with <strong>${esc(money(o.balance, o.currency))}</strong> still outstanding.`}
       </p>
       ${detailTable([
@@ -58,13 +56,10 @@ function invoiceHtml(o: {
         ['Issued', fmtDate(o.issuedAt)],
         ['Invoice total', money(o.total, o.currency)],
         ['Paid to date', money(o.amountPaid, o.currency)],
-        ['Balance due', money(o.balance, o.currency)],
-      ])}
+      ], ['Balance due', money(o.balance, o.currency)])}
       ${ctaButton(o.invoiceUrl, settled ? 'View your invoice' : 'View & pay your invoice')}
-      <p style="margin:24px 0 0;font-family:Arial,Helvetica,sans-serif;font-size:11px;color:#aaaaaa;line-height:1.6;">
-        This invoice covers your single trip with Visit Drakensberg — all accommodation,
-        activities, transfers and extras appear on one document.
-      </p>`,
+      ${finePrint(`This invoice covers your single trip with Visit Drakensberg. All accommodation,
+        activities, transfers and extras appear on one document.`)}`,
   })
 }
 
@@ -104,7 +99,6 @@ export async function POST(req: Request) {
   }
 
   const origin = process.env.NEXT_PUBLIC_SITE_URL || new URL(req.url).origin
-  const featured = await getFeaturedExperiences(origin)
 
   // Just the invoice's address. The id in it is 'inv-' + a v4 UUID, which is
   // credential enough to open and pay without signing in — so there is no
@@ -113,7 +107,7 @@ export async function POST(req: Request) {
 
   const { sent, error } = await sendMail({
     to: email,
-    subject: `Invoice ${invoice.invoice_number} — Visit Drakensberg`,
+    subject: `Invoice ${invoice.invoice_number} from Visit Drakensberg`,
     html: invoiceHtml({
       customerName: order.customer_name,
       invoiceNumber: invoice.invoice_number,
@@ -126,12 +120,13 @@ export async function POST(req: Request) {
       issuedAt: invoice.issued_at,
       invoiceUrl,
       origin,
-      featured,
     }),
   })
 
-  // In-app notification for account holders, so the invoice is surfaced even
-  // when SMTP is down — same pattern as the receipts route.
+  // In-app only, on purpose: this route has ALREADY emailed the customer the
+  // invoice above. Do NOT convert this to notifyServer() — it would
+  // send a second, near-identical email. The row is the fallback for when
+  // SMTP is down, not a missing notification.
   if (order.user_id) {
     await supabase.from('vd_notifications').insert({
       user_id: order.user_id,

@@ -10,6 +10,7 @@
 -- client-supplied capacity — and the row is locked with `for update` so
 -- concurrent bookings on the same slot can't both succeed past capacity.
 -- ============================================================================
+-- @rollback: additive — forward-only; safe to leave in place if the deploy is rolled back
 
 create or replace function public.vd_book_activity_slot(
   p_activity_id text, p_slot_date date, p_timeslot_id text, p_seats int

@@ -103,7 +103,7 @@ export default function TierItineraryEditor({
 
       <ExtraDaysEditor
         label="Extra days before the hiking date"
-        hint="Inserted ahead of the trail's Day 1 without moving the hike's own start date — e.g. a shuttle pickup the day before."
+        hint="Inserted ahead of the trail's Day 1 without moving the hike's own start date, for example a shuttle pickup the day before."
         days={before}
         onChange={next => update({ itineraryDaysBefore: next })}
       />
@@ -114,7 +114,7 @@ export default function TierItineraryEditor({
           const o = overrideFor(i)
           return (
             <div key={i} className="border border-black/10 rounded-lg p-3 space-y-2 bg-white">
-              <p className="font-sans text-xs font-medium text-black/70">Day {i + 1} — {day.label || 'Untitled'}</p>
+              <p className="font-sans text-xs font-medium text-black/70">Day {i + 1}: {day.label || 'Untitled'}</p>
               <textarea
                 value={o.notes ?? ''}
                 onChange={e => updateOverride(i, { notes: e.target.value })}
@@ -134,7 +134,7 @@ export default function TierItineraryEditor({
 
       <ExtraDaysEditor
         label="Extra days after the trail's plan"
-        hint="Appended after the last included trail day — e.g. an extra night and a shuttle back to the city."
+        hint="Appended after the last included trail day, for example an extra night and a shuttle back to the city."
         days={after}
         onChange={next => update({ itineraryDaysAfter: next })}
       />

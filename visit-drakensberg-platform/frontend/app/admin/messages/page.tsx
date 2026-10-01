@@ -484,7 +484,7 @@ export default function AdminMessagesHub() {
                 <div className="flex gap-2 p-3">
                   <textarea value={body} onChange={e => setBody(e.target.value)}
                     onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend() } }}
-                    placeholder={noteMode ? 'Internal note — never shown to the customer…' : 'Type a reply… (Enter to send, Shift+Enter for newline)'}
+                    placeholder={noteMode ? 'Internal note, never shown to the customer…' : 'Type a reply… (Enter to send, Shift+Enter for newline)'}
                     rows={2} className={`flex-1 font-sans text-sm border px-3 py-2 outline-none resize-none ${noteMode ? 'border-amber-300 bg-amber-50/40 focus:border-amber-400' : 'border-gray-200 focus:border-[#2d6a4f]'}`} />
                   <button onClick={handleSend} disabled={sending || !body.trim()}
                     className={`shrink-0 flex items-center gap-1.5 px-4 font-sans text-sm text-white transition-colors disabled:opacity-40 ${noteMode ? 'bg-amber-500 hover:bg-amber-600' : 'bg-[#2d6a4f] hover:bg-[#235a3f]'}`}>
@@ -582,7 +582,7 @@ function CustomerTab({ conv, profile, loading }: { conv: Conversation; profile: 
             <div className="bg-[#F7F5F2] px-2 py-2"><p className="font-sans text-[9px] uppercase text-gray-400">Owing</p><p className={`font-sans text-sm font-medium ${profile.outstandingBalance > 0 ? 'text-amber-600' : 'text-gray-800'}`}>{formatMoney(profile.outstandingBalance)}</p></div>
           </div>
           <p className="font-sans text-[9px] tracking-[0.1em] uppercase text-gray-400 mb-2">Trip History</p>
-          {profile.trips.length === 0 && <p className="font-sans text-xs text-gray-400">No bookings yet — this is a fresh lead.</p>}
+          {profile.trips.length === 0 && <p className="font-sans text-xs text-gray-400">No bookings yet. This is a fresh lead.</p>}
           <div className="space-y-2">
             {profile.trips.map(t => (
               <div key={t.orderId || t.bookingRef} className="border border-gray-100 px-3 py-2">
@@ -834,7 +834,7 @@ function NewEnquiryModal({ me, onClose, onCreated }: {
           <div>
             <label className="font-sans text-[10px] uppercase text-gray-400">Channel</label>
             <select value={channel} onChange={e => setChannel(e.target.value as ChannelId)} className={inputCls}>
-              {CHANNEL_LIST.map(ch => <option key={ch.id} value={ch.id}>{ch.label}{ch.connected ? '' : ' (log only — not connected)'}</option>)}
+              {CHANNEL_LIST.map(ch => <option key={ch.id} value={ch.id}>{ch.label}{ch.connected ? '' : ' (log only, not connected)'}</option>)}
             </select>
           </div>
           <div className="grid grid-cols-2 gap-3">

@@ -131,7 +131,7 @@ export function scoreCompany(
 
   const categoryRank = categories.indexOf(company.category)
   score += add('Category fit', (categoryRank === 0 ? 1 : categoryRank > 0 ? 0.55 : 0) * 10, 10,
-    categoryRank === 0 ? `${tripClass} trip — native category` : undefined)
+    categoryRank === 0 ? `${tripClass} trip, native category` : undefined)
 
   const bestVehicle = usableVehicles
     .map(v => ({ v, s: vehicleSuitability(v, tripClass, input.passengers) }))
@@ -372,7 +372,9 @@ export async function createTransportRequestForBooking(booking: SavedBooking): P
       pickup: { address: shuttle.pickup ?? shuttle.label, lat: shuttle.pickupLat, lng: shuttle.pickupLng },
       dropoff: { address: shuttle.destination ?? booking.stay?.title ?? booking.region, lat: shuttle.destinationLat, lng: shuttle.destinationLng },
       date: shuttle.date || booking.checkIn,
-      time: shuttle.meetAndGreet?.arrivalTime,
+      // The pickup time the guest chose on the transfer form; an arrival time
+      // from meet & greet stands in for legs booked before that field existed.
+      time: shuttle.time || shuttle.meetAndGreet?.arrivalTime,
       meetAndGreet: shuttle.meetAndGreet,
       passengers: shuttle.passengers ?? booking.guests,
       shuttleType: shuttle.shuttleType,

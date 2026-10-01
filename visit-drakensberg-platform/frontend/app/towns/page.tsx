@@ -1,6 +1,7 @@
 'use client'
 import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
+import Image from 'next/image'
 import { ArrowRight, MapPin } from 'lucide-react'
 import Footer from '@/components/layout/Footer'
 import EditablePageHeader from '@/components/editor/EditablePageHeader'
@@ -59,8 +60,8 @@ export default function TownsPage() {
                   <div key={town.id} className="group border border-forest/10 bg-mist/40 hover:border-gold/40 transition-colors overflow-hidden">
                     <Link href={`/towns/${town.slug}`}>
                       {town.image && (
-                        <div className="aspect-[16/9] overflow-hidden bg-forest/10">
-                          <img src={town.image} alt={town.name} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" />
+                        <div className="relative aspect-[16/9] overflow-hidden bg-forest/10">
+                          <Image src={town.image} alt={town.name} fill loading="lazy" sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw" className="object-cover transition-transform duration-500 group-hover:scale-105" />
                         </div>
                       )}
                     </Link>

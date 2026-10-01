@@ -49,7 +49,7 @@ export default function PropertiesPage() {
     try {
       await updateProperty(p.id, { bookingMode: next })
       toast.success(next === 'request'
-        ? `${p.name} now takes booking requests — guests aren't charged until you confirm.`
+        ? `${p.name} now takes booking requests. Guests aren't charged until you confirm.`
         : `${p.name} is back to instant booking.`)
     } catch {
       setProperties(rows => rows.map(r => r.id === p.id ? { ...r, bookingMode: previous } : r))
@@ -124,7 +124,7 @@ export default function PropertiesPage() {
                     </button>
                   ) : (
                     <span
-                      title="You don't hold a permission that lets you change this — ask a platform administrator."
+                      title="You don't hold a permission that lets you change this. Ask a platform administrator."
                       className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full font-sans text-xs ${
                         p.bookingMode === 'request' ? 'bg-blue-50 text-blue-700' : 'bg-slate-100 text-slate-500'
                       }`}

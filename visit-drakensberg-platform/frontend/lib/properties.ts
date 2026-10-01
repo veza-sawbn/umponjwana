@@ -1,5 +1,5 @@
 import { DEFAULT_REGIONS } from './regions'
-import { listEntities, getEntity, insertEntity, updateEntity, deleteEntity, newEntityId, listEntitiesByOwner } from './entities'
+import { listEntities, getEntityByIdOrSlug, insertEntity, updateEntity, deleteEntity, newEntityId, listEntitiesByOwner } from './entities'
 import type { GraphFields } from './graph-fields'
 import { slugify, uniqueSlug } from './slugify'
 import type { SupabaseClient } from '@supabase/supabase-js'
@@ -70,12 +70,32 @@ export type Property = {
 
 const KIND = 'property'
 
+// The public stay page (app/stays/[id]/page.tsx) is ISR-cached for up to 5
+// minutes, so a supplier's edit wouldn't reach visitors until that cache
+// window happened to expire. Best-effort and non-blocking — a failed
+// revalidate (e.g. offline) still leaves the save itself intact, just stale
+// until the cache naturally expires. Same pattern as lib/activities.ts's
+// revalidateActivityPage.
+function revalidateStayPage(propertyId: string): void {
+  if (typeof fetch !== 'function' || !propertyId) return
+  fetch('/api/revalidate/stay', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ id: propertyId }),
+  }).catch(() => {})
+}
+
 export async function getProperties(client?: SupabaseClient): Promise<Property[]> {
   return client ? listEntities<Property>(KIND, client) : listEntities<Property>(KIND)
 }
 
-export async function getPropertyById(id: string, client?: SupabaseClient): Promise<Property | null> {
-  return client ? getEntity<Property>(KIND, id, client) : getEntity<Property>(KIND, id)
+/** Accepts either form of the public URL segment (`slug || id`), so
+ *  /stays/champagne-sports-resort resolves as well as /stays/prop-<uuid>.
+ *  Callers holding a real id are unaffected — see getEntityByIdOrSlug(). */
+export async function getPropertyById(idOrSlug: string, client?: SupabaseClient): Promise<Property | null> {
+  return client
+    ? getEntityByIdOrSlug<Property>(KIND, idOrSlug, client)
+    : getEntityByIdOrSlug<Property>(KIND, idOrSlug)
 }
 
 export async function getPropertiesBySupplier(supplierId: string): Promise<Property[]> {
@@ -90,13 +110,20 @@ export async function addProperty(p: Omit<Property, 'id' | 'createdAt'>): Promis
   // other property's canonical URL segment (slug || id).
   const slug = p.slug || uniqueSlug(slugify(p.name), (await getProperties()).map(e => e.slug || e.id))
   const prop: Property = { ...p, slug, id: newEntityId('prop'), createdAt: new Date().toISOString() }
-  return insertEntity(KIND, prop)
+  const saved = await insertEntity(KIND, prop)
+  revalidateStayPage(saved.id)
+  return saved
 }
 
 export async function updateProperty(id: string, updates: Partial<Property>): Promise<void> {
   await updateEntity(KIND, id, updates)
+  revalidateStayPage(id)
 }
 
 export async function deleteProperty(id: string): Promise<void> {
+  // Revalidate *before* deleting — /api/revalidate/stay verifies ownership
+  // by looking the property up in vd_entities, which a call made after the
+  // delete would find gone, silently skipping the cache bust.
+  revalidateStayPage(id)
   await deleteEntity(KIND, id)
 }

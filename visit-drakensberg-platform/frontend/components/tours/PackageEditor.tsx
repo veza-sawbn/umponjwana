@@ -224,7 +224,7 @@ export function PackagesEditor({
               </div>
             )}
             {itineraryDayCount > 0 && pkg.tierId && (
-              <p className="font-sans text-xs text-black/35 self-end pb-2">Trip length &amp; itinerary follow this rate&apos;s pricing tier — edit on the tour.</p>
+              <p className="font-sans text-xs text-black/35 self-end pb-2">Trip length &amp; itinerary follow this rate&apos;s pricing tier. Edit them on the tour.</p>
             )}
           </div>
           <div>

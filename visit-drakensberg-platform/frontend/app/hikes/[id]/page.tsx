@@ -1,11 +1,12 @@
 import type { Metadata } from 'next'
 import { notFound } from 'next/navigation'
-import { getTrails, type Trail, DEFAULT_TRAILS } from '@/lib/trails'
+import { getTrailById, type Trail } from '@/lib/trails'
 import { getProperties, type Property } from '@/lib/properties'
 import { getActivities, type Activity } from '@/lib/activities'
 import { publicSupabase } from '@/lib/supabase-public'
 import HikeDetail from './HikeDetail'
 import TrackView from '@/components/analytics/TrackView'
+import JsonLd from '@/components/seo/JsonLd'
 
 // Server shell — same pattern as app/regions/[slug]/page.tsx. Trail has no
 // seoTitle/seoDescription populated yet (GraphFields fields exist but
@@ -27,9 +28,12 @@ const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://visitdrakensberg.c
 // docs/destination-graph/PHASE_D.md.
 export const revalidate = 1800
 
+// Previously fetched every trail (the whole 10.2MB `trails` row) just to
+// .find() this one — the same query that times out at that size (see
+// lib/trails.ts's getTrailById()). One id/slug lookup in the database
+// instead, at full fidelity for the one trail this page renders.
 async function resolveTrail(id: string): Promise<Trail | null> {
-  const trails = await getTrails(publicSupabase).catch(() => DEFAULT_TRAILS)
-  return trails.find(t => t.id === id || t.slug === id) ?? null
+  return getTrailById(id, publicSupabase)
 }
 
 /**
@@ -86,7 +90,7 @@ export async function generateMetadata({ params }: { params: { id: string } }): 
   const trail = await resolveTrail(params.id)
   if (!trail) return { title: 'Trail Not Found' }
 
-  const title = trail.seoTitle || `${trail.name} — ${trail.region} | Visit Drakensberg`
+  const title = trail.seoTitle || `${trail.name}, ${trail.region} | Visit Drakensberg`
   const description = buildDescription(trail)
   const canonical = `/hikes/${trail.slug || trail.id}`
 
@@ -139,8 +143,8 @@ export default async function HikePage({ params }: { params: { id: string } }) {
 
   return (
     <>
-      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(attractionJsonLd) }} />
-      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbJsonLd) }} />
+      <JsonLd data={attractionJsonLd} />
+      <JsonLd data={breadcrumbJsonLd} />
       <TrackView event="trail_view" properties={{ id: trail.id, name: trail.name, region: trail.region, difficulty: trail.difficulty }} />
       <HikeDetail
         trail={trail}

@@ -5,16 +5,20 @@ import { useState } from 'react'
 import { usePathname } from 'next/navigation'
 import Navbar from '@/components/layout/Navbar'
 import { BookingProvider } from '@/lib/booking-context'
+import { SavedListingsProvider } from '@/lib/saved-listings-context'
 import BookingBar from '@/components/booking/BookingBar'
 import EditModeGate from '@/components/editor/EditModeGate'
 import AnalyticsProvider from '@/components/analytics/AnalyticsProvider'
 
 export default function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
-  // Portal shells (admin/supplier/operations) render their own chrome —
-  // sidebar, own logo, own sign-out — so the public site Navbar/BookingBar
-  // would just be a second, conflicting header stacked on top of it.
-  const isAdmin = pathname.startsWith('/admin') || pathname.startsWith('/supplier') || pathname.startsWith('/operations') || pathname === '/maintenance'
+  // Portal shells (admin/supplier/operations/account) render their own
+  // chrome — sidebar, own logo, own sign-out — so the public site
+  // Navbar/BookingBar would just be a second, conflicting header stacked on
+  // top of it. /account in particular is the visitor's own dashboard: its
+  // sidebar already covers account navigation, so it doesn't need the
+  // public Navbar's mega-menu of every destination page on the site too.
+  const isAdmin = pathname.startsWith('/admin') || pathname.startsWith('/supplier') || pathname.startsWith('/operations') || pathname.startsWith('/account') || pathname === '/maintenance'
   const [queryClient] = useState(() => new QueryClient({
     defaultOptions: { queries: { staleTime: 60 * 1000 } },
   }))
@@ -22,13 +26,17 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   return (
     <QueryClientProvider client={queryClient}>
       <BookingProvider>
-        <EditModeGate>
-          <AnalyticsProvider />
-          {!isAdmin && <Navbar />}
-          {children}
-          {!isAdmin && <BookingBar />}
-          <Toaster position="top-right" toastOptions={{ duration: 4000 }} />
-        </EditModeGate>
+        {/* Wraps the portals too, not just the public site: /account/saved
+            reads the same store the heart buttons on /stays write to. */}
+        <SavedListingsProvider>
+          <EditModeGate>
+            <AnalyticsProvider />
+            {!isAdmin && <Navbar />}
+            {children}
+            {!isAdmin && <BookingBar />}
+            <Toaster position="top-right" toastOptions={{ duration: 4000 }} />
+          </EditModeGate>
+        </SavedListingsProvider>
       </BookingProvider>
     </QueryClientProvider>
   )

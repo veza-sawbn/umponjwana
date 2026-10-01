@@ -6,6 +6,8 @@ import Link from 'next/link'
 import { getAllSiteContent, setSiteContent, SITE_CONTENT_DEFAULTS } from '@/lib/site-content'
 import { adminMediaSource } from '@/lib/admin-supabase'
 import { MediaPicker, MediaGalleryPicker } from '@/components/media/MediaPicker'
+import { ImagePositionPicker } from '@/components/media/ImagePositionPicker'
+import { imagePositionToCss, isCenterPosition, CENTER_POSITION_CSS } from '@/lib/image-position'
 
 type Section = 'hero' | 'featured' | 'promos' | 'footer' | 'nav' | 'about'
 
@@ -44,6 +46,79 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 
 const inputCls = 'w-full border border-gray-200 px-3 py-2.5 font-sans text-sm focus:outline-none focus:border-[#2d6a4f] bg-[#F7F5F2]'
 const textareaCls = `${inputCls} resize-none`
+
+/**
+ * Focal points for the hero carousel, one photo at a time: a thumbnail strip
+ * to choose which photo you are aiming, then the full picker for it. Stacking
+ * a picker per photo would run to several screens for a five-photo carousel,
+ * and only one of them is ever being adjusted.
+ *
+ * Positions are keyed by image URL, so this also prunes entries for photos no
+ * longer in the carousel rather than letting them accumulate in the content
+ * blob forever.
+ */
+function CarouselPositions({ images, positions, onChange }: {
+  images: string[]
+  positions: Record<string, string>
+  onChange: (positions: Record<string, string>) => void
+}) {
+  const [selected, setSelected] = useState(0)
+  const image = images[Math.min(selected, images.length - 1)]
+
+  function set(position: string) {
+    const next: Record<string, string> = {}
+    images.forEach(url => {
+      const value = url === image ? position : positions[url]
+      // Centre is the default every render site falls back to, so storing it
+      // explicitly would only be noise.
+      if (value && !isCenterPosition(value)) next[url] = imagePositionToCss(value)
+    })
+    onChange(next)
+  }
+
+  return (
+    <div className="space-y-3">
+      {images.length > 1 && (
+        <div className="flex gap-2 flex-wrap">
+          {images.map((url, i) => {
+            const active = url === image
+            const adjusted = !isCenterPosition(positions[url])
+            return (
+              <button
+                key={`${url}-${i}`}
+                type="button"
+                onClick={() => setSelected(i)}
+                title={url}
+                className={`relative w-16 h-12 overflow-hidden border-2 transition-colors ${
+                  active ? 'border-[#2d6a4f]' : 'border-transparent hover:border-gray-300'
+                }`}
+              >
+                <img
+                  src={url}
+                  alt=""
+                  className="w-full h-full object-cover"
+                  style={{ objectPosition: imagePositionToCss(positions[url]) }}
+                />
+                {adjusted && <span className="absolute bottom-0.5 right-0.5 w-1.5 h-1.5 rounded-full bg-[#C9A96E]" />}
+              </button>
+            )
+          })}
+        </div>
+      )}
+      <ImagePositionPicker
+        image={image}
+        value={positions[image] ?? CENTER_POSITION_CSS}
+        onChange={set}
+      />
+      {images.length > 1 && (
+        <p className="font-sans text-xs text-gray-400">
+          Photo {Math.min(selected, images.length - 1) + 1} of {images.length}. A gold dot marks a photo
+          whose position has been moved off centre.
+        </p>
+      )}
+    </div>
+  )
+}
 
 export default function AdminWebsitePage() {
   const [activeSection, setActiveSection] = useState<Section>('hero')
@@ -186,10 +261,30 @@ export default function AdminWebsitePage() {
                   <p className="font-sans text-xs text-gray-400 mt-1">Used when the carousel below is empty or has only one photo.</p>
                 </Field>
 
+                {hero.image_url && (
+                  <Field label="Background Image Position">
+                    <ImagePositionPicker
+                      image={hero.image_url}
+                      value={hero.image_position}
+                      onChange={position => setHero(h => ({ ...h, image_position: position }))}
+                    />
+                  </Field>
+                )}
+
                 <Field label="Background Carousel (fades between photos, each with a slow zoom)">
                   <MediaGalleryPicker value={hero.images} onChange={imgs => setHero(h => ({ ...h, images: imgs }))} source={adminMediaSource} />
                   <p className="font-sans text-xs text-gray-400 mt-1">Add two or more photos to turn the hero into a rotating carousel. Leave empty to use the single background image above.</p>
                 </Field>
+
+                {hero.images.length > 0 && (
+                  <Field label="Carousel Photo Positions">
+                    <CarouselPositions
+                      images={hero.images}
+                      positions={hero.image_positions}
+                      onChange={positions => setHero(h => ({ ...h, image_positions: positions }))}
+                    />
+                  </Field>
+                )}
 
                 <Field label="Background Video (overrides image/carousel when set)">
                   <MediaPicker value={hero.video_url} onChange={url => setHero(h => ({ ...h, video_url: url }))} source={adminMediaSource} accept="video" />

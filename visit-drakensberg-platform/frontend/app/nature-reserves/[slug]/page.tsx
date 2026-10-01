@@ -1,15 +1,18 @@
 import type { Metadata } from 'next'
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
+import Image from 'next/image'
 import { ArrowRight, ChevronRight, Info, Mountain, ShieldCheck, Sunrise } from 'lucide-react'
 import Footer from '@/components/layout/Footer'
 import { getReserves, DEFAULT_RESERVES, type Reserve } from '@/lib/reserves'
 import { getRegions, DEFAULT_REGIONS } from '@/lib/regions'
 import { publicSupabase } from '@/lib/supabase-public'
+import { objectPositionStyle } from '@/lib/image-position'
 import { getNearbyTrails, getNearbyStays } from '@/lib/modules'
 import RelatedTrailsModule from '@/components/modules/RelatedTrailsModule'
 import NearbyStaysModule from '@/components/modules/NearbyStaysModule'
 import TrackView from '@/components/analytics/TrackView'
+import JsonLd from '@/components/seo/JsonLd'
 
 // New route — Reserve already had slug + seoTitle + seoDescription + rich
 // content (peaks, permits, best time, facilities) with admin CRUD, but no
@@ -112,14 +115,14 @@ export default async function ReservePage({ params }: { params: { slug: string }
 
   return (
     <main className="bg-mist">
-      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(attractionJsonLd) }} />
-      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbJsonLd) }} />
+      <JsonLd data={attractionJsonLd} />
+      <JsonLd data={breadcrumbJsonLd} />
       <TrackView event="destination_view" properties={{ id: reserve.id, name: reserve.name, kind: 'nature_reserve', region: regionName }} />
 
       {/* ── Hero ─────────────────────────────────────────────────────────── */}
       <section className="relative h-[60vh] min-h-[420px] overflow-hidden">
         {reserve.image ? (
-          <img src={reserve.image} alt={reserve.name} className="absolute inset-0 w-full h-full object-cover" />
+          <Image src={reserve.image} alt={reserve.name} fill priority sizes="100vw" className="object-cover" style={objectPositionStyle(reserve.imagePosition)} />
         ) : (
           <div className="absolute inset-0 bg-forest/20 flex items-center justify-center">
             <Mountain className="w-16 h-16 text-forest/20" />

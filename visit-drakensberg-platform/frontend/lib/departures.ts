@@ -108,14 +108,20 @@ export async function updateDepartureSeats(id: string, bookedSeats: number): Pro
   await updateEntity(KIND, id, { bookedSeats, status })
 }
 
-// Visitor-side booking: atomic, capacity-checked, executed server-side.
-// Throws with a readable message when the departure is full.
+// OPERATOR-side booking: a permanent, capacity-checked take on a departure
+// you run, used when recording a guest who booked off-platform
+// (lib/departure-guests.ts addManualGuest). NOT the checkout path — a guest
+// reserving at checkout takes a TTL'd hold instead, through
+// lib/inventory-holds.ts, and vd_book_seats now refuses anyone who is not the
+// departure's owner, an ops employee managing them, or staff.
 export async function bookDepartureSeats(id: string, seats: number): Promise<void> {
   const { error } = await supabase.rpc('vd_book_seats', { p_departure_id: id, p_seats: seats })
   if (error) throw new Error(error.message || 'Could not reserve seats')
 }
 
-// Free seats after a cancellation (booking owner or supplier).
+// Free seats taken by the operator path above (booking owner, the departure's
+// operator, or staff). Seats a guest holds come back through
+// releaseBookingInventory / the hold sweep instead.
 export async function releaseDepartureSeats(id: string, seats: number): Promise<void> {
   const { error } = await supabase.rpc('vd_release_seats', { p_departure_id: id, p_seats: seats })
   if (error) throw new Error(error.message || 'Could not release seats')

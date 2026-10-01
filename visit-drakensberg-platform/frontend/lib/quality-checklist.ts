@@ -251,7 +251,7 @@ export const MANUAL_CHECKS: ManualCheck[] = [
     id: 'manual-cta',
     category: 'ux',
     label: 'A clear call-to-action is visible above the fold',
-    guidance: 'Every page should direct the visitor to one primary action — book, enquire, or explore more.',
+    guidance: 'Every page should direct the visitor to one primary action: book, enquire, or explore more.',
   },
   {
     id: 'manual-contact',

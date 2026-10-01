@@ -713,10 +713,69 @@ Media Library refuses to delete a file a guide still references
 (`vd_field_guide_media_usage()`). Supabase JS v2 storage exposes no upload
 progress, so the uploader shows an indeterminate state rather than a bar.
 
-### Still open
+### Still open (Field Guide)
 - Layer reordering is arrow-buttons in the stack list; the preview supports
   drag-to-position but the list itself is not drag-sortable.
 - One guide is seeded (`drakensberg-field-guide`) whose main specimen images
   are Unsplash URLs, same as `lib/reserves.ts` and the blog. Replace them
   with cut-out transparent PNGs for the intended look — the detail layers
   already ship as local SVG line art in `frontend/public/field-guide/`.
+
+---
+
+## UPDATE — Vehicle-based activities unlock the transport tools (2026-09-09)
+
+**Branch:** `claude/sani-pass-lesotho-categorization-nylkdu`
+Run `frontend/supabase/migrations/20260909_activity_vehicle_tools.sql`.
+Purely additive — one new function, no schema or table changes.
+
+Came out of "how would we categorise Sani Pass / Lesotho tours". A single-day
+4x4 pass excursion fits the **Activity** model (region: Southern Drakensberg —
+`'sani pass'` is already a `SUBREGION_ALIASES` entry, and `sani-pass` is
+already a `TRANSPORT_AREAS` valley) far better than inventing a walking Trail
+for a drive: `TrailCategory` is a closed `day_hike | multi_day_hike |
+speciality_walk` enum with no vehicle-based option. But an activity supplier
+who drives their own guests still needs the fleet tooling that only the
+`Shuttle` supplier type carries.
+
+- `Activity.usesOwnVehicles?: boolean` — "This activity uses your own
+  vehicles" on the supplier create/edit forms
+  (`components/activities/VehicleToggle.tsx`, shared by both the way
+  `TimeslotEditor` is). Absent on every activity saved before this.
+- Saving with it ticked calls `addSupplierType()` (`lib/supplier-types.ts`)
+  → `vd_add_supplier_type()`, which appends `'Shuttle'` to the supplier's
+  `profiles.supplier_type`. `mergeNavForTypes()` then merges the fleet nav
+  (Transport Company · Transport Jobs · Vehicles · Drivers · Estimator) in
+  beside their Activities nav — the existing multi-type mechanism, no new
+  registration flow.
+- **Only ever adds.** The function validates against the `SupplierType` union
+  and cannot remove a type, so no client write can drop tools a supplier
+  already has or store a nav key that resolves to null. Unticking the box
+  later leaves the tools in place (they may already have live vehicles/jobs);
+  removal stays an admin action.
+- `role` / `is_approved` are untouched — revealing the tools is not approval.
+  Every transport write still passes the same `is_active_supplier()` RLS gate,
+  so an unapproved supplier gains screens, not the ability to publish.
+- Why an RPC when 20260704 already grants self-update on `supplier_type`: an
+  ops employee doing this for a managed supplier is not `auth.uid() = id`, so
+  the "Users can update own profile" policy would match zero rows and fail
+  silently. The function's guard is the `vd_add_supplier_contact` shape
+  (self / `is_managed_supplier` / `is_admin`).
+- Both forms hard-navigate (`window.location.href`) instead of
+  `router.push()` **only** when a type was newly added — `SupplierProvider`
+  reads the profile once on mount, so a client-side route change would leave
+  the just-unlocked nav items hidden until the next full page load. Same
+  reasoning as the existing hard-navigation auth links.
+
+### Still open
+- The dispatch scorer keyword-matches free-text `TransportVehicle.type`
+  (`'4'`, `'van'`, `'shuttle'`, `'minibus'`… — `lib/transport-dispatch.ts:60`),
+  so a Sani Pass operator must literally type "4x4" for their vehicle to score
+  on local/regional trips. A proper vehicle-type dropdown is the fix.
+- `usesOwnVehicles` is supplier-facing only: nothing on `/activities` or
+  `/activities/[id]` surfaces "transport included / vehicle-based" to visitors
+  yet, and the flag does not link the activity to a specific vehicle.
+- Lesotho still has no destination-graph node of its own — it is cross-border
+  content hung off Southern Drakensberg (`lib/destination-ia.ts`), which is
+  fine for Sani Pass day trips but would need revisiting for overnight
+  in-Lesotho products.

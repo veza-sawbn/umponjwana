@@ -1,4 +1,5 @@
 import { supabase } from './auth'
+import { requestUploadUrl, putToSignedUrl } from './applicant-upload'
 
 // Public "list with us" applications (see
 // supabase/migrations/20260807_listing_applications.sql).
@@ -102,6 +103,65 @@ export type ExperienceDetails = {
   setting: string
 }
 
+/* ── Accreditation and compliance ─────────────────────────────────────────
+ *
+ * The verification office cannot validate a listing on the applicant's word,
+ * so the application carries evidence: either an EDTEA tourism operator
+ * registration or CTO membership (one of the two is mandatory — see
+ * ACCREDITATION_DOC_TYPES in lib/compliance.ts), plus public liability cover
+ * and the registration details that let a reviewer confirm the entity is real.
+ *
+ * The certificates themselves are NOT stored here. They go into the private
+ * `compliance` bucket and are registered in vd_compliance_documents; what the
+ * application keeps is the id of that row, so the review queue can find the
+ * document without the application blob ever holding a readable path to
+ * somebody's registration papers.
+ */
+
+export type AccreditationKind = 'edtea' | 'cto'
+
+export const ACCREDITATION_OPTIONS: { id: AccreditationKind; label: string; blurb: string }[] = [
+  {
+    id: 'edtea',
+    label: 'EDTEA operator registration',
+    blurb: 'Registered as a tourism operator with KZN Economic Development, Tourism & Environmental Affairs',
+  },
+  {
+    id: 'cto',
+    label: 'CTO membership',
+    blurb: 'A current member of your local Community Tourism Organisation',
+  },
+]
+
+export type ComplianceDetails = {
+  accreditationKind: AccreditationKind | ''
+  accreditationIssuer: string
+  accreditationNumber: string
+  accreditationExpiry: string
+  /** vd_compliance_documents.id — not a storage path. */
+  accreditationDocId: string
+  accreditationFileName: string
+
+  insurer: string
+  insurancePolicyNumber: string
+  insuranceExpiry: string
+  insuranceDocId: string
+  insuranceFileName: string
+
+  companyRegistrationNumber: string
+  vatNumber: string
+}
+
+export function emptyCompliance(): ComplianceDetails {
+  return {
+    accreditationKind: '', accreditationIssuer: '', accreditationNumber: '',
+    accreditationExpiry: '', accreditationDocId: '', accreditationFileName: '',
+    insurer: '', insurancePolicyNumber: '', insuranceExpiry: '',
+    insuranceDocId: '', insuranceFileName: '',
+    companyRegistrationNumber: '', vatNumber: '',
+  }
+}
+
 export const STAY_ROOM_BANDS = ['1–5', '6–15', '16–40', '40+']
 export const TOUR_STYLES = ['Day hikes', 'Multi-day trekking', 'Summit attempts', 'Cultural & heritage', 'Wildlife & birding']
 export const VEHICLE_TYPES = ['Sedan', 'Minibus (≤14)', 'Coach (15+)', '4×4', 'Trailer / luggage']
@@ -148,6 +208,11 @@ export type CommissionTier = {
   isFloor?: boolean
 }
 
+// Trimmed to three stops — Standard, Premium, Signature — rather than the
+// six-tier ladder this used to be. Ids for the removed tiers ('enhanced',
+// 'priority', 'elite') are still handled gracefully: tierById() falls back to
+// Standard for any id it doesn't recognise, so an application already
+// recorded against one of them still renders instead of crashing.
 export const COMMISSION_TIERS: CommissionTier[] = [
   {
     id: 'standard', name: 'Standard', rate: 12, elevation: '1 200 m', tagline: 'Base camp',
@@ -158,35 +223,11 @@ export const COMMISSION_TIERS: CommissionTier[] = [
     ],
   },
   {
-    id: 'enhanced', name: 'Enhanced', rate: 15, elevation: '1 800 m', tagline: 'Tree line',
-    benefits: [
-      'Improved placement in relevant search results',
-      'Eligible for selected campaigns and newsletters',
-      'Increased promotional exposure',
-    ],
-  },
-  {
-    id: 'priority', name: 'Priority', rate: 18, elevation: '2 400 m', tagline: 'Escarpment',
-    benefits: [
-      'Priority ranking within category and region',
-      'Inclusion in featured accommodation sections',
-      'Greater access to promotional campaigns',
-    ],
-  },
-  {
     id: 'premium', name: 'Premium', rate: 22, elevation: '2 900 m', tagline: 'High plateau',
     benefits: [
       'Homepage features and seasonal campaigns',
       'Curated package inclusion',
       'Dedicated promotional opportunities',
-    ],
-  },
-  {
-    id: 'elite', name: 'Elite', rate: 26, elevation: '3 200 m', tagline: 'Alpine zone',
-    benefits: [
-      'Top-of-category placement',
-      'Cross-platform promotion (social, newsletter takeovers)',
-      'Priority tie-break against lower tiers',
     ],
   },
   {
@@ -238,11 +279,20 @@ export type ListingApplication = {
   // operator adds when they run guided activities alongside the main offering.
   offersActivities: boolean
   activities: ApplicationActivity[]
+  // Accreditation and supporting evidence (see ComplianceDetails)
+  compliance: ComplianceDetails
   // Commercial terms the applicant asked for (see COMMISSION_TIERS — a
   // preference, not a binding rate)
   commissionTier: string
   commissionAcknowledged: boolean
   createdAt: string
+  /**
+   * The supplier account this application was approved into, written by the
+   * approval route. Absent until approved — and the reason the review queue
+   * can still find the applicant's certificates afterwards, since approval
+   * moves them off the application reference and onto the account.
+   */
+  supplierId?: string
 }
 
 export type ListingApplicationDraft = Omit<
@@ -316,119 +366,116 @@ export function normalizeListingApplication(raw: Record<string, unknown>): Omit<
     experience: r.experience ?? emptyExperience(),
     offersActivities: r.offersActivities ?? activities.length > 0,
     activities,
+    // Applications lodged before accreditation was required carry no
+    // compliance block. They read back as an empty one — which the review
+    // queue renders as "no accreditation on file", the right answer for a
+    // row that genuinely has none.
+    compliance: { ...emptyCompliance(), ...(r.compliance ?? {}) },
     commissionTier: r.commissionTier ?? COMMISSION_TIERS[0].id,
     commissionAcknowledged: r.commissionAcknowledged ?? false,
     createdAt: r.createdAt ?? '',
+    supplierId: typeof r.supplierId === 'string' ? r.supplierId : undefined,
   }
-}
-
-/** Short, sayable handle for the applicant to quote when they follow up. */
-function newReference(): string {
-  const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789' // no I/O/0/1
-  let tail = ''
-  for (let i = 0; i < 6; i++) tail += alphabet[Math.floor(Math.random() * alphabet.length)]
-  return `LP-${tail}`
-}
-
-function newId(): string {
-  return typeof crypto !== 'undefined' && 'randomUUID' in crypto
-    ? `lapp-${crypto.randomUUID()}`
-    : `lapp-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`
 }
 
 /**
- * Lodge an application. Resolves with the stored row so the success screen can
- * show the reference; throws with a readable message if the write is refused
- * (most often because the migration has not been run yet).
+ * Short, sayable handle for the applicant to quote when they follow up.
+ *
+ * Exported because the reference is needed *before* the application is
+ * submitted: accreditation certificates upload into
+ * compliance/applications/<reference>/… while the applicant is still filling
+ * the form, so the form mints the reference up front and hands it back on
+ * submit. Defined in lib/listing-application-intake.ts so the server can mint
+ * one too, without importing the browser Supabase client.
  */
-export async function submitListingApplication(draft: ListingApplicationDraft): Promise<ListingApplication> {
-  const application: ListingApplication = {
+export { newApplicationReference } from './listing-application-intake'
+
+/**
+ * Lodge an application. Resolves with the stored row so the success screen can
+ * show the reference; throws with a readable message if the write is refused.
+ *
+ * THIS USED TO INSERT DIRECTLY, AND THAT WAS THE HOLE
+ *   `supabase.from(TABLE).insert(...)` with the anon key, guarded by nothing
+ *   but an RLS clause saying `status = 'new'`. It meant the client chose the
+ *   primary key, the timestamp and the whole `value` blob, and — far worse —
+ *   that anything able to reach PostgREST could lodge applications without
+ *   ever loading this form. In September 2026 something did: 144 applications,
+ *   109 of them scripted.
+ *
+ *   The write now goes through POST /api/listing-applications, which verifies
+ *   a Turnstile token, rate limits per caller and per address, and owns the id
+ *   and status itself. The table no longer accepts anonymous inserts at all
+ *   (20260921_listing_applications_server_only.sql), so this is not a
+ *   politeness the caller can decline.
+ */
+export async function submitListingApplication(
+  draft: ListingApplicationDraft,
+  /** The reference the form already uploaded compliance documents against. */
+  reference?: string,
+  /** Turnstile token from the widget on the last step. */
+  captchaToken?: string,
+): Promise<ListingApplication> {
+  const res = await fetch('/api/listing-applications', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      application: { ...draft, reference },
+      captchaToken,
+    }),
+  })
+
+  if (!res.ok) {
+    let message = 'Could not submit your application. Please try again.'
+    try {
+      const data = await res.json()
+      if (data?.error) message = data.error
+    } catch { /* non-JSON error page; keep the generic message */ }
+    throw new Error(message)
+  }
+
+  const stored = await res.json() as { id: string; reference: string; contactEmail: string }
+
+  // The server owns the id, the reference and the timestamp, so the record
+  // handed back to the success screen is built from what it stored — not from
+  // what this function hoped it would store.
+  return {
     ...draft,
-    id: newId(),
-    reference: newReference(),
+    id: stored.id,
+    reference: stored.reference,
+    contactEmail: stored.contactEmail,
     status: 'new',
     createdAt: new Date().toISOString(),
   }
-
-  const row = {
-    id: application.id,
-    reference: application.reference,
-    status: application.status,
-    // The mirrored name is whatever the applicant calls the thing they are
-    // listing: a stay has a property name, everyone else is known by their
-    // trading name.
-    property_name: application.stay.propertyName || application.tradingName,
-    contact_email: application.contactEmail,
-    region: application.region,
-    value: application,
-  }
-
-  // commission_tier is a mirror of value->>'commissionTier', added by a later
-  // migration than the table itself. Deploys and migrations do not land in
-  // lockstep, so a build carrying the tier can reach a database that has not
-  // run 20260808 yet — and this form is live with real applicants. Mirror it
-  // when the column is there, and fall back to the JSON-only row when it is
-  // not, rather than losing the application over a column that only helps the
-  // review queue sort.
-  let { error } = await supabase.from(TABLE).insert({ ...row, commission_tier: application.commissionTier })
-  if (error && isMissingColumn(error.message, 'commission_tier')) {
-    ({ error } = await supabase.from(TABLE).insert(row))
-  }
-
-  if (error) {
-    const message = String(error.message || '')
-    if (/relation .* does not exist|could not find the table/i.test(message)) {
-      throw new Error(
-        'Listing applications are not set up yet. Run supabase/migrations/20260807_listing_applications.sql in the Supabase SQL editor.',
-      )
-    }
-    throw new Error(message || 'Could not submit your application. Please try again.')
-  }
-
-  return application
-}
-
-/** PostgREST reports an unknown column either from its schema cache or straight from Postgres. */
-function isMissingColumn(message: string | undefined, column: string): boolean {
-  const m = String(message || '')
-  return m.includes(column) && /could not find|does not exist|schema cache/i.test(m)
 }
 
 export const PHOTO_MAX_BYTES = 8 * 1024 * 1024
 export const PHOTO_MAX_COUNT = 8
 
 /**
- * Upload one application photo to media/listing-applications/… and return its
- * public URL. Open to anonymous applicants by design — see the storage policy
- * in 20260807_listing_applications.sql for what that does and does not allow.
+ * Upload one application photo and return its public URL.
+ *
+ * The write used to go straight to storage with the anon key, under a policy
+ * that checked only the first path segment — so anything holding that key
+ * could fill the bucket, from anywhere, without loading this form. It now goes
+ * through a signed upload URL that the server issues only to a caller holding
+ * a valid upload grant, and the server picks the path.
+ *
+ * The limits below are re-checked server-side; these are here so the applicant
+ * finds out before the file leaves their phone.
  */
-export async function uploadApplicationPhoto(file: File): Promise<string> {
+export async function uploadApplicationPhoto(file: File, reference: string): Promise<string> {
   if (!file.type.startsWith('image/')) {
     throw new Error(`${file.name} is not an image.`)
   }
   if (file.size > PHOTO_MAX_BYTES) {
     throw new Error(`${file.name} is larger than ${PHOTO_MAX_BYTES / 1024 / 1024} MB.`)
   }
-  const ext = (file.name.split('.').pop() || 'jpg').toLowerCase().replace(/[^a-z0-9]/g, '') || 'jpg'
-  const path = `listing-applications/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`
-  const { error } = await supabase.storage.from('media').upload(path, file, {
-    contentType: file.type || undefined,
-    cacheControl: '31536000',
-  })
-  if (error) {
-    const message = String((error as { message?: string })?.message || '')
-    if (/row-level security|not authoriz/i.test(message)) {
-      throw new Error(
-        'Photo uploads aren’t enabled yet. Run supabase/migrations/20260807_listing_applications.sql in the Supabase SQL editor.',
-      )
-    }
-    if (/bucket.*not.*found/i.test(message)) {
-      throw new Error('Storage bucket "media" does not exist. Run supabase/migrations/20260719_media_storage.sql first.')
-    }
-    throw new Error(message || 'Upload failed.')
-  }
-  const { data } = supabase.storage.from('media').getPublicUrl(path)
-  return data.publicUrl
+
+  const signed = await requestUploadUrl({ kind: 'photo', reference, file })
+  await putToSignedUrl('media', signed, file)
+
+  if (!signed.publicUrl) throw new Error('Upload failed.')
+  return signed.publicUrl
 }
 
 type Row = { value: Record<string, unknown>; status: string; created_at: string }

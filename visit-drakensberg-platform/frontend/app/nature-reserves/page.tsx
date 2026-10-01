@@ -1,6 +1,7 @@
 'use client'
 import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
+import Image from 'next/image'
 import { ArrowRight, Info, ShieldCheck, Sunrise, Mountain } from 'lucide-react'
 import Footer from '@/components/layout/Footer'
 import EditablePageHeader from '@/components/editor/EditablePageHeader'
@@ -74,9 +75,9 @@ export default function NatureReservesPage() {
               <div className={`grid lg:grid-cols-2 gap-12 lg:gap-20 items-center ${i % 2 === 1 ? 'lg:[direction:rtl]' : ''}`}>
                 {/* Image */}
                 <div className="relative [direction:ltr]">
-                  <div className="aspect-[4/3] overflow-hidden bg-forest/10">
+                  <div className="relative aspect-[4/3] overflow-hidden bg-forest/10">
                     {reserve.image
-                      ? <img src={reserve.image} alt={reserve.name} className="w-full h-full object-cover" />
+                      ? <Image src={reserve.image} alt={reserve.name} fill loading="lazy" sizes="(max-width: 1024px) 100vw, 50vw" className="object-cover" />
                       : <div className="w-full h-full flex items-center justify-center"><Mountain className="w-10 h-10 text-forest/20" /></div>}
                   </div>
                 </div>

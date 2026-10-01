@@ -2,8 +2,10 @@ import type { Metadata } from 'next'
 import { notFound } from 'next/navigation'
 import { getGuideById, type GuideProfile } from '@/lib/operators'
 import { publicSupabase } from '@/lib/supabase-public'
+import { splitGuideName } from '@/lib/guide-profile'
 import GuideDetail from './GuideDetail'
 import TrackView from '@/components/analytics/TrackView'
+import JsonLd from '@/components/seo/JsonLd'
 
 // Server shell — same pattern as the other converted detail routes. Guide
 // profiles are always linked to their supplier (tour operator); the
@@ -24,7 +26,7 @@ export async function generateMetadata({ params }: { params: { id: string } }): 
   const guide = await resolveGuide(params.id)
   if (!guide) return { title: 'Guide Not Found' }
 
-  const title = guide.seoTitle || `${guide.name} — Certified Mountain Guide | Visit Drakensberg`
+  const title = guide.seoTitle || `${guide.name}, Certified Mountain Guide | Visit Drakensberg`
   const description = guide.seoDescription || guide.bio || `${guide.name} is a certified Drakensberg mountain guide${guide.yearsExperience ? ` with ${guide.yearsExperience} years of experience` : ''}.`
   const canonical = `/guides/${guide.slug || guide.id}`
 
@@ -52,6 +54,7 @@ export default async function GuidePage({ params }: { params: { id: string } }) 
     '@context': 'https://schema.org',
     '@type': 'Person',
     name: guide.name,
+    alternateName: splitGuideName(guide.name, guide.knownAs).knownAs || undefined,
     description: guide.seoDescription || guide.bio || undefined,
     image: guide.portrait || undefined,
     url: canonicalUrl,
@@ -77,8 +80,8 @@ export default async function GuidePage({ params }: { params: { id: string } }) 
 
   return (
     <>
-      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(personJsonLd) }} />
-      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbJsonLd) }} />
+      <JsonLd data={personJsonLd} />
+      <JsonLd data={breadcrumbJsonLd} />
       <TrackView event="guide_profile_viewed" properties={{ id: guide.id, name: guide.name }} />
       <GuideDetail guide={guide} />
     </>

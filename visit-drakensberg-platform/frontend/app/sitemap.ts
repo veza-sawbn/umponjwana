@@ -38,6 +38,15 @@ const STATIC_ROUTES = [
   { path: '/mydrakensberg', priority: 0.6 },
   { path: '/about', priority: 0.4 },
   { path: '/list-with-us', priority: 0.4 },
+  // The supplier documents an operator is asked to accept, and the concern
+  // channel the Code of Conduct points people at. Indexed on purpose: a
+  // business deciding whether to list should be able to read the terms
+  // before starting the form, and find the concern channel without one.
+  // (Neither is blocked by robots.ts — the /supplier/ disallow carries a
+  // trailing slash, so it does not match /supplier-terms.)
+  { path: '/supplier-terms', priority: 0.3 },
+  { path: '/supplier-code-of-conduct', priority: 0.3 },
+  { path: '/report-a-concern', priority: 0.3 },
   { path: '/privacy', priority: 0.2 },
   { path: '/terms', priority: 0.2 },
 ]

@@ -2,7 +2,9 @@ import type { Metadata } from 'next'
 import { notFound } from 'next/navigation'
 import { getExperienceById, type TrekkingExperience } from '@/lib/experiences'
 import { publicSupabase } from '@/lib/supabase-public'
+import { isOnOrAfterToday } from '@/lib/upcoming'
 import ExperienceDetail from './ExperienceDetail'
+import JsonLd from '@/components/seo/JsonLd'
 
 // Server shell — same pattern as the other converted detail routes. An
 // experience is a derived/composite view (Departure + Tour + Trail +
@@ -45,10 +47,10 @@ export async function generateMetadata({ params }: { params: { id: string } }): 
   const exp = await resolveExperience(params.id)
   if (!exp) return { title: 'Experience Not Found' }
 
-  const title = `${exp.title} — ${formatDateShort(exp.departureDate)} | Visit Drakensberg`
+  const title = `${exp.title}, ${formatDateShort(exp.departureDate)} | Visit Drakensberg`
   const description = `${exp.durationDays} day${exp.durationDays !== 1 ? 's' : ''} guided departure on ${exp.trailName || 'the trail'} with ${exp.operator}, departing ${formatDateShort(exp.departureDate)}. ${exp.description || ''}`.trim().slice(0, 160)
   const canonical = `/experiences/${exp.id}`
-  const isPast = new Date(exp.departureDate) < new Date()
+  const isPast = !isOnOrAfterToday(exp.departureDate)
 
   return {
     title: { absolute: title },
@@ -101,8 +103,8 @@ export default async function ExperiencePage({ params }: { params: { id: string 
 
   return (
     <>
-      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(eventJsonLd) }} />
-      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbJsonLd) }} />
+      <JsonLd data={eventJsonLd} />
+      <JsonLd data={breadcrumbJsonLd} />
       <ExperienceDetail exp={exp} />
     </>
   )

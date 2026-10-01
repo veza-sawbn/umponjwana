@@ -55,7 +55,7 @@ export default function MyRequestsPage() {
     setBusy(r.id)
     try {
       replace(await acceptQuote(r))
-      toast.success('Quote accepted — please complete payment.')
+      toast.success('Quote accepted. Please complete payment.')
     } catch (e) {
       toast.error(e instanceof Error ? e.message : 'Could not accept the quote. Please try again.')
     } finally { setBusy(null) }
@@ -67,7 +67,7 @@ export default function MyRequestsPage() {
   // payment actually went through (see app/api/payments/ikhokha/webhook).
   async function handlePay(r: TripRequest) {
     if (!r.bookingId) {
-      toast.error('This request has no payment set up yet — please contact us to arrange payment.')
+      toast.error('This request has no payment set up yet. Please contact us to arrange payment.')
       return
     }
     setBusy(r.id)

@@ -101,7 +101,7 @@ export default function AvailabilityPage() {
         <div className="bg-white rounded-xl border border-black/8 p-6 space-y-4">
           <p className="font-sans font-semibold text-black/80">Block a Date Range</p>
           {listings.length === 0 && !loading && (
-            <p className="font-sans text-sm text-black/40">You have no listings yet — create a listing first, then block dates on it.</p>
+            <p className="font-sans text-sm text-black/40">You have no listings yet. Create a listing first, then block dates on it.</p>
           )}
           <div className="grid grid-cols-2 gap-4">
             <div className="col-span-2 space-y-1.5">
@@ -139,7 +139,7 @@ export default function AvailabilityPage() {
           <thead><tr className="border-b border-black/6">{['Listing', 'From', 'To', 'Reason', ''].map((h, i) => <th key={i} className="px-4 py-3 text-left font-sans text-xs font-semibold text-black/40 uppercase tracking-wider">{h}</th>)}</tr></thead>
           <tbody>
             {loading && <tr><td colSpan={5} className="px-4 py-10 text-center font-sans text-sm text-black/30">Loading…</td></tr>}
-            {!loading && blocks.length === 0 && <tr><td colSpan={5} className="px-4 py-10 text-center font-sans text-sm text-black/30">No blocked dates — your listings are bookable on all dates.</td></tr>}
+            {!loading && blocks.length === 0 && <tr><td colSpan={5} className="px-4 py-10 text-center font-sans text-sm text-black/30">No blocked dates. Your listings are bookable on all dates.</td></tr>}
             {blocks.map((b, i) => (
               <tr key={b.id} className={i < blocks.length - 1 ? 'border-b border-black/5' : ''}>
                 <td className="px-4 py-3 font-sans text-sm text-black/80 max-w-[180px] truncate">{b.listing}</td>

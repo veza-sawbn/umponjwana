@@ -10,6 +10,7 @@ import {
 import type { TrekkingExperience } from '@/lib/experiences'
 import { StayDistance } from '@/lib/stay-distance'
 import { formatMoney } from '@/lib/allocation'
+import SaveButton from '@/components/ui/SaveButton'
 
 // "Upcoming Trekking Experiences" — the marketplace extension of a hiking
 // trail page. The trail remains the primary content; these are the commercial
@@ -179,6 +180,18 @@ export default function TrailExperiences({
                         Compare
                       </label>
                     )}
+                    <SaveButton
+                      variant="inline"
+                      className="!py-2.5"
+                      listing={{
+                        id: e.id,
+                        type: 'experience',
+                        title: e.title,
+                        location: e.region || e.meetingPoint,
+                        price: e.pricePerPerson,
+                        rating: e.rating ?? undefined,
+                      }}
+                    />
                     <Link
                       href={`/experiences/${e.id}`}
                       className="font-sans text-sm px-5 py-2.5 bg-[#2d6a4f] text-white hover:bg-[#235a3f] transition-colors"

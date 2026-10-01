@@ -1,5 +1,6 @@
 import { supabase } from './auth'
 import type { SupabaseClient } from '@supabase/supabase-js'
+import { imagePositionToCss } from './image-position'
 
 export type Subregion = { id: string; name: string; description: string }
 
@@ -16,6 +17,9 @@ export type Region = {
   name: string
   tagline: string
   heroImage: string
+  /** Focal point the hero crops around (lib/image-position.ts). Empty = centred,
+   *  which is what regions saved before this field existed keep doing. */
+  heroImagePosition?: string
   heroVideo: string
   overview: string
   highlights: string[]
@@ -47,7 +51,7 @@ export const DEFAULT_REGIONS: Region[] = [
     tagline: 'Royal Natal National Park · Amphitheatre',
     heroImage: 'https://images.unsplash.com/photo-1590098563548-8f14eed3a47f?w=1200&q=85',
     heroVideo: '',
-    overview: 'The Amphitheatre — a 5 km sheer basalt cliff — anchors the Northern Drakensberg. The Tugela River drops 948 metres over five falls here, making it the second highest waterfall on Earth. Royal Natal National Park offers some of the most dramatic scenery in Africa.',
+    overview: 'The Amphitheatre, a 5 km sheer basalt cliff, anchors the Northern Drakensberg. The Tugela River drops 948 metres over five falls here, making it the second highest waterfall on Earth. Royal Natal National Park offers some of the most dramatic scenery in Africa.',
     highlights: ['Tugela Falls Circuit', 'Amphitheatre via Chain Ladder', 'Policemans Helmet', 'Mont-aux-Sources'],
     gettingThere: '',
     gettingThereSections: [],
@@ -170,6 +174,7 @@ function normalizeRegion(region: Partial<Region> & { name: string; id?: string }
     name: region.name,
     tagline: region.tagline || '',
     heroImage: region.heroImage || '',
+    heroImagePosition: region.heroImagePosition ? imagePositionToCss(region.heroImagePosition) : '',
     heroVideo: region.heroVideo || '',
     overview: region.overview || '',
     highlights: region.highlights || [],
@@ -192,6 +197,21 @@ async function saveRegions(regions: Region[]) {
     { onConflict: 'key' },
   )
   if (error) throw error
+}
+
+// /regions/[slug] (1hr ISR) and /regions/[slug]/[season] (15min ISR) both
+// depend on this content, so an admin's edit wouldn't reach visitors until
+// that cache window happened to expire. Best-effort and non-blocking — a
+// failed revalidate (e.g. offline) still leaves the save itself intact,
+// just stale until the cache naturally expires. Same pattern as
+// lib/activities.ts's revalidateActivityPage.
+function revalidateRegionPage(slug: string): void {
+  if (typeof fetch !== 'function' || !slug) return
+  fetch('/api/revalidate/region', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ slug }),
+  }).catch(() => {})
 }
 
 // Accepts an optional Supabase client so Server Components can pass a
@@ -232,7 +252,9 @@ export async function getRegionNames(): Promise<string[]> {
  */
 export async function saveAllRegions(regions: Region[]): Promise<void> {
   const now = new Date().toISOString()
-  await saveRegions(regions.map(r => normalizeRegion({ ...r, updatedAt: r.updatedAt ?? now })))
+  const normalized = regions.map(r => normalizeRegion({ ...r, updatedAt: r.updatedAt ?? now }))
+  await saveRegions(normalized)
+  for (const r of normalized) revalidateRegionPage(r.slug)
 }
 
 export async function createRegion(data: Omit<Region, 'id' | 'slug' | 'createdAt' | 'updatedAt'>): Promise<Region> {
@@ -240,6 +262,7 @@ export async function createRegion(data: Omit<Region, 'id' | 'slug' | 'createdAt
   const now = new Date().toISOString()
   const item = normalizeRegion({ ...data, createdAt: now, updatedAt: now })
   await saveRegions([...all.filter(region => region.slug !== item.slug), item])
+  revalidateRegionPage(item.slug)
   return item
 }
 
@@ -251,10 +274,13 @@ export async function updateRegion(id: string, data: Omit<Region, 'id' | 'slug' 
   // canonical URL a previous normalizeRegion() call already committed to.
   const updated = normalizeRegion({ ...data, id, slug: previous?.slug, createdAt: previous?.createdAt, updatedAt: new Date().toISOString() })
   await saveRegions(all.map(region => region.id === id ? updated : region))
+  revalidateRegionPage(updated.slug)
   return updated
 }
 
 export async function deleteRegion(id: string): Promise<void> {
   const all = await getRegions()
+  const removed = all.find(region => region.id === id)
   await saveRegions(all.filter(region => region.id !== id))
+  if (removed) revalidateRegionPage(removed.slug)
 }

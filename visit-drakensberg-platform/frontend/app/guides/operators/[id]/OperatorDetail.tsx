@@ -2,13 +2,16 @@
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
+import Image from 'next/image'
 import Footer from '@/components/layout/Footer'
 import {
-  ArrowLeft, Building2, MapPin, Star, Award, Globe, Shield, Siren,
+  ArrowLeft, Building2, MapPin, Award, Globe, Shield, Siren,
   Backpack, UserCircle, Calendar, CheckCircle,
 } from 'lucide-react'
 import { getGuidesByOperator, type OperatorProfile, type GuideProfile } from '@/lib/operators'
+import GuideTeamCarousel from '@/components/guides/GuideTeamCarousel'
 import { getUpcomingExperiences, type TrekkingExperience } from '@/lib/experiences'
+import { publicSupabase } from '@/lib/supabase-public'
 import { formatMoney } from '@/lib/allocation'
 
 function formatDate(iso: string) {
@@ -27,8 +30,11 @@ export default function OperatorDetail({ operator }: { operator: OperatorProfile
   const [departures, setDepartures] = useState<TrekkingExperience[]>([])
 
   useEffect(() => {
-    getGuidesByOperator(operator).then(setGuides)
-    getUpcomingExperiences().then(exps =>
+    // publicSupabase (session-less) — matches the server shell's own read, so
+    // a signed-in admin or ops session sees the same page a visitor does
+    // rather than one including suspended suppliers. See lib/supabase-public.ts.
+    getGuidesByOperator(operator, publicSupabase).then(setGuides)
+    getUpcomingExperiences(publicSupabase).then(exps =>
       setDepartures(operator.supplierId ? exps.filter(e => e.operatorId === operator.supplierId) : [])
     )
   }, [operator])
@@ -41,9 +47,9 @@ export default function OperatorDetail({ operator }: { operator: OperatorProfile
             <ArrowLeft size={16} /> Guides & Tour Operators
           </Link>
           <div className="flex items-end gap-8 flex-wrap">
-            <div className="w-24 h-24 bg-white/10 flex items-center justify-center shrink-0 overflow-hidden">
+            <div className="relative w-24 h-24 bg-white/10 flex items-center justify-center shrink-0 overflow-hidden">
               {operator.logo
-                ? <img src={operator.logo} alt={operator.companyName} className="w-full h-full object-cover" />
+                ? <Image src={operator.logo} alt={operator.companyName} fill sizes="96px" className="object-cover" />
                 : <Building2 size={32} className="text-white/50" />}
             </div>
             <div>
@@ -82,30 +88,7 @@ export default function OperatorDetail({ operator }: { operator: OperatorProfile
               {guides.length === 0 ? (
                 <p className="font-sans text-sm text-gray-400 bg-white border border-gray-200 p-5">No verified guides listed yet.</p>
               ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  {guides.map(g => (
-                    <Link key={g.id} href={`/guides/${g.id}`} className="bg-white border border-gray-200 p-5 hover:border-[#2d6a4f] transition-colors block">
-                      <div className="flex items-start gap-3">
-                        <div className="w-12 h-12 bg-[#2d6a4f] text-white flex items-center justify-center font-display italic shrink-0 overflow-hidden">
-                          {g.portrait
-                            ? <img src={g.portrait} alt={g.name} className="w-full h-full object-cover" />
-                            : g.name.split(' ').map(n => n[0]).join('')}
-                        </div>
-                        <div className="min-w-0">
-                          <p className="font-display italic text-lg leading-tight">{g.name}</p>
-                          <p className="font-sans text-xs text-gray-400 mt-0.5">{g.certs}</p>
-                          <div className="flex items-center gap-3 mt-1 font-sans text-xs text-gray-500 flex-wrap">
-                            {g.yearsExperience ? <span>{g.yearsExperience} yrs experience</span> : null}
-                            {g.rating > 0 && (
-                              <span className="flex items-center gap-1 text-[#C9A96E]"><Star size={10} className="fill-[#C9A96E]" /> {g.rating}</span>
-                            )}
-                          </div>
-                          <span className="font-sans text-xs text-[#2d6a4f] mt-1.5 inline-block">View Profile →</span>
-                        </div>
-                      </div>
-                    </Link>
-                  ))}
-                </div>
+                <GuideTeamCarousel guides={guides} />
               )}
             </div>
 
@@ -139,7 +122,7 @@ export default function OperatorDetail({ operator }: { operator: OperatorProfile
             <div>
               <h2 className="font-display italic text-2xl text-[#000000] mb-6">Customer Reviews</h2>
               <div className="bg-white border border-gray-200 p-8 text-center">
-                <p className="font-sans text-sm text-gray-400">No reviews yet — be the first to book and share your experience.</p>
+                <p className="font-sans text-sm text-gray-400">No reviews yet. Be the first to book and share your experience.</p>
               </div>
             </div>
           </div>

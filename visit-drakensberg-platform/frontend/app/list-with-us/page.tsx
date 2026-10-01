@@ -2,23 +2,37 @@
 
 import { Fragment, useCallback, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
+import Image from 'next/image'
 import {
   ArrowLeft, ArrowRight, Check, CheckCircle, ChevronRight, ImageIcon, Info, Loader2,
   Lock, Plus, Shield, Trash2, Upload, X,
 } from 'lucide-react'
 import Footer from '@/components/layout/Footer'
 import { supabase } from '@/lib/auth'
+import { captchaOptions } from '@/lib/turnstile'
+import { requestUploadGrant, NeedsUploadGrantError } from '@/lib/applicant-upload'
 import { getRegionNames } from '@/lib/regions'
 import { PROPERTY_REGIONS, PROPERTY_TYPES, PROPERTY_AMENITIES } from '@/lib/properties'
 import { ACTIVITY_CATEGORIES, ACTIVITY_DIFFICULTIES, ACTIVITY_INCLUSIONS } from '@/lib/activities'
 import { formatMoney } from '@/lib/allocation'
 import {
   submitListingApplication, uploadApplicationPhoto, emptyActivity, tierById,
-  emptyStay, emptyTour, emptyShuttle, emptyExperience,
+  emptyStay, emptyTour, emptyShuttle, emptyExperience, emptyCompliance,
+  newApplicationReference,
   APPLICANT_TYPES, STAY_ROOM_BANDS, TOUR_STYLES, VEHICLE_TYPES, EXPERIENCE_SETTINGS,
+  ACCREDITATION_OPTIONS,
   COMMISSION_TIERS, COMMISSION_MIN_RATE, COMMISSION_MAX_RATE, PHOTO_MAX_COUNT,
-  type ApplicationActivity, type ListingApplicationDraft,
+  type ApplicationActivity, type ListingApplicationDraft, type AccreditationKind,
 } from '@/lib/listing-applications'
+import { uploadComplianceDocument, expiryState, COMPLIANCE_MAX_BYTES } from '@/lib/compliance'
+import Turnstile, {
+  captchaBlocked,
+  turnstileErrorMessage,
+  TURNSTILE_FAILED_MESSAGE,
+  TURNSTILE_PENDING_MESSAGE,
+  type TurnstileHandle,
+} from '@/components/security/Turnstile'
+import { recordBothAcceptances, SUPPLIER_TERMS_VERSION, CODE_OF_CONDUCT_VERSION } from '@/lib/supplier-agreement'
 
 // Public front door for every kind of operator — stays, activities, guided
 // tours, shuttles and experiences. The supplier portal's wizards sit behind an
@@ -31,11 +45,25 @@ import {
 // who you are, where you are, what it looks like, what commission you want —
 // is the same whether you run a lodge or a minibus.
 
-const STEPS = ['Basics', 'Offering', 'Commission', 'Review'] as const
+const STEPS = ['Basics', 'Offering', 'Accreditation', 'Commission', 'Review'] as const
+
+// Named rather than numbered: the accreditation step was inserted in the
+// middle, and every `step === n` in this file would otherwise be one off.
+const STEP_BASICS = 0
+const STEP_OFFERING = 1
+const STEP_ACCREDITATION = 2
+const STEP_COMMISSION = 3
+const STEP_REVIEW = 4
 
 const CONTACT_ROLES = ['Owner', 'Manager', 'Marketing / Reservations', 'Appointed agent']
 
 const DRAFT_KEY = 'vd:listing-application:draft'
+// The application reference is minted before submission, because compliance
+// certificates upload into compliance/applications/<reference>/… while the
+// applicant is still filling the form. Kept beside the draft so a refresh
+// doesn't strand documents under a reference the submitted application no
+// longer carries.
+const REF_KEY = 'vd:listing-application:ref'
 
 const inputCls =
   'w-full border border-gray-200 px-3 py-2.5 font-sans text-sm text-black placeholder:text-gray-300 focus:outline-none focus:border-[#2d6a4f] bg-white'
@@ -50,6 +78,7 @@ const EMPTY_DRAFT: Draft = {
   tradingName: '', region: '', baseTown: '', description: '', photos: [],
   stay: emptyStay(), tour: emptyTour(), shuttle: emptyShuttle(), experience: emptyExperience(),
   offersActivities: false, activities: [],
+  compliance: emptyCompliance(),
   commissionTier: COMMISSION_TIERS[0].id, commissionAcknowledged: false,
 }
 
@@ -64,16 +93,79 @@ export default function ListWithUsPage() {
   const [submitting, setSubmitting] = useState(false)
   const [done, setDone] = useState<{ reference: string; email: string } | null>(null)
   const [draftSavedAt, setDraftSavedAt] = useState<Date | null>(null)
+  const [applicationRef, setApplicationRef] = useState('')
+  const [uploadingDoc, setUploadingDoc] = useState<'accreditation' | 'insurance' | null>(null)
   const restored = useRef(false)
   // Password fields — deliberately kept out of the localStorage draft.
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
   // Whether the visitor already has a session (skip signUp on submit).
   const [isSignedIn, setIsSignedIn] = useState(false)
+  // Turnstile. This is the form the September 2026 flood came through — 144
+  // applications, 109 of them scripted. Two things on this page need a token
+  // and a token is redeemable once, so submit() spends one on the signup and
+  // asks the widget for a second for the application itself. Required whether
+  // or not there is a session: a signed-in applicant skips the signup but
+  // still has to get past POST /api/listing-applications.
+  const [captchaToken, setCaptchaToken] = useState('')
+  const turnstile = useRef<TurnstileHandle>(null)
+
+  // A second, separate widget on step 1, whose token is traded for the upload
+  // grant. Separate rather than shared because the step-5 widget does not
+  // exist while the applicant is on step 1 uploading photos, and because both
+  // tokens are spent on different things.
+  const grantTurnstile = useRef<TurnstileHandle>(null)
+  const [grantState, setGrantState] = useState<'idle' | 'ready' | 'failed'>('idle')
+  // WHY THIS IS A MESSAGE AND NOT A BOOLEAN
+  //   Two completely different things land on "failed" here — the Turnstile
+  //   widget itself erroring (wrong domain for the sitekey, script blocked),
+  //   and our own grant route refusing the token it produced (no secret key,
+  //   no service-role key, rate limited). They have different fixes and
+  //   different owners, and a single sentence covering both sent somebody
+  //   reloading a preview deployment that was never going to work. Whatever
+  //   actually failed now says so.
+  const [grantError, setGrantError] = useState('')
 
   const set = useCallback(<K extends keyof Draft>(key: K, value: Draft[K]) => {
     setForm(f => ({ ...f, [key]: value }))
   }, [])
+
+  // Trade the step-1 token for the upload grant as soon as the widget solves,
+  // so the photo control on step 2 just works rather than stopping to ask.
+  const onGrantToken = useCallback(async (token: string) => {
+    if (!token || !applicationRef) return
+    try {
+      await requestUploadGrant(applicationRef, token)
+      setGrantState('ready')
+      setGrantError('')
+    } catch (e) {
+      // Not fatal: the application itself submits without attachments, and
+      // saying so is better than blocking someone whose certificate upload
+      // would have failed anyway. The widget solved, so this is our end —
+      // report what the route said rather than blaming the security check.
+      setGrantState('failed')
+      setGrantError(e instanceof Error ? e.message : 'Could not enable uploads.')
+    }
+  }, [applicationRef])
+
+  // An upload that comes back "needs a grant" means the two-hour window
+  // lapsed while the form was open. Ask the widget for a fresh token and
+  // trade it, rather than making the applicant reload and lose the draft.
+  const renewGrant = useCallback(async (): Promise<boolean> => {
+    if (!applicationRef) return false
+    try {
+      const token = await grantTurnstile.current?.refresh()
+      if (!token) return false
+      await requestUploadGrant(applicationRef, token)
+      setGrantState('ready')
+      setGrantError('')
+      return true
+    } catch (e) {
+      setGrantState('failed')
+      setGrantError(e instanceof Error ? e.message : 'Could not renew the upload permission.')
+      return false
+    }
+  }, [applicationRef])
 
   // A validation message names a field; once that field is being edited the
   // message is stale, so it clears on the next keystroke rather than sitting
@@ -101,6 +193,24 @@ export default function ListWithUsPage() {
         }))
       }
     } catch {}
+
+    // Reuse the reference from an interrupted session so already-uploaded
+    // certificates stay attached; mint one otherwise.
+    try {
+      const storedRef = localStorage.getItem(REF_KEY)
+      if (storedRef) {
+        setApplicationRef(storedRef)
+      } else {
+        const fresh = newApplicationReference()
+        localStorage.setItem(REF_KEY, fresh)
+        setApplicationRef(fresh)
+      }
+    } catch {
+      // Private browsing with storage blocked: still needs a reference to
+      // upload against, it just won't survive a refresh.
+      setApplicationRef(newApplicationReference())
+    }
+
     restored.current = true
 
     getRegionNames().then(setRegions).catch(() => {})
@@ -131,18 +241,19 @@ export default function ListWithUsPage() {
   }, [form, done])
 
   /* ── Field helpers ───────────────────────────────────────────────────── */
-  function toggleType(id: string) {
+  // Exactly one operator type per application — a business that runs both a
+  // lodge and a shuttle service applies twice rather than blending two very
+  // different reviews (and two very different commission conversations) into
+  // one form.
+  function selectType(id: string) {
     setForm(f => {
-      const on = f.supplierTypes.includes(id)
-      const supplierTypes = on ? f.supplierTypes.filter(t => t !== id) : [...f.supplierTypes, id]
-      // Picking "Activities" as a core offering seeds the first activity row;
-      // the optional add-on toggle is then redundant and goes away.
-      const seedActivity = id === 'Activity' && !on && f.activities.length === 0
+      if (f.supplierTypes[0] === id) return f
+      // Picking "Activities" seeds the first activity row.
+      const seedActivity = id === 'Activity' && f.activities.length === 0
       return {
         ...f,
-        supplierTypes,
+        supplierTypes: [id],
         activities: seedActivity ? [emptyActivity()] : f.activities,
-        offersActivities: supplierTypes.includes('Activity') ? false : f.offersActivities,
       }
     })
   }
@@ -158,6 +269,68 @@ export default function ListWithUsPage() {
   }
   function setExperience<K extends keyof Draft['experience']>(k: K, v: Draft['experience'][K]) {
     setForm(f => ({ ...f, experience: { ...f.experience, [k]: v } }))
+  }
+  function setCompliance<K extends keyof Draft['compliance']>(k: K, v: Draft['compliance'][K]) {
+    setForm(f => ({ ...f, compliance: { ...f.compliance, [k]: v } }))
+  }
+
+  /**
+   * Upload one certificate into the private compliance bucket and hang its
+   * registry id on the draft. Errors surface in the form's own error strip
+   * rather than a toast — the applicant has to be able to act on them, and
+   * this step is the one that gates the whole application.
+   */
+  async function uploadDoc(slot: 'accreditation' | 'insurance', file: File) {
+    if (!applicationRef) {
+      setError('The form is still loading. Please try that again in a moment.')
+      return
+    }
+    if (file.size > COMPLIANCE_MAX_BYTES) {
+      setError(`${file.name} is larger than ${COMPLIANCE_MAX_BYTES / 1024 / 1024} MB. Send a smaller scan.`)
+      return
+    }
+    setUploadingDoc(slot)
+    setError('')
+    const send = () => uploadComplianceDocument({
+      file,
+      applicationRef,
+      docType: slot === 'accreditation'
+        ? (form.compliance.accreditationKind === 'cto' ? 'cto_membership' : 'edtea_registration')
+        : 'public_liability_insurance',
+      issuer: slot === 'accreditation' ? form.compliance.accreditationIssuer : form.compliance.insurer,
+      referenceNumber: slot === 'accreditation'
+        ? form.compliance.accreditationNumber
+        : form.compliance.insurancePolicyNumber,
+      expiresOn: slot === 'accreditation'
+        ? form.compliance.accreditationExpiry || null
+        : form.compliance.insuranceExpiry || null,
+    })
+    try {
+      let doc
+      try {
+        doc = await send()
+      } catch (e) {
+        // The two-hour grant lapsed while the form sat open. Renew it and try
+        // once more rather than making someone who has filled in four steps
+        // reload and start again.
+        if (!(e instanceof NeedsUploadGrantError) || !(await renewGrant())) throw e
+        doc = await send()
+      }
+      setForm(f => ({
+        ...f,
+        compliance: slot === 'accreditation'
+          ? { ...f.compliance, accreditationDocId: doc.id, accreditationFileName: file.name }
+          : { ...f.compliance, insuranceDocId: doc.id, insuranceFileName: file.name },
+      }))
+    } catch (e) {
+      setError(
+        e instanceof NeedsUploadGrantError
+          ? 'The security check has expired. Go back to the first step, complete it again, then retry this upload.'
+          : e instanceof Error ? e.message : 'That upload failed. Please try again.',
+      )
+    } finally {
+      setUploadingDoc(null)
+    }
   }
 
   function toggleAmenity(a: string) {
@@ -211,25 +384,26 @@ export default function ListWithUsPage() {
     }))
   }
 
-  // Activities appear either as the core offering or as an add-on a stay or
-  // tour operator switches on.
-  const activitiesShown = has('Activity') || form.offersActivities
-  const activityAddOnOffered = !has('Activity') && (has('Accommodation') || has('Guided Tours') || has('Experience'))
+  // Single-select means Activity is mutually exclusive with every other
+  // type, so there is no longer a separate "add activities alongside your
+  // main offering" path — the activities card only ever appears for an
+  // applicant whose one selected type is Activity.
+  const activitiesShown = has('Activity')
 
   /* ── Step flow ───────────────────────────────────────────────────────── */
   function validate(current: number): string {
-    if (current === 0) {
+    if (current === STEP_BASICS) {
       if (!form.contactName.trim()) return 'Tell us who we should speak to.'
       if (!/^\S+@\S+\.\S+$/.test(form.contactEmail.trim())) return 'Enter a valid email address.'
       if (!form.businessName.trim()) return 'Enter the registered or trading name of the business.'
       // Password only required when creating a new account
       if (!isSignedIn) {
         if (password.length < 8) return 'Your password must be at least 8 characters.'
-        if (password !== confirmPassword) return 'Passwords do not match — please re-enter.'
+        if (password !== confirmPassword) return 'Those passwords do not match. Please re-enter them.'
       }
-      if (form.supplierTypes.length === 0) return 'Choose at least one thing you operate.'
+      if (form.supplierTypes.length === 0) return 'Choose what you operate.'
     }
-    if (current === 1) {
+    if (current === STEP_OFFERING) {
       if (!form.region) return 'Choose the region you operate in.'
       if (form.description.trim().length < 40) return 'Give us at least a sentence or two about what you offer.'
       if (has('Accommodation')) {
@@ -246,16 +420,31 @@ export default function ListWithUsPage() {
       }
       if (activitiesShown) {
         const named = form.activities.filter(a => a.name.trim())
-        if (named.length === 0) {
-          return has('Activity')
-            ? 'Add at least one activity.'
-            : 'Add at least one activity, or switch guided activities off.'
-        }
+        if (named.length === 0) return 'Add at least one activity.'
         const incomplete = named.find(a => !a.category || !a.pricePerPerson.trim())
         if (incomplete) return `“${incomplete.name}” still needs a category and a price per person.`
       }
     }
-    if (current === 2 && !form.commissionAcknowledged) {
+    if (current === STEP_ACCREDITATION) {
+      const c = form.compliance
+      // The either/or rule (lib/compliance.ts ACCREDITATION_DOC_TYPES, and
+      // vd_accreditation_ok() in the migration). The form checks a document
+      // was *submitted*; the verification office decides whether it counts.
+      if (!c.accreditationKind) return 'Choose whether you are EDTEA registered or a CTO member.'
+      if (!c.accreditationIssuer.trim()) {
+        return c.accreditationKind === 'cto'
+          ? 'Tell us which Community Tourism Organisation you belong to.'
+          : 'Tell us which EDTEA office issued your registration.'
+      }
+      if (!c.accreditationNumber.trim()) return 'Enter the number printed on your certificate.'
+      if (!c.accreditationDocId) return 'Please upload your certificate. We cannot verify a listing without it.'
+      // Same helper the verification office reads expiry through, so the form
+      // and the review queue cannot disagree about what "expired" means.
+      if (expiryState(c.accreditationExpiry) === 'expired') {
+        return 'That certificate has already expired. Upload a current one.'
+      }
+    }
+    if (current === STEP_COMMISSION && !form.commissionAcknowledged) {
       return 'Please accept the commission terms for the tier you picked.'
     }
     return ''
@@ -291,10 +480,20 @@ export default function ListWithUsPage() {
       const problem = validate(i)
       if (problem) { setStep(i); setError(problem); return }
     }
-    if (!consent) { setError('Please confirm you are authorised to list this business.'); return }
+    if (!consent) {
+      setError('Please confirm you are authorised to list this business and accept the supplier documents.')
+      return
+    }
+    if (captchaBlocked(captchaToken)) {
+      setError(TURNSTILE_PENDING_MESSAGE)
+      return
+    }
 
     setSubmitting(true)
     setError('')
+    // The token the application itself is submitted with. It starts as the one
+    // on screen and is replaced after the signup, which redeems it.
+    let applicationToken = captchaToken
     try {
       // ── Step 1: create the supplier account if not already signed in ──────
       // role: 'supplier' is the one elevated value a signup payload may ask
@@ -310,10 +509,15 @@ export default function ListWithUsPage() {
               role: 'supplier',
               supplier_type: form.supplierTypes.join(','),
             },
+            ...captchaOptions(captchaToken),
           },
         })
         if (signUpError) {
           const msg = signUpError.message.toLowerCase()
+          // Either way out of this branch burns the captcha token: Supabase
+          // redeems it before it looks at the email, so the retry the message
+          // below asks for needs a fresh challenge.
+          turnstile.current?.reset()
           if (msg.includes('already registered') || msg.includes('already been registered')) {
             setError(
               'This email address already has an account. Sign in first, then return here to submit your application. If you forgot your password, use the "Forgot password" link on the sign-in page.',
@@ -323,9 +527,46 @@ export default function ListWithUsPage() {
           }
           throw signUpError
         }
+
+        // Supabase has just redeemed the token. POST /api/listing-applications
+        // needs an unspent one, and replaying this would be refused as already
+        // used — so ask the widget for the next one. A managed widget
+        // re-solves without interaction; if Cloudflare wants a click instead,
+        // refresh() times out rather than hanging, and the applicant gets a
+        // message they can act on with the form still filled in.
+        try {
+          applicationToken = (await turnstile.current?.refresh()) ?? ''
+        } catch {
+          setError('The security check needs completing again before we can submit this. Please complete it below and press Submit.')
+          setSubmitting(false)
+          return
+        }
       }
 
-      // ── Step 2: submit the listing application ────────────────────────────
+      // ── Step 2: record what was accepted, and which version ───────────────
+      // Before the application, so that an application on file always has an
+      // acceptance behind it rather than the other way round. Never blocks
+      // the submission: recordBothAcceptances logs and returns false rather
+      // than throwing (see its comment), and a missing acceptance shows up in
+      // the review queue where a human can chase it.
+      const acceptancesRecorded = await recordBothAcceptances({
+        applicationRef,
+        name: form.contactName.trim(),
+        email: form.contactEmail.trim().toLowerCase(),
+        role: form.contactRole,
+        // The rate as displayed at this moment — a later edit to
+        // COMMISSION_TIERS must not be able to rewrite what was agreed.
+        terms: {
+          commissionTier: form.commissionTier,
+          commissionRate: tierById(form.commissionTier).rate,
+          tierName: tierById(form.commissionTier).name,
+        },
+      })
+      if (!acceptancesRecorded) {
+        console.error('[list-with-us] acceptance record failed for', applicationRef)
+      }
+
+      // ── Step 3: submit the listing application ────────────────────────────
       const application = await submitListingApplication({
         ...form,
         contactName: form.contactName.trim(),
@@ -336,11 +577,17 @@ export default function ListWithUsPage() {
         baseTown: form.baseTown.trim(),
         description: form.description.trim(),
         stay: { ...form.stay, propertyName: form.stay.propertyName.trim(), elevation: form.stay.elevation.trim() },
+        offersActivities: activitiesShown,
         activities: activitiesShown
           ? form.activities.filter(a => a.name.trim()).map(a => ({ ...a, name: a.name.trim() }))
           : [],
-      })
-      try { localStorage.removeItem(DRAFT_KEY) } catch {}
+      }, applicationRef, applicationToken)
+      // Both keys go: leaving REF_KEY behind would attach the next
+      // application's certificates to this one's reference.
+      try {
+        localStorage.removeItem(DRAFT_KEY)
+        localStorage.removeItem(REF_KEY)
+      } catch {}
       setDone({ reference: application.reference, email: application.contactEmail })
       window.scrollTo({ top: 0, behavior: 'smooth' })
     } catch (e) {
@@ -363,11 +610,11 @@ export default function ListWithUsPage() {
             Reference <span className="text-[#2d6a4f] font-medium">{done.reference}</span>
           </p>
           <p className="font-sans text-sm text-gray-500 max-w-md mx-auto mb-4 leading-relaxed">
-            Our team reviews every operator before they go live — usually within two business days.
+            Our team reviews every operator before they go live, usually within two business days.
             We&apos;ll email <span className="text-black">{done.email}</span> with the outcome.
           </p>
           <p className="font-sans text-sm text-gray-500 max-w-md mx-auto mb-8 leading-relaxed">
-            Your supplier account is ready — please confirm your email address first (check your inbox),
+            Your supplier account is ready. Please confirm your email address first (check your inbox),
             then{' '}
             <Link href="/auth/login" className="text-[#2d6a4f] underline underline-offset-2 hover:text-[#235a3f]">
               sign in
@@ -399,9 +646,27 @@ export default function ListWithUsPage() {
           <p className="font-sans text-[10px] tracking-[0.2em] uppercase text-[#C9A96E] mb-2">Operator Listing</p>
           <h1 className="font-display italic text-4xl lg:text-5xl mb-3">List with us</h1>
           <p className="font-sans text-sm text-white/60 max-w-2xl leading-relaxed">
-            Stays, activities, guided tours, transport and experiences — tell us what you run and we&apos;ll
+            Stays, activities, guided tours, transport and experiences: tell us what you run and we&apos;ll
             take it from there. It takes about five minutes, our team reviews every operator before they go
             live, and there is no fee to apply.
+          </p>
+          <p className="font-sans text-sm text-white/60 max-w-2xl leading-relaxed mt-3">
+            Have your <span className="text-white">EDTEA operator registration</span> or{' '}
+            <span className="text-white">CTO membership certificate</span> to hand. We need one of the two before a
+            listing can go live.
+          </p>
+          {/* Readable before the form starts, not only at the checkbox at the
+              end: an operator deciding whether to list should be able to see
+              what they would be agreeing to first. */}
+          <p className="font-sans text-xs text-white/50 mt-4">
+            Read first:{' '}
+            <Link href="/supplier-terms" className="text-[#C9A96E] underline underline-offset-2 hover:text-white transition-colors">
+              Supplier Agreement
+            </Link>
+            {' · '}
+            <Link href="/supplier-code-of-conduct" className="text-[#C9A96E] underline underline-offset-2 hover:text-white transition-colors">
+              Code of Conduct
+            </Link>
           </p>
         </div>
       </section>
@@ -438,7 +703,7 @@ export default function ListWithUsPage() {
         {step === 0 && (
           <>
             <div className="bg-white border border-gray-200 p-6 lg:p-8 space-y-5">
-              <CardHead title="Your details" sub="Only our listings team sees this — it never appears on your public page." />
+              <CardHead title="Your details" sub="Only our listings team sees this. It never appears on your public page." />
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className={labelCls}>Contact name</label>
@@ -468,7 +733,7 @@ export default function ListWithUsPage() {
               <div>
                 <label className={labelCls}>Registered business name</label>
                 <input value={form.businessName} onChange={e => set('businessName', e.target.value)}
-                  placeholder="Witsieshoek Hospitality (Pty) Ltd" className={inputCls} />
+                  placeholder="Drakensberg (Pty) Ltd" className={inputCls} />
                 <p className="font-sans text-xs text-gray-400 mt-1.5">
                   The entity that will invoice and be paid out. You can give a different public-facing name next.
                 </p>
@@ -480,7 +745,7 @@ export default function ListWithUsPage() {
                   <div>
                     <p className="font-sans text-xs font-medium text-gray-700 mb-0.5">Create your supplier account</p>
                     <p className="font-sans text-[11px] text-gray-400 leading-relaxed">
-                      This gives you immediate access once your application is approved — no separate invite needed.
+                      This gives you immediate access once your application is approved, with no separate invite needed.
                       Confirm your email address after submitting.
                     </p>
                   </div>
@@ -503,25 +768,26 @@ export default function ListWithUsPage() {
             <div className="bg-white border border-gray-200 p-6 lg:p-8 space-y-5">
               <CardHead
                 title="What do you operate?"
-                sub="Pick everything that applies — plenty of operators do more than one, and we'll ask about each."
+                sub="Choose the one that best describes your business. We'll ask for the details next."
               />
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5" role="radiogroup" aria-label="What do you operate?">
                 {APPLICANT_TYPES.map(t => {
                   const on = has(t.id)
                   return (
                     <button
                       key={t.id}
                       type="button"
-                      onClick={() => toggleType(t.id)}
-                      aria-pressed={on}
+                      onClick={() => selectType(t.id)}
+                      role="radio"
+                      aria-checked={on}
                       className={`text-left border px-4 py-3.5 flex items-start gap-3 transition-colors ${
                         on ? 'border-[#C9A96E] bg-[#C9A96E]/5' : 'border-gray-200 hover:border-[#2d6a4f]'
                       }`}
                     >
-                      <span className={`w-4 h-4 mt-0.5 shrink-0 border flex items-center justify-center ${
+                      <span className={`w-4 h-4 mt-0.5 shrink-0 rounded-full border flex items-center justify-center ${
                         on ? 'border-[#C9A96E] bg-[#C9A96E]' : 'border-gray-300'
                       }`}>
-                        {on && <Check size={11} className="text-white" />}
+                        {on && <span className="w-1.5 h-1.5 rounded-full bg-white" />}
                       </span>
                       <span>
                         <span className="block font-sans text-sm font-medium text-black">{t.label}</span>
@@ -531,6 +797,36 @@ export default function ListWithUsPage() {
                   )
                 })}
               </div>
+            </div>
+
+            {/* The security check that unlocks uploading.
+                It sits here, on the first step, rather than next to the photo
+                and certificate controls on steps 2 and 3, because a Turnstile
+                token is redeemable once: a challenge per file would mean eight
+                of them for someone simply attaching pictures of their lodge.
+                Solving it once trades the token for a two-hour grant scoped to
+                this application (lib/upload-grant.ts), and the uploads carry
+                that instead. */}
+            <div className="bg-white border border-gray-200 p-6 lg:p-8 space-y-3">
+              <CardHead title="Security check"
+                sub="A quick check that you're a person, so you can attach photos and certificates." />
+              <Turnstile
+                ref={grantTurnstile}
+                action="listing-upload-grant"
+                onToken={onGrantToken}
+                onError={() => setGrantState('failed')}
+              />
+              {grantState === 'ready' && (
+                <p className="font-sans text-xs text-[#2d6a4f]">
+                  Done — you can attach photos and certificates on the next steps.
+                </p>
+              )}
+              {grantState === 'failed' && (
+                <p className="font-sans text-xs text-red-500">
+                  {grantError || TURNSTILE_FAILED_MESSAGE}{' '}
+                  You can still submit your application without attachments.
+                </p>
+              )}
             </div>
           </>
         )}
@@ -562,19 +858,20 @@ export default function ListWithUsPage() {
               <div>
                 <label className={labelCls}>Description</label>
                 <textarea rows={4} value={form.description} onChange={e => set('description', e.target.value)}
-                  placeholder="What makes a trip with you memorable? Two to four sentences works best — guests skim this first."
+                  placeholder="What makes a trip with you memorable? Two to four sentences works best, as guests skim this first."
                   className={`${inputCls} resize-none`} />
               </div>
               <div>
                 <label className={labelCls}>Photos</label>
-                <PhotoUploader photos={form.photos} onChange={photos => set('photos', photos)} />
+                <PhotoUploader photos={form.photos} onChange={photos => set('photos', photos)}
+                  applicationRef={applicationRef} onNeedsGrant={renewGrant} />
               </div>
             </div>
 
             {/* Accommodation */}
             {has('Accommodation') && (
               <div className="bg-white border border-gray-200 p-6 lg:p-8 space-y-5">
-                <CardHead title="Your property" sub="Somewhere to stay — lodge, guesthouse, cottage or campsite." />
+                <CardHead title="Your property" sub="Somewhere to stay: a lodge, guesthouse, cottage or campsite." />
                 <div>
                   <label className={labelCls}>Property name</label>
                   <input value={form.stay.propertyName} onChange={e => setStay('propertyName', e.target.value)}
@@ -668,7 +965,7 @@ export default function ListWithUsPage() {
                   <input value={form.tour.certifications} onChange={e => setTour('certifications', e.target.value)}
                     placeholder="MDT registered, Wilderness First Aid Level 3, CATHSSETA" className={inputCls} />
                   <p className="font-sans text-xs text-gray-400 mt-1.5">
-                    We verify these before your tours go live — listing them now speeds up the review.
+                    We verify these before your tours go live, so listing them now speeds up the review.
                   </p>
                 </div>
               </div>
@@ -748,45 +1045,13 @@ export default function ListWithUsPage() {
               </div>
             )}
 
-            {/* Activities — core offering, or an add-on for the other types */}
-            <div className="bg-white border border-gray-200 p-6 lg:p-8 space-y-5">
-              <CardHead
-                title={has('Activity') ? 'Your activities' : 'Activities alongside your main offering'}
-                sub={has('Activity')
-                  ? 'Add each activity you run. You can add more later from your supplier portal.'
-                  : 'Optional — guests see a “Stay + Adventure” option when you run your own guided activities.'}
-              />
-
-              {activityAddOnOffered && (
-                <div className="flex items-start justify-between gap-4 border border-gray-200 px-4 py-3.5">
-                  <div>
-                    <p className="font-sans text-sm font-medium text-black">We run our own guided activities</p>
-                    <p className="font-sans text-xs text-gray-400 mt-0.5">
-                      Turn this on to list them alongside your main offering.
-                    </p>
-                  </div>
-                  <button
-                    type="button" role="switch" aria-checked={form.offersActivities}
-                    onClick={() => {
-                      const on = !form.offersActivities
-                      setForm(f => ({
-                        ...f,
-                        offersActivities: on,
-                        activities: on && f.activities.length === 0 ? [emptyActivity()] : f.activities,
-                      }))
-                    }}
-                    className={`relative w-10 h-[22px] rounded-full shrink-0 mt-0.5 transition-colors ${
-                      form.offersActivities ? 'bg-[#2d6a4f]' : 'bg-gray-300'
-                    }`}
-                  >
-                    <span className={`absolute top-[3px] w-4 h-4 bg-white rounded-full transition-all ${
-                      form.offersActivities ? 'left-[21px]' : 'left-[3px]'
-                    }`} />
-                  </button>
-                </div>
-              )}
-
-              {activitiesShown && (
+            {/* Activities — the Activity type's own offering */}
+            {activitiesShown && (
+              <div className="bg-white border border-gray-200 p-6 lg:p-8 space-y-5">
+                <CardHead
+                  title="Your activities"
+                  sub="Add each activity you run. You can add more later from your supplier portal."
+                />
                 <div className="space-y-3">
                   {form.activities.map((activity, i) => (
                     <div key={i} className="border border-gray-200">
@@ -878,17 +1143,173 @@ export default function ListWithUsPage() {
                     <Plus size={13} /> Add another activity
                   </button>
                 </div>
-              )}
-            </div>
+              </div>
+            )}
           </>
         )}
 
-        {/* ── Step 3 · Commission ───────────────────────────────────────── */}
-        {step === 2 && (
+        {/* ── Step 3 · Accreditation ────────────────────────────────────── */}
+        {step === STEP_ACCREDITATION && (
+          <div className="space-y-5">
+            <div className="bg-white border border-gray-200 p-6 lg:p-8 space-y-5">
+              <CardHead
+                title="Accreditation"
+                sub="Our verification office checks every listing against real paperwork. We need whichever one of these two you hold."
+              />
+
+              <div className="grid sm:grid-cols-2 gap-3">
+                {ACCREDITATION_OPTIONS.map(opt => {
+                  const on = form.compliance.accreditationKind === opt.id
+                  return (
+                    <button
+                      key={opt.id}
+                      type="button"
+                      onClick={() => setCompliance('accreditationKind', opt.id as AccreditationKind)}
+                      className={`text-left border p-4 transition-colors ${
+                        on ? 'border-[#2d6a4f] bg-[#2d6a4f]/5' : 'border-gray-200 hover:border-[#2d6a4f]'
+                      }`}
+                    >
+                      <div className="flex items-start gap-2">
+                        <span
+                          aria-hidden
+                          className={`mt-[3px] w-3.5 h-3.5 shrink-0 rounded-full border ${
+                            on ? 'border-[#2d6a4f] bg-[#2d6a4f]' : 'border-gray-300'
+                          }`}
+                        />
+                        <span>
+                          <span className="block font-sans text-sm text-black">{opt.label}</span>
+                          <span className="block font-sans text-xs text-gray-500 mt-1 leading-relaxed">{opt.blurb}</span>
+                        </span>
+                      </div>
+                    </button>
+                  )
+                })}
+              </div>
+
+              {form.compliance.accreditationKind && (
+                <>
+                  <div className="grid sm:grid-cols-2 gap-4">
+                    <div>
+                      <label className={labelCls}>
+                        {form.compliance.accreditationKind === 'cto' ? 'Which CTO' : 'Issuing EDTEA office'}
+                      </label>
+                      <input
+                        value={form.compliance.accreditationIssuer}
+                        onChange={e => setCompliance('accreditationIssuer', e.target.value)}
+                        placeholder={form.compliance.accreditationKind === 'cto'
+                          ? 'e.g. Central Drakensberg CTO'
+                          : 'e.g. KZN EDTEA, Pietermaritzburg'}
+                        className={inputCls}
+                      />
+                    </div>
+                    <div>
+                      <label className={labelCls}>
+                        {form.compliance.accreditationKind === 'cto' ? 'Membership number' : 'Registration number'}
+                      </label>
+                      <input
+                        value={form.compliance.accreditationNumber}
+                        onChange={e => setCompliance('accreditationNumber', e.target.value)}
+                        placeholder="As printed on the certificate"
+                        className={inputCls}
+                      />
+                    </div>
+                    <div>
+                      <label className={labelCls}>Valid until {optional}</label>
+                      <input
+                        type="date"
+                        value={form.compliance.accreditationExpiry}
+                        onChange={e => setCompliance('accreditationExpiry', e.target.value)}
+                        className={inputCls}
+                      />
+                      <p className="font-sans text-[11px] text-gray-400 mt-1.5">
+                        Leave blank if your certificate carries no expiry date.
+                      </p>
+                    </div>
+                  </div>
+
+                  <DocUpload
+                    label={form.compliance.accreditationKind === 'cto'
+                      ? 'CTO membership certificate'
+                      : 'EDTEA registration certificate'}
+                    hint="PDF preferred. A clear photo of the certificate is fine too."
+                    fileName={form.compliance.accreditationFileName}
+                    busy={uploadingDoc === 'accreditation'}
+                    onPick={file => uploadDoc('accreditation', file)}
+                    onClear={() => {
+                      setCompliance('accreditationDocId', '')
+                      setCompliance('accreditationFileName', '')
+                    }}
+                  />
+                </>
+              )}
+
+              <div className="flex items-start gap-2.5 bg-[#2d6a4f]/5 border border-[#2d6a4f]/20 px-4 py-3">
+                <Lock size={14} className="text-[#2d6a4f] mt-0.5 shrink-0" />
+                <p className="font-sans text-xs text-gray-600 leading-relaxed">
+                  Documents you upload here are stored privately and are never shown on your public listing. Only our
+                  verification office can open them.
+                </p>
+              </div>
+            </div>
+
+            <div className="bg-white border border-gray-200 p-6 lg:p-8 space-y-5">
+              <CardHead
+                title="Insurance & registration"
+                sub="Not required to apply, but a listing moves through verification much faster with these in hand."
+              />
+
+              <div className="grid sm:grid-cols-2 gap-4">
+                <div>
+                  <label className={labelCls}>Public liability insurer {optional}</label>
+                  <input value={form.compliance.insurer} onChange={e => setCompliance('insurer', e.target.value)}
+                    placeholder="e.g. Santam" className={inputCls} />
+                </div>
+                <div>
+                  <label className={labelCls}>Policy number {optional}</label>
+                  <input value={form.compliance.insurancePolicyNumber}
+                    onChange={e => setCompliance('insurancePolicyNumber', e.target.value)}
+                    placeholder="Policy reference" className={inputCls} />
+                </div>
+                <div>
+                  <label className={labelCls}>Cover expires {optional}</label>
+                  <input type="date" value={form.compliance.insuranceExpiry}
+                    onChange={e => setCompliance('insuranceExpiry', e.target.value)} className={inputCls} />
+                </div>
+                <div>
+                  <label className={labelCls}>CIPC registration number {optional}</label>
+                  <input value={form.compliance.companyRegistrationNumber}
+                    onChange={e => setCompliance('companyRegistrationNumber', e.target.value)}
+                    placeholder="e.g. 2019/123456/07" className={inputCls} />
+                </div>
+                <div>
+                  <label className={labelCls}>VAT number {optional}</label>
+                  <input value={form.compliance.vatNumber} onChange={e => setCompliance('vatNumber', e.target.value)}
+                    placeholder="If you are a VAT vendor" className={inputCls} />
+                </div>
+              </div>
+
+              <DocUpload
+                label="Public liability schedule"
+                hint="Your certificate of currency or policy schedule."
+                fileName={form.compliance.insuranceFileName}
+                busy={uploadingDoc === 'insurance'}
+                optionalDoc
+                onPick={file => uploadDoc('insurance', file)}
+                onClear={() => {
+                  setCompliance('insuranceDocId', '')
+                  setCompliance('insuranceFileName', '')
+                }}
+              />
+            </div>
+          </div>
+        )}
+
+        {/* ── Step 4 · Commission ───────────────────────────────────────── */}
+        {step === STEP_COMMISSION && (
           <div className="bg-white border border-gray-200 p-6 lg:p-8 space-y-5">
             <CardHead
               title="Choose your commission tier"
-              sub="Think of it as elevation on the mountain: everyone starts at base camp with full visibility. Higher tiers buy eligibility for better placement — never a guaranteed ranking or booking."
+              sub="Think of it as elevation on the mountain: everyone starts at base camp with full visibility. Higher tiers buy eligibility for better placement, never a guaranteed ranking or booking."
             />
             <TierLadder selected={form.commissionTier} onSelect={id => set('commissionTier', id)} />
 
@@ -896,9 +1317,9 @@ export default function ListWithUsPage() {
               <Info size={14} className="text-[#2d6a4f] mt-0.5 shrink-0" />
               <p className="font-sans text-xs text-gray-600 leading-relaxed">
                 <span className="text-black font-medium">
-                  {tierById(form.commissionTier).rate}% is the total platform fee
+                  {tierById(form.commissionTier).rate}% is the total platform fee,
                 </span>{' '}
-                — not an additional charge on top of a base rate. The lowest selectable rate is {COMMISSION_MIN_RATE}%
+                not an additional charge on top of a base rate. The lowest selectable rate is {COMMISSION_MIN_RATE}%
                 and the highest is {COMMISSION_MAX_RATE}%. Moving up a tier applies immediately to new bookings.
                 Moving down requires notice, cannot take effect before your 90-day minimum hold ends, and never
                 changes bookings already confirmed.
@@ -918,10 +1339,10 @@ export default function ListWithUsPage() {
           </div>
         )}
 
-        {/* ── Step 4 · Review ───────────────────────────────────────────── */}
-        {step === 3 && (
+        {/* ── Step 5 · Review ───────────────────────────────────────────── */}
+        {step === STEP_REVIEW && (
           <div className="bg-white border border-gray-200 p-6 lg:p-8 space-y-5">
-            <CardHead title="Review & submit" sub="Check the details below — you can still go back and change anything." />
+            <CardHead title="Review & submit" sub="Check the details below. You can still go back and change anything." />
 
             <div className="border border-gray-200">
               <SummaryRow k="Contact" v={form.contactName} />
@@ -968,24 +1389,77 @@ export default function ListWithUsPage() {
                 <SummaryRow k="Activities" v={form.activities.filter(a => a.name.trim()).map(a => {
                   const bits = [a.category, a.difficulty, a.durationHours && `${a.durationHours}h`,
                     a.pricePerPerson && `${formatMoney(Number(a.pricePerPerson))} pp`].filter(Boolean)
-                  return `${a.name} — ${bits.join(', ')}`
+                  return `${a.name}: ${bits.join(', ')}`
                 }).join(' · ')} />
               )}
               <SummaryRow
+                k="Accreditation"
+                v={[
+                  form.compliance.accreditationKind === 'cto' ? 'CTO membership' : 'EDTEA registration',
+                  form.compliance.accreditationIssuer,
+                  form.compliance.accreditationNumber,
+                  form.compliance.accreditationExpiry ? `valid to ${form.compliance.accreditationExpiry}` : '',
+                  form.compliance.accreditationFileName ? '✓ certificate attached' : '',
+                ].filter(Boolean).join(' · ')}
+              />
+              {(form.compliance.insurer || form.compliance.insuranceFileName) && (
+                <SummaryRow
+                  k="Insurance"
+                  v={[
+                    form.compliance.insurer,
+                    form.compliance.insurancePolicyNumber,
+                    form.compliance.insuranceExpiry ? `to ${form.compliance.insuranceExpiry}` : '',
+                    form.compliance.insuranceFileName ? '✓ schedule attached' : '',
+                  ].filter(Boolean).join(' · ')}
+                />
+              )}
+              <SummaryRow
                 k="Commission"
-                v={`${tierById(form.commissionTier).name} — ${tierById(form.commissionTier).rate}% total platform fee`}
+                v={`${tierById(form.commissionTier).name}, ${tierById(form.commissionTier).rate}% total platform fee`}
               />
             </div>
 
+            {/* The documents a supplier is actually bound by. This used to
+                point at /terms and /privacy — the *visitor* documents — which
+                left the commission ladder, the accreditation duty and the
+                POPIA obligations on guest data resting on nothing. The
+                accepted versions are written to vd_supplier_agreements on
+                submit, so what was agreed stays provable after the wording
+                changes. */}
             <label className="flex items-start gap-3 font-sans text-xs text-gray-500 leading-relaxed cursor-pointer">
               <input type="checkbox" checked={consent} onChange={e => setConsent(e.target.checked)}
                 className="mt-0.5 accent-[#2d6a4f] shrink-0" />
               <span>
-                I am authorised to list this business, the details above are accurate, and I accept the{' '}
-                <Link href="/terms" className="text-[#2d6a4f] underline underline-offset-2">Terms of Use</Link> and{' '}
-                <Link href="/privacy" className="text-[#2d6a4f] underline underline-offset-2">Privacy Policy</Link>.
+                I am authorised to list this business and the details above are accurate. I have read and accept the{' '}
+                <Link href="/supplier-terms" target="_blank" className="text-[#2d6a4f] underline underline-offset-2">
+                  Supplier Agreement
+                </Link>{' '}
+                and the{' '}
+                <Link href="/supplier-code-of-conduct" target="_blank" className="text-[#2d6a4f] underline underline-offset-2">
+                  Supplier Code of Conduct
+                </Link>
+                , and the{' '}
+                <Link href="/privacy" target="_blank" className="text-[#2d6a4f] underline underline-offset-2">
+                  Privacy Policy
+                </Link>
+                .
               </span>
             </label>
+            <p className="font-sans text-[11px] text-gray-400 leading-relaxed">
+              Recorded as accepted: Supplier Agreement v{SUPPLIER_TERMS_VERSION}, Code of Conduct
+              v{CODE_OF_CONDUCT_VERSION}.
+            </p>
+
+            {/* Shown whether or not there is a session: a signed-in applicant
+                skips the signup but still has to get past the application
+                route, which is now the only way into the table. */}
+            <Turnstile
+              ref={turnstile}
+              action="listing-application"
+              onToken={setCaptchaToken}
+              onError={code => setError(turnstileErrorMessage(code))}
+              className="pt-1"
+            />
           </div>
         )}
 
@@ -1007,7 +1481,7 @@ export default function ListWithUsPage() {
               Continue to {STEPS[step + 1]} <ArrowRight size={14} />
             </button>
           ) : (
-            <button onClick={submit} disabled={submitting}
+            <button onClick={submit} disabled={submitting || captchaBlocked(captchaToken)}
               className="flex items-center gap-2 bg-[#C9A96E] text-black px-6 py-3 font-sans text-sm font-medium hover:bg-[#b8935a] transition-colors disabled:opacity-50">
               {submitting ? <><Loader2 size={14} className="animate-spin" /> Submitting…</> : 'Submit application'}
             </button>
@@ -1032,6 +1506,77 @@ function CardHead({ title, sub }: { title: string; sub: string }) {
     <div className="pb-1">
       <h2 className="font-display italic text-2xl text-black">{title}</h2>
       <p className="font-sans text-xs text-gray-400 mt-1">{sub}</p>
+    </div>
+  )
+}
+
+/**
+ * One certificate slot. Deliberately plainer than PhotoUploader: there is
+ * nothing to preview — the file goes into the private bucket and the
+ * applicant never sees it again — so the control's whole job is to say
+ * clearly whether a document is attached, and let it be replaced.
+ */
+function DocUpload({
+  label, hint, fileName, busy, optionalDoc, onPick, onClear,
+}: {
+  label: string
+  hint: string
+  fileName: string
+  busy: boolean
+  optionalDoc?: boolean
+  onPick: (file: File) => void
+  onClear: () => void
+}) {
+  const inputRef = useRef<HTMLInputElement>(null)
+
+  return (
+    <div className="border border-dashed border-gray-300 p-4">
+      <div className="flex items-start justify-between gap-4 flex-wrap">
+        <div className="min-w-0">
+          <p className="font-sans text-sm text-black">
+            {label}
+            {optionalDoc && <span className="text-gray-300 font-normal"> (optional)</span>}
+          </p>
+          <p className="font-sans text-xs text-gray-400 mt-1">{hint}</p>
+        </div>
+
+        {fileName ? (
+          <div className="flex items-center gap-3">
+            <span className="flex items-center gap-1.5 font-sans text-xs text-[#2d6a4f] max-w-[220px]">
+              <Check size={13} className="shrink-0" />
+              <span className="truncate">{fileName}</span>
+            </span>
+            <button type="button" onClick={onClear}
+              className="text-gray-400 hover:text-red-500 transition-colors" aria-label={`Remove ${label}`}>
+              <X size={14} />
+            </button>
+          </div>
+        ) : (
+          <button
+            type="button"
+            disabled={busy}
+            onClick={() => inputRef.current?.click()}
+            className="flex items-center gap-2 border border-gray-300 px-4 py-2 font-sans text-xs text-gray-600 hover:border-[#2d6a4f] hover:text-[#2d6a4f] transition-colors disabled:opacity-40"
+          >
+            {busy ? <Loader2 size={13} className="animate-spin" /> : <Upload size={13} />}
+            {busy ? 'Uploading…' : 'Choose file'}
+          </button>
+        )}
+      </div>
+
+      <input
+        ref={inputRef}
+        type="file"
+        accept="application/pdf,image/jpeg,image/png,image/webp"
+        className="hidden"
+        onChange={e => {
+          const file = e.target.files?.[0]
+          // Reset first: picking the same file twice in a row otherwise fires
+          // no change event, so a failed upload could not be retried.
+          e.target.value = ''
+          if (file) onPick(file)
+        }}
+      />
     </div>
   )
 }
@@ -1125,7 +1670,14 @@ function TierLadder({ selected, onSelect }: { selected: string; onSelect: (id: s
  * 20260807_listing_applications.sql), so what is stored on the application is
  * a list of URLs — which also means an in-progress draft survives a reload.
  */
-function PhotoUploader({ photos, onChange }: { photos: string[]; onChange: (photos: string[]) => void }) {
+function PhotoUploader({ photos, onChange, applicationRef, onNeedsGrant }: {
+  photos: string[]
+  onChange: (photos: string[]) => void
+  /** Every object now lands under this application's own prefix, server-side. */
+  applicationRef: string
+  /** Renew a lapsed upload grant. Resolves false when it could not be renewed. */
+  onNeedsGrant: () => Promise<boolean>
+}) {
   const fileRef = useRef<HTMLInputElement>(null)
   const [dragging, setDragging] = useState(false)
   const [busy, setBusy] = useState(0)
@@ -1144,9 +1696,20 @@ function PhotoUploader({ photos, onChange }: { photos: string[]; onChange: (phot
     const uploaded: string[] = []
     for (const file of batch) {
       try {
-        uploaded.push(await uploadApplicationPhoto(file))
+        try {
+          uploaded.push(await uploadApplicationPhoto(file, applicationRef))
+        } catch (e) {
+          // Grant lapsed mid-batch: renew once and retry this file, so a long
+          // session does not silently drop the rest of the photos.
+          if (!(e instanceof NeedsUploadGrantError) || !(await onNeedsGrant())) throw e
+          uploaded.push(await uploadApplicationPhoto(file, applicationRef))
+        }
       } catch (e) {
-        setUploadError(e instanceof Error ? e.message : 'Upload failed.')
+        setUploadError(
+          e instanceof NeedsUploadGrantError
+            ? 'The security check has expired. Go back to the first step, complete it again, then retry.'
+            : e instanceof Error ? e.message : 'Upload failed.',
+        )
       } finally {
         setBusy(b => b - 1)
       }
@@ -1185,7 +1748,7 @@ function PhotoUploader({ photos, onChange }: { photos: string[]; onChange: (phot
       <div className="grid grid-cols-4 gap-2">
         {photos.map((url, i) => (
           <div key={url} className="relative aspect-square border border-gray-200 bg-gray-50 group">
-            <img src={url} alt="" className="w-full h-full object-cover"
+            <Image src={url} alt="" fill loading="lazy" sizes="25vw" className="object-cover"
               onError={e => { (e.target as HTMLImageElement).style.display = 'none' }} />
             <button
               type="button"

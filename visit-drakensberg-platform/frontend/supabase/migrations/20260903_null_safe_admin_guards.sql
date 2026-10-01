@@ -25,6 +25,7 @@
 --   2. vd_recompute_supplier_contacts — latest body per 20260827_supplier_contacts_import.sql
 --   3. vd_add_supplier_contact        — 20260828_manual_guest_package_and_contacts.sql
 -- ============================================================================
+-- @rollback: additive — forward-only; safe to leave in place if the deploy is rolled back
 
 create or replace function public.vd_recompute_segments(
   p_high_value_threshold numeric default 50000,

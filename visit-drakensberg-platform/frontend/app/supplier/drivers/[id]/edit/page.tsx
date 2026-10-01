@@ -1,8 +1,25 @@
 'use client'
 
 import { useParams, useRouter } from 'next/navigation'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { ChevronLeft } from 'lucide-react'
+import { getSupplierEntity, updateSupplierEntity, type SupplierEntity } from '@/lib/supplier-entities'
+
+/**
+ * Edit one driver.
+ *
+ * WHAT THIS PAGE USED TO DO
+ *   Nothing. It seeded itself from a hardcoded MOCK_DRIVERS table — three
+ *   invented people, with invented licence numbers and next-of-kin phone
+ *   numbers — falling back to MOCK_DRIVERS['1'] for any id it did not
+ *   recognise, which is every real driver id. "Save Changes" awaited a 600 ms
+ *   timeout and navigated away: it wrote nothing, and the fake delay made it
+ *   look like it had.
+ *
+ *   The list page beside it has always read real rows, and the "new" page has
+ *   always written them. Only the edit path was a shell, so a supplier
+ *   correcting a driver's PDP number was told it saved and it did not.
+ */
 
 function F({ label, required, children }: { label: string; required?: boolean; children: React.ReactNode }) {
   return (
@@ -31,36 +48,90 @@ const STATUS_DOT: Record<DriverStatus, string> = {
   inactive: 'bg-red-400',
 }
 
-const MOCK_DRIVERS: Record<string, {
-  fullName: string; licenseType: string; licenseNumber: string; languages: string;
-  yearsExperience: number; phone: string; emergencyName: string; emergencyPhone: string; status: DriverStatus
-}> = {
-  '1': { fullName: 'Sipho Dlamini', licenseType: 'PDP', licenseNumber: 'KZN-PDP-2019-04821', languages: 'Zulu, English, Afrikaans', yearsExperience: 8, phone: '+27 82 345 6789', emergencyName: 'Nomsa Dlamini', emergencyPhone: '+27 72 123 4567', status: 'active' },
-  '2': { fullName: 'Thabo Mokoena', licenseType: 'Code 10', licenseNumber: 'GP-C10-2021-00934', languages: 'Sotho, English', yearsExperience: 5, phone: '+27 83 456 7890', emergencyName: 'Lerato Mokoena', emergencyPhone: '+27 71 234 5678', status: 'active' },
-  '3': { fullName: 'Ayanda Nkosi', licenseType: 'Code 8', licenseNumber: 'KZN-C8-2020-07712', languages: 'Zulu, English', yearsExperience: 3, phone: '+27 79 567 8901', emergencyName: 'Busi Nkosi', emergencyPhone: '+27 73 345 6789', status: 'on leave' },
+type Driver = SupplierEntity & {
+  fullName?: string
+  name?: string
+  licenseType?: string
+  license?: string
+  licenseNumber?: string
+  languages?: string
+  yearsExperience?: number
+  phone?: string
+  emergencyName?: string
+  emergencyPhone?: string
 }
 
 export default function EditDriverPage() {
   const { id } = useParams<{ id: string }>()
   const router = useRouter()
 
-  const mock = MOCK_DRIVERS[id] ?? MOCK_DRIVERS['1']
-
-  const [fullName, setFullName] = useState(mock.fullName)
-  const [licenseType, setLicenseType] = useState(mock.licenseType)
-  const [licenseNumber, setLicenseNumber] = useState(mock.licenseNumber)
-  const [languages, setLanguages] = useState(mock.languages)
-  const [yearsExperience, setYearsExperience] = useState(mock.yearsExperience)
-  const [phone, setPhone] = useState(mock.phone)
-  const [emergencyName, setEmergencyName] = useState(mock.emergencyName)
-  const [emergencyPhone, setEmergencyPhone] = useState(mock.emergencyPhone)
-  const [status, setStatus] = useState<DriverStatus>(mock.status)
+  const [fullName, setFullName] = useState('')
+  const [licenseType, setLicenseType] = useState('Code 8')
+  const [licenseNumber, setLicenseNumber] = useState('')
+  const [languages, setLanguages] = useState('')
+  const [yearsExperience, setYearsExperience] = useState(0)
+  const [phone, setPhone] = useState('')
+  const [emergencyName, setEmergencyName] = useState('')
+  const [emergencyPhone, setEmergencyPhone] = useState('')
+  const [status, setStatus] = useState<DriverStatus>('active')
+  const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  // A driver that cannot be loaded must say so. Showing a blank form for a row
+  // that does not exist is a gentler version of what the mock did.
+  const [error, setError] = useState('')
+
+  useEffect(() => {
+    let cancelled = false
+    async function load() {
+      try {
+        const driver = await getSupplierEntity<Driver>('drivers', id)
+        if (cancelled) return
+        if (!driver) {
+          setError('That driver could not be found. They may have been removed.')
+          return
+        }
+        setFullName(driver.fullName ?? driver.name ?? '')
+        setLicenseType(driver.licenseType ?? driver.license ?? 'Code 8')
+        setLicenseNumber(driver.licenseNumber ?? '')
+        setLanguages(driver.languages ?? '')
+        setYearsExperience(Number(driver.yearsExperience) || 0)
+        setPhone(driver.phone ?? '')
+        setEmergencyName(driver.emergencyName ?? '')
+        setEmergencyPhone(driver.emergencyPhone ?? '')
+        setStatus((STATUS_OPTIONS as readonly string[]).includes(driver.status ?? '')
+          ? (driver.status as DriverStatus) : 'active')
+      } catch {
+        if (!cancelled) setError('Could not load that driver. Please try again.')
+      } finally {
+        if (!cancelled) setLoading(false)
+      }
+    }
+    load()
+    return () => { cancelled = true }
+  }, [id])
 
   async function handleSave() {
     setSaving(true)
-    await new Promise(r => setTimeout(r, 600))
-    router.push('/supplier/drivers')
+    setError('')
+    try {
+      // `name` and `license` are mirrored the way the "new" page writes them,
+      // and the list page reads either — so a driver created there and edited
+      // here keeps one shape.
+      await updateSupplierEntity<Driver>('drivers', id, {
+        fullName, name: fullName,
+        licenseType, license: licenseType,
+        licenseNumber, languages, yearsExperience,
+        phone, emergencyName, emergencyPhone, status,
+      } as Partial<Driver>)
+      router.push('/supplier/drivers')
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Could not save those changes. Please try again.')
+      setSaving(false)
+    }
+  }
+
+  if (loading) {
+    return <div className="p-8 font-sans text-sm text-black/40">Loading driver…</div>
   }
 
   return (
@@ -79,6 +150,10 @@ export default function EditDriverPage() {
             <p className="font-sans text-sm text-black/50 mt-0.5">Update driver profile and status</p>
           </div>
         </div>
+
+        {error && (
+          <div className="mb-4 border border-red-200 bg-red-50 px-4 py-3 font-sans text-sm text-red-700">{error}</div>
+        )}
 
         <div className="bg-white rounded-xl border border-black/8 p-6 space-y-6">
           {/* Personal Info */}

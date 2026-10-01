@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useMemo } from 'react'
 import Link from 'next/link'
+import Image from 'next/image'
 import Footer from '@/components/layout/Footer'
 import Editable from '@/components/editor/Editable'
 import { useSiteSection } from '@/lib/use-site-section'
@@ -113,9 +114,9 @@ export default function MyDrakensbergPage() {
             {featured && (
               <Link href={`/mydrakensberg/${featured.slug}`} className="group block mb-14">
                 <div className="grid grid-cols-1 lg:grid-cols-5 gap-0 overflow-hidden border border-gray-200">
-                  <div className="lg:col-span-3 h-64 lg:h-auto overflow-hidden bg-gray-100">
+                  <div className="relative lg:col-span-3 h-64 lg:h-auto overflow-hidden bg-gray-100">
                     {featured.image && (
-                      <img src={featured.image} alt={featured.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" />
+                      <Image src={featured.image} alt={featured.title} fill priority sizes="(max-width: 1024px) 100vw, 60vw" className="object-cover group-hover:scale-105 transition-transform duration-700" />
                     )}
                   </div>
                   <div className="lg:col-span-2 bg-[#000000] text-white p-8 lg:p-10 flex flex-col justify-between">
@@ -148,9 +149,9 @@ export default function MyDrakensbergPage() {
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {filtered.map(article => (
                   <Link key={article.slug} href={`/mydrakensberg/${article.slug}`} className="group bg-white border border-gray-200 overflow-hidden hover:border-[#2d6a4f] transition-colors">
-                    <div className="h-52 overflow-hidden bg-gray-100">
+                    <div className="relative h-52 overflow-hidden bg-gray-100">
                       {article.image && (
-                        <img loading="lazy" decoding="async" src={article.image} alt={article.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+                        <Image src={article.image} alt={article.title} fill loading="lazy" sizes="(max-width: 768px) 100vw, (max-width: 1024px) 50vw, 33vw" className="object-cover group-hover:scale-105 transition-transform duration-500" />
                       )}
                     </div>
                     <div className="p-6">

@@ -110,7 +110,7 @@ function NewQuoteModal({ customers, onClose, onCreated }: { customers: Person[];
           <div>
             <p className="font-sans text-[10px] tracking-[0.14em] uppercase text-gray-400">Quotes</p>
             <h2 className="font-display italic text-xl sm:text-2xl">New Quote</h2>
-            <p className="hidden sm:block font-sans text-xs text-gray-400 mt-1">Saved as a draft — send it once you're happy, and the customer can accept it themselves.</p>
+            <p className="hidden sm:block font-sans text-xs text-gray-400 mt-1">Saved as a draft. Send it once you're happy, and the customer can accept it themselves.</p>
           </div>
           <button onClick={onClose} aria-label="Close" className="p-1 text-gray-400 hover:text-gray-700"><X size={20} /></button>
         </div>
@@ -271,7 +271,7 @@ export default function AdminQuotesPage() {
         <div>
           <p className="font-sans text-[10px] tracking-[0.14em] uppercase text-gray-400 mb-1">Sales</p>
           <h1 className="font-display italic text-2xl sm:text-3xl text-[#000000]">Quotes</h1>
-          <p className="font-sans text-sm text-gray-500 mt-1">Build a quote, send it, and the customer accepts it themselves — turning it straight into a payable invoice.</p>
+          <p className="font-sans text-sm text-gray-500 mt-1">Build a quote, send it, and the customer accepts it themselves, turning it straight into a payable invoice.</p>
         </div>
         <div className="flex gap-2 shrink-0">
           <button onClick={load} aria-label="Refresh" className="inline-flex items-center justify-center gap-2 border border-gray-200 px-4 py-3 sm:py-2 font-sans text-sm text-gray-600 hover:border-[#2d6a4f] hover:text-[#2d6a4f] transition-colors">
@@ -395,7 +395,7 @@ export default function AdminQuotesPage() {
         <NewQuoteModal customers={people} onClose={() => setShowNew(false)} onCreated={load} />
       )}
       {!loading && quotes.length === 0 && (
-        <p className="mt-4 font-sans text-xs text-gray-400 flex items-center gap-1.5"><FileSignature size={12} /> No quotes yet — create your first one above.</p>
+        <p className="mt-4 font-sans text-xs text-gray-400 flex items-center gap-1.5"><FileSignature size={12} /> No quotes yet. Create your first one above.</p>
       )}
     </div>
   )

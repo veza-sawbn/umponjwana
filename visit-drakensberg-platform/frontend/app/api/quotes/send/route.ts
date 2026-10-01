@@ -3,7 +3,7 @@ import { cookies } from 'next/headers'
 import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs'
 import { sendMail } from '@/lib/mailer'
 import { formatMoney as money } from '@/lib/allocation'
-import { emailShell, ctaButton, detailTable, esc, getFeaturedExperiences } from '@/lib/email-layout'
+import { emailShell, ctaButton, detailTable, esc } from '@/lib/email-layout'
 
 export const dynamic = 'force-dynamic'
 
@@ -32,7 +32,6 @@ export async function POST(req: Request) {
 
   const origin = process.env.NEXT_PUBLIC_SITE_URL || new URL(req.url).origin
   const quoteUrl = `${origin}/quotes/${quote.id}`
-  const featured = await getFeaturedExperiences(origin)
 
   const validUntil = quote.valid_until
     ? new Date(quote.valid_until).toLocaleDateString('en-ZA', { day: 'numeric', month: 'long', year: 'numeric' })
@@ -40,26 +39,24 @@ export async function POST(req: Request) {
 
   const { sent, error } = await sendMail({
     to: quote.customer_email,
-    subject: `Your quote ${quote.quote_number} — Visit Drakensberg`,
+    subject: `Your quote ${quote.quote_number} from Visit Drakensberg`,
     html: emailShell({
       origin,
       eyebrow: `Quote ${quote.quote_number}`,
       heading: 'Your quote is ready',
-      preheader: `${money(Number(quote.total), quote.currency)} total${validUntil ? ` — valid until ${validUntil}` : ''}.`,
-      featured,
+      preheader: `${money(Number(quote.total), quote.currency)} total${validUntil ? `, valid until ${validUntil}` : ''}.`,
       bodyHtml: `
         <p style="margin:0 0 4px;">Dear ${esc(quote.customer_name || 'traveller')},</p>
         <p style="margin:0 0 20px;">
-          We've put together a quote${quote.trip_name ? ` for ${esc(quote.trip_name)}` : ''} —
-          <strong>${esc(money(Number(quote.total), quote.currency))}</strong> total.
+          We've put together a quote${quote.trip_name ? ` for ${esc(quote.trip_name)}` : ''}, coming to
+          <strong>${esc(money(Number(quote.total), quote.currency))}</strong> in total.
           ${validUntil ? `This quote is valid until ${esc(validUntil)}.` : ''}
         </p>
         ${detailTable([
           ['Quote', quote.quote_number],
           ...(quote.trip_name ? [['Trip', quote.trip_name] as [string, string]] : []),
           ...(validUntil ? [['Valid until', validUntil] as [string, string]] : []),
-          ['Total', money(Number(quote.total), quote.currency)],
-        ])}
+        ], ['Total', money(Number(quote.total), quote.currency)])}
         ${ctaButton(quoteUrl, 'View & Accept Quote')}`,
     }),
   })

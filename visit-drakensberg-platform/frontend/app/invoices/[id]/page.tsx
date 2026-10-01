@@ -283,17 +283,17 @@ function PrintableInvoiceInner() {
         {paymentResult === 'success' && (
           <div className="mb-4 print:hidden bg-[#2d6a4f]/10 border border-[#2d6a4f]/30 text-[#2d6a4f] font-sans text-sm px-4 py-3 flex items-center gap-2">
             {invoice.status !== 'paid' && <Loader2 size={14} className="animate-spin shrink-0" />}
-            {invoice.status === 'paid' ? 'Payment received — thank you!' : 'Payment received — confirming with the bank, this page will update automatically…'}
+            {invoice.status === 'paid' ? 'Payment received. Thank you!' : 'Payment received. We are confirming it with the bank, and this page will update automatically…'}
           </div>
         )}
         {paymentResult === 'failed' && (
           <div className="mb-4 print:hidden bg-red-50 border border-red-200 text-red-600 font-sans text-sm px-4 py-3">
-            The payment didn't go through — your card was declined. Please check your card details and try again below.
+            The payment didn't go through, because your card was declined. Please check your card details and try again below.
           </div>
         )}
         {paymentResult === 'cancelled' && (
           <div className="mb-4 print:hidden bg-amber-50 border border-amber-200 text-amber-700 font-sans text-sm px-4 py-3">
-            Payment cancelled — your invoice balance is unchanged.
+            Payment cancelled. Your invoice balance is unchanged.
           </div>
         )}
         {/* Persistent decline notice: shown when the gateway declined a previous
@@ -314,7 +314,7 @@ function PrintableInvoiceInner() {
             <h2 className="font-display italic text-xl sm:text-2xl text-[#000000] mt-1">Add a tip for your guide?</h2>
             <p className="font-sans text-xs text-gray-500 mt-1.5 max-w-xl leading-relaxed">
               The guided part of this invoice came to {formatMoney(tippable, invoice.currency)}. A tip is entirely
-              optional, and every cent of it goes to the operator who took you out — no commission, no VAT.
+              optional, and every cent of it goes to the operator who took you out, with no commission and no VAT.
             </p>
 
             <div className="flex flex-wrap gap-2 mt-4">

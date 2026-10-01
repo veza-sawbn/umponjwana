@@ -1,8 +1,11 @@
 'use client'
 import { useRef } from 'react'
 import Link from 'next/link'
+import Image from 'next/image'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { formatMoney } from '@/lib/allocation'
+import { useAutoScrollCarousel } from '@/lib/carousel-autoplay'
+import SaveButton from '@/components/ui/SaveButton'
 
 export type StayCard = {
   id: string
@@ -25,9 +28,16 @@ export type StayCard = {
  * page tall enough that finding one means a lot of vertical scrolling.
  * Native touch/trackpad scrolling works on any device; the arrow buttons are
  * a pointer-only convenience layered on top.
+ *
+ * The row also drifts a card at a time on its own, so a category shows more
+ * than the three or four stays that happen to fit — it holds still while the
+ * visitor is using it, and wraps back to the first stay at the end. See
+ * lib/carousel-autoplay.ts.
  */
 export default function StayCarousel({ stays }: { stays: StayCard[] }) {
   const trackRef = useRef<HTMLDivElement>(null)
+
+  useAutoScrollCarousel(trackRef, { itemCount: stays.length })
 
   function scrollByPage(direction: 1 | -1) {
     const el = trackRef.current
@@ -37,9 +47,13 @@ export default function StayCarousel({ stays }: { stays: StayCard[] }) {
 
   return (
     <div className="relative group/carousel">
+      {/* The track bleeds to the screen edge so the next card peeks past it,
+          but scroll-padding keeps the snap position on the page gutter —
+          without it, snapping swallows the padding and the first card sits
+          flush against the edge, out of line with the heading above it. */}
       <div
         ref={trackRef}
-        className="flex gap-5 overflow-x-auto snap-x snap-mandatory scroll-smooth scrollbar-none pb-2 -mx-6 px-6 lg:-mx-12 lg:px-12"
+        className="flex gap-5 overflow-x-auto snap-x snap-mandatory scroll-smooth scrollbar-none pb-2 -mx-6 px-6 scroll-pl-6 lg:-mx-12 lg:px-12 lg:scroll-pl-12"
       >
         {stays.map((stay) => <StayTile key={stay.id} stay={stay} />)}
       </div>
@@ -70,14 +84,15 @@ export default function StayCarousel({ stays }: { stays: StayCard[] }) {
 function StayTile({ stay }: { stay: StayCard }) {
   const discountedPrice = stay.discount ? Math.round(stay.price * (1 - stay.discount / 100)) : null
   return (
-    <Link
-      href={`/stays/${stay.id}`}
-      className="group block shrink-0 snap-start w-[260px] sm:w-[280px]"
-    >
+    // The heart sits outside the Link rather than inside it: a <button>
+    // nested in an <a> is invalid HTML and gives keyboard users a control
+    // that lives inside the thing it isn't meant to activate.
+    <div className="relative shrink-0 snap-start w-[260px] sm:w-[280px]">
+    <Link href={`/stays/${stay.id}`} className="group block">
       <div className="relative overflow-hidden aspect-[4/3] mb-4 bg-[#2d6a4f]/10">
         {stay.img ? (
-          <img src={stay.img} alt={stay.title}
-            className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" />
+          <Image src={stay.img} alt={stay.title} fill loading="lazy" sizes="280px"
+            className="object-cover transition-transform duration-700 group-hover:scale-105" />
         ) : (
           <div className="w-full h-full flex items-center justify-center bg-[#C9A96E]/10">
             <span className="font-display italic text-2xl text-[#C9A96E]/40">{stay.category}</span>
@@ -128,5 +143,20 @@ function StayTile({ stay }: { stay: StayCard }) {
         </div>
       </div>
     </Link>
+      {/* Nudged below the discount flag when there is one, so the two don't
+          stack on top of each other in the same corner. */}
+      <SaveButton
+        className={stay.discount ? '!top-12' : ''}
+        listing={{
+          id: stay.id,
+          type: 'stay',
+          title: stay.title,
+          location: stay.location,
+          price: stay.price || null,
+          image: stay.img,
+          rating: stay.rating,
+        }}
+      />
+    </div>
   )
 }

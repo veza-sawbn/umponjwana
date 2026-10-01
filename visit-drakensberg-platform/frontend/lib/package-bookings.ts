@@ -1,6 +1,9 @@
 import { supabase } from './auth'
 import { notify } from './notifications'
-import type { MarketplacePackage } from './packages'
+import {
+  isGroupPriced, packageGroupSize, packagePricePerPerson, packagePriceTotal,
+  type MarketplacePackage,
+} from './packages'
 import type { SavedBooking } from './bookings'
 import { createOrder, type OrderLineInput } from './orders'
 
@@ -38,7 +41,9 @@ function addDays(iso: string, days: number) {
 export async function bookPackage(input: PackageBookingInput): Promise<SavedBooking> {
   const { pkg, guests } = input
   const endDate = addDays(input.startDate, pkg.durationNights)
-  const subtotal = pkg.pricePerPerson * guests
+  // Group packages are sold as a single unit: the flat rate stands whatever
+  // the party size, so the subtotal must not be multiplied out per head.
+  const subtotal = packagePriceTotal(pkg, guests)
   const serviceFee = Math.round(subtotal * 0.03)
   const vat = Math.round((subtotal + serviceFee) * 0.15)
 
@@ -63,7 +68,7 @@ export async function bookPackage(input: PackageBookingInput): Promise<SavedBook
       type: 'tour',
       title: `Package — ${pkg.title}`,
       date: input.startDate,
-      price_per_person: pkg.pricePerPerson,
+      price_per_person: packagePricePerPerson(pkg),
       guests,
     }],
     shuttles: [],
@@ -193,14 +198,23 @@ export async function bookPackage(input: PackageBookingInput): Promise<SavedBook
       },
       orderLines,
       {
-        invoiceLines: [{
-          title: `Package — ${pkg.title} (${guests} guest${guests !== 1 ? 's' : ''})`,
-          category: 'package',
-          quantity: guests,
-          unitLabel: 'guest',
-          unitPrice: pkg.pricePerPerson,
-          total: subtotal,
-        }],
+        invoiceLines: [isGroupPriced(pkg)
+          ? {
+            title: `Package — ${pkg.title} (group of ${packageGroupSize(pkg)}, ${guests} guest${guests !== 1 ? 's' : ''} travelling)`,
+            category: 'package',
+            quantity: 1,
+            unitLabel: 'group',
+            unitPrice: subtotal,
+            total: subtotal,
+          }
+          : {
+            title: `Package — ${pkg.title} (${guests} guest${guests !== 1 ? 's' : ''})`,
+            category: 'package',
+            quantity: guests,
+            unitLabel: 'guest',
+            unitPrice: pkg.pricePerPerson,
+            total: subtotal,
+          }],
         payment: { amount: booking.total, type: 'payment', method: 'card', reference: booking.reference },
       },
     )

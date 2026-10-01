@@ -1,5 +1,6 @@
 import { supabase } from './auth'
 import type { SupabaseClient } from '@supabase/supabase-js'
+import { imagePositionToCss } from './image-position'
 
 export type Town = {
   id: string
@@ -11,9 +12,15 @@ export type Town = {
   gateway: string
   description: string
   image: string
+  /** Focal point the hero crops around (lib/image-position.ts). Empty =
+   *  centred, which is what rows saved before this field existed keep doing. */
+  imagePosition?: string
   highlights: string[]
   seoTitle: string
   seoDescription: string
+  /** Surfaced in the homepage "Top Attractions" section. Optional: towns
+   *  saved before this existed simply aren't featured. See lib/attractions.ts. */
+  featured?: boolean
   createdAt?: string
   updatedAt?: string
 }
@@ -50,7 +57,7 @@ export const DEFAULT_TOWNS: Town[] = [
   },
   {
     id: 'himeville', slug: 'himeville', regionSlug: 'south-berg', name: 'Himeville',
-    gateway: 'Southern Drakensberg — boutique',
+    gateway: 'Southern Drakensberg · boutique',
     description: 'A charming village with a restored fort, trout streams and boutique accommodation. A hidden gem.',
     image: 'https://images.unsplash.com/photo-1520250497591-112f2f40a3f4?w=900&q=80',
     highlights: [], seoTitle: 'Himeville | Visit Drakensberg', seoDescription: '',
@@ -85,9 +92,11 @@ function normalizeTown(town: Partial<Town> & { name: string; id?: string }): Tow
     gateway: town.gateway || '',
     description: town.description || '',
     image: town.image || '',
+    imagePosition: town.imagePosition ? imagePositionToCss(town.imagePosition) : '',
     highlights: town.highlights || [],
     seoTitle: town.seoTitle || `${town.name} | Visit Drakensberg`,
     seoDescription: town.seoDescription || '',
+    featured: town.featured ?? false,
     createdAt: town.createdAt,
     updatedAt: town.updatedAt,
   }
@@ -99,6 +108,20 @@ async function saveTowns(towns: Town[]) {
     { onConflict: 'key' },
   )
   if (error) throw error
+}
+
+// /towns/[slug] is ISR-cached for an hour, so an admin's edit wouldn't
+// reach visitors until that cache window happened to expire. Best-effort
+// and non-blocking — a failed revalidate (e.g. offline) still leaves the
+// save itself intact, just stale until the cache naturally expires. Same
+// pattern as lib/activities.ts's revalidateActivityPage.
+function revalidateTownPage(slug: string): void {
+  if (typeof fetch !== 'function' || !slug) return
+  fetch('/api/revalidate/town', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ slug }),
+  }).catch(() => {})
 }
 
 // Accepts an optional Supabase client so Server Components can pass a
@@ -120,7 +143,9 @@ export async function getTownsByRegion(regionSlug: string): Promise<Town[]> {
 
 export async function saveAllTowns(towns: Town[]): Promise<void> {
   const now = new Date().toISOString()
-  await saveTowns(towns.map(t => normalizeTown({ ...t, updatedAt: t.updatedAt ?? now })))
+  const normalized = towns.map(t => normalizeTown({ ...t, updatedAt: t.updatedAt ?? now }))
+  await saveTowns(normalized)
+  for (const t of normalized) revalidateTownPage(t.slug)
 }
 
 export async function createTown(data: Omit<Town, 'id' | 'slug' | 'createdAt' | 'updatedAt'>): Promise<Town> {
@@ -128,6 +153,7 @@ export async function createTown(data: Omit<Town, 'id' | 'slug' | 'createdAt' | 
   const now = new Date().toISOString()
   const item = normalizeTown({ ...data, createdAt: now, updatedAt: now })
   await saveTowns([...all.filter(t => t.slug !== item.slug), item])
+  revalidateTownPage(item.slug)
   return item
 }
 
@@ -137,10 +163,13 @@ export async function updateTown(id: string, data: Omit<Town, 'id' | 'slug' | 'c
   const updated = normalizeTown({ ...data, id, slug: previous?.slug, createdAt: previous?.createdAt, updatedAt: new Date().toISOString() })
   const next = previous ? all.map(t => t.id === id ? updated : t) : [...all, updated]
   await saveTowns(next)
+  revalidateTownPage(updated.slug)
   return updated
 }
 
 export async function deleteTown(id: string): Promise<void> {
   const all = await getTowns()
+  const removed = all.find(t => t.id === id)
   await saveTowns(all.filter(t => t.id !== id))
+  if (removed) revalidateTownPage(removed.slug)
 }

@@ -2,6 +2,7 @@ import { getActivities, type Activity } from './activities'
 import { getDepartures, type Departure } from './departures'
 import { getProperties, type Property } from './properties'
 import { getRoomsByProperty } from './rooms'
+import { todayISO } from './upcoming'
 
 // Context-aware recommendation engine. Inputs are the visitor's real
 // context (region, travel dates, current cart, past bookings); output is a
@@ -51,7 +52,7 @@ function dateInRange(date: string, from?: string, to?: string) {
 
 export async function getRecommendations(ctx: RecommendationContext, limit = 6): Promise<Recommendation[]> {
   const exclude = new Set(ctx.excludeIds ?? [])
-  const today = new Date().toISOString().slice(0, 10)
+  const today = todayISO()
 
   const [activities, departures, properties] = await Promise.all([
     getActivities().catch(() => [] as Activity[]),

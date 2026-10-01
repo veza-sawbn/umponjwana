@@ -5,8 +5,7 @@ import Link from 'next/link'
 import toast from 'react-hot-toast'
 import { MapPin, Calendar, Users, CheckCircle, Clock, XCircle, Download, ChevronRight } from 'lucide-react'
 import { getBookingsByUser, updateBookingStatus, type SavedBooking } from '@/lib/bookings'
-import { getDepartures, releaseDepartureSeats } from '@/lib/departures'
-import { releaseActivityTimeslot } from '@/lib/activities'
+import { releaseBookingInventory } from '@/lib/inventory-holds'
 import { supabase } from '@/lib/auth'
 import { formatMoney } from '@/lib/allocation'
 import { holdDeadlineLabel, holdHasLapsed } from '@/lib/stay-requests'
@@ -77,15 +76,15 @@ function BookingCard({ b, onCancel }: { b: SavedBooking; onCancel?: (b: SavedBoo
         </div>
         {b.status === 'requested' && (
           <p className="font-sans text-xs text-blue-700 mt-2 flex items-center gap-1.5">
-            <Clock size={11} /> Waiting on the property to confirm your dates — you have not been charged.
+            <Clock size={11} /> Waiting on the property to confirm your dates. You have not been charged.
           </p>
         )}
         {b.status === 'pending' && b.holdExpiresAt && (
           <p className={`font-sans text-xs mt-2 flex items-center gap-1.5 ${holdHasLapsed(b.holdExpiresAt) ? 'text-red-500' : 'text-[#8B6914]'}`}>
             <Clock size={11} />
             {holdHasLapsed(b.holdExpiresAt)
-              ? 'Your payment window has passed — pay now to try to keep this booking.'
-              : `Dates confirmed — pay by ${holdDeadlineLabel(b.holdExpiresAt)} to hold your room.`}
+              ? 'Your payment window has passed. Pay now to try to keep this booking.'
+              : `Dates confirmed. Pay by ${holdDeadlineLabel(b.holdExpiresAt)} to hold your room.`}
           </p>
         )}
         {b.status === 'declined' && b.declineReason && (
@@ -152,16 +151,11 @@ export default function AccountBookingsPage() {
       : `Cancel booking ${b.reference}? Free cancellation applies until 48 hours before check-in.`)) return
     try {
       await updateBookingStatus(b.id, 'cancelled', { notifySuppliers: true })
-      // Release any tour departure seats and activity timeslots held by this booking.
-      const deps = await getDepartures()
-      await Promise.all([
-        ...b.addons
-          .filter(a => deps.some(d => d.id === a.id))
-          .map(a => releaseDepartureSeats(a.id, a.guests).catch(() => {})),
-        ...b.addons
-          .filter(a => a.activityId && a.timeslotId && a.date)
-          .map(a => releaseActivityTimeslot(a.activityId!, a.date!, a.timeslotId!, a.guests).catch(() => {})),
-      ])
+      // Release everything this booking holds — departure seats and activity
+      // timeslots alike. One server call that releases exactly the holds this
+      // booking took, instead of re-deriving them from the addons blob here
+      // and hoping the two agree (see lib/inventory-holds.ts).
+      await releaseBookingInventory(b.id)
       setBookings(prev => prev.map(x => x.id === b.id ? { ...x, status: 'cancelled' } : x))
       toast.success(withdrawing ? 'Request withdrawn.' : 'Booking cancelled. The suppliers have been notified.')
     } catch {

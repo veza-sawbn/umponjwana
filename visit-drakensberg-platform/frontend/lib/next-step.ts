@@ -62,7 +62,7 @@ export function getOrderNextStep(order: MasterOrder): NextStep {
   if (order.payment_status === 'unpaid' && balance > 0) {
     return withUrgency({
       label: 'Collect payment',
-      detail: 'No payment received yet — send or re-send the invoice, or follow up with the customer.',
+      detail: 'No payment received yet. Send or re-send the invoice, or follow up with the customer.',
       urgency: 'attention',
     }, order.travel_start)
   }
@@ -78,7 +78,7 @@ export function getOrderNextStep(order: MasterOrder): NextStep {
   if (order.supplier_status === 'pending') {
     return withUrgency({
       label: 'Confirm with supplier',
-      detail: 'Payment is in — the allocated supplier(s) still need to confirm they can deliver.',
+      detail: 'Payment is in. The allocated suppliers still need to confirm they can deliver.',
       urgency: 'attention',
     }, order.travel_start)
   }
@@ -92,33 +92,33 @@ export function getOrderNextStep(order: MasterOrder): NextStep {
   }
 
   if (order.trip_status === 'completed' && order.financial_status === 'open') {
-    return { label: 'Close out', detail: 'Trip is done — settle supplier payouts and close the order.', urgency: 'info' }
+    return { label: 'Close out', detail: 'Trip is done. Settle supplier payouts and close the order.', urgency: 'info' }
   }
 
   if (order.trip_status === 'in_progress') {
     return { label: 'Trip underway', detail: 'Monitor fulfilment until the trip completes.', urgency: 'info' }
   }
 
-  return { label: 'On track', detail: 'Paid and confirmed — nothing needs staff action right now.', urgency: 'done' }
+  return { label: 'On track', detail: 'Paid and confirmed. Nothing needs staff action right now.', urgency: 'done' }
 }
 
 /** What should staff do about a sales quote right now? Mirrors getOrderNextStep's shape for a consistent console feel. */
 export function getQuoteNextStep(quote: { status: string; valid_until: string | null; sent_at: string | null }): NextStep {
   switch (quote.status) {
     case 'draft':
-      return { label: 'Send it', detail: 'Still a draft — the customer has not seen this quote yet.', urgency: 'attention' }
+      return { label: 'Send it', detail: 'Still a draft. The customer has not seen this quote yet.', urgency: 'attention' }
     case 'sent': {
       const days = daysUntil(quote.valid_until)
-      if (days !== null && days < 0) return { label: 'Expired', detail: 'Past its valid-until date — reissue or follow up.', urgency: 'attention' }
+      if (days !== null && days < 0) return { label: 'Expired', detail: 'Past its valid-until date. Reissue or follow up.', urgency: 'attention' }
       if (days !== null && days <= 2) return { label: 'Follow up', detail: 'Sent and about to expire with no response.', urgency: 'urgent' }
-      return { label: 'Awaiting response', detail: 'Sent — waiting on the customer to accept or decline.', urgency: 'info' }
+      return { label: 'Awaiting response', detail: 'Sent. Waiting on the customer to accept or decline.', urgency: 'info' }
     }
     case 'converted':
-      return { label: 'Now an order', detail: 'Accepted — track it from here on in Orders.', urgency: 'done' }
+      return { label: 'Now an order', detail: 'Accepted. Track it from here on in Orders.', urgency: 'done' }
     case 'declined':
       return { label: 'Declined', detail: 'Customer declined this quote.', urgency: 'done' }
     case 'expired':
-      return { label: 'Expired', detail: 'Never accepted — reissue if the customer is still interested.', urgency: 'info' }
+      return { label: 'Expired', detail: 'Never accepted. Reissue if the customer is still interested.', urgency: 'info' }
     default:
       return { label: 'Review', detail: '', urgency: 'info' }
   }

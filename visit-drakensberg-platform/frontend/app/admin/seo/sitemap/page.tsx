@@ -147,7 +147,7 @@ function TypeRow({
           {/* Slug gaps */}
           {summary.slugGaps.length > 0 && (
             <div>
-              <p className={labelCls}>Slug gaps — using UUID as URL ({summary.slugGaps.length})</p>
+              <p className={labelCls}>Slug gaps, using UUID as URL ({summary.slugGaps.length})</p>
               <div className="space-y-1">
                 {summary.slugGaps.slice(0, 10).map(e => (
                   <div key={e.id} className="flex items-center justify-between gap-3 bg-white border border-amber-200 px-3 py-2">
@@ -167,7 +167,7 @@ function TypeRow({
                 ))}
                 {summary.slugGaps.length > 10 && (
                   <p className="font-sans text-xs text-gray-400 px-1">
-                    +{summary.slugGaps.length - 10} more — edit entity to add slug
+                    +{summary.slugGaps.length - 10} more. Edit entity to add slug
                   </p>
                 )}
               </div>
@@ -454,7 +454,7 @@ export default function SitemapControlPage() {
                 <CheckCircle2 size={16} className="text-emerald-500 mt-0.5 shrink-0" />
                 <div>
                   <p className="font-sans text-sm text-gray-700 font-medium mb-0.5">
-                    {STATIC_ROUTE_COUNT} static routes + {STORY_SLUG_COUNT} editorial stories — always in sitemap
+                    {STATIC_ROUTE_COUNT} static routes + {STORY_SLUG_COUNT} editorial stories, always in sitemap
                   </p>
                   <p className="font-sans text-xs text-gray-400">
                     These are hardcoded in <code className="bg-gray-100 px-1">app/sitemap.ts</code> and always included regardless of DB state.
@@ -508,7 +508,7 @@ export default function SitemapControlPage() {
               <div className="bg-emerald-50 border border-emerald-200 p-4 flex items-center gap-3">
                 <CheckCircle2 size={16} className="text-emerald-600 shrink-0" />
                 <p className="font-sans text-sm text-emerald-800">
-                  All published entities have real slugs — the sitemap is advertising clean canonical URLs.
+                  All published entities have real slugs, so the sitemap is advertising clean canonical URLs.
                 </p>
               </div>
             ) : (

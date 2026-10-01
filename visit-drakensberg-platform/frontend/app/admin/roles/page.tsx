@@ -89,7 +89,7 @@ function InviteModal({ onClose, onInvited }: { onClose: () => void; onInvited: (
           {busy ? 'Sending invite…' : 'Send Invite'}
         </button>
         <p className="font-sans text-[11px] text-gray-400 mt-3 leading-relaxed">
-          Sends a Supabase Auth invite email so they can set their own password. This requires SMTP to be configured on the project — if it isn't, the account is still created but no email goes out.
+          Sends a Supabase Auth invite email so they can set their own password. This requires SMTP to be configured on the project. If it isn't, the account is still created but no email goes out.
         </p>
       </div>
     </div>
@@ -179,7 +179,7 @@ export default function RolesPage() {
             {!loading && collaborators.length === 0 && (
               <tr><td colSpan={5} className="px-5 py-12 text-center font-sans text-sm text-gray-400">
                 <Shield size={20} className="mx-auto mb-2 text-gray-300" />
-                No collaborators yet — invite one above.
+                No collaborators yet. Invite one above.
               </td></tr>
             )}
             {loading && <tr><td colSpan={5} className="px-5 py-12 text-center font-sans text-sm text-gray-400">Loading collaborators…</td></tr>}

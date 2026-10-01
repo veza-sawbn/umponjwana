@@ -6,6 +6,7 @@ import { CalendarDays, Plus, Users, Trash2, ChevronLeft, X, Settings2, UserPlus,
 import { supabase } from '@/lib/auth'
 import { effectiveSupplierId } from '@/lib/effective-supplier'
 import { getSupplierEntities, type SupplierEntity } from '@/lib/supplier-entities'
+import { GUIDE_TYPE_LABEL, guideTypeOf, type GuideType } from '@/lib/operators'
 import { getMyTours, type Tour, type PricingTier } from '@/lib/tours'
 import { getTrails, type Trail } from '@/lib/trails'
 import { formatMoney } from '@/lib/allocation'
@@ -21,7 +22,7 @@ import {
   getGuestsForDeparture, addManualGuest, removeManualGuest, type DepartureGuest,
 } from '@/lib/departure-guests'
 
-type Guide = SupplierEntity & { name: string }
+type Guide = SupplierEntity & { name: string; guideType?: GuideType }
 
 const STATUS: Record<string, string> = {
   confirmed: 'bg-emerald-100 text-emerald-700',
@@ -60,7 +61,7 @@ function RatesFieldset({
         {trailDayCount > 0 && (
           <p className="font-sans text-xs text-black/40">
             &quot;{tour!.name}&quot;&apos;s trail has a {trailDayCount}-day itinerary. A freeform rate below can set its own
-            trip length; a rate linked to a pricing tier follows that tier&apos;s itinerary instead — edit it on the tour.
+            trip length; a rate linked to a pricing tier follows that tier&apos;s itinerary instead, which you edit on the tour.
           </p>
         )}
         <PackagesEditor packages={packages} onChange={onChangePackages} itineraryDayCount={trailDayCount} />
@@ -303,7 +304,7 @@ function GuestsModal({
               </select>
             </div>
           )}
-          <input value={form.notes} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))} placeholder="Notes — e.g. Wix booking reference (optional)" className={inp} />
+          <input value={form.notes} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))} placeholder="Notes, e.g. Wix booking reference (optional)" className={inp} />
           <label className="flex items-center gap-2 font-sans text-xs text-black/60 cursor-pointer">
             <input
               type="checkbox"
@@ -471,7 +472,7 @@ function DeparturesInner() {
                 className={inp}
               >
                 <option value="">Select tour…</option>
-                {tours.length === 0 && <option disabled>No active tours — create one first</option>}
+                {tours.length === 0 && <option disabled>No active tours. Create one first</option>}
                 {tours.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
               </select>
             </div>
@@ -484,7 +485,11 @@ function DeparturesInner() {
               <select value={form.guide} onChange={e => setForm(f => ({ ...f, guide: e.target.value }))} className={inp}>
                 <option value="">Select guide…</option>
                 {guides.length === 0 && <option disabled>No guides on your team yet</option>}
-                {guides.map(g => <option key={g.id} value={g.name}>{g.name}</option>)}
+                {/* The type rides along in the label: a trainee shouldn't be
+                    assigned to lead a departure on their own. */}
+                {guides.map(g => (
+                  <option key={g.id} value={g.name}>{g.name} — {GUIDE_TYPE_LABEL[guideTypeOf(g)]}</option>
+                ))}
               </select>
               {guides.length === 0 && (
                 <p className="font-sans text-[11px] text-black/30">

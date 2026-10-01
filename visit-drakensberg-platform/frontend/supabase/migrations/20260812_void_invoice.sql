@@ -18,6 +18,7 @@
 --
 -- Both actions are finance-staff-only (is_finance() guard) and audited.
 -- ============================================================================
+-- @rollback: additive — forward-only; safe to leave in place if the deploy is rolled back
 
 -- ────────────────────────────────────────────────────────────────────────────
 -- 1. Audit-trail columns

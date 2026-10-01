@@ -87,7 +87,7 @@ export default function EstimatorPage() {
   }, [autoDistance])
 
   const distanceStatus =
-    distanceCalcStatus === 'idle' ? 'Enter pickup and drop-off addresses — distance calculates automatically.'
+    distanceCalcStatus === 'idle' ? 'Enter pickup and drop-off addresses. Distance calculates automatically.'
     : distanceCalcStatus === 'calculating' ? 'Calculating route distance in the background…'
     : distanceCalcStatus === 'error' ? 'Could not calculate a driving distance for those addresses. Try more specific locations.'
     : `Distance calculated automatically${autoDistance?.durationText ? ` · ~${autoDistance.durationText} drive` : ''}.`
@@ -166,7 +166,7 @@ export default function EstimatorPage() {
       await navigator.clipboard.writeText(quoteSummary())
       setCopyMsg('Estimate copied to clipboard.')
     } catch {
-      setCopyMsg('Could not copy — your browser blocked clipboard access.')
+      setCopyMsg('We could not copy that. Your browser blocked clipboard access.')
     }
     setTimeout(() => setCopyMsg(''), 3000)
   }
@@ -294,7 +294,7 @@ export default function EstimatorPage() {
 
               <div className="space-y-2 pt-1">
                 <button onClick={handleCopy} className="w-full flex items-center justify-center gap-1.5 font-sans text-sm px-3 py-2 rounded-lg border border-black/10 text-black/60 hover:bg-black/5 transition-colors"><Copy size={14} />Copy Estimate</button>
-                <p className="font-sans text-xs text-black/40 text-center leading-relaxed">This is an estimate only — nothing is saved or sent. Ask an administrator to issue it as a formal quote.</p>
+                <p className="font-sans text-xs text-black/40 text-center leading-relaxed">This is an estimate only. Nothing is saved or sent. Ask an administrator to issue it as a formal quote.</p>
               </div>
             </div>
           </div>

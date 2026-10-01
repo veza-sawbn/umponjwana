@@ -203,7 +203,7 @@ export async function approveGuideAvailability(request: TripRequest, guideName: 
 export async function issueQuote(request: TripRequest, quote: TripQuote): Promise<TripRequest> {
   const updated = await saveTransition(request, 'quote_ready',
     { operatorApprovedAt: new Date().toISOString(), quote },
-    'Operational approval — quote issued')
+    'Operational approval, quote issued')
   await notify(request.userId, 'approval',
     `Quote ready — ${request.reference}`,
     `${request.operatorName || 'The operator'} approved your ${request.trailName} trip and sent a quote of ${formatMoney(quote.total)}.`,

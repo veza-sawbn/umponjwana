@@ -47,7 +47,7 @@ function CreateSettlementModal({ balance, onClose, onCreated }: {
         scheduledFor: scheduledFor || undefined,
         notes,
       })
-      toast.success('Settlement created — pending approval.')
+      toast.success('Settlement created and pending approval.')
       onCreated()
       onClose()
     } catch (e) {
@@ -237,7 +237,7 @@ export default function AdminSettlementsPage() {
                       <button onClick={() => act(() => approveSettlement(s.id), 'Settlement approved.')} className="font-sans text-xs text-blue-500 hover:underline">Approve</button>
                     )}
                     {(s.status === 'pending' || s.status === 'approved') && (
-                      <button onClick={() => act(() => paySettlement(s.id, payoutRefs[s.id] ?? ''), 'Settlement paid — supplier balance updated.')} className="font-sans text-xs text-[#2d6a4f] hover:underline">Mark Paid</button>
+                      <button onClick={() => act(() => paySettlement(s.id, payoutRefs[s.id] ?? ''), 'Settlement paid. Supplier balance updated.')} className="font-sans text-xs text-[#2d6a4f] hover:underline">Mark Paid</button>
                     )}
                     {s.status !== 'reversed' && (
                       <button onClick={() => act(() => reverseSettlement(s.id, 'Reversed from admin console'), 'Settlement reversed.')} className="font-sans text-xs text-red-400 hover:underline inline-flex items-center gap-1"><Undo2 size={11} />Reverse</button>
@@ -246,7 +246,7 @@ export default function AdminSettlementsPage() {
                 </td>
               </tr>
             ))}
-            {!loading && settlements.length === 0 && <tr><td colSpan={9} className="px-5 py-10 text-center font-sans text-sm text-gray-400">No settlements yet — settle a supplier balance above.</td></tr>}
+            {!loading && settlements.length === 0 && <tr><td colSpan={9} className="px-5 py-10 text-center font-sans text-sm text-gray-400">No settlements yet. Settle a supplier balance above.</td></tr>}
           </tbody>
         </table>
       </div>

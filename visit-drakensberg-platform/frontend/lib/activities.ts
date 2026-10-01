@@ -1,4 +1,4 @@
-import { listEntities, getEntity, insertEntity, updateEntity, deleteEntity, newEntityId, listEntitiesByOwner } from './entities'
+import { listEntities, getEntityByIdOrSlug, insertEntity, updateEntity, deleteEntity, newEntityId, listEntitiesByOwner } from './entities'
 import type { GraphFields } from './graph-fields'
 import { slugify, uniqueSlug } from './slugify'
 import type { Season, SeasonTopic } from './seasons'
@@ -85,6 +85,12 @@ export type Activity = {
   slotBookings?: Record<string, number>
   depositRequired: boolean
   depositPercent: string
+  /** The supplier drives guests themselves on this activity — a Sani Pass 4x4
+   *  run, a game drive, a guided tour by minibus. Ticking it on the supplier
+   *  form adds the 'Shuttle' supplier type (lib/supplier-types.ts), which is
+   *  what reveals the fleet tools: Transport Company, Vehicles, Drivers and
+   *  Transport Jobs. Absent on every activity saved before this existed. */
+  usesOwnVehicles?: boolean
   status: 'active' | 'draft'
   createdAt: string
   /** Which seasons this activity suits — powers the region "When to Go"
@@ -122,8 +128,11 @@ export function slotRemaining(activity: Pick<Activity, 'timeslots' | 'slotBookin
   return Math.max(slot.capacity - slotBookedCount(activity, dateStr, timeslotId), 0)
 }
 
-/** Visitor-side booking: atomic, capacity-checked, executed server-side.
- *  Throws with a readable message when the timeslot is full for that date. */
+/** OPERATOR-side booking: a permanent, capacity-checked take on a timeslot of
+ *  an activity you run. NOT the checkout path — a guest reserving at checkout
+ *  takes a TTL'd hold through lib/inventory-holds.ts, and vd_book_activity_slot
+ *  now refuses anyone who is not the activity's owner, an ops employee managing
+ *  them, or staff. */
 export async function bookActivityTimeslot(activityId: string, dateStr: string, timeslotId: string, seats: number): Promise<void> {
   const { error } = await supabase.rpc('vd_book_activity_slot', {
     p_activity_id: activityId, p_slot_date: dateStr, p_timeslot_id: timeslotId, p_seats: seats,
@@ -131,7 +140,11 @@ export async function bookActivityTimeslot(activityId: string, dateStr: string, 
   if (error) throw new Error(error.message || 'Could not reserve this timeslot')
 }
 
-/** Free seats after a cancellation (booking owner or supplier). */
+/** Free seats on a timeslot (the activity's operator, staff, or a guest who
+ *  actually holds them). Until 20260914_inventory_holds.sql this accepted any
+ *  signed-in caller and any seat count, including a negative one — which
+ *  INFLATED the booked count and let anyone mark a timeslot permanently full.
+ *  Seats a guest holds normally come back through releaseBookingInventory. */
 export async function releaseActivityTimeslot(activityId: string, dateStr: string, timeslotId: string, seats: number): Promise<void> {
   const { error } = await supabase.rpc('vd_release_activity_slot', {
     p_activity_id: activityId, p_slot_date: dateStr, p_timeslot_id: timeslotId, p_seats: seats,
@@ -149,8 +162,12 @@ export async function getActivitiesBySupplier(supplierId: string): Promise<Activ
   return listEntitiesByOwner<Activity>(KIND, supplierId)
 }
 
-export async function getActivityById(id: string, client?: SupabaseClient): Promise<Activity | null> {
-  return client ? getEntity<Activity>(KIND, id, client) : getEntity<Activity>(KIND, id)
+/** Accepts either form of the public URL segment (`slug || id`) — see
+ *  getEntityByIdOrSlug(). */
+export async function getActivityById(idOrSlug: string, client?: SupabaseClient): Promise<Activity | null> {
+  return client
+    ? getEntityByIdOrSlug<Activity>(KIND, idOrSlug, client)
+    : getEntityByIdOrSlug<Activity>(KIND, idOrSlug)
 }
 
 // The public activity page (app/activities/[id]/page.tsx) is ISR-cached for

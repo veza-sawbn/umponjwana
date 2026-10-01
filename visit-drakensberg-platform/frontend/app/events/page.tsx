@@ -5,6 +5,7 @@ import Footer from '@/components/layout/Footer'
 import { CalendarDays, MapPin, Ticket, Star, Filter, Check, Loader2 } from 'lucide-react'
 import { useBooking } from '@/lib/booking-context'
 import { getSupplierEntities } from '@/lib/supplier-entities'
+import { isEventUpcoming } from '@/lib/upcoming'
 import { formatMoney } from '@/lib/allocation'
 
 interface PublicEvent {
@@ -42,13 +43,12 @@ export default function EventsPage() {
   useEffect(() => {
     getSupplierEntities<any>(ENTITY)
       .then((all: PublicEvent[]) => {
-        const now = new Date().toISOString()
         setEvents(
           all
             // RLS already hides drafts from the public, but a supplier
             // browsing this page while signed in would otherwise see their
             // own unpublished events too — filter defensively.
-            .filter(e => e.is_published && (e.ends_at || e.starts_at) >= now)
+            .filter(e => e.is_published && isEventUpcoming(e))
             .sort((a, b) => a.starts_at.localeCompare(b.starts_at)),
         )
       })
@@ -84,7 +84,7 @@ export default function EventsPage() {
           <p className="font-sans text-[10px] tracking-[0.2em] uppercase text-[#C9A96E] mb-4">What's On</p>
           <h1 className="font-display italic text-5xl lg:text-6xl mb-4">Events & Specials</h1>
           <p className="font-sans text-lg text-white/70 max-w-2xl">
-            Guided experiences, cultural evenings, seasonal specials and more — all set against the dramatic backdrop of the Drakensberg.
+            Guided experiences, cultural evenings, seasonal specials and more, all set against the dramatic backdrop of the Drakensberg.
           </p>
         </div>
       </section>
@@ -110,7 +110,7 @@ export default function EventsPage() {
           <div className="py-24 flex justify-center"><Loader2 size={24} className="animate-spin text-gray-300" /></div>
         ) : filtered.length === 0 ? (
           <div className="py-24 text-center">
-            <p className="font-sans text-sm text-gray-400">No upcoming events or specials right now — check back soon.</p>
+            <p className="font-sans text-sm text-gray-400">No upcoming events or specials right now. Please check back soon.</p>
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">

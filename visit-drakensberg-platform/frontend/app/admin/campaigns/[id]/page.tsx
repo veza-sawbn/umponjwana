@@ -60,7 +60,10 @@ export default function EmailCampaignDetailPage() {
     if (!template) return
     const res = await fetch('/api/admin/campaigns/preview', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ subject: template.subject, preheader: template.preheader, htmlBody: template.htmlBody }),
+      body: JSON.stringify({
+        subject: template.subject, preheader: template.preheader, htmlBody: template.htmlBody,
+        heroImageUrl: template.heroImageUrl, heroImageAlt: template.heroImageAlt,
+      }),
     })
     const data = await res.json()
     setPreviewHtml(data.html ?? '')

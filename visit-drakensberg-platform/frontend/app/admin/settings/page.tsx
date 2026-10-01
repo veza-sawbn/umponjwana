@@ -50,7 +50,7 @@ function BusinessDetailsCard() {
           <Save size={12} /> {saving ? 'Saving…' : 'Save'}
         </button>
       </div>
-      <p className="font-sans text-xs text-gray-400 mb-5">Appears on every invoice and quote — legal name, registration/VAT numbers, and banking details for EFT payers.</p>
+      <p className="font-sans text-xs text-gray-400 mb-5">Appears on every invoice and quote: legal name, registration/VAT numbers, and banking details for EFT payers.</p>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {field('Business Name', 'business_name')}
         {field('Registration Number', 'registration_number', 'e.g. 2024/000000/07')}
@@ -77,7 +77,7 @@ function BusinessDetailsCard() {
           value={details.invoice_footer_note}
           onChange={e => set('invoice_footer_note', e.target.value)}
           rows={2}
-          placeholder="e.g. Thank you for your business — payment due within 7 days."
+          placeholder="e.g. Thank you for your business. Payment due within 7 days."
           className="w-full border border-gray-200 px-4 py-3 font-sans text-sm focus:outline-none focus:border-[#2d6a4f] bg-[#F7F5F2] resize-none"
         />
       </div>
@@ -136,7 +136,7 @@ function TaxSettingsCard() {
           <Save size={12} /> {saving ? 'Saving…' : 'Save'}
         </button>
       </div>
-      <p className="font-sans text-xs text-gray-400 mb-5">Applied by default to every new order, invoice and quote — individual documents can still override these.</p>
+      <p className="font-sans text-xs text-gray-400 mb-5">Applied by default to every new order, invoice and quote. Individual documents can still override these.</p>
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div>
           <label className="block font-sans text-[10px] tracking-[0.12em] uppercase text-gray-400 mb-1.5">VAT Rate (%)</label>

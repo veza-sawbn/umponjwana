@@ -61,7 +61,7 @@ export default function AdminListingsPage() {
     try {
       await setAdminListingBookingMode(l.id, next)
       toast.success(next === 'request'
-        ? `${l.name} now takes booking requests — guests aren't charged until the operator confirms.`
+        ? `${l.name} now takes booking requests. Guests aren't charged until the operator confirms.`
         : `${l.name} is back to instant booking.`)
     } catch {
       setListings(p => p.map(x => x.id === l.id ? { ...x, bookingMode: previous } : x))
@@ -191,7 +191,7 @@ export default function AdminListingsPage() {
         {!loading && filtered.length === 0 && (
           <div className="py-12 text-center">
             <p className="font-sans text-sm text-gray-400">
-              {listings.length === 0 ? 'No listings yet — they appear here as suppliers publish them.' : 'No listings match your filters.'}
+              {listings.length === 0 ? 'No listings yet. They appear here as suppliers publish them.' : 'No listings match your filters.'}
             </p>
           </div>
         )}

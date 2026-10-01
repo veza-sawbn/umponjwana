@@ -3,6 +3,7 @@ import { notFound } from 'next/navigation'
 import { getOperatorById, type OperatorProfile } from '@/lib/operators'
 import { publicSupabase } from '@/lib/supabase-public'
 import OperatorDetail from './OperatorDetail'
+import JsonLd from '@/components/seo/JsonLd'
 
 // Server shell — same pattern as the other converted detail routes.
 // See docs/destination-graph/PHASE_B.md.
@@ -21,7 +22,7 @@ export async function generateMetadata({ params }: { params: { id: string } }): 
   const operator = await resolveOperator(params.id)
   if (!operator) return { title: 'Operator Not Found' }
 
-  const title = operator.seoTitle || `${operator.companyName} — ${operator.location || 'Drakensberg'} Tour Operator | Visit Drakensberg`
+  const title = operator.seoTitle || `${operator.companyName}, ${operator.location || 'Drakensberg'} Tour Operator | Visit Drakensberg`
   const description = operator.seoDescription || operator.overview || `${operator.companyName}, a verified Drakensberg tour operator${operator.yearsOperating ? ` with ${operator.yearsOperating} years operating` : ''}.`
   const canonical = `/guides/operators/${operator.slug || operator.id}`
 
@@ -75,8 +76,8 @@ export default async function OperatorPage({ params }: { params: { id: string } 
 
   return (
     <>
-      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(orgJsonLd) }} />
-      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbJsonLd) }} />
+      <JsonLd data={orgJsonLd} />
+      <JsonLd data={breadcrumbJsonLd} />
       <OperatorDetail operator={operator} />
     </>
   )

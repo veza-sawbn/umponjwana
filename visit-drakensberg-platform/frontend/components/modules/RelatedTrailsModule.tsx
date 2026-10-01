@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import Image from 'next/image'
 import { Mountain, Navigation } from 'lucide-react'
 import type { NearbyTrailResult } from '@/lib/modules'
 
@@ -35,7 +36,7 @@ export default function RelatedTrailsModule({
         {trails.map(t => (
           <Link key={t.id} href={`/hikes/${t.slug || t.id}`} className="group bg-white border border-gray-200 overflow-hidden hover:border-[#2d6a4f] transition-colors flex gap-0">
             <div className="relative w-28 shrink-0 overflow-hidden">
-              <img src={t.image || FALLBACK} alt={t.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+              <Image src={t.image || FALLBACK} alt={t.name} fill loading="lazy" sizes="112px" className="object-cover group-hover:scale-105 transition-transform duration-500" />
             </div>
             <div className="p-4 flex flex-col justify-between flex-1 min-w-0">
               <div>

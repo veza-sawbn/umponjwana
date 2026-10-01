@@ -1,8 +1,9 @@
 import type { Metadata } from 'next'
 import { notFound } from 'next/navigation'
-import { getPackageById, type MarketplacePackage } from '@/lib/packages'
+import { getPackageById, packageHeadlinePrice, type MarketplacePackage } from '@/lib/packages'
 import { publicSupabase } from '@/lib/supabase-public'
 import PackageDetail from './PackageDetail'
+import JsonLd from '@/components/seo/JsonLd'
 
 // Server shell — same pattern as the other converted detail routes. Only a
 // genuinely missing package 404s server-side; an existing-but-unpublished
@@ -34,7 +35,7 @@ export async function generateMetadata({ params }: { params: { id: string } }): 
   const pkg = await resolvePackage(params.id)
   if (!pkg) return { title: 'Package Not Found' }
 
-  const title = pkg.seoTitle || `${pkg.title} — ${pkg.region || 'Drakensberg'} | Visit Drakensberg`
+  const title = pkg.seoTitle || `${pkg.title}, ${pkg.region || 'Drakensberg'} | Visit Drakensberg`
   const description = buildDescription(pkg)
   const canonical = `/packages/${pkg.slug || pkg.id}`
 
@@ -66,9 +67,11 @@ export default async function PackagePage({ params }: { params: { id: string } }
     description: pkg.seoDescription || pkg.summary || pkg.description || undefined,
     image: pkg.image || undefined,
     url: canonicalUrl,
-    offers: pkg.pricePerPerson ? {
+    // A group package's offer is the flat rate for the whole group; a
+    // per-person package quotes the per-traveller price, as before.
+    offers: packageHeadlinePrice(pkg) ? {
       '@type': 'Offer',
-      price: pkg.pricePerPerson,
+      price: packageHeadlinePrice(pkg),
       priceCurrency: 'ZAR',
       availability: pkg.packageStatus === 'published' ? 'https://schema.org/InStock' : 'https://schema.org/OutOfStock',
       url: canonicalUrl,
@@ -87,9 +90,9 @@ export default async function PackagePage({ params }: { params: { id: string } }
 
   return (
     <>
-      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(productJsonLd) }} />
-      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbJsonLd) }} />
-      <PackageDetail pkg={pkg} id={params.id} />
+      <JsonLd data={productJsonLd} />
+      <JsonLd data={breadcrumbJsonLd} />
+      <PackageDetail pkg={pkg} id={pkg.id} />
     </>
   )
 }

@@ -16,6 +16,7 @@
 -- flow — this is a separate, explicitly-labelled bucket within the same
 -- table, not a change to how booking-derived contacts are produced.
 -- ============================================================================
+-- @rollback: additive — forward-only; safe to leave in place if the deploy is rolled back
 
 alter table vd_supplier_contacts
   add column if not exists source text not null default 'booking'

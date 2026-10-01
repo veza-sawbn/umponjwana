@@ -107,7 +107,7 @@ export function SeoPanel({
             </p>
             <p className="font-sans text-[12px] text-[#006621] mb-1 truncate">{displayUrl}</p>
             <p className="font-sans text-[12px] text-gray-500 leading-snug line-clamp-2">
-              {seoDescription || <span className="text-gray-300 italic">No meta description — search engines will pick a snippet from the page.</span>}
+              {seoDescription || <span className="text-gray-300 italic">No meta description. Search engines will pick a snippet from the page.</span>}
             </p>
           </div>
 

@@ -1,4 +1,5 @@
 import { supabase } from './auth'
+import { getEffectiveSupplierId } from './effective-supplier'
 import type { SavedBooking } from './bookings'
 import { getPropertyById } from './properties'
 import { notify } from './notifications'
@@ -164,12 +165,37 @@ export async function createOrdersForBooking(booking: SavedBooking): Promise<voi
   if (error) throw error
 }
 
-/** Orders for the signed-in supplier (RLS scopes rows automatically). */
+/**
+ * Orders for the supplier whose portal this is.
+ *
+ * WHY THE EXPLICIT FILTER — IT USED TO SAY "RLS SCOPES ROWS AUTOMATICALLY"
+ *   That was true of a supplier and false of an operations employee, and the
+ *   difference produced a reported "data breach" that wasn't one.
+ *   20260902_stay_booking_requests.sql added:
+ *
+ *     create policy "Managed ops agents read booking orders"
+ *       for select using (is_managed_supplier(supplier_id)
+ *                         and has_supplier_permission(supplier_id, 'view_bookings'));
+ *
+ *   so this unfiltered query returned the UNION of every supplier that
+ *   employee manages — and /supplier rendered that union under whichever
+ *   supplier's name the console said it had entered. Two different managed
+ *   suppliers showed identical dashboards.
+ *
+ *   No RLS change fixes that, because RLS is answering the question it was
+ *   asked ("may this caller see this row?") correctly. The query simply has to
+ *   say WHICH supplier it means. supabase/tests/cross_supplier_isolation_test
+ *   .sql pins both halves down: no supplier can ever see another's rows, and
+ *   filtering by the effective id is what makes the employee's view right.
+ */
 export async function getMyOrders(): Promise<SupplierOrder[]> {
   try {
+    const supplierId = await getEffectiveSupplierId()
+    if (!supplierId) return []
     const { data } = await supabase
       .from('vd_booking_orders')
       .select('*')
+      .eq('supplier_id', supplierId)
       .order('created_at', { ascending: false })
     if (Array.isArray(data)) return (data as Row[]).map(rowToOrder)
   } catch {}

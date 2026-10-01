@@ -7,6 +7,7 @@ import {
   CalendarDays, Heart, Star, Gift, Map, Settings, LogOut, User, ChevronDown, Receipt, MessageCircle,
 } from 'lucide-react'
 import Footer from '@/components/layout/Footer'
+import Logo from '@/components/Logo'
 import NotificationsBell from '@/components/ui/NotificationsBell'
 import { supabase, signOut } from '@/lib/auth'
 
@@ -58,7 +59,16 @@ export default function AccountLayout({ children }: { children: React.ReactNode 
   return (
     <div className="min-h-screen bg-[#F7F5F2]">
 
-      <div className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-12 pt-20 sm:pt-24 lg:pt-28 pb-16">
+      {/* No fixed public Navbar sits above this anymore (see AppShell's
+          isAdmin gate), so top padding is just breathing room, not a
+          spacer for a fixed header. */}
+      <div className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-12 pt-6 sm:pt-8 lg:pt-10 pb-16">
+
+        {/* ── Brand ── the public Navbar no longer renders above this
+            portal, so this is the only way back to the site/home. ── */}
+        <Link href="/" className="inline-flex items-center gap-2 mb-4">
+          <Logo className="h-6 w-auto text-[#2d6a4f]" />
+        </Link>
 
         {/* ── Mobile profile header ── */}
         <div className="lg:hidden mb-4">
@@ -143,7 +153,7 @@ export default function AccountLayout({ children }: { children: React.ReactNode 
         <div className="flex gap-8 items-start">
 
           {/* Desktop sidebar */}
-          <aside className="w-56 shrink-0 sticky top-24 hidden lg:block">
+          <aside className="w-56 shrink-0 sticky top-10 hidden lg:block">
             <div className="bg-white border border-gray-200 p-5 mb-4">
               <div className="flex items-start justify-between">
                 <div className="w-12 h-12 bg-[#2d6a4f]/10 flex items-center justify-center font-display italic text-[#2d6a4f] text-xl mb-3">

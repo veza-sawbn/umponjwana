@@ -6,6 +6,7 @@ import { publicSupabase } from '@/lib/supabase-public'
 import StayDetail from './StayDetail'
 import TrackView from '@/components/analytics/TrackView'
 import { formatMoney } from '@/lib/allocation'
+import JsonLd from '@/components/seo/JsonLd'
 
 // Server shell — same pattern as the other converted detail routes. Property
 // has no seoTitle/seoDescription populated yet, so title/description are
@@ -24,10 +25,12 @@ const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://visitdrakensberg.c
 // docs/destination-graph/PHASE_D.md.
 export const revalidate = 300
 
-async function resolveStay(id: string): Promise<{ property: Property; rooms: Room[] } | null> {
-  const property = await getPropertyById(id, publicSupabase)
+async function resolveStay(idOrSlug: string): Promise<{ property: Property; rooms: Room[] } | null> {
+  const property = await getPropertyById(idOrSlug, publicSupabase)
   if (!property) return null
-  const rooms = await getRoomsByProperty(id, publicSupabase)
+  // property.id, not the URL segment — the segment is `slug || id`, and rooms
+  // are keyed on the property id alone.
+  const rooms = await getRoomsByProperty(property.id, publicSupabase)
   return { property, rooms }
 }
 
@@ -49,7 +52,7 @@ export async function generateMetadata({ params }: { params: { id: string } }): 
   const { property, rooms } = resolved
   const minPrice = rooms.length > 0 ? Math.min(...rooms.map(r => r.basePrice)) : 0
 
-  const title = property.seoTitle || `${property.name} — ${property.region || 'Drakensberg'} | Visit Drakensberg`
+  const title = property.seoTitle || `${property.name}, ${property.region || 'Drakensberg'} | Visit Drakensberg`
   const description = buildDescription(property, minPrice)
   const canonical = `/stays/${property.slug || property.id}`
 
@@ -105,8 +108,8 @@ export default async function StayPage({ params }: { params: { id: string } }) {
 
   return (
     <>
-      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(lodgingJsonLd) }} />
-      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbJsonLd) }} />
+      <JsonLd data={lodgingJsonLd} />
+      <JsonLd data={breadcrumbJsonLd} />
       <TrackView event="accommodation_view" properties={{ id: property.id, name: property.name, region: property.region }} />
       <StayDetail property={property} rooms={rooms} id={params.id} />
     </>

@@ -3,15 +3,19 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
+import Image from 'next/image'
 import Footer from '@/components/layout/Footer'
 import { MapPin, Star, Users, Wifi, Flame, Utensils, Car, ArrowLeft, Calendar, Waves, TreePine, ShieldCheck, BedDouble } from 'lucide-react'
 import SmartRecommendations from '@/components/booking/SmartRecommendations'
+import HeroCarousel from '@/components/media/HeroCarousel'
 import RoomDetailModal, { type RoomDetail } from '@/components/listings/RoomDetailModal'
 import { useBooking } from '@/lib/booking-context'
 import { Check, Clock } from 'lucide-react'
 import type { Property } from '@/lib/properties'
 import { isRequestMode } from '@/lib/stay-requests'
 import { getRoomUnitsLeft, type Room } from '@/lib/rooms'
+import SaveButton from '@/components/ui/SaveButton'
+import type { SaveableListing } from '@/lib/saved-listings'
 import { formatMoney } from '@/lib/allocation'
 import ReadMoreText from '@/components/ui/ReadMoreText'
 
@@ -82,6 +86,19 @@ export default function StayDetail({ property, rooms: roomsData, id }: { propert
   // before the guest builds a whole trip around it.
   const requestOnly = isRequestMode(property)
 
+  // The snapshot both hero save buttons write — one object so the mobile
+  // photo hero and the desktop band can never disagree about what got saved.
+  const savedListing: SaveableListing = {
+    id,
+    type: 'stay',
+    title: stay.title,
+    location: stay.location,
+    price: stay.price_from || null,
+    image: stay.images[0],
+    rating: stay.rating || undefined,
+  }
+
+  const [heroSlide, setHeroSlide] = useState(0)
   const [selectedRoom, setSelectedRoom] = useState<any>(null)
   const [showRooms, setShowRooms] = useState(false)
   const [roomImage, setRoomImage] = useState<string | null>(null)
@@ -132,8 +149,49 @@ export default function StayDetail({ property, rooms: roomsData, id }: { propert
   return (
     <div className="min-h-screen bg-[#F7F5F2]">
 
-      {/* Hero header */}
-      <section className={`${stay.hero} text-white py-20 px-6 lg:px-12 mt-16`}>
+      {/* Mobile hero — the property photos themselves are the hero, sitting
+          right under the site header and auto-transitioning the same way
+          the homepage hero carousel does, with the title overlaid like it
+          is there. From sm up this gives way to the plain colour header +
+          4-up photo collage below. */}
+      <section className="relative h-[60vh] min-h-[420px] sm:hidden overflow-hidden mt-16">
+        <HeroCarousel images={stay.images} alt={stay.title} onIndexChange={setHeroSlide} />
+        <div className="absolute inset-0 bg-gradient-to-b from-black/45 via-black/10 to-black/65" />
+        <div className="relative h-full flex flex-col justify-between px-6 py-6">
+          <Link href="/stays" className="inline-flex items-center gap-2 text-white/80 hover:text-white text-sm w-fit transition-colors">
+            <ArrowLeft size={16} /> All Stays
+          </Link>
+          <div>
+            <span className="inline-block font-sans text-[10px] tracking-[0.14em] uppercase bg-[#C9A96E]/20 text-[#C9A96E] px-3 py-1.5 mb-3">{stay.category}</span>
+            <h1 className="font-display italic text-4xl text-white leading-[1.05] mb-3">{stay.title}</h1>
+            <div className="flex flex-wrap items-center gap-4 font-sans text-sm text-white/70">
+              <span className="flex items-center gap-1.5"><MapPin size={14} />{stay.location}</span>
+              {stay.rating && (
+                <span className="flex items-center gap-1.5">
+                  <Star size={14} className="text-[#C9A96E] fill-[#C9A96E]" />
+                  <span className="text-white">{stay.rating}</span>
+                  <span>({stay.review_count} reviews)</span>
+                </span>
+              )}
+            </div>
+          </div>
+        </div>
+        {stay.images.length > 1 && (
+          <span className="absolute top-6 right-6 font-sans text-[11px] tracking-wide bg-black/50 text-white px-2.5 py-1 rounded-full">
+            {heroSlide + 1} / {stay.images.length}
+          </span>
+        )}
+        {/* Under the slide counter when there is one — the desktop hero puts
+            the same control inline next to the rating instead. */}
+        <SaveButton
+          tone="dark"
+          className={stay.images.length > 1 ? '!top-16 !right-6' : '!top-6 !right-6'}
+          listing={savedListing}
+        />
+      </section>
+
+      {/* Hero header — sm and up (mobile uses the photo hero above instead). */}
+      <section className={`${stay.hero} text-white py-20 px-6 lg:px-12 mt-16 hidden sm:block`}>
         <div className="max-w-[1440px] mx-auto">
           <Link href="/stays" className="inline-flex items-center gap-2 text-white/60 hover:text-white text-sm mb-8 transition-colors">
             <ArrowLeft size={16} /> All Stays
@@ -149,29 +207,20 @@ export default function StayDetail({ property, rooms: roomsData, id }: { propert
                 <span>({stay.review_count} reviews)</span>
               </span>
             )}
+            <SaveButton variant="inline" tone="dark" listing={savedListing} />
           </div>
         </div>
       </section>
 
-      {/* Photo gallery — a single full-width hero on mobile (the 4-up collage
-          reads as a strip of thumbnails on a narrow screen), the full collage
-          from sm up. */}
-      <div className="relative h-[42vh] min-h-[240px] sm:hidden overflow-hidden">
-        <img src={stay.images[0]} alt={stay.title} className="w-full h-full object-cover" />
-        {stay.images.length > 1 && (
-          <span className="absolute bottom-3 right-3 font-sans text-[11px] tracking-wide bg-black/60 text-white px-2.5 py-1 rounded-full">
-            1 / {stay.images.length}
-          </span>
-        )}
-      </div>
+      {/* Desktop/tablet 4-up photo collage. */}
       <div className="hidden sm:grid grid-cols-4 grid-rows-2 h-[52vh] min-h-[340px] gap-px">
-        <div className="col-span-2 row-span-2 overflow-hidden">
-          <img src={stay.images[0]} alt={stay.title} className="w-full h-full object-cover" />
+        <div className="relative col-span-2 row-span-2 overflow-hidden">
+          <Image src={stay.images[0]} alt={stay.title} fill priority sizes="50vw" className="object-cover" />
         </div>
         {[1, 2, 3].map(i => (
-          <div key={i} className="overflow-hidden bg-[#2d6a4f]/10">
+          <div key={i} className="relative overflow-hidden bg-[#2d6a4f]/10">
             {stay.images[i] ? (
-              <img src={stay.images[i]} alt="" className="w-full h-full object-cover" />
+              <Image src={stay.images[i]} alt="" fill loading="lazy" sizes="25vw" className="object-cover" />
             ) : (
               <div className="w-full h-full flex items-center justify-center">
                 <span className="font-sans text-xs text-gray-400">Photo {i + 1}</span>
@@ -247,7 +296,7 @@ export default function StayDetail({ property, rooms: roomsData, id }: { propert
               {stay.rooms.length === 0 ? (
                 <div className="bg-white border border-gray-200 p-8 text-center">
                   <BedDouble size={24} className="text-gray-300 mx-auto mb-2" />
-                  <p className="font-sans text-sm text-gray-400">No rooms listed yet — contact the property directly.</p>
+                  <p className="font-sans text-sm text-gray-400">No rooms listed yet. Please contact the property directly.</p>
                 </div>
               ) : (
                 <div className={`space-y-4 ${!showRooms ? 'hidden lg:block' : ''}`}>
@@ -268,9 +317,9 @@ export default function StayDetail({ property, rooms: roomsData, id }: { propert
                             <button
                               type="button"
                               onClick={e => { e.stopPropagation(); setDetailRoom(room) }}
-                              className="block w-full aspect-[4/3] overflow-hidden bg-gray-100"
+                              className="relative block w-full aspect-[4/3] overflow-hidden bg-gray-100"
                             >
-                              <img src={room.images[0]} alt={room.name} className="w-full h-full object-cover hover:opacity-90 transition-opacity" />
+                              <Image src={room.images[0]} alt={room.name} fill loading="lazy" sizes="160px" className="object-cover hover:opacity-90 transition-opacity" />
                             </button>
                             {room.images.length > 1 && (
                               <div className="grid grid-cols-3 gap-1 mt-1">
@@ -281,7 +330,7 @@ export default function StayDetail({ property, rooms: roomsData, id }: { propert
                                     onClick={e => { e.stopPropagation(); setDetailRoom(room) }}
                                     className="relative aspect-square overflow-hidden bg-gray-100"
                                   >
-                                    <img src={url} alt="" className="w-full h-full object-cover hover:opacity-90 transition-opacity" />
+                                    <Image src={url} alt="" fill loading="lazy" sizes="53px" className="object-cover hover:opacity-90 transition-opacity" />
                                     {i === 2 && room.images.length > 4 && (
                                       <span className="absolute inset-0 bg-black/50 flex items-center justify-center font-sans text-[10px] text-white">
                                         +{room.images.length - 4}
@@ -460,7 +509,7 @@ export default function StayDetail({ property, rooms: roomsData, id }: { propert
                       <label className="block font-sans text-[10px] tracking-[0.1em] uppercase text-gray-400 mb-1.5">Room</label>
                       <select value={selectedRoom?.id || ''} onChange={e => setSelectedRoom(stay.rooms.find((r: any) => r.id === e.target.value) || null)} className="w-full border border-gray-300 px-3 py-2.5 font-sans text-sm focus:outline-none bg-white">
                         <option value="">Select a room…</option>
-                        {stay.rooms.map((r: any) => <option key={r.id} value={r.id}>{r.name} — {formatMoney(r.price_per_night)}/night</option>)}
+                        {stay.rooms.map((r: any) => <option key={r.id} value={r.id}>{r.name} · {formatMoney(r.price_per_night)}/night</option>)}
                       </select>
                     </div>
                     {!showRooms && (
@@ -512,7 +561,7 @@ export default function StayDetail({ property, rooms: roomsData, id }: { propert
                 }}
                 className={`w-full py-3.5 font-sans text-sm font-medium transition-colors ${selectedRoom ? 'bg-[#2d6a4f] text-white hover:bg-[#235a3f]' : 'bg-gray-100 text-gray-400 cursor-not-allowed'}`}
               >
-                {selectedRoom ? (isSelectedStay ? <span className="flex items-center justify-center gap-2"><Check size={14} /> Stay Selected — View Trip</span> : 'Select & Browse Activities') : 'Select a Room First'}
+                {selectedRoom ? (isSelectedStay ? <span className="flex items-center justify-center gap-2"><Check size={14} /> Stay Selected · View Trip</span> : 'Select & Browse Activities') : 'Select a Room First'}
               </button>
               {isSelectedStay && (
                 <button onClick={() => router.push('/checkout/shuttle')} className="w-full mt-2 py-3 font-sans text-sm border border-[#2d6a4f] text-[#2d6a4f] hover:bg-[#2d6a4f] hover:text-white transition-colors">
@@ -525,7 +574,7 @@ export default function StayDetail({ property, rooms: roomsData, id }: { propert
                     <Clock size={12} className="text-[#2d6a4f] mt-0.5 shrink-0" />
                     <span>
                       <span className="text-[#2d6a4f] font-medium">Confirmed by the property.</span> You won&apos;t be
-                      charged when you book — they check these dates first, then you pay to confirm.
+                      charged when you book. They check these dates first, then you pay to confirm.
                     </span>
                   </p>
                 </div>

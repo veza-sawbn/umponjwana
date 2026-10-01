@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import Image from 'next/image'
 import type { SeasonCard } from '@/lib/season-cards'
 
 /** Pure presentational card — used both in the desktop grid and inside
@@ -11,7 +12,7 @@ export default function SeasonListingCard({ card }: { card: SeasonCard }) {
       className="group bg-white border border-gray-200 overflow-hidden hover:border-[#2d6a4f] transition-colors flex flex-col h-full"
     >
       <div className="relative aspect-[4/3] overflow-hidden bg-mist">
-        <img src={card.image} alt="" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+        <Image src={card.image} alt="" fill loading="lazy" sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw" className="object-cover group-hover:scale-105 transition-transform duration-500" />
         <span className="absolute top-3 left-3 bg-white/92 font-sans text-[9px] tracking-[0.1em] uppercase px-2 py-1 text-gray-700">
           {card.kind}
         </span>

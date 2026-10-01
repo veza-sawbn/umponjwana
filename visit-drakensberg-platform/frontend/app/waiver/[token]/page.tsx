@@ -214,7 +214,7 @@ export default function WaiverSigningPage() {
           </div>
           <h1 className="font-display italic text-3xl text-black mb-3">Waiver signed</h1>
           <p className="font-sans text-sm text-black/50 leading-relaxed mb-8">
-            Thank you. Your operator has received your signed waiver — there&apos;s nothing
+            Thank you. Your operator has received your signed waiver, so there is nothing
             further you need to do. Keep an eye on your inbox for trip details.
           </p>
           <Link
@@ -294,7 +294,7 @@ export default function WaiverSigningPage() {
                   rows={3}
                   value={answers[f.key] ?? ''}
                   onChange={e => setAnswers(a => ({ ...a, [f.key]: e.target.value }))}
-                  placeholder={f.key === 'medical' ? 'Allergies, medication, conditions — or "none"' : ''}
+                  placeholder={f.key === 'medical' ? 'Allergies, medication, conditions, or "none"' : ''}
                   className={`${inp} resize-none`}
                 />
               ) : (

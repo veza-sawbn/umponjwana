@@ -1,6 +1,7 @@
-import { listEntities, getEntity, insertEntity, updateEntity } from './entities'
+import { listEntities, getEntity, getEntityByIdOrSlug, insertEntity, updateEntity } from './entities'
 import { getSupplierEntities, type SupplierEntity } from './supplier-entities'
 import type { GraphFields } from './graph-fields'
+import type { BioSection } from './guide-profile'
 import type { SupabaseClient } from '@supabase/supabase-js'
 
 // Supplier directory: Tour Operator → Guide Team → Guide Profile.
@@ -33,7 +34,7 @@ export type OperatorProfile = {
 
 export type GuideProfile = SupplierEntity & {
   name: string
-  certs: string
+  /** SA Tourism guide registration number. */
   guideNo: string
   speciality: string
   languages: string
@@ -51,27 +52,80 @@ export type GuideProfile = SupplierEntity & {
   specialisations?: string
   highestSummit?: string
   completedExpeditions?: number
-  // 'certified' (FGASA/TBCSA or equivalent — the default, including for rows
-  // saved before this field existed) or 'trainee' — internally trained staff
-  // a supplier wants listed while they work toward formal certification.
-  // Neither certs nor guideNo is required for a trainee.
-  guideType?: 'certified' | 'trainee'
+  /** Nickname shown under the name, e.g. Charlie. See splitGuideName(). */
+  knownAs?: string
+  /** Title over the biography; the page shows "Biography" when blank. */
+  bioHeadline?: string
+  /** One short line shown large within the biography. */
+  bioHighlight?: string
+  /** Headed blocks after the introduction (`bio`). See lib/guide-profile.ts. */
+  bioSections?: BioSection[]
+  // Optional so rows saved before this field existed still read as
+  // 'certified' — see GUIDE_TYPE_LABEL and guideTypeOf() below.
+  guideType?: GuideType
 } & GraphFields
 
-export const GUIDE_TYPE_LABEL: Record<'certified' | 'trainee', string> = {
+/**
+ * What a supplier is putting forward when they register someone.
+ *
+ * 'certified' and 'expedition_leader' both carry an SA Tourism guide number;
+ * they differ in what the person is deployed on, which is why a tour operator
+ * needs to distinguish them on a departure. 'trainee' is internally trained
+ * staff a supplier wants listed while they work toward registration, so the
+ * guide number is optional for them and only for them.
+ */
+export type GuideType = 'certified' | 'trainee' | 'expedition_leader'
+
+/** Declaration order — drives the chips on the supplier's register/edit forms. */
+export const GUIDE_TYPES: readonly GuideType[] = ['certified', 'trainee', 'expedition_leader'] as const
+
+export const GUIDE_TYPE_LABEL: Record<GuideType, string> = {
   certified: 'Certified',
   trainee: 'Trainee',
+  expedition_leader: 'Expedition Leader',
+}
+
+/** Shown under the type chips so a supplier picks the right one. */
+export const GUIDE_TYPE_HINT: Record<GuideType, string> = {
+  certified: 'Registered guide leading day walks, tours and activities.',
+  trainee:
+    'Internally trained staff not yet registered. The SA Tourism guide number is optional for a trainee.',
+  expedition_leader:
+    'Registered guide who leads multi-day and summit expeditions. The summit and expedition fields below carry the most weight for this type.',
+}
+
+/** A guide's type, defaulting rows saved before the field existed to certified. */
+export function guideTypeOf(guide: { guideType?: string }): GuideType {
+  const t = guide.guideType
+  return t === 'trainee' || t === 'expedition_leader' ? t : 'certified'
 }
 
 const KIND = 'operator_profile'
+
+// Both /guides/operators/[id] (operator profiles) and /guides/[id] (guide
+// profiles) are ISR-cached for up to 30 minutes, so a supplier's edit
+// wouldn't reach visitors until that cache window happened to expire.
+// Best-effort and non-blocking — a failed revalidate (e.g. offline) still
+// leaves the save itself intact, just stale until the cache naturally
+// expires. Exported (not just used by saveOperatorProfile below) because
+// guide create/edit/delete happens directly in app/supplier/guides/**,
+// which has no lib wrapper of its own to hook this into.
+export function revalidateGuidePage(kind: 'operator' | 'guide', id: string, slug?: string): void {
+  if (typeof fetch !== 'function' || !id) return
+  fetch('/api/revalidate/guide', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ kind, id, slug }),
+  }).catch(() => {})
+}
 
 export function operatorProfileId(supplierId: string): string {
   return `opr-${supplierId}`
 }
 
 /** Published operator profiles. */
-export async function getOperators(): Promise<OperatorProfile[]> {
-  return (await listEntities<OperatorProfile>(KIND)).filter(o => o.status === 'active')
+export async function getOperators(client?: SupabaseClient): Promise<OperatorProfile[]> {
+  return (await listEntities<OperatorProfile>(KIND, client)).filter(o => o.status === 'active')
 }
 
 export async function getOperatorById(id: string, client?: SupabaseClient): Promise<OperatorProfile | null> {
@@ -91,26 +145,34 @@ export async function saveOperatorProfile(
   const existing = await getEntity<OperatorProfile>(KIND, id)
   if (existing) {
     await updateEntity(KIND, id, { ...data, supplierId })
-    return { ...existing, ...data, id, supplierId }
+    const updated = { ...existing, ...data, id, supplierId }
+    revalidateGuidePage('operator', id, updated.slug)
+    return updated
   }
   const profile: OperatorProfile = { ...data, id, supplierId, createdAt: new Date().toISOString() }
-  return insertEntity(KIND, profile)
+  const saved = await insertEntity(KIND, profile)
+  revalidateGuidePage('operator', saved.id, saved.slug)
+  return saved
 }
 
 /** Verified guides for one operator. */
-export async function getGuidesByOperator(operator: OperatorProfile): Promise<GuideProfile[]> {
+export async function getGuidesByOperator(operator: OperatorProfile, client?: SupabaseClient): Promise<GuideProfile[]> {
   if (!operator.supplierId) return []
-  const guides = await getSupplierEntities<GuideProfile>('guides', operator.supplierId)
+  const guides = await getSupplierEntities<GuideProfile>('guides', operator.supplierId, client)
   return guides.filter(g => g.status === 'verified')
 }
 
 /** All publicly listed guides (live verified). */
-export async function getDirectoryGuides(): Promise<GuideProfile[]> {
-  return (await getSupplierEntities<GuideProfile>('guides')).filter(g => g.status === 'verified')
+export async function getDirectoryGuides(client?: SupabaseClient): Promise<GuideProfile[]> {
+  return (await getSupplierEntities<GuideProfile>('guides', undefined, client)).filter(g => g.status === 'verified')
 }
 
-export async function getGuideById(id: string, client?: SupabaseClient): Promise<GuideProfile | null> {
-  return client ? getEntity<GuideProfile>('supplier_guides', id, client) : getEntity<GuideProfile>('supplier_guides', id)
+/** Accepts either form of the public URL segment (`slug || id`) — see
+ *  getEntityByIdOrSlug(). */
+export async function getGuideById(idOrSlug: string, client?: SupabaseClient): Promise<GuideProfile | null> {
+  return client
+    ? getEntityByIdOrSlug<GuideProfile>('supplier_guides', idOrSlug, client)
+    : getEntityByIdOrSlug<GuideProfile>('supplier_guides', idOrSlug)
 }
 
 /** The operator a guide belongs to. */

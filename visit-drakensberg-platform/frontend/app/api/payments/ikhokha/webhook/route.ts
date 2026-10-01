@@ -1,6 +1,10 @@
 import { NextResponse } from 'next/server'
 import { getPaymentLinkStatus } from '@/lib/ikhokha'
 import { supabaseAdmin } from '@/lib/supabase-admin'
+import { getSiteOrigin } from '@/lib/origin'
+import { sendOrderReceipt } from '@/lib/receipts-server'
+import { alertEvent, EVENTS } from '@/lib/observability'
+import { notifyServer, notifyServerMany } from '@/lib/notify-server'
 
 export const dynamic = 'force-dynamic'
 
@@ -33,7 +37,13 @@ export async function POST(req: Request) {
   try {
     status = await getPaymentLinkStatus(paylinkID)
   } catch (e) {
-    console.error('[ikhokha webhook] status check failed:', e)
+    // The gateway is the only authority on whether this payment cleared, so
+    // failing to reach it means we cannot reconcile at all.
+    await alertEvent({
+      event: EVENTS.PAYMENT_GATEWAY_UNREACHABLE,
+      severity: 'error',
+      fields: { paylinkId: paylinkID, orderId: link.order_id, reason: e },
+    })
     return NextResponse.json({ ok: false }, { status: 502 })
   }
 
@@ -71,24 +81,27 @@ export async function POST(req: Request) {
     const invoiceUrl = `/invoices/${link.invoice_id ?? link.order_id}`
 
     if (link.user_id) {
-      await admin.from('vd_notifications').insert({
-        user_id: link.user_id,
+      await notifyServer({
+        userId: link.user_id,
         type: 'payment',
-        title: `Payment declined — ${declinedOrder?.order_number ?? link.order_id}`,
+        title: `Payment declined for ${declinedOrder?.order_number ?? link.order_id}`,
         body: 'Your card payment was declined and no charge was made. You can try again from your invoice.',
         link: invoiceUrl,
-      })
+      }, getSiteOrigin(req))
     }
     const { data: financeStaff } = await admin
       .from('profiles').select('id').or('role.eq.admin,staff_role.eq.finance')
     if (financeStaff && financeStaff.length > 0) {
-      await admin.from('vd_notifications').insert(financeStaff.map(f => ({
-        user_id: (f as { id: string }).id,
-        type: 'payment',
-        title: `Payment declined — ${declinedOrder?.order_number ?? link.order_id}`,
-        body: `${declinedOrder?.customer_name || 'A customer'}'s online payment attempt of ${link.amount} ${link.currency} was declined.`,
-        link: '/admin/orders',
-      })))
+      await notifyServerMany(
+        financeStaff.map(f => (f as { id: string }).id),
+        {
+          type: 'payment',
+          title: `Payment declined for ${declinedOrder?.order_number ?? link.order_id}`,
+          body: `${declinedOrder?.customer_name || 'A customer'}'s online payment attempt of ${link.amount} ${link.currency} was declined.`,
+          link: '/admin/orders',
+        },
+        getSiteOrigin(req),
+      )
     }
 
     return NextResponse.json({ ok: true })
@@ -172,21 +185,22 @@ export async function POST(req: Request) {
             tripValue.status = 'confirmed'
             tripValue.timeline = [
               ...timeline,
-              { at: new Date().toISOString(), status: 'confirmed', note: 'Payment received — booking confirmed' },
+              { at: new Date().toISOString(), status: 'confirmed', note: 'Payment received, booking confirmed' },
             ]
             await admin.from('vd_trip_requests')
               .update({ status: 'confirmed', value: tripValue, updated_at: new Date().toISOString() })
               .eq('id', tripReq.id)
           }
         }
-        const rows = (confirmedBooking.supplier_ids ?? []).map((sid: string) => ({
-          user_id: sid,
-          type: 'booking',
-          title: `New booking ${confirmedBooking.reference}`,
-          body: `${value?.customerName ?? 'A guest'} booked with you (${guests} guest${guests !== 1 ? 's' : ''}). Open your bookings for details.`,
-          link: '/supplier/bookings',
-        }))
-        if (rows.length > 0) await admin.from('vd_notifications').insert(rows)
+        const supplierIds: string[] = confirmedBooking.supplier_ids ?? []
+        if (supplierIds.length > 0) {
+          await notifyServerMany(supplierIds, {
+            type: 'booking',
+            title: `New booking ${confirmedBooking.reference}`,
+            body: `${value?.customerName ?? 'A guest'} booked with you (${guests} guest${guests !== 1 ? 's' : ''}). Open your bookings for details.`,
+            link: '/supplier/bookings',
+          }, getSiteOrigin(req))
+        }
 
         // Booking funnel completion (§3/§5) — fires here, on actual payment
         // confirmation, not at checkout submission (which only creates a
@@ -217,14 +231,45 @@ export async function POST(req: Request) {
     // Fire-and-forget the same receipt email + in-app notification a manual
     // payment gets, authenticating as a trusted internal caller since there's
     // no customer session here.
-    const origin = process.env.NEXT_PUBLIC_SITE_URL || new URL(req.url).origin
-    fetch(`${origin}/api/receipts/send`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${process.env.SUPABASE_SERVICE_ROLE_KEY}` },
-      body: JSON.stringify({ orderId: link.order_id, paymentId }),
-    }).catch(err => console.error('[ikhokha webhook] receipt email failed:', err))
+    // In-process, with the admin client this handler already holds (audit
+    // finding M8). This used to be a fetch() to our own /api/receipts/send
+    // carrying SUPABASE_SERVICE_ROLE_KEY as a bearer token — the one
+    // credential that bypasses RLS entirely — over the network on every
+    // confirmed payment, to an origin derived as `NEXT_PUBLIC_SITE_URL ||
+    // new URL(req.url).origin`. That fallback read the host from the INBOUND
+    // request, on an endpoint anyone can POST to, so with the env var unset a
+    // spoofed host sent the key wherever the caller liked.
+    //
+    // There is now no request, no token in flight and no origin to get wrong.
+    // Same move lib/notify-server.ts already made, for the same reason.
+    // Still fire-and-forget: a receipt that cannot be delivered must not fail
+    // the payment it is announcing.
+    sendOrderReceipt(admin, {
+      orderId: link.order_id,
+      paymentId: paymentId as string,
+      origin: getSiteOrigin(req),
+    }).then(result => {
+      if (result.error && result.error !== 'SMTP not configured') {
+        console.error('[ikhokha webhook] receipt email failed:', result.error)
+      }
+    }).catch(err => console.error('[ikhokha webhook] receipt email threw:', err))
   } catch (e) {
-    console.error('[ikhokha webhook] failed to record order payment:', e)
+    // THE alert this application most needed and did not have: iKhokha has
+    // taken the customer's money and we could not record it. The 500 below
+    // relies on iKhokha retrying, and until this line nobody was told that a
+    // paid order was sitting unpaid in our database.
+    await alertEvent({
+      event: EVENTS.PAYMENT_RECONCILIATION_FAILED,
+      severity: 'critical',
+      fields: {
+        paylinkId: paylinkID,
+        orderId: link.order_id,
+        invoiceId: link.invoice_id,
+        amount: link.amount,
+        currency: link.currency,
+        reason: e,
+      },
+    })
     // Roll back to pending so a retried webhook (or manual reconciliation) can complete it.
     await admin.from('vd_payment_links').update({ status: 'pending' }).eq('id', link.id)
     return NextResponse.json({ ok: false }, { status: 500 })

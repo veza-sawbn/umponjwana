@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import { ArrowLeft, Car, Bus, Check, Clock, ChevronRight, MapPin } from 'lucide-react'
 import { useBooking, type ShuttleOption } from '@/lib/booking-context'
 import { GoogleAddressField, useAutoDrivingDistance, type GooglePlaceSelection } from '@/components/maps/GoogleAddressField'
-import { buildShuttleOption, estimateTransferPrice, suggestedVehicleType, SHUTTLE_TYPES, type ShuttleSupplierChoice, type ShuttleType } from '@/lib/shuttle-service'
+import { buildShuttleOption, estimateTransferPrice, suggestedVehicleType, type ShuttleSupplierChoice } from '@/lib/shuttle-service'
 import { TransportSupplierPicker } from '@/components/booking/TransportSupplierPicker'
 import { MeetAndGreetForm } from '@/components/booking/MeetAndGreetForm'
 import type { MeetAndGreetDetails } from '@/lib/transport'
@@ -21,31 +21,57 @@ export default function ShuttlePage() {
   const booking = useBooking()
   const [needsShuttle, setNeedsShuttle] = useState<boolean | null>(null)
   const [pickup, setPickup] = useState<GooglePlaceSelection>({ address: '' })
-  const [shuttleType, setShuttleType] = useState<ShuttleType>('Private Shuttle')
   const [date, setDate] = useState(booking.checkIn || '')
   const [supplierChoice, setSupplierChoice] = useState<ShuttleSupplierChoice | null>(null)
   const [eligibleCount, setEligibleCount] = useState<number | null>(null)
   const [meetAndGreet, setMeetAndGreet] = useState<MeetAndGreetDetails>({})
+  // Drop-off of the leg this page adopted, when it adopted one. A transfer
+  // booked on /shuttles can be headed somewhere that is neither the cart's
+  // stay nor its region, so re-deriving the destination below would quote a
+  // different route and rewrite the guest's drop-off on confirm.
+  const [adoptedDestination, setAdoptedDestination] = useState<GooglePlaceSelection | null>(null)
   const prefilled = useRef(false)
+  // The adopted leg's own party size, which prices the fare and is read
+  // while rendering — so state, not a ref.
+  const [adoptedPassengers, setAdoptedPassengers] = useState<number | null>(null)
+  // Fields of an adopted leg that this form has no input for and that only
+  // confirm() reads, held so rebuilding the leg does not quietly drop them:
+  // its pickup time, and its link back to an outbound leg when it is the
+  // return half of one.
+  const adoptedExtrasRef = useRef<{ time?: string; returnOfId?: string }>({})
   // Id of the cart shuttle being configured, when this page picked one up
   // for completion rather than starting a brand-new leg.
   const existingIdRef = useRef<string | null>(null)
 
-  // A suggested transfer already in the cart (from the trip banner) lands
-  // here for configuration: restore its route, partner and arrival details.
-  // Only the leg still missing a transport partner is picked up — other
-  // shuttles already added stay untouched and are configured individually
-  // from the trip page.
+  // A transfer already in the cart lands here for configuration rather than
+  // being ignored: restore its route, partner and arrival details.
+  //
+  // A leg still missing a transport partner is picked up first — that is the
+  // suggested transfer from the trip banner, the case this page exists for.
+  // Failing that we adopt the first leg the trip already has. Without that
+  // fallback a fully-configured transfer (one booked on /shuttles) matched
+  // nothing, so this page opened blank and confirming it called addShuttle()
+  // and billed the guest for a second copy of the transfer they had already
+  // chosen. Reachable by pressing Back from checkout, so it is not enough
+  // that /trip now routes around this page.
   useEffect(() => {
     if (!booking.hydrated || prefilled.current) return
     prefilled.current = true
-    const existing = booking.shuttles.find(s => !s.supplierId)
+    const existing = booking.shuttles.find(s => !s.supplierId) ?? booking.shuttles[0]
     if (!existing) return
     existingIdRef.current = existing.id
     setNeedsShuttle(true)
     setPickup({ address: existing.pickup ?? '', lat: existing.pickupLat, lng: existing.pickupLng })
+    if (existing.destination) {
+      setAdoptedDestination({
+        address: existing.destination,
+        lat: existing.destinationLat,
+        lng: existing.destinationLng,
+      })
+    }
+    adoptedExtrasRef.current = { time: existing.time, returnOfId: existing.returnOfId }
+    if (existing.passengers) setAdoptedPassengers(existing.passengers)
     if (existing.date) setDate(existing.date)
-    if (existing.shuttleType === 'Shared Shuttle' || existing.shuttleType === 'Private Shuttle') setShuttleType(existing.shuttleType)
     if (existing.meetAndGreet) setMeetAndGreet(existing.meetAndGreet)
     if (existing.supplierId && existing.companyId && existing.companyName && existing.vehicleId && existing.vehicleName) {
       setSupplierChoice({
@@ -61,11 +87,17 @@ export default function ShuttlePage() {
   }, [booking.hydrated])
 
   const stay = booking.stay
-  const destination: GooglePlaceSelection = stay
-    ? { address: stay.address || `${stay.title}, ${stay.region}, South Africa`, lat: stay.lat, lng: stay.lng }
-    : { address: booking.region ? `${booking.region}, Drakensberg, South Africa` : '' }
+  // An adopted leg keeps its own drop-off; only a brand-new transfer falls
+  // back to the stay (or, failing that, the trip's region).
+  const destination: GooglePlaceSelection = adoptedDestination
+    ?? (stay
+      ? { address: stay.address || `${stay.title}, ${stay.region}, South Africa`, lat: stay.lat, lng: stay.lng }
+      : { address: booking.region ? `${booking.region}, Drakensberg, South Africa` : '' })
 
-  const passengers = booking.guests || 2
+  // An adopted leg was quoted and priced for its own party size; the trip's
+  // guest count can differ (a cart with a stay keeps its own). Re-quoting on
+  // the wrong number would change the fare under the guest.
+  const passengers = adoptedPassengers || booking.guests || 2
 
   const { result, status } = useAutoDrivingDistance(
     { address: pickup.address, lat: pickup.lat, lng: pickup.lng },
@@ -73,7 +105,7 @@ export default function ShuttlePage() {
   )
 
   const shuttlePrice = needsShuttle && result
-    ? (supplierChoice?.price ?? estimateTransferPrice(result.distanceKm, passengers, shuttleType))
+    ? (supplierChoice?.price ?? estimateTransferPrice(result.distanceKm, passengers))
     : 0
   // The transfer needs a chosen transport partner + vehicle unless no
   // registered partner covers the route (then dispatch places it later).
@@ -82,6 +114,10 @@ export default function ShuttlePage() {
 
   function confirm() {
     if (needsShuttle === false) {
+      // Choosing self-drive over a transfer that is already in the trip means
+      // they no longer want it. Leaving it in the cart would bill them for a
+      // shuttle they just declined on this very screen.
+      if (existingIdRef.current) booking.removeShuttle(existingIdRef.current)
       router.push('/checkout')
       return
     }
@@ -92,10 +128,11 @@ export default function ShuttlePage() {
         pickup: { address: pickup.address, lat: pickup.lat, lng: pickup.lng },
         destination: { address: destination.address, lat: destination.lat, lng: destination.lng },
         date,
+        time: adoptedExtrasRef.current.time,
         passengers,
-        shuttleType,
         result,
         supplier: supplierChoice ?? undefined,
+        returnOfId: adoptedExtrasRef.current.returnOfId,
       }),
       meetAndGreet,
     }
@@ -202,19 +239,10 @@ export default function ShuttlePage() {
                       <span>Drop-off: {destination.address || 'your accommodation'}</span>
                     </div>
 
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      <div>
-                        <label className="font-sans text-xs text-gray-500 mb-2 block">Transfer date</label>
-                        <input type="date" value={date} onChange={e => setDate(e.target.value)}
-                          className="w-full border border-gray-200 px-4 py-3 font-sans text-sm focus:outline-none focus:border-[#2d6a4f]" />
-                      </div>
-                      <div>
-                        <label className="font-sans text-xs text-gray-500 mb-2 block">Shuttle type</label>
-                        <select value={shuttleType} onChange={e => setShuttleType(e.target.value as ShuttleType)}
-                          className="w-full border border-gray-200 px-4 py-3 font-sans text-sm focus:outline-none focus:border-[#2d6a4f]">
-                          {SHUTTLE_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
-                        </select>
-                      </div>
+                    <div>
+                      <label className="font-sans text-xs text-gray-500 mb-2 block">Transfer date</label>
+                      <input type="date" value={date} onChange={e => setDate(e.target.value)}
+                        className="w-full border border-gray-200 px-4 py-3 font-sans text-sm focus:outline-none focus:border-[#2d6a4f] sm:max-w-xs" />
                     </div>
 
                     <div className="border-t border-gray-100 pt-4">
@@ -251,7 +279,6 @@ export default function ShuttlePage() {
                         dropoff={{ address: destination.address, lat: destination.lat, lng: destination.lng }}
                         date={date}
                         passengers={passengers}
-                        shuttleType={shuttleType}
                         distanceKm={result.distanceKm}
                         selected={supplierChoice}
                         onSelect={setSupplierChoice}

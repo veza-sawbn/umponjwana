@@ -89,7 +89,23 @@ function authHint(): string {
   return notes.length ? ` — ${notes.join('; ')}` : ' — check SMTP_USER and SMTP_PASSWORD against the mailbox credentials'
 }
 
-export async function sendMail(o: { to: string; subject: string; html: string }): Promise<{ sent: boolean; error: string | null }> {
+/**
+ * A file to send with the message. `content` is raw bytes, not base64, and a
+ * Buffer specifically — nodemailer's own Attachment type does not accept a
+ * plain Uint8Array. @react-pdf/renderer's renderToBuffer already returns one.
+ */
+export type MailAttachment = {
+  filename: string
+  content: Buffer
+  contentType?: string
+}
+
+export async function sendMail(o: {
+  to: string
+  subject: string
+  html: string
+  attachments?: MailAttachment[]
+}): Promise<{ sent: boolean; error: string | null }> {
   const t = getTransporter()
   if (!t) return { sent: false, error: 'SMTP not configured' }
   try {
@@ -98,6 +114,9 @@ export async function sendMail(o: { to: string; subject: string; html: string })
       to: o.to,
       subject: o.subject,
       html: o.html,
+      // Omitted entirely when absent — nodemailer treats an empty array as a
+      // multipart message with no parts, which some servers reject.
+      ...(o.attachments?.length ? { attachments: o.attachments } : {}),
     })
     return { sent: true, error: null }
   } catch (e) {

@@ -349,7 +349,7 @@ export default function LayerStudio({
         </div>
         <p className="mt-2 font-sans text-[11px] text-gray-400 leading-relaxed">
           Drag any layer in the preview to position it. Positions are saved as percentages, and the desktop and
-          mobile compositions are edited separately — switch device to move the mobile arrangement.
+          mobile compositions are edited separately. Switch device to move the mobile arrangement.
         </p>
       </div>
 
@@ -489,7 +489,7 @@ function LayerInspector({
               {measuring ? (
                 <span className="inline-flex items-center gap-1.5"><Loader2 size={10} className="animate-spin" /> Reading dimensions…</span>
               ) : layer.media_width && layer.media_height ? (
-                `${layer.media_width}×${layer.media_height} px — box reserved, no layout shift.`
+                `${layer.media_width}×${layer.media_height} px. Box reserved, no layout shift.`
               ) : (
                 'Transparent PNG or WebP recommended. JPEG is for paper textures and backdrops.'
               )}

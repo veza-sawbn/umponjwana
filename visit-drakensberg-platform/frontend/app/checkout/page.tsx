@@ -8,8 +8,10 @@ import Footer from '@/components/layout/Footer'
 import { ArrowLeft, ShieldCheck, Lock, Calendar, Users, MapPin, Bus } from 'lucide-react'
 import { useBooking, describeAddonParty } from '@/lib/booking-context'
 import { addBooking } from '@/lib/bookings'
-import { getDepartures, bookDepartureSeats, releaseDepartureSeats } from '@/lib/departures'
-import { bookActivityTimeslot, releaseActivityTimeslot } from '@/lib/activities'
+import { getDepartures } from '@/lib/departures'
+import {
+  holdDepartureSeats, holdActivitySlot, releaseInventoryHolds, claimInventoryHolds,
+} from '@/lib/inventory-holds'
 import { getSupplierEntities } from '@/lib/supplier-entities'
 import { getPropertyById } from '@/lib/properties'
 import { isRequestMode, paymentWindowLabel } from '@/lib/stay-requests'
@@ -167,28 +169,32 @@ export default function CheckoutPage() {
       const allDeps = requestMode ? [] : await getDepartures()
       const departureAddons = requestMode ? [] : snap.addons.filter(a => allDeps.some(d => d.id === a.id))
       const slotAddons = requestMode ? [] : snap.addons.filter(a => a.activityId && a.timeslotId && a.date)
-      const reserved: { id: string; seats: number }[] = []
-      const reservedSlots: { activityId: string; date: string; timeslotId: string; seats: number }[] = []
+      // Every seat taken here is a HOLD, not a booking: it records who took
+      // it and expires in 30 minutes if no booking claims it. Before this,
+      // an abandoned checkout kept a departure's seats until the daily sweep
+      // noticed — and kept an activity timeslot forever, because that sweep
+      // only ever released departures. See lib/inventory-holds.ts.
+      const holds: string[] = []
       try {
         for (const addon of departureAddons) {
-          await bookDepartureSeats(addon.id, addon.guests)
-          reserved.push({ id: addon.id, seats: addon.guests })
+          holds.push(await holdDepartureSeats(addon.id, addon.guests))
         }
         for (const addon of slotAddons) {
-          await bookActivityTimeslot(addon.activityId!, addon.date!, addon.timeslotId!, addon.guests)
-          reservedSlots.push({ activityId: addon.activityId!, date: addon.date!, timeslotId: addon.timeslotId!, seats: addon.guests })
+          holds.push(await holdActivitySlot(addon.activityId!, addon.date!, addon.timeslotId!, addon.guests))
         }
       } catch (seatErr) {
         // Roll back anything we already took, then surface the problem.
-        await Promise.all([
-          ...reserved.map(r => releaseDepartureSeats(r.id, r.seats).catch(() => {})),
-          ...reservedSlots.map(r => releaseActivityTimeslot(r.activityId, r.date, r.timeslotId, r.seats).catch(() => {})),
-        ])
-        const msg = seatErr instanceof Error && (seatErr.message.includes('seats') || seatErr.message.includes('timeslot'))
-          ? seatErr.message.includes('timeslot')
+        await releaseInventoryHolds(holds)
+        const message = seatErr instanceof Error ? seatErr.message : ''
+        const msg = /already hold/i.test(message)
+          // The per-account quota. Worth saying plainly rather than as a
+          // generic failure, because the guest can act on it.
+          ? 'You have another checkout still holding seats. Finish or cancel it, or try again in half an hour.'
+          : /timeslot/i.test(message)
             ? 'One of your activity timeslots no longer has enough seats. Please adjust your trip.'
-            : 'One of your tour departures no longer has enough seats. Please adjust your trip.'
-          : 'We could not reserve your booking. Please try again.'
+            : /seats/i.test(message)
+              ? 'One of your tour departures no longer has enough seats. Please adjust your trip.'
+              : 'We could not reserve your booking. Please try again.'
         toast.error(msg)
         setLoading(false)
         return
@@ -223,6 +229,18 @@ export default function CheckoutPage() {
         analyticsSessionId,
       })
 
+      // The booking owns these seats now, so they stop expiring on their own.
+      // A failure here is not fatal: the holds simply keep their TTL and the
+      // sweep returns the seats, which is the safe direction to fail in — the
+      // alternative is a booking silently holding inventory forever.
+      if (holds.length > 0) {
+        try {
+          await claimInventoryHolds(saved.id, holds)
+        } catch (claimErr) {
+          console.error('Could not attach inventory holds to booking:', claimErr)
+        }
+      }
+
       completedRef.current = true
       booking.clearBooking()
 
@@ -230,7 +248,7 @@ export default function CheckoutPage() {
       // dates. The guest is sent to their booking's page, which tracks the
       // request and grows a Pay button the moment it is approved.
       if (requestMode) {
-        toast.success('Request sent — the property will confirm your dates.')
+        toast.success('Request sent. The property will confirm your dates.')
         router.push(`/checkout/success?id=${saved.id}`)
         return
       }
@@ -239,7 +257,7 @@ export default function CheckoutPage() {
         // Booking + inventory hold succeeded but the order/invoice failed —
         // there's nothing to pay against. Send them to the booking's status
         // page rather than a broken payment redirect.
-        toast.error('Your booking was saved but payment setup failed — please contact us to complete it.')
+        toast.error('Your booking was saved, but payment setup failed. Please contact us to complete it.')
         router.push(`/checkout/success?id=${saved.id}`)
         return
       }
@@ -257,7 +275,7 @@ export default function CheckoutPage() {
         if (!res.ok || !json.paylinkUrl) throw new Error(json.error || 'Could not start payment')
         window.location.href = json.paylinkUrl
       } catch (payErr) {
-        toast.error(payErr instanceof Error ? payErr.message : 'Could not start payment — you can retry from your booking.')
+        toast.error(payErr instanceof Error ? payErr.message : 'We could not start the payment. You can retry from your booking.')
         router.push(`/checkout/success?id=${saved.id}`)
       }
     } catch (err) {
@@ -268,7 +286,7 @@ export default function CheckoutPage() {
       } else if (/unavailable/i.test(msg)) {
         toast.error('The property is unavailable for these dates. Please choose different dates.')
       } else {
-        toast.error('We could not complete your booking. You have not been charged — please try again.')
+        toast.error('We could not complete your booking. You have not been charged, so please try again.')
       }
       setLoading(false)
     }
@@ -337,7 +355,7 @@ export default function CheckoutPage() {
                   </div>
                 </div>
                 <p className="font-sans text-sm text-gray-600 leading-relaxed">
-                  Your card details are never entered on this site. After you submit, you&apos;ll be redirected to iKhokha&apos;s secure payment page to complete the transaction — your booking is only confirmed once that payment succeeds.
+                  Your card details are never entered on this site. After you submit, you&apos;ll be redirected to iKhokha&apos;s secure payment page to complete the transaction. Your booking is only confirmed once that payment succeeds.
                 </p>
               </div>
 
@@ -443,14 +461,14 @@ export default function CheckoutPage() {
                   {loading
                     ? (requestMode ? 'Sending your request…' : 'Redirecting to payment…')
                     : !settingsLoaded || !modeResolved ? 'Loading rates…'
-                    : requestMode ? `Request to Book — ${formatMoney(total)}`
-                    : `Continue to Payment — ${formatMoney(total)}`}
+                    : requestMode ? `Request to Book · ${formatMoney(total)}`
+                    : `Continue to Payment · ${formatMoney(total)}`}
                 </button>
                 {requestMode ? (
                   <p className="font-sans text-xs text-white/50 leading-relaxed mt-4">
                     <span className="text-[#C9A96E]">You won&apos;t be charged yet.</span> This property confirms
                     availability before taking payment. Once they confirm, you&apos;ll have{' '}
-                    {paymentWindowLabel(booking.checkIn)} to pay while your room is held — we&apos;ll email you.
+                    {paymentWindowLabel(booking.checkIn)} to pay while your room is held, and we&apos;ll email you.
                     {(booking.addons.length > 0 || booking.shuttles.length > 0) && (
                       <> Anything else in this trip is requested at the same time and isn&apos;t held until then.</>
                     )}

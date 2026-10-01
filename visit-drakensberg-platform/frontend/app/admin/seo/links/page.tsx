@@ -220,7 +220,7 @@ export default function LinkSuggestionsPage() {
         </div>
         <h1 className="font-display italic text-2xl text-gray-900">Internal Link Suggestions</h1>
         <p className="font-sans text-sm text-gray-500 mt-0.5">
-          Pick a page — get ranked suggestions for internal links based on region, name similarity, and keyword overlap.
+          Pick a page to get ranked suggestions for internal links based on region, name similarity and keyword overlap.
         </p>
       </div>
 
@@ -422,7 +422,7 @@ export default function LinkSuggestionsPage() {
             <LinkIcon size={32} className="text-gray-300 mx-auto mb-3" />
             <p className="font-display italic text-lg text-gray-400 mb-1">Select a source page above</p>
             <p className="font-sans text-sm text-gray-400">
-              Link suggestions are computed from region proximity, name similarity, and keyword overlap — no AI.
+              Link suggestions are computed from region proximity, name similarity and keyword overlap, with no AI.
             </p>
           </div>
         )}
