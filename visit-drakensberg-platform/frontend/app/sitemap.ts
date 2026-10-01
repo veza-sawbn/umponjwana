@@ -2,7 +2,7 @@ import type { MetadataRoute } from 'next'
 import { getRegions, DEFAULT_REGIONS } from '@/lib/regions'
 import { getReserves, DEFAULT_RESERVES } from '@/lib/reserves'
 import { getTowns, DEFAULT_TOWNS } from '@/lib/towns'
-import { getTrails, DEFAULT_TRAILS } from '@/lib/trails'
+import { getTrailSummaries, DEFAULT_TRAILS } from '@/lib/trails'
 import { getProperties } from '@/lib/properties'
 import { getActivities } from '@/lib/activities'
 import { getPackages } from '@/lib/packages'
@@ -79,7 +79,15 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     getRegions(publicSupabase).catch(() => DEFAULT_REGIONS),
     getReserves(publicSupabase).catch(() => DEFAULT_RESERVES),
     getTowns(publicSupabase).catch(() => DEFAULT_TOWNS),
-    getTrails(publicSupabase).catch(() => DEFAULT_TRAILS),
+    // Summaries, not getTrails(): getTrails() reads the whole multi-megabyte
+    // `trails` row, which PostgREST times out on (see lib/trails.ts), and its
+    // DEFAULT_TRAILS fallback then put six sample trails in the sitemap, five
+    // of which 404, in place of the twelve real published ones. On a failure
+    // here, list no trails rather than sample ones: /hikes/[id] resolves
+    // against the database and 404s every sample id.
+    getTrailSummaries(publicSupabase)
+      .then(list => (list === DEFAULT_TRAILS ? [] : list))
+      .catch(() => []),
     getProperties(publicSupabase).catch(() => []),
     getActivities(publicSupabase).catch(() => []),
     getPackages(publicSupabase).catch(() => []),

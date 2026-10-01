@@ -63,6 +63,15 @@ export const metadata: Metadata = {
       'Discover and book stays, activities, hikes, shuttles and holiday packages in the Drakensberg mountains of South Africa.',
     images: [DEFAULT_OG_IMAGE.url],
   },
+  // Search Console / Bing Webmaster ownership by HTML tag. Paste only the
+  // token from the tag Google shows (content="…"), e.g. in Vercel's env vars.
+  // DNS verification (a TXT record) works too and needs neither variable.
+  verification: {
+    google: process.env.NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION || undefined,
+    other: process.env.NEXT_PUBLIC_BING_SITE_VERIFICATION
+      ? { 'msvalidate.01': process.env.NEXT_PUBLIC_BING_SITE_VERIFICATION }
+      : undefined,
+  },
   robots: IS_INDEXABLE_DEPLOY ? { index: true, follow: true } : { index: false, follow: false },
   // Icons come from the file conventions: app/icon.svg (a mountain mark that
   // stays legible at 16px, which the full wordmark in public/favicon.svg did
@@ -85,11 +94,21 @@ const ORG_JSONLD = {
   areaServed: { '@type': 'Place', name: 'Drakensberg, KwaZulu-Natal, South Africa' },
 }
 
+// Names the site for Google's search results (the site name shown above the
+// title), alongside the organisation block above.
+const WEBSITE_JSONLD = {
+  '@context': 'https://schema.org',
+  '@type': 'WebSite',
+  name: SITE_NAME,
+  url: SITE_URL,
+}
+
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en-ZA" className={`${dmSans.variable} ${dmSerif.variable}`}>
       <body>
         <JsonLd data={ORG_JSONLD} />
+        <JsonLd data={WEBSITE_JSONLD} />
         <AppShell>{children}</AppShell>
       </body>
     </html>
