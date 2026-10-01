@@ -14,6 +14,7 @@ import { getRoomsByProperty } from '@/lib/rooms'
 import { getActivities, type Activity } from '@/lib/activities'
 import { getTrails, trailStartPoint, type Trail } from '@/lib/trails'
 import { getSupplierEntities } from '@/lib/supplier-entities'
+import { isEventUpcoming } from '@/lib/upcoming'
 import { publicSupabase } from '@/lib/supabase-public'
 import { StayDistance, useStayCoords, haversineKm } from '@/lib/stay-distance'
 import { trackEvent, AnalyticsEvent } from '@/lib/analytics'
@@ -62,6 +63,7 @@ type LiveEvent = {
   title: string
   location: string
   starts_at: string
+  ends_at?: string
   event_type: 'event' | 'special'
   ticket_price: number
   is_published: boolean
@@ -245,10 +247,9 @@ function SearchResults() {
       setLiveHikes(trails.filter(t => t.status === 'published').map(trailToLiveHike))
     })
     getSupplierEntities<any>('events', undefined, publicSupabase).then((all: LiveEvent[]) => {
-      const now = new Date().toISOString()
       // RLS already hides drafts from the public; filtering defensively in
       // case a signed-in supplier is browsing and sees their own drafts too.
-      setLiveEvents(all.filter(e => e.is_published && e.starts_at >= now))
+      setLiveEvents(all.filter(e => e.is_published && isEventUpcoming(e)))
     }).catch(() => setLiveEvents([]))
   }, [])
 

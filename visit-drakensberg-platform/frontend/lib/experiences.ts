@@ -2,6 +2,7 @@ import { getTours, resolveItinerary, type Tour, type PricingTier, type ComposedI
 import { getDepartures, type Departure, type DeparturePackage } from './departures'
 import { getTrailSummaries, type Trail, type TrailDay } from './trails'
 import type { SupabaseClient } from '@supabase/supabase-js'
+import { todayISO, isOnOrAfterToday } from './upcoming'
 
 export type { DeparturePackage, ComposedItineraryDay }
 
@@ -195,9 +196,9 @@ async function loadAll(client?: SupabaseClient): Promise<TrekkingExperience[]> {
 
 /** All published upcoming experiences, soonest first. */
 export async function getUpcomingExperiences(client?: SupabaseClient): Promise<TrekkingExperience[]> {
-  const today = new Date().toISOString().slice(0, 10)
+  const today = todayISO()
   return (await loadAll(client))
-    .filter(e => e.departureDate >= today)
+    .filter(e => isOnOrAfterToday(e.departureDate, today))
     .sort((a, b) => a.departureDate.localeCompare(b.departureDate))
 }
 

@@ -8,6 +8,7 @@ import { getTrailSummaries, Trail, trailCategory } from '@/lib/trails'
 import UpcomingDepartures from '@/components/tours/UpcomingDepartures'
 import TrailExperiences from '@/components/experiences/TrailExperiences'
 import { getDepartures } from '@/lib/departures'
+import { todayISO } from '@/lib/upcoming'
 import { getTours } from '@/lib/tours'
 import { getExperiencesByTrail, type TrekkingExperience } from '@/lib/experiences'
 import { publicSupabase } from '@/lib/supabase-public'
@@ -74,7 +75,7 @@ export default function HikeDetail({
     getTrailSummaries(publicSupabase).then(setAllTrails)
     Promise.all([getDepartures(publicSupabase), getTours(publicSupabase)]).then(([all, tours]) => {
       const activeTourIds = new Set(tours.filter(t => t.status === 'active').map(t => t.id))
-      const today = new Date().toISOString().slice(0, 10)
+      const today = todayISO()
       const tourDates: TourDate[] = all
         .filter(d => d.trailId === trail.id && d.date >= today && d.status !== 'full' && activeTourIds.has(d.tourId))
         .sort((a, b) => a.date.localeCompare(b.date))

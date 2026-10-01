@@ -25,6 +25,7 @@ import EditableCard from '@/components/editor/EditableCard'
 import { getTrailSummaries, type Trail } from '@/lib/trails'
 import { getFeaturedAttractions, ATTRACTION_KIND_LABEL, type Attraction } from '@/lib/attractions'
 import { getUpcomingExperiences, type TrekkingExperience } from '@/lib/experiences'
+import { isEventUpcoming } from '@/lib/upcoming'
 import { getSupplierEntities } from '@/lib/supplier-entities'
 import { getActivities, type Activity } from '@/lib/activities'
 import { trackEvent, AnalyticsEvent } from '@/lib/analytics'
@@ -449,10 +450,9 @@ export default function HomePage() {
       .catch(() => setScheduledHikes([]))
     getSupplierEntities<any>('events', undefined, publicSupabase)
       .then((all: PublicEvent[]) => {
-        const now = new Date().toISOString()
         setUpcomingEvents(
           all
-            .filter(e => e.is_published && (e.ends_at || e.starts_at) >= now)
+            .filter(e => e.is_published && isEventUpcoming(e))
             .sort((a, b) => a.starts_at.localeCompare(b.starts_at))
             .slice(0, 3),
         )
