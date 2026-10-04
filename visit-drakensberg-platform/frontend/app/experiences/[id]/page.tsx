@@ -33,7 +33,16 @@ const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://visitdrakensberg.c
 // until the next deploy or on-demand revalidation quietly fixes it. Was
 // missing here for a while — caught when a freshly-created multi-package
 // departure kept 404ing on a live deploy.
+//
+// …and `force-dynamic` alone still isn't enough on Next 14.2: at request
+// time it only marks the render dynamic, it does not stop un-optioned
+// fetches from going to the Data Cache (patch-fetch's "auto cache" path
+// falls back to revalidate=false). The Supabase reads kept showing "Using
+// cache" in Vercel's request log and a departure created after the cache
+// was filled still 404'd. `fetchCache = 'force-no-store'` is what actually
+// makes every fetch on this route skip the cache.
 export const dynamic = 'force-dynamic'
+export const fetchCache = 'force-no-store'
 
 async function resolveExperience(id: string): Promise<TrekkingExperience | null> {
   return getExperienceById(id, publicSupabase)
