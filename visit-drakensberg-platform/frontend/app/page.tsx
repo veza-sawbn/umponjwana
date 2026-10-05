@@ -14,6 +14,9 @@ import SearchBar from '@/components/search/SearchBar'
 import HeroCarousel from '@/components/media/HeroCarousel'
 import { useSwiperAutoplay, CAROUSEL_SPEED_MS } from '@/lib/carousel-autoplay'
 import Footer from '@/components/layout/Footer'
+import TripPlanningTools from '@/components/home/TripPlanningTools'
+import TopDestinations from '@/components/home/TopDestinations'
+import RecommendedThisSeason from '@/components/home/RecommendedThisSeason'
 import { getAllSiteContent, SITE_CONTENT_DEFAULTS, type HomeCard } from '@/lib/site-content'
 import { useSiteSection } from '@/lib/use-site-section'
 import { objectPositionStyle } from '@/lib/image-position'
@@ -859,6 +862,11 @@ export default function HomePage() {
 
       {/* ── Hero ── */}
       <HeroSection hero={hero} />
+
+      {/* ── Travel hub (components/home/*) ── */}
+      <TripPlanningTools />
+      <TopDestinations regionCards={cards.regions ?? []} />
+      <RecommendedThisSeason />
 
       {/* ── Reorderable sections ── */}
       {orderedSections}

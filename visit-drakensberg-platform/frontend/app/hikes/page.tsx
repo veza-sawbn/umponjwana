@@ -67,6 +67,16 @@ export default function HikesPage() {
     // is honoured, so a stray/old param can't land on a blank tab state.
     const categoryParam = params.get('category')
     if (CATEGORY_TABS.some(c => c.value === categoryParam)) setCategory(categoryParam as TrailCategory)
+    // Difficulty / route type deep links (e.g. the homepage trip-planning
+    // tools → /hikes?difficulty=Easy) — recognised values only, and the
+    // filter panel opens so the applied filter is visible.
+    const difficultyParam = params.get('difficulty')
+    const routeTypeParam = params.get('route_type')
+    const validDifficulty = difficultyParam && difficultyParam !== 'All' && DIFF_OPTS.includes(difficultyParam)
+    const validRouteType = routeTypeParam && routeTypeParam !== 'All' && TYPE_OPTS.includes(routeTypeParam)
+    if (validDifficulty) setDiff(difficultyParam)
+    if (validRouteType) setRouteType(routeTypeParam)
+    if (validDifficulty || validRouteType) setFiltersOpen(true)
     const reserveParam = params.get('nature-reserves')
     if (reserveParam) {
       setReserveId(reserveParam)
