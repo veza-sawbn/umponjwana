@@ -1,4 +1,5 @@
 import { supabase } from './auth'
+import { getEffectiveSupplierId } from './effective-supplier'
 import type { OrderLine } from './orders'
 
 // Settlement engine + virtual supplier statements.
@@ -85,11 +86,14 @@ export async function getSettlements(): Promise<Settlement[]> {
 
 export async function getMySettlements(): Promise<Settlement[]> {
   try {
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return []
+    // Effective, not signed-in: an operations employee inside a managed
+    // supplier would otherwise query their own id and see no payouts at all
+    // on a page whose whole job is showing what has been paid out.
+    const supplierId = await getEffectiveSupplierId()
+    if (!supplierId) return []
     const { data } = await supabase
       .from('vd_settlements').select('*')
-      .eq('supplier_id', user.id)
+      .eq('supplier_id', supplierId)
       .order('created_at', { ascending: false })
     if (Array.isArray(data)) return data as Settlement[]
   } catch {}

@@ -1,4 +1,5 @@
 import { supabase } from './auth'
+import { getEffectiveSupplierId } from './effective-supplier'
 import type { SavedBooking } from './bookings'
 import { getPropertyById } from './properties'
 import { sendReceiptEmail } from './order-payments'
@@ -412,11 +413,16 @@ export async function getAllOrderLines(): Promise<OrderLine[]> {
 /** Supplier portal: only the lines allocated to the signed-in supplier. */
 export async function getMyOrderLines(): Promise<OrderLine[]> {
   try {
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return []
+    // The signed-in user id is the wrong id whenever an operations employee
+    // has entered a managed supplier: it is the EMPLOYEE's, and no order line
+    // is owned by them, so /supplier/earnings showed a managed supplier a
+    // confident R0 rather than their money. Same resolver the rest of the
+    // portal uses.
+    const supplierId = await getEffectiveSupplierId()
+    if (!supplierId) return []
     const { data } = await supabase
       .from('vd_order_lines').select('*')
-      .eq('supplier_id', user.id)
+      .eq('supplier_id', supplierId)
       .order('created_at', { ascending: false })
     if (Array.isArray(data)) return data as OrderLine[]
   } catch {}
@@ -467,12 +473,13 @@ export async function setLineFulfilment(lineId: string, status: string): Promise
  */
 export async function getMyOrderLinesForBooking(bookingId: string): Promise<OrderLine[]> {
   try {
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return []
+    // Effective, not signed-in — see getMyOrderLines above.
+    const supplierId = await getEffectiveSupplierId()
+    if (!supplierId) return []
     const { data } = await supabase
       .from('vd_order_lines')
       .select('*, vd_orders!inner(booking_id)')
-      .eq('supplier_id', user.id)
+      .eq('supplier_id', supplierId)
       .eq('vd_orders.booking_id', bookingId)
     if (Array.isArray(data)) {
       return (data as Array<OrderLine & { vd_orders?: unknown }>).map(({ vd_orders: _vd_orders, ...line }) => line)

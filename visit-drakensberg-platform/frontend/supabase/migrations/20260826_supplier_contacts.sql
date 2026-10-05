@@ -16,6 +16,7 @@
 -- all suppliers. Same shape as every other supplier-scoped table in this
 -- schema (vd_order_lines, vd_booking_orders, vd_settlements, …).
 -- ============================================================================
+-- @rollback: additive — forward-only; safe to leave in place if the deploy is rolled back
 
 create table if not exists vd_supplier_contacts (
   id                 uuid primary key default gen_random_uuid(),

@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 import { notFound } from 'next/navigation'
 import { getExperienceById, type TrekkingExperience } from '@/lib/experiences'
 import { publicSupabase } from '@/lib/supabase-public'
+import { isOnOrAfterToday } from '@/lib/upcoming'
 import ExperienceDetail from './ExperienceDetail'
 import JsonLd from '@/components/seo/JsonLd'
 
@@ -32,7 +33,16 @@ const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://visitdrakensberg.c
 // until the next deploy or on-demand revalidation quietly fixes it. Was
 // missing here for a while — caught when a freshly-created multi-package
 // departure kept 404ing on a live deploy.
+//
+// …and `force-dynamic` alone still isn't enough on Next 14.2: at request
+// time it only marks the render dynamic, it does not stop un-optioned
+// fetches from going to the Data Cache (patch-fetch's "auto cache" path
+// falls back to revalidate=false). The Supabase reads kept showing "Using
+// cache" in Vercel's request log and a departure created after the cache
+// was filled still 404'd. `fetchCache = 'force-no-store'` is what actually
+// makes every fetch on this route skip the cache.
 export const dynamic = 'force-dynamic'
+export const fetchCache = 'force-no-store'
 
 async function resolveExperience(id: string): Promise<TrekkingExperience | null> {
   return getExperienceById(id, publicSupabase)
@@ -49,7 +59,7 @@ export async function generateMetadata({ params }: { params: { id: string } }): 
   const title = `${exp.title}, ${formatDateShort(exp.departureDate)} | Visit Drakensberg`
   const description = `${exp.durationDays} day${exp.durationDays !== 1 ? 's' : ''} guided departure on ${exp.trailName || 'the trail'} with ${exp.operator}, departing ${formatDateShort(exp.departureDate)}. ${exp.description || ''}`.trim().slice(0, 160)
   const canonical = `/experiences/${exp.id}`
-  const isPast = new Date(exp.departureDate) < new Date()
+  const isPast = !isOnOrAfterToday(exp.departureDate)
 
   return {
     title: { absolute: title },

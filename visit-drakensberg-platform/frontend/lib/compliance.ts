@@ -1,4 +1,5 @@
 import { supabase } from './auth'
+import { requestUploadUrl, putToSignedUrl, registerComplianceDocument } from './applicant-upload'
 
 // Supplier compliance documents (see
 // supabase/migrations/20260905_supplier_compliance.sql).
@@ -262,10 +263,25 @@ export async function uploadComplianceDocument(input: ComplianceUploadInput): Pr
     throw new Error(`${file.name} must be a PDF, JPEG, PNG or WebP.`)
   }
 
+  // ── Applicants: through the server, on an upload grant ────────────────────
+  // A pre-account applicant used to write straight into
+  // compliance/applications/… with the anon key, and then insert the registry
+  // row the same way. The policy pinned review_status, supplier_id and the
+  // review columns — but it could not check that storage_path pointed at an
+  // object this applicant had uploaded, so a caller could lodge a row naming
+  // ANOTHER application's certificate and have its accreditation assessed
+  // against someone else's papers. Both halves now go through routes that
+  // require a grant scoped to this reference.
+  if (applicationRef) {
+    return uploadApplicantDocument(input, applicationRef)
+  }
+
+  // ── Suppliers: unchanged ──────────────────────────────────────────────────
+  // An approved supplier is signed in and owns its own subtree, so RLS is
+  // already the right control and the direct write stays.
   const id = newDocId()
   const ext = safeExtension(file.name, file.type)
-  const prefix = supplierId ? `suppliers/${supplierId}` : `applications/${applicationRef}`
-  const storagePath = `${prefix}/${id}.${ext}`
+  const storagePath = `suppliers/${supplierId}/${id}.${ext}`
 
   const { error: uploadError } = await supabase.storage
     .from(COMPLIANCE_BUCKET)
@@ -305,6 +321,61 @@ export async function uploadComplianceDocument(input: ComplianceUploadInput): Pr
   }
 
   return fromRow(row as Record<string, unknown>)
+}
+
+/**
+ * The pre-account path: signed upload URL, then a server-side registry row.
+ *
+ * Unlike the supplier path above, the object is NOT rolled back if the
+ * registry insert fails — an applicant has never been able to delete from the
+ * compliance bucket, and nothing here changes that. An orphaned object the
+ * reviewer never sees is the better failure: the alternative is telling the
+ * applicant their certificate is on file when no row points at it.
+ */
+async function uploadApplicantDocument(
+  input: ComplianceUploadInput,
+  applicationRef: string,
+): Promise<ComplianceDocument> {
+  const { file, docType } = input
+
+  const signed = await requestUploadUrl({ kind: 'compliance', reference: applicationRef, file })
+  await putToSignedUrl(COMPLIANCE_BUCKET, signed, file)
+
+  // The server picked the path; the id is derived from it so the row and the
+  // object cannot drift apart.
+  const id = `cdoc-${(signed.path.split('/').pop() ?? '').split('.')[0]}`
+
+  const row = {
+    id,
+    supplier_id: null,
+    application_ref: applicationRef,
+    doc_type: docType,
+    issuer: input.issuer ?? '',
+    reference_number: input.referenceNumber ?? '',
+    issued_on: input.issuedOn || null,
+    expires_on: input.expiresOn || null,
+    storage_path: signed.path,
+    file_name: file.name,
+    mime_type: file.type || '',
+    byte_size: file.size,
+    review_status: 'pending' as const,
+  }
+
+  await registerComplianceDocument({
+    id,
+    reference: applicationRef,
+    storagePath: signed.path,
+    docType,
+    issuer: row.issuer,
+    referenceNumber: row.reference_number,
+    issuedOn: row.issued_on,
+    expiresOn: row.expires_on,
+    fileName: row.file_name,
+    mimeType: row.mime_type,
+    byteSize: row.byte_size,
+  })
+
+  return fromRow(row as unknown as Record<string, unknown>)
 }
 
 /**

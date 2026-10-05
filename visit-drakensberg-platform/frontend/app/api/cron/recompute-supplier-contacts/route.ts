@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase-admin'
+import { bearerMatches } from '@/lib/secret-compare'
 
 export const dynamic = 'force-dynamic'
 
@@ -10,12 +11,12 @@ export const dynamic = 'force-dynamic'
 // service-role client carries no user JWT, so the RPC checks
 // auth.role() = 'service_role' rather than is_admin() for this caller.
 export async function GET(req: Request) {
+  // Constant-time: `auth !== \`Bearer ${secret}\`` short-circuits at the first
+  // differing byte, which over enough unthrottled samples recovers CRON_SECRET
+  // a byte at a time (audit finding L2).
   const secret = process.env.CRON_SECRET
-  if (secret) {
-    const auth = req.headers.get('authorization')
-    if (auth !== `Bearer ${secret}`) {
-      return NextResponse.json({ error: 'unauthorized' }, { status: 401 })
-    }
+  if (secret && !bearerMatches(req, secret)) {
+    return NextResponse.json({ error: 'unauthorized' }, { status: 401 })
   }
 
   const admin = supabaseAdmin()

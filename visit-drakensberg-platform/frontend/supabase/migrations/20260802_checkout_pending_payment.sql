@@ -44,6 +44,7 @@
 --      is also not resolved — validation falls back to the departure's own
 --      top-level pricePerPerson regardless of which package was selected.
 -- ============================================================================
+-- @rollback: additive — forward-only; safe to leave in place if the deploy is rolled back
 
 -- A 'pending' booking must hold the room the same as 'confirmed', otherwise
 -- a second visitor could book the same room while the first is off at

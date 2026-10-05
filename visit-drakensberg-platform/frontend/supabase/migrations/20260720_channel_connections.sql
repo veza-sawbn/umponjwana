@@ -7,6 +7,7 @@
 -- this table is admin-only for BOTH read and write. Run in the Supabase SQL
 -- editor.
 -- ============================================================================
+-- @rollback: additive — forward-only; safe to leave in place if the deploy is rolled back
 
 create table if not exists vd_channel_connections (
   channel      text primary key,

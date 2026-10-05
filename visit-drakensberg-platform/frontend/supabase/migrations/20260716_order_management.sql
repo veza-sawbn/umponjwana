@@ -22,6 +22,7 @@
 --   * Multi-destination / multi-currency ready (destination + currency
 --     columns everywhere; ZAR/Drakensberg are defaults, not assumptions).
 -- ============================================================================
+-- @rollback: additive — forward-only; safe to leave in place if the deploy is rolled back
 
 -- ────────────────────────────────────────────────────────────────────────────
 -- 0. Staff roles (finance / operations) on top of the existing role enum.

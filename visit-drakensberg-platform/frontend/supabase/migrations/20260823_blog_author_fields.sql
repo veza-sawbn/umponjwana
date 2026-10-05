@@ -1,3 +1,4 @@
+-- @rollback: additive — forward-only; safe to leave in place if the deploy is rolled back
 -- Add denormalized author display fields and per-article SEO overrides to
 -- blog_posts. Denormalized author fields allow guest contributors who have no
 -- platform account; SEO fields give editors control without touching the global

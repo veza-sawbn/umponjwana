@@ -1,6 +1,7 @@
 import { listEntities, getEntity, getEntityByIdOrSlug, insertEntity, updateEntity } from './entities'
 import { getSupplierEntities, type SupplierEntity } from './supplier-entities'
 import type { GraphFields } from './graph-fields'
+import type { BioSection } from './guide-profile'
 import type { SupabaseClient } from '@supabase/supabase-js'
 
 // Supplier directory: Tour Operator → Guide Team → Guide Profile.
@@ -51,6 +52,14 @@ export type GuideProfile = SupplierEntity & {
   specialisations?: string
   highestSummit?: string
   completedExpeditions?: number
+  /** Nickname shown under the name, e.g. Charlie. See splitGuideName(). */
+  knownAs?: string
+  /** Title over the biography; the page shows "Biography" when blank. */
+  bioHeadline?: string
+  /** One short line shown large within the biography. */
+  bioHighlight?: string
+  /** Headed blocks after the introduction (`bio`). See lib/guide-profile.ts. */
+  bioSections?: BioSection[]
   // Optional so rows saved before this field existed still read as
   // 'certified' — see GUIDE_TYPE_LABEL and guideTypeOf() below.
   guideType?: GuideType
@@ -93,6 +102,23 @@ export function guideTypeOf(guide: { guideType?: string }): GuideType {
 
 const KIND = 'operator_profile'
 
+// Both /guides/operators/[id] (operator profiles) and /guides/[id] (guide
+// profiles) are ISR-cached for up to 30 minutes, so a supplier's edit
+// wouldn't reach visitors until that cache window happened to expire.
+// Best-effort and non-blocking — a failed revalidate (e.g. offline) still
+// leaves the save itself intact, just stale until the cache naturally
+// expires. Exported (not just used by saveOperatorProfile below) because
+// guide create/edit/delete happens directly in app/supplier/guides/**,
+// which has no lib wrapper of its own to hook this into.
+export function revalidateGuidePage(kind: 'operator' | 'guide', id: string, slug?: string): void {
+  if (typeof fetch !== 'function' || !id) return
+  fetch('/api/revalidate/guide', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ kind, id, slug }),
+  }).catch(() => {})
+}
+
 export function operatorProfileId(supplierId: string): string {
   return `opr-${supplierId}`
 }
@@ -119,10 +145,14 @@ export async function saveOperatorProfile(
   const existing = await getEntity<OperatorProfile>(KIND, id)
   if (existing) {
     await updateEntity(KIND, id, { ...data, supplierId })
-    return { ...existing, ...data, id, supplierId }
+    const updated = { ...existing, ...data, id, supplierId }
+    revalidateGuidePage('operator', id, updated.slug)
+    return updated
   }
   const profile: OperatorProfile = { ...data, id, supplierId, createdAt: new Date().toISOString() }
-  return insertEntity(KIND, profile)
+  const saved = await insertEntity(KIND, profile)
+  revalidateGuidePage('operator', saved.id, saved.slug)
+  return saved
 }
 
 /** Verified guides for one operator. */

@@ -1,6 +1,7 @@
 import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs'
 import { cookies } from 'next/headers'
 import { NextResponse } from 'next/server'
+import { safeRedirectPath } from '@/lib/safe-redirect'
 
 export const dynamic = 'force-dynamic'
 
@@ -31,7 +32,11 @@ export async function GET(request: Request) {
   const url = new URL(request.url)
   const code = url.searchParams.get('code')
   // Allow callers to override the post-exchange redirect (e.g. ?next=/supplier)
-  const next = url.searchParams.get('next') ?? '/auth/reset-password'
+  // — but only to a path on this site. new URL(next, base) returns the
+  // ABSOLUTE url when `next` is one, so ?next=https://attacker.example used to
+  // set the session cookie and then forward the user off-site from our own
+  // domain at the end of a flow they trust. See lib/safe-redirect.ts.
+  const next = safeRedirectPath(url.searchParams.get('next'))
 
   if (code) {
     const supabase = createRouteHandlerClient({ cookies })

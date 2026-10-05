@@ -199,6 +199,21 @@ async function saveRegions(regions: Region[]) {
   if (error) throw error
 }
 
+// /regions/[slug] (1hr ISR) and /regions/[slug]/[season] (15min ISR) both
+// depend on this content, so an admin's edit wouldn't reach visitors until
+// that cache window happened to expire. Best-effort and non-blocking — a
+// failed revalidate (e.g. offline) still leaves the save itself intact,
+// just stale until the cache naturally expires. Same pattern as
+// lib/activities.ts's revalidateActivityPage.
+function revalidateRegionPage(slug: string): void {
+  if (typeof fetch !== 'function' || !slug) return
+  fetch('/api/revalidate/region', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ slug }),
+  }).catch(() => {})
+}
+
 // Accepts an optional Supabase client so Server Components can pass a
 // session-less client (lib/supabase-public.ts) instead of the browser
 // client-component client this module defaults to — every existing caller
@@ -237,7 +252,9 @@ export async function getRegionNames(): Promise<string[]> {
  */
 export async function saveAllRegions(regions: Region[]): Promise<void> {
   const now = new Date().toISOString()
-  await saveRegions(regions.map(r => normalizeRegion({ ...r, updatedAt: r.updatedAt ?? now })))
+  const normalized = regions.map(r => normalizeRegion({ ...r, updatedAt: r.updatedAt ?? now }))
+  await saveRegions(normalized)
+  for (const r of normalized) revalidateRegionPage(r.slug)
 }
 
 export async function createRegion(data: Omit<Region, 'id' | 'slug' | 'createdAt' | 'updatedAt'>): Promise<Region> {
@@ -245,6 +262,7 @@ export async function createRegion(data: Omit<Region, 'id' | 'slug' | 'createdAt
   const now = new Date().toISOString()
   const item = normalizeRegion({ ...data, createdAt: now, updatedAt: now })
   await saveRegions([...all.filter(region => region.slug !== item.slug), item])
+  revalidateRegionPage(item.slug)
   return item
 }
 
@@ -256,10 +274,13 @@ export async function updateRegion(id: string, data: Omit<Region, 'id' | 'slug' 
   // canonical URL a previous normalizeRegion() call already committed to.
   const updated = normalizeRegion({ ...data, id, slug: previous?.slug, createdAt: previous?.createdAt, updatedAt: new Date().toISOString() })
   await saveRegions(all.map(region => region.id === id ? updated : region))
+  revalidateRegionPage(updated.slug)
   return updated
 }
 
 export async function deleteRegion(id: string): Promise<void> {
   const all = await getRegions()
+  const removed = all.find(region => region.id === id)
   await saveRegions(all.filter(region => region.id !== id))
+  if (removed) revalidateRegionPage(removed.slug)
 }

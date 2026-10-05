@@ -1,5 +1,5 @@
 import {
-  listEntities, listEntitiesByOwner, insertEntity, updateEntity, deleteEntity, newEntityId,
+  listEntities, listEntitiesByOwner, insertEntity, updateEntity, deleteEntity, newEntityId, getEntity,
 } from './entities'
 import { deleteDeparturesByTour } from './departures'
 import { getEffectiveSupplierId } from './effective-supplier'
@@ -101,6 +101,13 @@ export type Tour = {
   // unchanged. Only a true stored value when pricingTiers is empty.
   pricePerPerson: number
   pricingTiers?: PricingTier[]
+  /** Per-child rate, applied across every pricing tier/departure of this
+   *  tour. Only applied when childMaxAge is also set — tours created before
+   *  this existed have neither, so everyone pays the tier's adult rate as
+   *  before. */
+  childPrice?: number
+  /** Age in years, inclusive, at or under which the child rate applies. */
+  childMaxAge?: number
   /** @deprecated Superseded by PricingTier's itinerary fields, which build on the linked Trail's `days` instead of a separate tour-level plan. Retained so tours saved by the earlier version of this feature still parse; no longer read anywhere. */
   itinerary?: unknown
   /** @deprecated Removed from the supplier forms; retained so stored tours still parse. */
@@ -209,17 +216,38 @@ export async function getMyTours(): Promise<Tour[]> {
   return ownerId ? getToursBySupplier(ownerId) : []
 }
 
+// The public tour page (app/tours/[id]/page.tsx) is ISR-cached for up to 5
+// minutes, so a supplier's edit wouldn't reach visitors until that cache
+// window happened to expire. Best-effort and non-blocking — a failed
+// revalidate (e.g. offline) still leaves the save itself intact, just stale
+// until the cache naturally expires. Same pattern as lib/activities.ts's
+// revalidateActivityPage.
+function revalidateTourPage(id: string, slug?: string): void {
+  if (typeof fetch !== 'function' || !id) return
+  fetch('/api/revalidate/tour', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ id, slug }),
+  }).catch(() => {})
+}
+
 export async function addTour(tour: Omit<Tour, 'id' | 'createdAt'>): Promise<Tour> {
   // Slug population (see lib/slugify.ts) — auto-generated from the tour
   // name unless already supplied, unique against every other tour's
   // canonical URL segment (slug || id).
   const slug = tour.slug || uniqueSlug(slugify(tour.name), (await getTours()).map(e => e.slug || e.id))
   const newTour: Tour = { ...tour, slug, id: newEntityId('tour'), createdAt: new Date().toISOString() }
-  return insertEntity(KIND, newTour)
+  const saved = await insertEntity(KIND, newTour)
+  revalidateTourPage(saved.id, saved.slug)
+  return saved
 }
 
 export async function updateTour(id: string, patch: Partial<Tour>): Promise<void> {
   await updateEntity(KIND, id, patch)
+  // patch usually won't carry `slug` (the edit form never touches it), so
+  // read it back rather than assuming the id-only path is enough.
+  const current = await getEntity<Tour>(KIND, id)
+  revalidateTourPage(id, current?.slug)
 }
 
 export async function deleteTour(id: string): Promise<void> {

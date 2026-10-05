@@ -12,6 +12,7 @@
 -- the owner and admins can read it), reusing the existing entity RLS model
 -- instead of inventing a new table.
 -- ============================================================================
+-- @rollback: additive — forward-only; safe to leave in place if the deploy is rolled back
 
 drop policy if exists "Suppliers upload own media" on storage.objects;
 drop policy if exists "Suppliers update own media" on storage.objects;

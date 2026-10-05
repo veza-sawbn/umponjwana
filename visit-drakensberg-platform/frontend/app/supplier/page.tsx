@@ -67,8 +67,11 @@ export default function SupplierOverview() {
   useEffect(() => {
     supabase.auth.getUser().then(async ({ data: { user } }) => {
       if (!user) { setOrdersLoading(false); return }
-      // RLS scopes this to orders that actually belong to the signed-in
-      // supplier — never another supplier's bookings.
+      // This used to say "RLS scopes this to orders that actually belong to
+      // the signed-in supplier — never another supplier's bookings." True of a
+      // supplier, false of an operations employee managing several, and the
+      // reason two managed suppliers showed identical dashboards. getMyOrders
+      // now names the supplier it means; the comment there has the detail.
       setOrders(await getMyOrders())
       setOrdersLoading(false)
     })

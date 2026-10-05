@@ -25,6 +25,7 @@
 -- No hero on an existing template renders exactly as it does today: the shell
 -- omits the band entirely when the URL is empty.
 -- ============================================================================
+-- @rollback: additive — forward-only; safe to leave in place if the deploy is rolled back
 
 alter table vd_email_templates
   add column if not exists hero_image_url text not null default '',

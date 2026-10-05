@@ -20,6 +20,7 @@ const EMPTY = {
   name: '', difficulty: 'Moderate', days: 1, minAge: 0, maxGroup: 10,
   meetingPoint: '', gpsLat: '', gpsLng: '', description: '',
   included: [] as string[], fitnessNotes: '', cancellation: '48h',
+  childMaxAge: '', childPrice: '',
   status: 'draft' as 'active' | 'draft',
 }
 
@@ -111,6 +112,8 @@ export default function NewTourPage() {
         included,
         pricingTiers,
         pricePerPerson: cheapest(pricingTiers),
+        childPrice: snapshot.childMaxAge ? (+snapshot.childPrice || 0) : undefined,
+        childMaxAge: snapshot.childMaxAge ? +snapshot.childMaxAge : undefined,
         supplierId: ownerId,
         supplierName: companyName,
       })
@@ -293,6 +296,20 @@ export default function NewTourPage() {
               : ' Add a day-by-day plan to this trail at Admin → Trails to let tiers customize their itinerary.'}
           </p>
         </F>
+
+        <div className="grid grid-cols-2 gap-4">
+          <F label="Child Age Cutoff (optional)">
+            <input type="number" min="0" value={form.childMaxAge} onChange={e => set('childMaxAge', e.target.value)} placeholder="e.g. 12" className={inp} />
+          </F>
+          <F label="Child Price per Person (ZAR)">
+            <input type="number" min="0" value={form.childPrice} onChange={e => set('childPrice', e.target.value)} disabled={!form.childMaxAge} placeholder="Leave blank to charge adult rate" className={`${inp} disabled:opacity-40`} />
+          </F>
+        </div>
+        {form.childMaxAge && (
+          <p className="font-sans text-xs text-black/35 -mt-2">
+            Applies across every pricing tier and departure of this tour.
+          </p>
+        )}
 
         <F label="Status">
           <div className="flex gap-2">

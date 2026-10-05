@@ -11,6 +11,7 @@ import {
 } from 'lucide-react'
 import { getExperiencesByTrail, resolvePackageItinerary, type TrekkingExperience } from '@/lib/experiences'
 import { useBooking } from '@/lib/booking-context'
+import { isOnOrAfterToday } from '@/lib/upcoming'
 import { formatMoney } from '@/lib/allocation'
 import ReadMoreText from '@/components/ui/ReadMoreText'
 import SaveButton from '@/components/ui/SaveButton'
@@ -71,6 +72,9 @@ export default function ExperienceDetail({ exp }: { exp: TrekkingExperience }) {
   }
 
   const full = exp.spacesAvailable === 0
+  // Direct links (emails, saved lists) keep resolving after the date, but a
+  // departure that has already left can't be booked.
+  const departed = !isOnOrAfterToday(exp.departureDate)
   const isAdded = booking.addons.some(a => a.id === exp.id)
   const clampedGuests = Math.min(guests, Math.max(1, exp.spacesAvailable))
   const selectedPackage = exp.packages.find(p => p.id === packageId) ?? exp.packages[0]
@@ -86,7 +90,7 @@ export default function ExperienceDetail({ exp }: { exp: TrekkingExperience }) {
   const effectiveReturnDate = itinerary.endDate
 
   function handleBook() {
-    if (full || isAdded || !selectedPackage) return
+    if (departed || full || isAdded || !selectedPackage) return
     booking.setSearch(
       exp.region || booking.region,
       addDays(itinerary.startDate, -1),
@@ -378,7 +382,7 @@ export default function ExperienceDetail({ exp }: { exp: TrekkingExperience }) {
                 </div>
               )}
 
-              {!full && !isAdded && (
+              {!departed && !full && !isAdded && (
                 <div className="flex items-center justify-between mb-4">
                   <span className="font-sans text-sm text-gray-600">Guests</span>
                   <div className="flex items-center border border-gray-200">
@@ -401,7 +405,9 @@ export default function ExperienceDetail({ exp }: { exp: TrekkingExperience }) {
                 </div>
               )}
 
-              {full ? (
+              {departed ? (
+                <span className="block text-center font-sans text-sm text-gray-400 py-3 border border-gray-200">This departure has passed</span>
+              ) : full ? (
                 <span className="block text-center font-sans text-sm text-gray-400 py-3 border border-gray-200">Fully booked</span>
               ) : isAdded ? (
                 <button

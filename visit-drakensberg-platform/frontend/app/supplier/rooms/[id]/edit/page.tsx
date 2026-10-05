@@ -81,6 +81,8 @@ type FormState = {
   seasons: Season[]
   minNights: string
   cleaningFee: string
+  childMaxAge: string
+  childPrice: string
 }
 
 export default function EditRoomPage() {
@@ -98,6 +100,7 @@ export default function EditRoomPage() {
     basePrice: '', weekendSurcharge: '0',
     seasons: [{ name: '', from: '', to: '', price: '' }],
     minNights: '1', cleaningFee: '',
+    childMaxAge: '', childPrice: '',
   })
 
   useEffect(() => {
@@ -125,6 +128,8 @@ export default function EditRoomPage() {
           seasons: room.seasons.length > 0 ? room.seasons : [{ name: '', from: '', to: '', price: '' }],
           minNights: String(room.minNights),
           cleaningFee: room.cleaningFee ? String(room.cleaningFee) : '',
+          childMaxAge: room.childMaxAge ? String(room.childMaxAge) : '',
+          childPrice: room.childPrice ? String(room.childPrice) : '',
         })
       }
       setLoading(false)
@@ -172,6 +177,8 @@ export default function EditRoomPage() {
         seasons: form.seasons.filter(s => s.name),
         minNights: +form.minNights || 1,
         cleaningFee: +form.cleaningFee || 0,
+        childPrice: form.childMaxAge ? (+form.childPrice || 0) : undefined,
+        childMaxAge: form.childMaxAge ? +form.childMaxAge : undefined,
       })
       router.push('/supplier/rooms')
     } catch (e) {
@@ -306,6 +313,20 @@ export default function EditRoomPage() {
                 <input type="number" min="0" value={form.cleaningFee} onChange={e => setField('cleaningFee', e.target.value)} placeholder="0" className={inp} />
               </Field>
             </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <Field label="Child Age Cutoff (optional)">
+                <input type="number" min="0" value={form.childMaxAge} onChange={e => setField('childMaxAge', e.target.value)} placeholder="e.g. 12" className={inp} />
+              </Field>
+              <Field label="Child Price per Night (ZAR)">
+                <input type="number" min="0" value={form.childPrice} onChange={e => setField('childPrice', e.target.value)} disabled={!form.childMaxAge} placeholder="Extra charge per child sharing" className={`${inp} disabled:opacity-40`} />
+              </Field>
+            </div>
+            {form.childMaxAge && (
+              <p className="font-sans text-xs text-black/35 -mt-2">
+                Charged per child, per night, on top of the base room price — not instead of it.
+              </p>
+            )}
           </>
         )}
 
@@ -328,6 +349,7 @@ export default function EditRoomPage() {
                 ['Base Price', form.basePrice ? `${formatMoney(Number(form.basePrice))}/night` : ''],
                 ['Min Nights', form.minNights],
                 ['Cleaning Fee', form.cleaningFee ? `${formatMoney(Number(form.cleaningFee))}` : 'None'],
+                ['Child Rate', form.childMaxAge ? `${formatMoney(Number(form.childPrice || 0))}/night extra (${form.childMaxAge} & under)` : ''],
               ] as [string, string][]).map(([k, v]) => v ? (
                 <div key={k} className="flex gap-3 font-sans text-sm">
                   <span className="text-black/40 w-36 shrink-0">{k}</span>

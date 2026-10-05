@@ -9,6 +9,7 @@
 --   2. Adds storage.objects policies: anyone can read, admins can write.
 -- Run in the Supabase SQL editor.
 -- ============================================================================
+-- @rollback: additive — forward-only; safe to leave in place if the deploy is rolled back
 
 insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
 values (

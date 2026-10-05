@@ -1,6 +1,9 @@
 import { createMiddlewareClient } from '@supabase/auth-helpers-nextjs'
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
+import { isTrustedHost } from '@/lib/origin'
+import { safeRedirectPath } from '@/lib/safe-redirect'
+import { alertEvent, EVENTS } from '@/lib/observability'
 
 const PROTECTED_ROUTES = ['/dashboard', '/checkout', '/supplier', '/admin', '/account', '/operations']
 const ADMIN_ROUTES = ['/admin']
@@ -64,10 +67,36 @@ export async function middleware(req: NextRequest) {
         const items = rData.value.items as RItem[]
         const match = items.find((r: RItem) => r.from === pathname)
         if (match) {
-          const target = match.to.startsWith('http')
-            ? match.to
-            : new URL(match.to, req.url).toString()
-          return NextResponse.redirect(target, { status: match.statusCode ?? 301 })
+          // An off-site redirect target is a lot of authority for one CMS row
+          // to carry: a 301 is cached by browsers and is painful to undo, and
+          // site_content is world-readable, so anyone can see where the site
+          // points. Genuine off-site moves still work, but only to a host we
+          // already trust — anything else is treated as a path on this site
+          // rather than followed (audit finding M5).
+          let target: string
+          if (/^https?:\/\//i.test(match.to)) {
+            let host = ''
+            try { host = new URL(match.to).hostname } catch { host = '' }
+            if (!host || !isTrustedHost(host)) {
+              void alertEvent({
+                event: EVENTS.UNTRUSTED_REDIRECT_TARGET,
+                severity: 'warn',
+                fields: { from: match.from, to: match.to, statusCode: match.statusCode },
+              })
+              return res
+            }
+            target = match.to
+          } else {
+            // Also guards against a "to" of '//attacker.example', which
+            // new URL(…, base) resolves as an absolute off-site URL.
+            const safe = safeRedirectPath(match.to, '')
+            if (!safe) {
+              console.warn('[middleware] ignoring malformed redirect target:', match.to)
+              return res
+            }
+            target = new URL(safe, req.url).toString()
+          }
+          return NextResponse.redirect(target, { status: match.statusCode === 302 ? 302 : 301 })
         }
       }
     } catch {
@@ -76,9 +105,23 @@ export async function middleware(req: NextRequest) {
   }
   // ──────────────────────────────────────────────────────────────────────────
 
-  // Always call getSession so the helper has a chance to refresh the token and
-  // write updated Set-Cookie headers onto `res`.
-  const { data: { session } } = await supabase.auth.getSession()
+  // getSession() first, purely for its side effect: it is what gives the
+  // auth-helpers client a chance to refresh an expiring token and write the
+  // updated Set-Cookie headers onto `res`.
+  await supabase.auth.getSession()
+
+  // …but the ROUTING DECISION is made from getUser(), not getSession().
+  //
+  // getSession() decodes the JWT out of the cookie without verifying its
+  // signature — it has no key to verify with. So every branch below used to
+  // turn on session.user.app_metadata.role, a value a forged cookie could
+  // simply assert (audit finding M1). RLS kept forged credentials from reading
+  // anything privileged, since Postgres verifies the signature independently,
+  // but the console shell, its client bundles and the maintenance-mode bypass
+  // were all reachable. getUser() round-trips to the auth server, so the
+  // identity here is one Supabase has actually vouched for.
+  const { data: { user } } = await supabase.auth.getUser()
+  const session = user ? { user } : null
 
   let role: string | undefined
   let staffRole: string | undefined

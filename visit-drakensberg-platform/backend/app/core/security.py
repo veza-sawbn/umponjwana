@@ -1,3 +1,4 @@
+import logging
 from datetime import datetime, timedelta, timezone
 from typing import Optional, Any
 from uuid import UUID
@@ -11,6 +12,8 @@ from sqlalchemy import select
 
 from app.core.config import settings
 from app.core.database import get_db, redis
+
+logger = logging.getLogger(__name__)
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 bearer_scheme = HTTPBearer()
@@ -71,13 +74,20 @@ def verify_supabase_jwt(token: str) -> dict:
             token,
             settings.SUPABASE_JWT_SECRET,
             algorithms=["HS256"],
-            options={"verify_aud": False},
+            # Supabase stamps aud="authenticated" on a signed-in user's access
+            # token. Verifying it was switched off, which meant a token minted
+            # for any other audience on the same project secret — a service or
+            # anon token — would also be accepted here (audit finding M4).
+            audience="authenticated",
         )
         return payload
     except JWTError as e:
+        # The exception text can carry claim values; it goes to the log, not to
+        # the caller, who gets the same answer for every kind of bad token.
+        logger.warning("Supabase token rejected: %s", e)
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail=f"Invalid Supabase token: {str(e)}",
+            detail="Invalid Supabase token",
         )
 
 

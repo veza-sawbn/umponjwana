@@ -6,8 +6,10 @@ import { getMyContacts, type SupplierContact } from '@/lib/supplier-contacts'
 import { formatMoney } from '@/lib/allocation'
 
 // Every customer who has actually booked with this supplier, automatically
-// kept up to date — row-level security guarantees these are this supplier's
-// own contacts only, no other supplier's. There's no way to add a contact
+// kept up to date. RLS guarantees a supplier sees only their own contacts;
+// getMyContacts additionally scopes to the supplier this console has entered,
+// because an operations employee may be authorised for several and would
+// otherwise see a merged address book under one supplier's name. There's no way to add a contact
 // directly from this page: a 'booking' row only exists because a real
 // booking created it; a 'manual' row comes from adding a guest by hand on a
 // departure (Departures → Guests) instead.

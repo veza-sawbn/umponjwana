@@ -6,6 +6,7 @@ import { createPaymentLink, isIkhokhaConfigured } from '@/lib/ikhokha'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 import { maxTip, tippableTotal } from '@/lib/tips'
 import type { InvoiceLine } from '@/lib/invoices'
+import { rateLimit, rateLimitHeaders, callerKey } from '@/lib/rate-limit'
 
 export const dynamic = 'force-dynamic'
 
@@ -41,6 +42,16 @@ export async function POST(req: Request) {
   }
   if (!body.invoiceId && !body.bookingId) {
     return NextResponse.json({ error: 'invoiceId or bookingId required' }, { status: 400 })
+  }
+
+  // Every successful call creates a payment link at iKhokha. Budgeted per
+  // caller so the gateway relationship cannot be abused from here.
+  const limit = await rateLimit('paymentCreate', callerKey(req))
+  if (!limit.ok) {
+    return NextResponse.json(
+      { error: 'Too many payment attempts. Please try again shortly.' },
+      { status: 429, headers: rateLimitHeaders(limit) },
+    )
   }
 
   if (!isIkhokhaConfigured()) {

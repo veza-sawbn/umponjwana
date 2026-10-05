@@ -24,6 +24,11 @@ export type TourDate = {
   tourDays?: number     // used to calculate checkout date for accommodation
   notes?: string
   booking_href?: string
+  // A child rate only applies once the parent tour has an age cutoff
+  // configured (lib/tours.ts) — absent for every departure on a tour
+  // without one, same as before these fields existed.
+  childPrice?: number
+  childMaxAge?: number
 }
 
 const TYPE_META: Record<TourDate['type'], { label: string; color: string; bg: string; Icon: React.ElementType }> = {
@@ -61,23 +66,52 @@ export default function UpcomingDepartures({
   customDatesHref?: string
 }) {
   const [filter, setFilter] = useState<'all' | TourDate['type']>('all')
-  const [guestCounts, setGuestCounts] = useState<Record<string, number>>({})
+  const [adultCounts, setAdultCounts] = useState<Record<string, number>>({})
+  const [childCounts, setChildCounts] = useState<Record<string, number>>({})
   const booking = useBooking()
   const router = useRouter()
 
-  function getGuests(id: string, maxSpots: number) {
-    return Math.min(guestCounts[id] ?? 1, maxSpots)
+  function hasChildRate(d: TourDate) {
+    return d.childMaxAge !== undefined
   }
 
+  function getAdults(id: string, maxSpots: number) {
+    return Math.min(adultCounts[id] ?? 1, maxSpots)
+  }
+
+  function getChildren(id: string, maxSpots: number) {
+    const adults = getAdults(id, maxSpots)
+    return Math.min(childCounts[id] ?? 0, Math.max(0, maxSpots - adults))
+  }
+
+  // Legacy single counter — used only for departures with no child rate.
   function changeGuests(id: string, delta: number, maxSpots: number) {
-    setGuestCounts(prev => ({
+    setAdultCounts(prev => ({
       ...prev,
       [id]: Math.max(1, Math.min(maxSpots, (prev[id] ?? 1) + delta)),
     }))
   }
 
+  function changeAdults(id: string, delta: number, maxSpots: number) {
+    setAdultCounts(prev => {
+      const children = getChildren(id, maxSpots)
+      return { ...prev, [id]: Math.max(1, Math.min(maxSpots - children, (prev[id] ?? 1) + delta)) }
+    })
+  }
+
+  function changeChildren(id: string, delta: number, maxSpots: number) {
+    setChildCounts(prev => {
+      const adults = getAdults(id, maxSpots)
+      return { ...prev, [id]: Math.max(0, Math.min(maxSpots - adults, (prev[id] ?? 0) + delta)) }
+    })
+  }
+
   function handleAdd(d: TourDate) {
-    const guests = getGuests(d.id, d.spots_remaining)
+    const childRate = hasChildRate(d)
+    const adults = getAdults(d.id, d.spots_remaining)
+    const children = childRate ? getChildren(d.id, d.spots_remaining) : 0
+    const guests = adults + children
+    const total = adults * d.price_per_person + children * (d.childPrice ?? d.price_per_person)
     const days = d.tourDays ?? 1
     // Night before departure → night after last day of tour
     booking.setSearch(
@@ -92,8 +126,13 @@ export default function UpcomingDepartures({
       title: `${d.operator}${d.guide ? ` · ${d.guide}` : ''}`,
       supplierId: d.supplierId,
       date: d.date,
-      price_per_person: d.price_per_person,
+      // Blended average per-person price so every `price_per_person * guests`
+      // total calculation across the cart/checkout pipeline stays correct
+      // unchanged, even with separate adult/child rates — see
+      // BookingAddon.price_per_person in lib/booking-context.tsx.
+      price_per_person: guests > 0 ? total / guests : d.price_per_person,
       guests,
+      ...(childRate ? { adults, children } : {}),
     })
     router.push('/trip')
   }
@@ -140,7 +179,11 @@ export default function UpcomingDepartures({
           const Icon = meta.Icon
           const spots = spotsLabel(d.spots_remaining, d.spots_total)
           const isAdded = booking.addons.some(a => a.id === d.id)
-          const guests = getGuests(d.id, d.spots_remaining)
+          const childRate = hasChildRate(d)
+          const adults = getAdults(d.id, d.spots_remaining)
+          const children = childRate ? getChildren(d.id, d.spots_remaining) : 0
+          const guests = adults + children
+          const total = adults * d.price_per_person + children * (d.childPrice ?? d.price_per_person)
 
           return (
             <motion.div key={d.id} variants={staggerChild} className={`bg-white border ${spots.full ? 'border-gray-100 opacity-60' : 'border-gray-200'} p-5`}>
@@ -191,11 +234,43 @@ export default function UpcomingDepartures({
                 {/* Right: price + guest picker + CTA */}
                 <div className="flex flex-col items-end gap-3 shrink-0">
                   <div className="text-right">
-                    <p className="font-display italic text-xl text-[#2d6a4f]">{formatMoney(d.price_per_person)}</p>
-                    <p className="font-sans text-[10px] text-gray-400">per person</p>
+                    <p className="font-display italic text-xl text-[#2d6a4f]">
+                      {formatMoney(d.price_per_person)}
+                      {childRate && <span className="text-sm text-gray-400"> / {formatMoney(d.childPrice ?? d.price_per_person)}</span>}
+                    </p>
+                    <p className="font-sans text-[10px] text-gray-400">
+                      {childRate ? `per adult / child (${d.childMaxAge} & under)` : 'per person'}
+                    </p>
                   </div>
 
-                  {!spots.full && !isAdded && (
+                  {!spots.full && !isAdded && (childRate ? (
+                    <div className="flex items-center gap-3">
+                      <div className="flex items-center gap-1.5">
+                        <span className="font-sans text-[10px] text-gray-400">Adults</span>
+                        <div className="flex items-center border border-gray-200 rounded">
+                          <button onClick={() => changeAdults(d.id, -1, d.spots_remaining)} className="px-2 py-1 text-gray-500 hover:text-black disabled:opacity-30" disabled={adults <= 1}>
+                            <Minus size={11} />
+                          </button>
+                          <span className="font-sans text-sm px-2 min-w-[24px] text-center">{adults}</span>
+                          <button onClick={() => changeAdults(d.id, 1, d.spots_remaining)} className="px-2 py-1 text-gray-500 hover:text-black disabled:opacity-30" disabled={guests >= d.spots_remaining}>
+                            <Plus size={11} />
+                          </button>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <span className="font-sans text-[10px] text-gray-400">Children</span>
+                        <div className="flex items-center border border-gray-200 rounded">
+                          <button onClick={() => changeChildren(d.id, -1, d.spots_remaining)} className="px-2 py-1 text-gray-500 hover:text-black disabled:opacity-30" disabled={children <= 0}>
+                            <Minus size={11} />
+                          </button>
+                          <span className="font-sans text-sm px-2 min-w-[24px] text-center">{children}</span>
+                          <button onClick={() => changeChildren(d.id, 1, d.spots_remaining)} className="px-2 py-1 text-gray-500 hover:text-black disabled:opacity-30" disabled={guests >= d.spots_remaining}>
+                            <Plus size={11} />
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
                     <div className="flex items-center gap-2">
                       <span className="font-sans text-xs text-gray-400">Spots:</span>
                       <div className="flex items-center border border-gray-200 rounded">
@@ -216,7 +291,7 @@ export default function UpcomingDepartures({
                         </button>
                       </div>
                     </div>
-                  )}
+                  ))}
 
                   <div className="flex items-center gap-3">
                     <span
@@ -256,7 +331,7 @@ export default function UpcomingDepartures({
 
                   {!spots.full && !isAdded && guests > 1 && (
                     <p className="font-sans text-[10px] text-gray-400">
-                      Total: {formatMoney(d.price_per_person * guests)}
+                      Total: {formatMoney(total)}
                     </p>
                   )}
                 </div>

@@ -37,6 +37,7 @@
 -- are revoked explicitly rather than left to RLS alone — see the header of
 -- 20260817_view_security_invoker.sql for why that default matters here.
 -- ============================================================================
+-- @rollback: additive — forward-only; safe to leave in place if the deploy is rolled back
 
 -- ────────────────────────────────────────────────────────────────────────────
 -- 1. Tables

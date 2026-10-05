@@ -11,6 +11,7 @@
 -- check now uses IS DISTINCT FROM so a NULL user_id (guest order) can never
 -- slip past the authorisation test — guest orders are staff-managed only.
 -- ============================================================================
+-- @rollback: additive — forward-only; safe to leave in place if the deploy is rolled back
 
 alter table vd_orders         alter column user_id drop not null;
 alter table vd_order_lines    alter column user_id drop not null;

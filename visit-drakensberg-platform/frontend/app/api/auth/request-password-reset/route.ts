@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 import { getSiteOrigin } from '@/lib/origin'
+import { rateLimit, rateLimitHeaders, callerKey } from '@/lib/rate-limit'
+import { verifyTurnstileToken } from '@/lib/turnstile-verify'
 import { sendMail } from '@/lib/mailer'
 import { emailShell, ctaButton, esc } from '@/lib/email-layout'
 
@@ -42,15 +44,64 @@ export const dynamic = 'force-dynamic'
  */
 export async function POST(req: Request) {
   let email: string | undefined
+  let captchaToken: string | undefined
   try {
     const body = await req.json()
     email = typeof body.email === 'string' ? body.email.trim().toLowerCase() : undefined
+    captchaToken = typeof body.captchaToken === 'string' ? body.captchaToken : undefined
   } catch {
     return NextResponse.json({ error: 'Invalid request body' }, { status: 400 })
   }
 
   if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
     return NextResponse.json({ error: 'A valid email address is required.' }, { status: 400 })
+  }
+
+  // Supabase's captcha setting cannot protect this route: everything below runs
+  // under the service-role key, which GoTrue exempts by design. So the check
+  // happens here, before the rate limiter — a forged or replayed token should
+  // not get to spend anyone's budget.
+  //
+  // Unlike the rest of this route, a failure here answers honestly instead of
+  // with the anti-enumeration {ok:true}. Nothing about a captcha verdict
+  // depends on the email address, so there is nothing to leak, and a silent
+  // success would leave someone whose widget failed staring at "check your
+  // inbox" for a mail that is never coming.
+  //
+  // No remoteip and no idempotency_key are sent. remoteip is optional and
+  // Cloudflare validates it against the address that actually solved the
+  // challenge, so an x-forwarded-for that has been through one proxy too many
+  // turns into a refused password reset for a real person — the header is
+  // good enough to budget a rate limit against and not good enough to fail a
+  // reset on. idempotency_key is for retrying the same token; this route
+  // verifies each token exactly once, and keying it by email would make two
+  // different tokens for one address share a verdict.
+  const captcha = await verifyTurnstileToken(captchaToken)
+  if (!captcha.ok) {
+    console.warn('[request-password-reset] captcha refused:', captcha.reason, captcha.errorCodes)
+    return NextResponse.json(
+      { error: 'Security check failed. Please reload the page and try again.' },
+      { status: 400 },
+    )
+  }
+
+  // This route mails a real person through our own SMTP, so the cost of abuse
+  // lands on a third party's inbox and on our sender reputation. Budgeted per
+  // caller AND per target address, so neither one IP working through a list
+  // nor a distributed burst at one victim gets through. Fails closed: better
+  // to refuse a reset for fifteen minutes than to let a Redis outage open a
+  // mail-bomb window.
+  const limits = await Promise.all([
+    rateLimit('passwordReset', callerKey(req)),
+    rateLimit('passwordReset', `email:${email}`),
+  ])
+  const blocked = limits.find(l => !l.ok)
+  if (blocked) {
+    // Same shape as the success response below — telling an attacker which
+    // addresses are rate limited would undo the anti-enumeration behaviour
+    // this route is careful about everywhere else.
+    console.warn('[request-password-reset] rate limited')
+    return NextResponse.json({ ok: true }, { headers: rateLimitHeaders(blocked) })
   }
 
   const origin = getSiteOrigin(req)
