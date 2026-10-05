@@ -74,11 +74,15 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
 
   return [
     ...STATIC_ROUTES.map(r => ({
-      // `|| '/'` for the homepage: the root layout's canonical resolves to
-      // https://visitdrakensberg.com/ (metadataBase + '/'), and a sitemap
-      // entry without the slash is a different URL string to Search Console,
-      // which reports it as submitted-but-canonicalised-elsewhere.
-      url: `${SITE_URL}${r.path || '/'}`,
+      // The homepage entry is the bare origin, no trailing slash, because
+      // that is what the root layout's canonical renders as — Next resolves
+      // `alternates: { canonical: '/' }` against metadataBase and then strips
+      // the slash (14.1 kept it, 14.2 drops it, so this is worth re-checking
+      // on a Next upgrade: `curl -s / | grep canonical`). The two have to
+      // agree: a sitemap entry whose string differs from the page's own
+      // canonical is reported in Search Console as submitted but
+      // canonicalised elsewhere, which is a wasted submission.
+      url: `${SITE_URL}${r.path}`,
       lastModified: now,
       changeFrequency: 'weekly' as const,
       priority: r.priority,
