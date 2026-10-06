@@ -42,6 +42,10 @@ export default function PackagesPage() {
   const [category, setCategory] = useState<PackageCategory | ''>('')
 
   useEffect(() => {
+    // ?category=<PackageCategory> (e.g. from the homepage trip-planning
+    // tools) — only a recognised tab value is honoured.
+    const categoryParam = new URLSearchParams(window.location.search).get('category')
+    if (categoryParam && TABS.some(t => t.slug && t.slug === categoryParam)) setCategory(categoryParam as PackageCategory)
     // publicSupabase (session-less) — a signed-in admin or ops session would
     // otherwise read past the public RLS gate and list packages built on
     // suspended suppliers' inventory here. See lib/supabase-public.ts.

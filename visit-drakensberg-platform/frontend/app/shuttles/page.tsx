@@ -64,20 +64,28 @@ function ShuttlesPageContent() {
   // over the booking-context stay prefill since it's an explicit link the
   // visitor just followed.
   const prefillTo = searchParams.get('to')
+  // The homepage trip-planning tools also pass the pickup, date and party
+  // size (?from= / ?date=YYYY-MM-DD / ?passengers=) — prefill only; the
+  // visitor still runs the quote here.
+  const prefillFrom = searchParams.get('from')
+  const dateParam = searchParams.get('date')
+  const prefillDate = dateParam && /^\d{4}-\d{2}-\d{2}$/.test(dateParam) ? dateParam : ''
+  const passengersParam = parseInt(searchParams.get('passengers') || '', 10)
+  const prefillPassengers = passengersParam >= 1 ? Math.min(20, passengersParam) : 0
 
   const [search, setSearch] = useState<ShuttleSearchValue>({
     tripType: 'one-way',
-    pickup: EMPTY_PLACE,
+    pickup: prefillFrom ? { address: prefillFrom } : EMPTY_PLACE,
     destination: prefillTo
       ? { address: prefillTo }
       : booking.stay?.address || booking.stay?.lat
         ? { address: booking.stay.address || booking.stay.title, lat: booking.stay.lat, lng: booking.stay.lng }
         : EMPTY_PLACE,
-    date: booking.checkIn || '',
+    date: prefillDate || booking.checkIn || '',
     time: '',
     returnDate: booking.checkOut || '',
     returnTime: '',
-    passengers: booking.guests || 2,
+    passengers: prefillPassengers || booking.guests || 2,
   })
 
   const [trip, setTrip] = useState<SearchedTrip | null>(null)
