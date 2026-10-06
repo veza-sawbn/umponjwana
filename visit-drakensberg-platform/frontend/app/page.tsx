@@ -10,7 +10,6 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { Swiper, SwiperSlide } from 'swiper/react'
 import { Autoplay } from 'swiper/modules'
 import 'swiper/css'
-import SearchBar from '@/components/search/SearchBar'
 import HeroCarousel from '@/components/media/HeroCarousel'
 import { useSwiperAutoplay, CAROUSEL_SPEED_MS } from '@/lib/carousel-autoplay'
 import Footer from '@/components/layout/Footer'
@@ -184,13 +183,10 @@ function HeroSection({ hero }: { hero: typeof SITE_CONTENT_DEFAULTS.hero }) {
           </motion.h1>
         </Editable>
         <Editable section="hero" fieldKey="subheadline" value={subheadline} label="Subheadline" type="textarea">
-          <motion.p variants={fadeUp} className="font-sans text-base text-white/70 max-w-md mb-10 font-light leading-relaxed">
+          <motion.p variants={fadeUp} className="font-sans text-base text-white/70 max-w-md font-light leading-relaxed">
             {subheadline}
           </motion.p>
         </Editable>
-        <motion.div variants={fadeUp} className="w-full">
-          <SearchBar />
-        </motion.div>
       </motion.div>
 
       <div className="absolute bottom-6 left-1/2 -translate-x-1/2 flex flex-col items-center gap-1 text-white/40">
