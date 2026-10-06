@@ -166,8 +166,10 @@ function HeroSection({ hero }: { hero: typeof SITE_CONTENT_DEFAULTS.hero }) {
         />
       </div>
 
+      {/* -translate-y-[15%]: this block fills the hero's height, so the text
+          sits 15% of the hero higher than its bottom-aligned resting place. */}
       <motion.div
-        className="relative flex-1 flex flex-col justify-end pb-20 pt-[102px] lg:pt-0 px-6 lg:px-20 max-w-[1440px] mx-auto w-full"
+        className="relative flex-1 flex flex-col justify-end pb-20 pt-[102px] lg:pt-0 px-6 lg:px-20 max-w-[1440px] mx-auto w-full -translate-y-[15%]"
         variants={staggerContainer(0.12, 0.2)}
         initial="hidden"
         animate="show"
