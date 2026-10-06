@@ -5,7 +5,7 @@ import Image from 'next/image'
 import Footer from '@/components/layout/Footer'
 import { Clock, ArrowLeft, MapPin, Mountain, Bird, ChefHat, Sword, Leaf, ArrowRight } from 'lucide-react'
 import { publicSupabase } from '@/lib/supabase-public'
-import { getPostBySlug, getRelatedPosts, parseBody, estimateReadTime } from '@/lib/blog-posts'
+import { getPostBySlug, getPublishedPosts, getRelatedPosts, parseBody, estimateReadTime } from '@/lib/blog-posts'
 import JsonLd from '@/components/seo/JsonLd'
 
 export const revalidate = 3600
@@ -205,7 +205,33 @@ export default async function ArticleDetailPage({ params }: { params: { slug: st
       publishedAt: dbPost.published_at,
     }
   } else {
-    article = { ...hardcoded!, publishedAt: null }
+    // The compiled relatedArticles lists name three articles that were never
+    // written: battle-of-isandlwana-history, zulu-cuisine-foothills and
+    // conservation-umdoni-wetlands have no entry in ARTICLES and no blog_posts
+    // row, so every "More Stories" card on these three pages was a link to a
+    // 404 — and the sitemap submitted them as URLs besides (see
+    // lib/seo-routes.ts). Keep the curated order, drop what does not resolve,
+    // and when that empties the list, fall back to what the journal does have
+    // rather than dropping the section.
+    const published = await getPublishedPosts(publicSupabase).catch(() => [])
+    const resolves = (slug: string) => slug in ARTICLES || published.some(p => p.slug === slug)
+
+    const curated = hardcoded!.relatedArticles.filter(rel => resolves(rel.slug))
+    const fallback = curated.length > 0 ? [] : [
+      ...Object.values(ARTICLES)
+        .filter(a => a.slug !== params.slug)
+        .map(a => ({ slug: a.slug, title: a.title, category: a.category, image: a.image })),
+      ...published
+        .filter(post => post.slug !== params.slug)
+        .map(post => ({
+          slug: post.slug,
+          title: post.title,
+          category: post.category ?? '',
+          image: post.featured_image ?? '',
+        })),
+    ].slice(0, 3)
+
+    article = { ...hardcoded!, relatedArticles: [...curated, ...fallback], publishedAt: null }
   }
 
   const canonical = `${SITE_URL}/mydrakensberg/${article.slug}`

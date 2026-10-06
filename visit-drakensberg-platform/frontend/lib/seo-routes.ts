@@ -66,7 +66,13 @@ export const EDITORIAL_FALLBACK_SLUGS = [
   'san-bushmen-rock-art-giants-castle',
   'tugela-falls-chain-ladder-guide',
   'bearded-vulture-lammergeier',
-  'zulu-cuisine-foothills',
-  'battle-of-isandlwana-history',
-  'conservation-umdoni-wetlands',
 ]
+
+// This list previously carried three more — zulu-cuisine-foothills,
+// battle-of-isandlwana-history and conservation-umdoni-wetlands. No article
+// was ever written for any of them: they are absent from the ARTICLES record
+// and from blog_posts, so /mydrakensberg/<slug> 404s for all three. The
+// sitemap had been submitting them regardless, which is how a Search Console
+// property accumulates "Not found (404)" against URLs it was handed itself.
+// tests/seo-routes.test.ts holds this list to what the route actually serves,
+// so the next one cannot be added silently.
