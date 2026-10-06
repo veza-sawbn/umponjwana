@@ -132,8 +132,12 @@ function StaysForm({ idBase }: { idBase: string }) {
     e.preventDefault()
     // Same hand-off as the /plan trip planner: dates and guests go into the
     // shared booking context the stay pages read, region/type into the URL.
-    const keepCheckOut = booking.checkOut && checkIn && booking.checkOut > checkIn ? booking.checkOut : ''
-    booking.setSearch(region, checkIn, keepCheckOut, Number(guests))
+    // Skipped when the trip already holds a stay — its nights (and so its
+    // price) come from those dates, same rule /shuttles follows.
+    if (!booking.stay) {
+      const keepCheckOut = booking.checkOut && checkIn && booking.checkOut > checkIn ? booking.checkOut : ''
+      booking.setSearch(region, checkIn, keepCheckOut, Number(guests))
+    }
     router.push(withQuery('/stays', { type, region, check_in: checkIn, guests }))
   }
 
@@ -216,7 +220,9 @@ function TransportForm({ idBase }: { idBase: string }) {
 
   const townOptions: Option[] = [...towns]
     .sort((a, b) => a.name.localeCompare(b.name))
-    .map(t => ({ value: t.name, label: t.name }))
+    // The value is what /shuttles hands Google's distance lookup, so it
+    // carries the country (several of these names exist abroad too).
+    .map(t => ({ value: `${t.name}, South Africa`, label: t.name }))
 
   function submit(e: React.FormEvent) {
     e.preventDefault()

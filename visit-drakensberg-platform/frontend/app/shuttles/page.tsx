@@ -6,7 +6,7 @@ import { ArrowRight, Bus, Calendar, Check, Clock, MapPin, Plus, Trash2, Users } 
 import Footer from '@/components/layout/Footer'
 import { useBooking, type ShuttleOption } from '@/lib/booking-context'
 import { useAutoDrivingDistance, type GooglePlaceSelection } from '@/components/maps/GoogleAddressField'
-import { buildShuttleOption, estimateTransferPrice, type ShuttleSupplierChoice } from '@/lib/shuttle-service'
+import { buildShuttleOption, estimateTransferPrice, MAJOR_HUBS, type ShuttleSupplierChoice } from '@/lib/shuttle-service'
 import { TransportSupplierPicker } from '@/components/booking/TransportSupplierPicker'
 import { ShuttleSearchForm, type ShuttleSearchValue } from '@/components/shuttles/ShuttleSearchForm'
 import { HowShuttlesWork } from '@/components/shuttles/HowShuttlesWork'
@@ -68,6 +68,9 @@ function ShuttlesPageContent() {
   // size (?from= / ?date=YYYY-MM-DD / ?passengers=) — prefill only; the
   // visitor still runs the quote here.
   const prefillFrom = searchParams.get('from')
+  // A known airport hub carries its coordinates, so the quote and partner
+  // ranking work from an exact point rather than a geocoded name.
+  const prefillHub = MAJOR_HUBS.find(h => h.name === prefillFrom)
   const dateParam = searchParams.get('date')
   const prefillDate = dateParam && /^\d{4}-\d{2}-\d{2}$/.test(dateParam) ? dateParam : ''
   const passengersParam = parseInt(searchParams.get('passengers') || '', 10)
@@ -75,7 +78,9 @@ function ShuttlesPageContent() {
 
   const [search, setSearch] = useState<ShuttleSearchValue>({
     tripType: 'one-way',
-    pickup: prefillFrom ? { address: prefillFrom } : EMPTY_PLACE,
+    pickup: prefillHub
+      ? { address: prefillHub.name, lat: prefillHub.lat, lng: prefillHub.lng }
+      : prefillFrom ? { address: prefillFrom } : EMPTY_PLACE,
     destination: prefillTo
       ? { address: prefillTo }
       : booking.stay?.address || booking.stay?.lat
