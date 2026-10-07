@@ -3,7 +3,7 @@ import { useEffect, useId, useState } from 'react'
 import Link from 'next/link'
 import { ArrowRight } from 'lucide-react'
 import SafeImage from '@/components/ui/SafeImage'
-import { DEFAULT_REGIONS, getRegions, type Region } from '@/lib/regions'
+import { DEFAULT_REGIONS, getRegions, regionsMatch, type Region } from '@/lib/regions'
 import { publicSupabase } from '@/lib/supabase-public'
 import { objectPositionStyle } from '@/lib/image-position'
 
@@ -19,6 +19,22 @@ import { objectPositionStyle } from '@/lib/image-position'
    neutral placeholders, and a missing region is simply left out. */
 
 const TOP_DESTINATIONS = ['Northern Drakensberg', 'Central Drakensberg', 'Southern Drakensberg'] as const
+
+// Region pages keep their slug when an admin renames a region (see
+// updateRegion), so cards are matched by slug first — the live slugs, then
+// the original north-berg/central-berg/south-berg ids — and only then by a
+// tolerant name match. The card always shows the record's stored name.
+const DESTINATION_SLUGS: Record<(typeof TOP_DESTINATIONS)[number], string[]> = {
+  'Northern Drakensberg': ['northern-drakensberg', 'north-berg'],
+  'Central Drakensberg': ['central-drakensberg', 'central-berg'],
+  'Southern Drakensberg': ['southern-drakensberg', 'south-berg'],
+}
+
+function findDestination(regions: Region[], name: (typeof TOP_DESTINATIONS)[number]): Region | undefined {
+  const slugs = DESTINATION_SLUGS[name]
+  return regions.find(r => slugs.includes(r.slug) || slugs.includes(r.id))
+    ?? regions.find(r => regionsMatch(r.name, name))
+}
 
 export default function TopDestinations({ initialRegions }: { initialRegions?: Region[] }) {
   const headingId = useId()
@@ -39,7 +55,7 @@ export default function TopDestinations({ initialRegions }: { initialRegions?: R
   }, [initialRegions])
 
   const destinations = regions
-    ? TOP_DESTINATIONS.flatMap(name => regions.filter(r => r.name === name).slice(0, 1))
+    ? TOP_DESTINATIONS.flatMap(name => { const r = findDestination(regions, name); return r ? [r] : [] })
     : []
 
   // Nothing real to show (read failed, or no matching records): omit the
