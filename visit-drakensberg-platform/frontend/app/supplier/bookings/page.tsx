@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import toast from 'react-hot-toast'
-import { CalendarDays, Search, Phone, Mail, Users, MessageSquare, XCircle, CheckCircle2, Clock, AlertTriangle } from 'lucide-react'
+import { CalendarDays, Search, Phone, Mail, Users, MessageSquare, XCircle, CheckCircle2, Clock, AlertTriangle, Route, MessagesSquare } from 'lucide-react'
 import { getMyOrders, cancelOrderAsSupplier, type SupplierOrder } from '@/lib/booking-orders'
 import { getMyOrderLinesForBooking, setLineFulfilment, type OrderLine } from '@/lib/orders'
 import { releaseBookingInventory } from '@/lib/inventory-holds'
@@ -10,6 +10,12 @@ import { supabase } from '@/lib/auth'
 import { readManagedSupplierId } from '@/lib/effective-supplier'
 import { formatMoney } from '@/lib/allocation'
 import { decideStayRequest, holdDeadlineLabel, paymentWindowHours } from '@/lib/stay-requests'
+import { useSupplier } from '@/lib/supplier-context'
+import { getTours } from '@/lib/tours'
+import { getDepartures } from '@/lib/departures'
+import { getTrails } from '@/lib/trails'
+import BookingItineraryEditor, { type ItineraryCatalog } from '@/components/booking/BookingItineraryEditor'
+import GuestMessagePanel from '@/components/messaging/GuestMessagePanel'
 
 type Status = 'all' | 'requested' | 'confirmed' | 'cancelled'
 
@@ -33,7 +39,13 @@ function fmt(d?: string) {
   return new Date(d).toLocaleDateString('en-ZA', { day: 'numeric', month: 'short', year: 'numeric' })
 }
 
+// Booked items that carry a day-by-day itinerary the guest sees.
+const ITINERARY_TYPES = new Set(['hike', 'tour'])
+
 export default function BookingsPage() {
+  const { fullName } = useSupplier()
+  const [supplierName, setSupplierName] = useState('')
+  const [catalog, setCatalog] = useState<ItineraryCatalog | null>(null)
   const [filter, setFilter] = useState<Status>('all')
   const [search, setSearch] = useState('')
   const [orders, setOrders] = useState<SupplierOrder[]>([])
@@ -59,6 +71,21 @@ export default function BookingsPage() {
       setLoading(false)
     })
   }, [])
+
+  // Signs this operator's messages and itinerary edits.
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      setSupplierName(fullName || user?.user_metadata?.full_name || user?.email || 'Your operator')
+    })
+  }, [fullName])
+
+  // The public catalog the guest's itinerary is computed from — loaded once,
+  // the first time a tour booking is opened.
+  async function ensureCatalog() {
+    if (catalog) return
+    const [departures, tours, trails] = await Promise.all([getDepartures(), getTours(), getTrails()])
+    setCatalog({ departures, tours, trails })
+  }
 
   async function cancelOrder(o: SupplierOrder) {
     if (!window.confirm(`Cancel your service on booking ${o.reference} for ${o.customerName}? The guest will be notified; the rest of their trip is unaffected.`)) return
@@ -107,6 +134,7 @@ export default function BookingsPage() {
   async function toggleExpand(o: SupplierOrder) {
     const willOpen = expanded !== o.id
     setExpanded(willOpen ? o.id : null)
+    if (willOpen && o.items.some(i => ITINERARY_TYPES.has(i.type))) ensureCatalog()
     if (willOpen && !linesByBooking[o.bookingId]) {
       setLinesLoading(s => ({ ...s, [o.bookingId]: true }))
       const lines = await getMyOrderLinesForBooking(o.bookingId)
@@ -377,6 +405,30 @@ export default function BookingsPage() {
                           ))}
                         </div>
                       )}
+                    </div>
+
+                    {o.items.filter(i => ITINERARY_TYPES.has(i.type)).map(item => (
+                      <div key={`itinerary-${item.id}`} className="md:col-span-2">
+                        <p className="font-sans text-[10px] uppercase tracking-wider text-black/30 mb-3 flex items-center gap-1.5">
+                          <Route size={11} /> Itinerary the guest sees{o.items.length > 1 ? ` — ${item.title}` : ''}
+                        </p>
+                        {catalog ? (
+                          <BookingItineraryEditor order={o} item={item} catalog={catalog} supplierName={supplierName} />
+                        ) : (
+                          <p className="font-sans text-xs text-black/30">Loading the guest&apos;s itinerary…</p>
+                        )}
+                      </div>
+                    ))}
+
+                    <div className="md:col-span-2">
+                      <p className="font-sans text-[10px] uppercase tracking-wider text-black/30 mb-3 flex items-center gap-1.5">
+                        <MessagesSquare size={11} /> Messages with {o.customerName}
+                      </p>
+                      <GuestMessagePanel
+                        order={o}
+                        serviceTitle={(o.items.find(i => ITINERARY_TYPES.has(i.type)) ?? o.items[0])?.title ?? o.reference}
+                        supplierName={supplierName}
+                      />
                     </div>
 
                     {o.specialRequests && (

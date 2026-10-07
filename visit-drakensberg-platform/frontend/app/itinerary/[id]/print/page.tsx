@@ -4,10 +4,14 @@ import { useEffect, useMemo, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { Printer, ArrowLeft } from 'lucide-react'
 import { getBookingById, type SavedBooking } from '@/lib/bookings'
-import { getTours, resolveItinerary, type Tour } from '@/lib/tours'
+import { getTours, type Tour } from '@/lib/tours'
 import { getDepartures, type Departure } from '@/lib/departures'
 import { getTrails, type Trail } from '@/lib/trails'
-import { resolveLivePackages } from '@/components/tours/PackageEditor'
+import { getTripRequestById, type TripRequest } from '@/lib/custom-trips'
+import {
+  resolveDefaultItinerary, effectiveItineraryDays, getBookingItineraries, tripRequestIdForItem,
+  type BookingItinerary,
+} from '@/lib/booking-itinerary'
 import Logo from '@/components/Logo'
 import { formatMoney } from '@/lib/allocation'
 
@@ -15,12 +19,6 @@ import { formatMoney } from '@/lib/allocation'
 // trip summary, guest details, accommodation, a chronological day-by-day
 // schedule, transfers, payment summary and emergency numbers. Access is
 // scoped by RLS on vd_bookings (the traveller and admins).
-
-function addDaysIso(iso: string, days: number) {
-  const d = new Date(iso)
-  d.setDate(d.getDate() + days)
-  return d.toISOString().slice(0, 10)
-}
 
 function fmtLong(iso?: string) {
   if (!iso) return '—'
@@ -40,7 +38,15 @@ const EMERGENCY = [
 
 type DayEvent = { time: string; title: string; detail: string }
 
-function buildSchedule(b: SavedBooking, departures: Departure[], tours: Tour[], trails: Trail[]): Array<{ date: string; label: string; events: DayEvent[] }> {
+type ScheduleSources = {
+  departures: Departure[]
+  tours: Tour[]
+  trails: Trail[]
+  tripRequests: Record<string, TripRequest>
+  overrides: BookingItinerary[]
+}
+
+function buildSchedule(b: SavedBooking, { departures, tours, trails, tripRequests, overrides }: ScheduleSources): Array<{ date: string; label: string; events: DayEvent[] }> {
   const days = new Map<string, DayEvent[]>()
   const push = (date: string | undefined, ev: DayEvent) => {
     const key = date || ''
@@ -68,22 +74,20 @@ function buildSchedule(b: SavedBooking, departures: Departure[], tours: Tour[], 
   for (const a of b.addons) {
     // A multi-day hike gets one schedule entry per day of its trail's
     // default plan (Trail.days, /admin/trails), narrowed/customized/
-    // extended by exactly the rate package this guest booked — see
-    // resolveItinerary() in lib/tours.ts. Each day lands on its real
-    // calendar date, offset from the departure's "hiking date"; a tier
-    // that adds a day before it can start the guest's schedule earlier
-    // than the hiking date itself. Anything else (or a hike whose trail
-    // has no day-by-day plan authored) falls back to the single generic
-    // line it always got.
-    const dep = departures.find(d => d.id === a.id)
-    const tour = dep ? tours.find(t => t.id === dep.tourId) : undefined
-    const trail = tour ? trails.find(t => t.id === (dep?.trailId || tour.trailId)) : undefined
-    const pkg = dep?.packages ? resolveLivePackages(dep.packages, tour).find(p => p.id === a.packageId) : undefined
-    const itineraryDays = resolveItinerary(trail?.days, tour?.pricingTiers, pkg)
-    if (itineraryDays.length > 0 && a.date) {
+    // extended by exactly the rate package this guest booked — or the
+    // operator's own version of it when they have set one (see
+    // lib/booking-itinerary.ts). Each day lands on its real calendar date.
+    // Anything else (or a hike whose trail has no day-by-day plan
+    // authored) falls back to the single generic line it always got.
+    const requestId = tripRequestIdForItem(a.id)
+    const resolved = resolveDefaultItinerary(a, {
+      departures, tours, trails, tripRequest: requestId ? tripRequests[requestId] : null,
+    })
+    const itineraryDays = effectiveItineraryDays(resolved, overrides.find(o => o.itemId === a.id))
+    if (itineraryDays.length > 0 && itineraryDays.some(d => d.date)) {
       itineraryDays.forEach((day, i) => {
-        push(addDaysIso(a.date!, day.dateOffset), {
-          time: day.dateOffset === 0 ? 'Departure' : `Day ${i + 1}`,
+        push(day.date || a.date, {
+          time: day.date === a.date ? 'Departure' : `Day ${i + 1}`,
           title: day.label || `${a.title} · Day ${i + 1}`,
           detail: [day.description, day.accommodation ? `Overnight: ${day.accommodation}` : '', day.transport || '', day.meals || '']
             .filter(Boolean).join(' · '),
@@ -124,25 +128,33 @@ export default function PrintableItineraryPage() {
   const [departures, setDepartures] = useState<Departure[]>([])
   const [tours, setTours] = useState<Tour[]>([])
   const [trails, setTrails] = useState<Trail[]>([])
+  const [tripRequests, setTripRequests] = useState<Record<string, TripRequest>>({})
+  const [overrides, setOverrides] = useState<BookingItinerary[]>([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     if (!params?.id) return
+    const bookingId = decodeURIComponent(params.id)
     Promise.all([
-      getBookingById(decodeURIComponent(params.id)),
+      getBookingById(bookingId),
       getDepartures(),
       getTours(),
       getTrails(),
-    ]).then(([b, deps, trs, trls]) => {
+      getBookingItineraries(bookingId),
+    ]).then(async ([b, deps, trs, trls, its]) => {
+      const requestIds = (b?.addons ?? []).map(a => tripRequestIdForItem(a.id)).filter((x): x is string => !!x)
+      const found = await Promise.all(requestIds.map(getTripRequestById))
+      setTripRequests(Object.fromEntries(found.filter((r): r is TripRequest => !!r).map(r => [r.id, r])))
       setBooking(b)
       setDepartures(deps)
       setTours(trs)
       setTrails(trls)
+      setOverrides(its)
       setLoading(false)
     })
   }, [params?.id])
 
-  const schedule = useMemo(() => booking ? buildSchedule(booking, departures, tours, trails) : [], [booking, departures, tours, trails])
+  const schedule = useMemo(() => booking ? buildSchedule(booking, { departures, tours, trails, tripRequests, overrides }) : [], [booking, departures, tours, trails, tripRequests, overrides])
 
   if (loading) {
     return <div className="min-h-screen bg-[#F7F5F2] flex items-center justify-center pt-24 font-sans text-sm text-gray-400">Preparing your itinerary…</div>

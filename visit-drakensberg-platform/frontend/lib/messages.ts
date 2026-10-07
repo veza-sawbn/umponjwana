@@ -181,7 +181,7 @@ export async function sendMessage(
   if (recipient && UUID_RE.test(recipient)) {
     await notify(recipient, 'message', `New message — ${thread.addonTitle || thread.bookingRef}`,
       `${senderName}: ${body.slice(0, 120)}`,
-      from === 'visitor' ? '/supplier/messages' : '/account/itinerary')
+      from === 'visitor' ? '/supplier/messages' : `/account/itinerary?id=${encodeURIComponent(thread.bookingId)}`)
   }
   return updated
 }
