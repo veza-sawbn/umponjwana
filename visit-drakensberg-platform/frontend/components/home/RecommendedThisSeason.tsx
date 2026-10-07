@@ -68,7 +68,13 @@ export default function RecommendedThisSeason() {
   if (!data || data.items.length === 0) return null
 
   const meta = SEASON_META[data.season]
-  const cards: SeasonCard[] = data.items.slice(0, MAX_CARDS).map(toSeasonCard)
+  // toSeasonCard() substitutes a stock photo when a listing has none; here a
+  // listing without its own photo shows the card's plain background instead.
+  const cards: SeasonCard[] = data.items.slice(0, MAX_CARDS).map(entry => {
+    const card = toSeasonCard(entry)
+    const ownImage = entry.kind === 'trail' ? entry.item.image : entry.item.photos?.[0]
+    return ownImage ? card : { ...card, image: '' }
+  })
   // Only link a region's season page when that region has tagged content.
   const regionLinks = REGION_LINKS.filter(r =>
     data.items.some(entry => regionsMatch(entry.item.region, r.label)),

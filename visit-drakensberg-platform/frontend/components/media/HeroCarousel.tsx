@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { optimizedImageUrl, viewportImageWidth } from '@/lib/image-url'
+import { responsiveImageSources } from '@/lib/image-url'
 import { usePrefersReducedMotion } from '@/lib/carousel-autoplay'
 import { imagePositionToCss } from '@/lib/image-position'
 
@@ -37,17 +37,20 @@ export default function HeroCarousel({
   const reduced = usePrefersReducedMotion()
   const [index, setIndex] = useState(0)
   const [loaded, setLoaded] = useState<Record<number, boolean>>({})
+  // Slides whose resized rendition failed (optimizer 4xx/5xx) — those fall
+  // back to the original URL, the same degrade path SafeImage takes.
+  const [rawFallback, setRawFallback] = useState<Record<number, boolean>>({})
   const hasCycledRef = useRef(false)
-  // Computed once per mount rather than tracked live: good enough to size
-  // requests for this device, and stable so the preload effect below and
-  // the rendered <img> below always agree on the same URL (same browser
-  // cache entry) instead of racing a resize into a second fetch.
-  const [targetWidth] = useState(() => viewportImageWidth())
+  // Right-sized renditions via srcset + sizes="100vw": the browser picks the
+  // width for this viewport, and the preload below uses the identical
+  // srcset/sizes so it lands in the same cache entry as the rendered <img>.
+  const sourcesFor = (i: number) => (rawFallback[i] ? { src: images[i] } : responsiveImageSources(images[i]))
 
   useEffect(() => {
     setIndex(0)
     hasCycledRef.current = false
     setLoaded({})
+    setRawFallback({})
   }, [images])
 
   useEffect(() => { onIndexChange?.(index) }, [index, onIndexChange])
@@ -61,12 +64,17 @@ export default function HeroCarousel({
     const upcoming = [index, (index + 1) % images.length]
     upcoming.forEach(i => {
       if (loaded[i]) return
+      const { src, srcSet } = sourcesFor(i)
       const img = new window.Image()
       img.onload = () => setLoaded(prev => (prev[i] ? prev : { ...prev, [i]: true }))
-      img.src = optimizedImageUrl(images[i], { width: targetWidth })
+      if (srcSet) {
+        img.sizes = '100vw'
+        img.srcset = srcSet
+      }
+      img.src = src
     })
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [index, images, targetWidth])
+  }, [index, images, rawFallback])
 
   // Advances on its own, but only while the tab is actually in front of the
   // visitor: a slideshow left running in a background tab is pure waste (it
@@ -102,6 +110,7 @@ export default function HeroCarousel({
   const panFromLeft = index % 2 === 0
   const isFirstSlide = !hasCycledRef.current
   const currentLoaded = Boolean(loaded[index])
+  const current = sourcesFor(index)
 
   // Reduced motion keeps the slideshow itself — there are no arrows here, so
   // stopping it would put the rest of the gallery out of reach — but drops
@@ -131,7 +140,9 @@ export default function HeroCarousel({
           <div className="absolute inset-0 animate-pulse bg-gradient-to-br from-slate-700/60 to-slate-900/80" />
         )}
         <motion.img
-          src={optimizedImageUrl(images[index], { width: targetWidth })}
+          src={current.src}
+          srcSet={current.srcSet}
+          sizes={current.srcSet ? '100vw' : undefined}
           alt={alt}
           className="w-full h-full object-cover"
           // The ken-burns pan above animates transforms, which move the whole
@@ -142,6 +153,7 @@ export default function HeroCarousel({
           loading={isFirstSlide ? 'eager' : 'lazy'}
           decoding="async"
           onLoad={() => setLoaded(prev => (prev[index] ? prev : { ...prev, [index]: true }))}
+          onError={() => { if (current.srcSet) setRawFallback(prev => ({ ...prev, [index]: true })) }}
           initial={{ ...panStart, opacity: 0 }}
           animate={currentLoaded ? { ...panEnd, opacity: 1 } : { ...panStart, opacity: 0 }}
           transition={{

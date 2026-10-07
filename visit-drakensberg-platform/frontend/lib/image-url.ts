@@ -52,6 +52,22 @@ export function viewportImageWidth(max = 1920): number {
  * plain, unoptimized `<img>` for anything it doesn't recognize, rather than
  * trusting every stored image URL to stay inside the configured hosts.
  */
+// The third-party hosts next.config.mjs's images.remotePatterns allow-lists
+// (keep the two in sync). Photos there — region heroes, trail and activity
+// images — go through the optimizer instead of shipping full-size; if a host
+// ever drops off the config, SafeImage's onError still falls back to the
+// raw URL.
+const ALLOW_LISTED_THIRD_PARTY_HOSTS = new Set([
+  'hiking-trails.com',
+  'www.alexnail.com',
+  'encrypted-tbn0.gstatic.com',
+  'www.champagnesportsresort.com',
+  'wildmanranch.com',
+  'static.wixstatic.com',
+  'upload.wikimedia.org',
+  'southafrica.co.za',
+])
+
 export function isOptimizableImageHost(url: string): boolean {
   if (!url) return false
   let hostname: string
@@ -62,6 +78,7 @@ export function isOptimizableImageHost(url: string): boolean {
   }
   if (hostname === 'images.unsplash.com' || hostname === 'plus.unsplash.com') return true
   if (hostname.endsWith('.supabase.co')) return true
+  if (ALLOW_LISTED_THIRD_PARTY_HOSTS.has(hostname)) return true
   // Covers a Supabase project fronted by a custom domain, which wouldn't
   // match the .supabase.co check above.
   try {
@@ -70,4 +87,52 @@ export function isOptimizableImageHost(url: string): boolean {
     // NEXT_PUBLIC_SUPABASE_URL unset/invalid — nothing more to check.
   }
   return false
+}
+
+// next/image's default deviceSizes (next.config.mjs sets no custom list).
+// The optimizer endpoint rejects any `w` outside its configured sizes with a
+// 400, so responsive URLs below only ever use these.
+const NEXT_IMAGE_WIDTHS = [640, 750, 828, 1080, 1200, 1920, 2048] as const
+
+/** A URL on next/image's own optimizer (/_next/image) — the same endpoint
+ *  <Image> uses, so it resizes, re-encodes to WebP/AVIF and caches. */
+export function nextImageUrl(url: string, width: number, quality = 75): string {
+  return `/_next/image?url=${encodeURIComponent(url)}&w=${width}&q=${quality}`
+}
+
+/**
+ * `src` + `srcSet` for a hand-rolled full-bleed `<img>` (the hero carousel),
+ * so the browser picks a right-sized rendition for its viewport (with
+ * `sizes="100vw"`) instead of downloading the original.
+ *
+ * This matters for Supabase Storage: admin uploads there are served as-is,
+ * and several hero/region photos are 15–22 MB camera originals. Routing them
+ * through next/image's optimizer (Supabase is in remotePatterns) turns each
+ * into a few hundred KB of WebP. Unsplash keeps its own CDN resizing; any
+ * other host is returned untouched, exactly as before.
+ *
+ * Deterministic (no viewport reads), so server and client render the same
+ * markup and the server-rendered hero can start downloading immediately.
+ */
+export function responsiveImageSources(url: string, quality = 75): { src: string; srcSet?: string } {
+  if (!url) return { src: url }
+  let hostname = ''
+  try {
+    hostname = new URL(url).hostname
+  } catch {
+    return { src: url }
+  }
+  if (hostname === 'images.unsplash.com' || hostname === 'plus.unsplash.com') {
+    return {
+      src: optimizedImageUrl(url, { width: 1920, quality }),
+      srcSet: NEXT_IMAGE_WIDTHS.map(w => `${optimizedImageUrl(url, { width: w, quality })} ${w}w`).join(', '),
+    }
+  }
+  if (isOptimizableImageHost(url)) {
+    return {
+      src: nextImageUrl(url, 1920, quality),
+      srcSet: NEXT_IMAGE_WIDTHS.map(w => `${nextImageUrl(url, w, quality)} ${w}w`).join(', '),
+    }
+  }
+  return { src: url }
 }
