@@ -174,7 +174,7 @@ spam complaint withdraws consent through `vd_set_consent()` too.
 4. Brevo → Transactional → Settings → Webhook: add
    `https://<site>/api/webhooks/brevo?token=<BREVO_WEBHOOK_SECRET>` for
    delivered, opened, clicked, bounces, blocked, spam and unsubscribed.
-5. Apply the migration (`scripts/migrate.sh`).
+5. Apply the migration (`frontend/supabase/migrate.sh`, or paste it into the Supabase SQL editor).
 6. Send a campaign to a hand-picked list containing only yourself first.
 
 A send that Brevo rejects outright puts the campaign back to draft with the
