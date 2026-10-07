@@ -116,8 +116,8 @@ text. Two sources feed it:
 nothing fills is left in place verbatim, so a typo shows up in the preview
 rather than vanishing. Values are HTML-escaped in the body. The campaign
 builder previews the email as any chosen recipient and warns about unknown or
-blank tags. The only send that exists today is still a dry run; a real ESP send
-must render each recipient through the same `renderMergeTags()`.
+blank tags. A real send (Brevo, below) renders each recipient through the same
+`renderMergeTags()` and shell, via `frontend/lib/campaign-send.ts`.
 
 The starters still carry finished prose with editorial decisions marked in
 square brackets, which are visible in the live preview and cannot be mistaken
@@ -140,6 +140,47 @@ which now leads on the trail photograph, puts the meeting point and guide in a
 permit requirement and a conditions caveat. Every one of those fields is read
 from data the platform already holds; nothing about permits, weather or safety
 is invented, and nothing is promised on the operator's behalf.
+
+## Sending through Brevo
+
+Campaigns are delivered by [Brevo](https://www.brevo.com); transactional mail
+stays on SMTP (`lib/mailer.ts`). Each recipient's email is rendered on our side
+and handed to Brevo's transactional API as per-recipient `messageVersions`, so
+the campaign builder, merge tags and consent rules are unchanged and no
+contact list has to be synced to Brevo before a send.
+
+| Piece | Where |
+|---|---|
+| Brevo client | `frontend/lib/brevo.ts` |
+| Per-recipient rendering | `frontend/lib/campaign-send.ts` |
+| Send (admin, "Send Now" on a campaign) | `app/api/admin/campaigns/[id]/send` |
+| Opens / clicks / bounces / unsubscribes | `app/api/webhooks/brevo` → `vd_email_events` |
+| Claim + audience + outcome | `supabase/migrations/20261008_brevo_campaign_send.sql` |
+
+**Who is emailed.** Everyone the dry run counts, minus staff and anyone whose
+latest `marketing_email` row in `vd_customer_consents` is a withdrawal (an
+anonymous `/unsubscribe` updates the log but not the cached
+`marketing_consent` flag, so the send checks the log). A Brevo unsubscribe or
+spam complaint withdraws consent through `vd_set_consent()` too.
+
+**Setup.**
+
+1. Brevo → Senders, Domains & Dedicated IPs: add and verify the sending
+   domain (DKIM + DMARC records) and the sender address.
+2. Brevo → SMTP & API → API Keys: create a key.
+3. Set on Vercel: `BREVO_API_KEY`, `BREVO_SENDER_EMAIL`, optionally
+   `BREVO_SENDER_NAME`, `BREVO_REPLY_TO`; `EMAIL_POSTAL_ADDRESS` for the
+   footer; and a random `BREVO_WEBHOOK_SECRET`.
+4. Brevo → Transactional → Settings → Webhook: add
+   `https://<site>/api/webhooks/brevo?token=<BREVO_WEBHOOK_SECRET>` for
+   delivered, opened, clicked, bounces, blocked, spam and unsubscribed.
+5. Apply the migration (`scripts/migrate.sh`).
+6. Send a campaign to a hand-picked list containing only yourself first.
+
+A send that Brevo rejects outright puts the campaign back to draft with the
+error shown on the campaign page. If some batches succeed and others fail, the
+campaign is marked sent (retrying would double-email the successful batches)
+and the failure is kept in `send_error`.
 
 ## Changing the design system
 

@@ -6,12 +6,13 @@ import { Plus, Send, FileText, AlertTriangle } from 'lucide-react'
 import { getEmailCampaigns, type EmailCampaign } from '@/lib/email-campaigns-admin'
 
 const STATUS_LABEL: Record<EmailCampaign['status'], string> = {
-  draft: 'Draft', scheduled: 'Scheduled', dry_run_sent: 'Dry Run Sent', sent: 'Sent', paused: 'Paused', cancelled: 'Cancelled',
+  draft: 'Draft', scheduled: 'Scheduled', dry_run_sent: 'Dry Run Sent', sending: 'Sending', sent: 'Sent', paused: 'Paused', cancelled: 'Cancelled',
 }
 const STATUS_STYLE: Record<EmailCampaign['status'], string> = {
   draft: 'bg-gray-100 text-gray-500',
   scheduled: 'bg-blue-50 text-blue-600',
   dry_run_sent: 'bg-[#C9A96E]/15 text-[#8B6914]',
+  sending: 'bg-blue-50 text-blue-600',
   sent: 'bg-[#2d6a4f]/10 text-[#2d6a4f]',
   paused: 'bg-gray-100 text-gray-500',
   cancelled: 'bg-red-50 text-red-400',

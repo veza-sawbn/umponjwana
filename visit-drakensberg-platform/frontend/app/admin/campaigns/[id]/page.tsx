@@ -7,18 +7,19 @@ import { ArrowLeft, Loader2, Send, Pause, Play, XCircle, Eye, AlertTriangle, Use
 import {
   getEmailCampaign, getEmailTemplate, getAudienceSegmentOptions, getConsentedAudienceCount,
   getConsentedRecipientCount, getCampaignContacts,
-  dryRunSendCampaign, setCampaignStatus, type EmailCampaign, type EmailTemplate, type CampaignContact,
+  dryRunSendCampaign, sendCampaign, setCampaignStatus, type EmailCampaign, type EmailTemplate, type CampaignContact,
 } from '@/lib/email-campaigns-admin'
 import type { SegmentCount } from '@/lib/customers-admin'
 import PersonalisedPreview from '@/components/admin/campaigns/PersonalisedPreview'
 
 const STATUS_LABEL: Record<EmailCampaign['status'], string> = {
-  draft: 'Draft', scheduled: 'Scheduled', dry_run_sent: 'Dry Run Sent', sent: 'Sent', paused: 'Paused', cancelled: 'Cancelled',
+  draft: 'Draft', scheduled: 'Scheduled', dry_run_sent: 'Dry Run Sent', sending: 'Sending', sent: 'Sent', paused: 'Paused', cancelled: 'Cancelled',
 }
 const STATUS_STYLE: Record<EmailCampaign['status'], string> = {
   draft: 'bg-gray-100 text-gray-500',
   scheduled: 'bg-blue-50 text-blue-600',
   dry_run_sent: 'bg-[#C9A96E]/15 text-[#8B6914]',
+  sending: 'bg-blue-50 text-blue-600',
   sent: 'bg-[#2d6a4f]/10 text-[#2d6a4f]',
   paused: 'bg-gray-100 text-gray-500',
   cancelled: 'bg-red-50 text-red-400',
@@ -38,8 +39,10 @@ export default function EmailCampaignDetailPage() {
   const [showPreview, setShowPreview] = useState(false)
   const [loading, setLoading] = useState(true)
   const [sending, setSending] = useState(false)
-  const [confirmSend, setConfirmSend] = useState(false)
+  // Which send the admin is confirming: the real Brevo send, or a dry run.
+  const [confirmSend, setConfirmSend] = useState<null | 'real' | 'dry'>(null)
   const [error, setError] = useState('')
+  const [notice, setNotice] = useState('')
 
   async function load() {
     setLoading(true)
@@ -72,11 +75,17 @@ export default function EmailCampaignDetailPage() {
   }, [campaign, contacts])
 
   async function handleSend() {
-    if (!campaign) return
-    setSending(true); setError('')
-    const { error: err } = await dryRunSendCampaign(campaign.id)
-    setSending(false); setConfirmSend(false)
-    if (err) { setError(err); return }
+    if (!campaign || !confirmSend) return
+    setSending(true); setError(''); setNotice('')
+    if (confirmSend === 'dry') {
+      const { error: err } = await dryRunSendCampaign(campaign.id)
+      if (err) setError(err)
+    } else {
+      const { sent, total, error: err } = await sendCampaign(campaign.id)
+      if (sent > 0) setNotice(`Sent to ${sent.toLocaleString()} of ${total.toLocaleString()} recipient${total === 1 ? '' : 's'}.`)
+      if (err) setError(err)
+    }
+    setSending(false); setConfirmSend(null)
     await load()
   }
 
@@ -123,39 +132,58 @@ export default function EmailCampaignDetailPage() {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 lg:gap-8">
         <div className="lg:col-span-2 space-y-6">
-          {/* Send / dry-run panel */}
+          {/* Send panel */}
           <div className="bg-white border border-gray-200 p-6">
             <div className="flex items-start gap-3 mb-5">
               <AlertTriangle size={16} className="text-[#C9A96E] shrink-0 mt-0.5" />
               <p className="font-sans text-xs text-gray-500 leading-relaxed">
-                Sending is a <strong>dry run</strong>: the real, consented audience is resolved and recorded below, but
-                no email is actually delivered. Wire in a marketing email provider before enabling real sends.
+                <strong>Send now</strong> delivers through Brevo to every consented recipient — it can&apos;t be undone.
+                A <strong>dry run</strong> resolves and records the audience without emailing anyone. Anyone who has
+                unsubscribed since is skipped, so the sent count can be lower than the audience shown.
               </p>
             </div>
 
-            {campaign.sentAt ? (
+            {notice && <p className="font-sans text-sm text-[#2d6a4f] mb-4">{notice}</p>}
+            {campaign.sendError && (
+              <p className="font-sans text-xs text-red-500 mb-4 break-words">Last send problem: {campaign.sendError}</p>
+            )}
+
+            {campaign.status === 'sending' ? (
+              <p className="font-sans text-sm text-gray-700 inline-flex items-center gap-2"><Loader2 size={14} className="animate-spin" /> Sending through Brevo…</p>
+            ) : campaign.sentAt ? (
               <div className="space-y-2">
-                <p className="font-sans text-sm text-gray-700">Dry run completed {fmtDateTime(campaign.sentAt)}</p>
-                <p className="font-display italic text-2xl text-[#2d6a4f]">{campaign.audienceCountSnapshot?.toLocaleString() ?? 0} recipients resolved</p>
+                <p className="font-sans text-sm text-gray-700">
+                  {campaign.dryRun ? 'Dry run completed' : 'Sent through Brevo'} {fmtDateTime(campaign.sentAt)}
+                </p>
+                <p className="font-display italic text-2xl text-[#2d6a4f]">
+                  {campaign.audienceCountSnapshot?.toLocaleString() ?? 0} {campaign.dryRun ? 'recipients resolved' : 'recipients emailed'}
+                </p>
               </div>
             ) : sendable ? (
               confirmSend ? (
                 <div className="space-y-3">
                   <p className="font-sans text-sm text-gray-700">
-                    Confirm dry-run send to <strong>{liveAudienceCount ?? '…'}</strong> consented recipient{liveAudienceCount === 1 ? '' : 's'} in
-                    &ldquo;{segmentName}&rdquo;? No real email will be sent.
+                    {confirmSend === 'real' ? 'Send this campaign now to' : 'Confirm dry-run send to'}{' '}
+                    <strong>{liveAudienceCount ?? '…'}</strong> consented recipient{liveAudienceCount === 1 ? '' : 's'} in
+                    &ldquo;{segmentName}&rdquo;?{confirmSend === 'real' ? ' Real email will be delivered.' : ' No real email will be sent.'}
                   </p>
                   <div className="flex gap-3">
                     <button onClick={handleSend} disabled={sending} className="inline-flex items-center gap-2 bg-[#2d6a4f] text-white px-5 py-2.5 font-sans text-sm hover:bg-[#245a41] transition-colors disabled:opacity-50">
-                      {sending ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />} {sending ? 'Sending…' : 'Confirm Dry-Run Send'}
+                      {sending ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}
+                      {sending ? 'Sending…' : confirmSend === 'real' ? 'Confirm Send' : 'Confirm Dry-Run Send'}
                     </button>
-                    <button onClick={() => setConfirmSend(false)} className="font-sans text-sm text-gray-400 hover:text-gray-600 px-3">Cancel</button>
+                    <button onClick={() => setConfirmSend(null)} disabled={sending} className="font-sans text-sm text-gray-400 hover:text-gray-600 px-3">Cancel</button>
                   </div>
                 </div>
               ) : (
-                <button onClick={() => setConfirmSend(true)} className="inline-flex items-center gap-2 bg-[#2d6a4f] text-white px-5 py-2.5 font-sans text-sm hover:bg-[#245a41] transition-colors">
-                  <Send size={14} /> Send (Dry Run)
-                </button>
+                <div className="flex flex-wrap gap-3">
+                  <button onClick={() => setConfirmSend('real')} className="inline-flex items-center gap-2 bg-[#2d6a4f] text-white px-5 py-2.5 font-sans text-sm hover:bg-[#245a41] transition-colors">
+                    <Send size={14} /> Send Now
+                  </button>
+                  <button onClick={() => setConfirmSend('dry')} className="inline-flex items-center gap-2 border border-gray-200 px-5 py-2.5 font-sans text-sm text-gray-600 hover:border-[#2d6a4f] hover:text-[#2d6a4f] transition-colors">
+                    Dry Run
+                  </button>
+                </div>
               )
             ) : (
               <p className="font-sans text-sm text-gray-400">
@@ -247,7 +275,7 @@ export default function EmailCampaignDetailPage() {
               {campaign.status === 'paused' && (
                 <button onClick={() => handleStatus('draft')} className="w-full inline-flex items-center gap-2 border border-gray-200 px-4 py-2.5 font-sans text-sm text-gray-600 hover:border-[#2d6a4f] hover:text-[#2d6a4f] transition-colors"><Play size={14} /> Resume to Draft</button>
               )}
-              {!['sent', 'dry_run_sent'].includes(campaign.status) && (
+              {!['sent', 'dry_run_sent', 'sending'].includes(campaign.status) && (
                 <button onClick={() => handleStatus('cancelled')} className="w-full inline-flex items-center gap-2 border border-red-200 px-4 py-2.5 font-sans text-sm text-red-400 hover:bg-red-50 transition-colors"><XCircle size={14} /> Cancel</button>
               )}
             </div>

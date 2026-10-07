@@ -6,10 +6,10 @@ import type { MergeContact } from './email-merge-tags'
  * Admin email campaign system (§10/§11 "Email Campaign System" / "Campaign
  * Types"). Templates + campaigns are plain CRUD over the Phase 5 schema
  * (supabase/migrations/20260825_email_campaign_foundation.sql); "sending" a
- * campaign calls vd_campaign_dry_run_send() — the only send path that
- * exists today (see that migration's header for why). Every campaign this
- * module can create or send is dry-run only; nothing here delivers real
- * email.
+ * campaign either dry-runs it (vd_campaign_dry_run_send() — resolves and
+ * records the audience, emails nobody) or sends it for real through Brevo
+ * (app/api/admin/campaigns/[id]/send — see
+ * migrations/20261008_brevo_campaign_send.sql).
  * ──────────────────────────────────────────────────────────────────────────── */
 
 export type EmailTemplate = {
@@ -38,11 +38,13 @@ export type EmailCampaign = {
   recipientUserIds: string[]
   /** Campaign-level merge fields ({{offer}}, {{promo_code}}…), see lib/email-merge-tags.ts. */
   mergeValues: Record<string, string>
-  status: 'draft' | 'scheduled' | 'dry_run_sent' | 'sent' | 'paused' | 'cancelled'
+  status: 'draft' | 'scheduled' | 'dry_run_sent' | 'sending' | 'sent' | 'paused' | 'cancelled'
   scheduledAt: string | null
   sentAt: string | null
   dryRun: boolean
   audienceCountSnapshot: number | null
+  /** Last ESP failure; kept alongside status 'sent' after a partial send. */
+  sendError: string | null
   notes: string
   createdAt: string
   updatedAt: string
@@ -68,6 +70,7 @@ function rowToCampaign(r: any): EmailCampaign {
     mergeValues: r.merge_values && typeof r.merge_values === 'object' ? r.merge_values : {},
     status: r.status, scheduledAt: r.scheduled_at,
     sentAt: r.sent_at, dryRun: r.dry_run, audienceCountSnapshot: r.audience_count_snapshot,
+    sendError: r.send_error ?? null,
     notes: r.notes ?? '', createdAt: r.created_at, updatedAt: r.updated_at,
   }
 }
@@ -165,12 +168,23 @@ export async function setCampaignStatus(id: string, status: 'paused' | 'cancelle
   return { error: error?.message ?? null }
 }
 
-/** The only send path that exists today — see the migration header. Resolves
- *  the real consented audience server-side and records the outcome; never
- *  delivers real email. Returns the resolved recipient count. */
+/** Resolves the real consented audience server-side and records the
+ *  outcome; never delivers real email. Returns the resolved recipient count. */
 export async function dryRunSendCampaign(id: string): Promise<{ count: number | null; error: string | null }> {
   const { data, error } = await supabase.rpc('vd_campaign_dry_run_send', { p_campaign_id: id })
   return { count: typeof data === 'number' ? data : null, error: error?.message ?? null }
+}
+
+/** The real send, through Brevo. Server-side because rendering uses the
+ *  server-only email shell and the Brevo key never leaves the server. */
+export async function sendCampaign(id: string): Promise<{ sent: number; total: number; error: string | null }> {
+  try {
+    const res = await fetch(`/api/admin/campaigns/${encodeURIComponent(id)}/send`, { method: 'POST' })
+    const body = await res.json().catch(() => ({}))
+    return { sent: Number(body.sent) || 0, total: Number(body.total) || 0, error: body.error ?? (res.ok ? null : `send failed (${res.status})`) }
+  } catch (e) {
+    return { sent: 0, total: 0, error: e instanceof Error ? e.message : 'send failed' }
+  }
 }
 
 // ── Audience ─────────────────────────────────────────────────────────────
