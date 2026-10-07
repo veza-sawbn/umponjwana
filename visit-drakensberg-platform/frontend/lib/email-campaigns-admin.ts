@@ -38,11 +38,15 @@ export type EmailCampaign = {
   recipientUserIds: string[]
   /** Campaign-level merge fields ({{offer}}, {{promo_code}}…), see lib/email-merge-tags.ts. */
   mergeValues: Record<string, string>
-  status: 'draft' | 'scheduled' | 'dry_run_sent' | 'sent' | 'paused' | 'cancelled'
+  status: 'draft' | 'scheduled' | 'sending' | 'dry_run_sent' | 'sent' | 'paused' | 'cancelled'
   scheduledAt: string | null
   sentAt: string | null
   dryRun: boolean
   audienceCountSnapshot: number | null
+  startedAt: string | null
+  completedAt: string | null
+  /** Why a campaign was parked (provider rejected the key, template deleted, …). */
+  lastError: string | null
   notes: string
   createdAt: string
   updatedAt: string
@@ -68,6 +72,7 @@ function rowToCampaign(r: any): EmailCampaign {
     mergeValues: r.merge_values && typeof r.merge_values === 'object' ? r.merge_values : {},
     status: r.status, scheduledAt: r.scheduled_at,
     sentAt: r.sent_at, dryRun: r.dry_run, audienceCountSnapshot: r.audience_count_snapshot,
+    startedAt: r.started_at ?? null, completedAt: r.completed_at ?? null, lastError: r.last_error ?? null,
     notes: r.notes ?? '', createdAt: r.created_at, updatedAt: r.updated_at,
   }
 }
@@ -160,17 +165,83 @@ export async function deleteEmailCampaign(id: string): Promise<{ error: string |
   return { error: error?.message ?? null }
 }
 
-export async function setCampaignStatus(id: string, status: 'paused' | 'cancelled' | 'draft'): Promise<{ error: string | null }> {
+export async function setCampaignStatus(id: string, status: 'paused' | 'cancelled' | 'draft' | 'sending'): Promise<{ error: string | null }> {
   const { error } = await supabase.from('vd_email_campaigns').update({ status, updated_at: new Date().toISOString() }).eq('id', id)
   return { error: error?.message ?? null }
 }
 
-/** The only send path that exists today — see the migration header. Resolves
- *  the real consented audience server-side and records the outcome; never
- *  delivers real email. Returns the resolved recipient count. */
+/** Count-only rehearsal: resolves the real consented audience server-side and
+ *  records the outcome, but delivers nothing. Real delivery is
+ *  sendCampaignNow(). Returns the resolved recipient count. */
 export async function dryRunSendCampaign(id: string): Promise<{ count: number | null; error: string | null }> {
   const { data, error } = await supabase.rpc('vd_campaign_dry_run_send', { p_campaign_id: id })
   return { count: typeof data === 'number' ? data : null, error: error?.message ?? null }
+}
+
+// ── Real sending (Brevo) ─────────────────────────────────────────────────
+
+export type SendReadiness = {
+  ready: boolean
+  /** Names of missing settings — never values. */
+  missing: string[]
+  sender: string | null
+  dailyCap: number
+}
+
+export async function getSendReadiness(): Promise<SendReadiness | null> {
+  try {
+    const res = await fetch('/api/admin/campaigns/readiness')
+    return res.ok ? await res.json() : null
+  } catch { return null }
+}
+
+/** Queues the consented audience and starts delivery. Server-side checks decide
+ *  whether sending is configured; this surfaces the reason when it is not. */
+export async function sendCampaignNow(id: string): Promise<{ queued: number | null; error: string | null }> {
+  try {
+    const res = await fetch('/api/admin/campaigns/send', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ campaignId: id }),
+    })
+    const data = await res.json().catch(() => ({}))
+    if (!res.ok) {
+      const missing = Array.isArray(data.missing) && data.missing.length ? ` Missing: ${data.missing.join(', ')}.` : ''
+      return { queued: null, error: `${data.error ?? 'Send failed.'}${missing}` }
+    }
+    return { queued: typeof data.queued === 'number' ? data.queued : null, error: null }
+  } catch (e) {
+    return { queued: null, error: e instanceof Error ? e.message : 'Send failed.' }
+  }
+}
+
+export async function sendTestEmail(
+  input: { campaignId: string; to: string[] },
+): Promise<{ results: { to: string; ok: boolean; error?: string }[]; error: string | null }> {
+  try {
+    const res = await fetch('/api/admin/campaigns/test', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(input),
+    })
+    const data = await res.json().catch(() => ({}))
+    if (!res.ok) {
+      const missing = Array.isArray(data.missing) && data.missing.length ? ` Missing: ${data.missing.join(', ')}.` : ''
+      return { results: [], error: `${data.error ?? 'Test send failed.'}${missing}` }
+    }
+    return { results: data.results ?? [], error: null }
+  } catch (e) {
+    return { results: [], error: e instanceof Error ? e.message : 'Test send failed.' }
+  }
+}
+
+export type CampaignStats = {
+  /** Recipient rows by status: queued, sending, sent, failed, suppressed, bounced, complained. */
+  recipients: Record<string, number>
+  /** Distinct addresses per event: delivered, opened, clicked, unsubscribed, … */
+  events: Record<string, number>
+}
+
+export async function getCampaignStats(id: string): Promise<CampaignStats | null> {
+  const { data, error } = await supabase.rpc('vd_campaign_stats', { p_campaign_id: id })
+  if (error) { console.error('[email-campaigns-admin] stats failed:', error); return null }
+  return { recipients: data?.recipients ?? {}, events: data?.events ?? {} }
 }
 
 // ── Audience ─────────────────────────────────────────────────────────────

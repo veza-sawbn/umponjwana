@@ -93,6 +93,20 @@ export const RATE_LIMITS = {
    * having a bad time with their phone camera.
    */
   listingUpload: { limit: 40, windowSeconds: 3600 },
+  /**
+   * Public marketing opt-in. Each call can send one confirmation email to an
+   * arbitrary address, so it is a mail-relay vector: budgeted per caller AND
+   * per target address, and fails closed.
+   */
+  marketingSubscribe: { limit: 5, windowSeconds: 3600, failClosed: true },
+  /** Public "email me an unsubscribe link" request — same relay concern. */
+  marketingUnsubscribeRequest: { limit: 5, windowSeconds: 3600, failClosed: true },
+  /** Token-bearing opt-out / confirm calls. Cheap, but unauthenticated. */
+  marketingToken: { limit: 60, windowSeconds: 300 },
+  /** Starting a real send to thousands of people. An admin needs one per campaign. */
+  campaignSend: { limit: 10, windowSeconds: 600 },
+  /** Test sends go to addresses the admin types; keep it from becoming a relay. */
+  campaignTest: { limit: 10, windowSeconds: 600 },
 } as const satisfies Record<string, RateLimitRule>
 
 // ── In-process fallback ─────────────────────────────────────────────────────
