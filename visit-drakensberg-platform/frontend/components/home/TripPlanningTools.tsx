@@ -208,7 +208,10 @@ function ActivitiesForm({ idBase }: { idBase: string }) {
 function TransportForm({ idBase }: { idBase: string }) {
   const router = useRouter()
   const booking = useBooking()
-  const [towns, setTowns] = useState<Town[]>(DEFAULT_TOWNS)
+  // Live towns only (Admin → Towns). Starts empty: getTowns()' built-in
+  // DEFAULT_TOWNS fallback is never offered as if it were live data.
+  const [towns, setTowns] = useState<Town[]>([])
+  const [townsLoaded, setTownsLoaded] = useState(false)
   const [from, setFrom] = useState(MAJOR_HUBS[0].name)
   const [to, setTo] = useState('')
   const [date, setDate] = useState(booking.checkIn || '')
@@ -218,7 +221,10 @@ function TransportForm({ idBase }: { idBase: string }) {
   const [passengers, setPassengers] = useState(String(Math.min(20, Math.max(1, booking.guests || 1))))
 
   useEffect(() => {
-    getTowns(publicSupabase).then(setTowns).catch(() => {})
+    getTowns(publicSupabase)
+      .then(all => { if (all !== DEFAULT_TOWNS) setTowns(all) })
+      .catch(() => {})
+      .finally(() => setTownsLoaded(true))
   }, [])
 
   const townOptions: Option[] = [...towns]
@@ -238,7 +244,7 @@ function TransportForm({ idBase }: { idBase: string }) {
       <div className={fieldGrid}>
         <SelectField id={`${idBase}-from`} label="From" value={from} onChange={setFrom}
           options={[...MAJOR_HUBS.map(h => ({ value: h.name, label: h.name })), ...townOptions]} />
-        <SelectField id={`${idBase}-to`} label="To" value={to} onChange={setTo} placeholder="Choose a town" required options={townOptions} />
+        <SelectField id={`${idBase}-to`} label="To" value={to} onChange={setTo} placeholder={townsLoaded ? (townOptions.length ? 'Choose a town' : 'No towns available') : 'Loading towns…'} required options={townOptions} />
         <DateField id={`${idBase}-date`} label="Date" value={date} onChange={setDate} />
         <SelectField id={`${idBase}-passengers`} label="Passengers" value={passengers} onChange={setPassengers}
           options={PASSENGER_OPTIONS.map(n => ({ value: String(n), label: `${n} passenger${n === 1 ? '' : 's'}` }))} />

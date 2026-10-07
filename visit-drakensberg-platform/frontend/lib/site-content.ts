@@ -1,3 +1,4 @@
+import type { SupabaseClient } from '@supabase/supabase-js'
 import { supabase } from './auth'
 import { CENTER_POSITION_CSS } from './image-position'
 
@@ -258,30 +259,47 @@ export const SITE_CONTENT_DEFAULTS = {
 export type SiteContentKey = keyof typeof SITE_CONTENT_DEFAULTS
 export type SiteContent = typeof SITE_CONTENT_DEFAULTS
 
-async function fetchKey<K extends SiteContentKey>(key: K): Promise<SiteContent[K]> {
+/**
+ * One section as stored, merged over its defaults — or null when the read
+ * failed or the row doesn't exist. Callers that already show content (a
+ * server-rendered page, a seeded hook) use this so a failed refresh can't
+ * swap real content back to the placeholder defaults.
+ */
+export async function getSiteContentOrNull<K extends SiteContentKey>(key: K, client: SupabaseClient = supabase): Promise<SiteContent[K] | null> {
   try {
-    const { data } = await supabase
+    const { data, error } = await client
       .from('site_content')
       .select('value')
       .eq('key', key)
       .maybeSingle()
-    if (data?.value) {
+    if (!error && data?.value) {
       return { ...SITE_CONTENT_DEFAULTS[key], ...data.value } as SiteContent[K]
     }
   } catch {
-    // table may not exist yet — fall through to defaults
+    // table may not exist yet
   }
-  return SITE_CONTENT_DEFAULTS[key]
+  return null
 }
 
 export async function getSiteContent<K extends SiteContentKey>(key: K): Promise<SiteContent[K]> {
-  return fetchKey(key)
+  return (await getSiteContentOrNull(key)) ?? SITE_CONTENT_DEFAULTS[key]
 }
 
-export async function getAllSiteContent(): Promise<SiteContent> {
+/**
+ * Every stored section merged over the defaults, or null when the read
+ * failed / returned nothing. Takes a client so a Server Component can call
+ * it with lib/supabase-public.ts (the homepage renders real CMS content in
+ * its first HTML instead of flashing the defaults).
+ */
+export async function loadSiteContent(client: SupabaseClient = supabase): Promise<SiteContent | null> {
   try {
-    const { data } = await supabase.from('site_content').select('key, value')
-    if (data && data.length > 0) {
+    // Only the CMS sections defined above. Selecting every site_content row
+    // also pulled `trails` (~11 MB of GPS data) on each homepage load.
+    const { data, error } = await client
+      .from('site_content')
+      .select('key, value')
+      .in('key', Object.keys(SITE_CONTENT_DEFAULTS))
+    if (!error && data && data.length > 0) {
       const result = structuredClone(SITE_CONTENT_DEFAULTS) as SiteContent
       for (const row of data) {
         const k = row.key as SiteContentKey
@@ -294,7 +312,11 @@ export async function getAllSiteContent(): Promise<SiteContent> {
   } catch {
     // fall through
   }
-  return structuredClone(SITE_CONTENT_DEFAULTS) as SiteContent
+  return null
+}
+
+export async function getAllSiteContent(): Promise<SiteContent> {
+  return (await loadSiteContent()) ?? (structuredClone(SITE_CONTENT_DEFAULTS) as SiteContent)
 }
 
 export async function setSiteContent<K extends SiteContentKey>(key: K, value: SiteContent[K]): Promise<void> {

@@ -1,46 +1,66 @@
 'use client'
-import { useId } from 'react'
+import { useEffect, useId, useState } from 'react'
 import Link from 'next/link'
 import { ArrowRight } from 'lucide-react'
 import SafeImage from '@/components/ui/SafeImage'
-import { DESTINATION_GRAPH_NAV } from '@/lib/destination-ia'
-import type { HomeCard } from '@/lib/site-content'
+import { DEFAULT_REGIONS, getRegions, regionsMatch, type Region } from '@/lib/regions'
+import { publicSupabase } from '@/lib/supabase-public'
+import { objectPositionStyle } from '@/lib/image-position'
 
 /* ─── Top destinations ──────────────────────────────────────────────────────
-   Exactly the three Drakensberg regions, in north → south order.
+   Exactly the three Drakensberg regions, north → south, built from the live
+   region records (Admin → Regions, site_content.admin_regions): each card
+   links to that region's own page (/regions/<slug>) and shows its stored
+   name, tagline, overview and hero photo (with its focal point).
 
-   - Image, subtitle and description come from the CMS region cards
-     (site_content.home_cards.regions) — the same admin-approved content the
-     homepage "Choose your Berg" section renders.
-   - The link is the region's canonical page from the primary navigation
-     (lib/destination-ia.ts, e.g. /regions/northern-drakensberg). The CMS
-     cards' own href points at a /regions#fragment that matches no anchor on
-     that page, so it is used only if the nav entry is ever missing.
-   - A region with no CMS card is skipped rather than filled with made-up copy. */
+   Records come from the server (app/page.tsx) when available, otherwise
+   from a client read. getRegions()' built-in DEFAULT_REGIONS fallback is
+   never shown as live content: until real records arrive the cards are
+   neutral placeholders, and a missing region is simply left out. */
 
 const TOP_DESTINATIONS = ['Northern Drakensberg', 'Central Drakensberg', 'Southern Drakensberg'] as const
 
-const regionNavHref = (name: string) =>
-  DESTINATION_GRAPH_NAV.find(n => n.href === '/regions')
-    ?.children?.find(c => c.label === name && c.status === 'live')?.href
+// Region pages keep their slug when an admin renames a region (see
+// updateRegion), so cards are matched by slug first — the live slugs, then
+// the original north-berg/central-berg/south-berg ids — and only then by a
+// tolerant name match. The card always shows the record's stored name.
+const DESTINATION_SLUGS: Record<(typeof TOP_DESTINATIONS)[number], string[]> = {
+  'Northern Drakensberg': ['northern-drakensberg', 'north-berg'],
+  'Central Drakensberg': ['central-drakensberg', 'central-berg'],
+  'Southern Drakensberg': ['southern-drakensberg', 'south-berg'],
+}
 
-export default function TopDestinations({ regionCards }: { regionCards: HomeCard[] }) {
+function findDestination(regions: Region[], name: (typeof TOP_DESTINATIONS)[number]): Region | undefined {
+  const slugs = DESTINATION_SLUGS[name]
+  return regions.find(r => slugs.includes(r.slug) || slugs.includes(r.id))
+    ?? regions.find(r => regionsMatch(r.name, name))
+}
+
+export default function TopDestinations({ initialRegions }: { initialRegions?: Region[] }) {
   const headingId = useId()
+  const [regions, setRegions] = useState<Region[] | null>(initialRegions ?? null)
+  const [failed, setFailed] = useState(false)
 
-  const destinations = TOP_DESTINATIONS.flatMap(name => {
-    const card = regionCards.find(c => c.name === name)
-    if (!card) return []
-    return [{
-      id: card.id,
-      name,
-      href: regionNavHref(name) || String(card.href || '/regions'),
-      img: String(card.img || ''),
-      subtitle: String(card.subtitle || ''),
-      desc: String(card.desc || ''),
-    }]
-  })
+  useEffect(() => {
+    if (initialRegions) return
+    let cancelled = false
+    getRegions(publicSupabase)
+      .then(all => {
+        if (cancelled) return
+        if (all === DEFAULT_REGIONS) setFailed(true)
+        else setRegions(all)
+      })
+      .catch(() => { if (!cancelled) setFailed(true) })
+    return () => { cancelled = true }
+  }, [initialRegions])
 
-  if (destinations.length === 0) return null
+  const destinations = regions
+    ? TOP_DESTINATIONS.flatMap(name => { const r = findDestination(regions, name); return r ? [r] : [] })
+    : []
+
+  // Nothing real to show (read failed, or no matching records): omit the
+  // section rather than render built-in copy.
+  if (failed || (regions && destinations.length === 0)) return null
 
   return (
     // Continues the trip-planning panel above (same bg-forest), as in the
@@ -58,36 +78,51 @@ export default function TopDestinations({ regionCards }: { regionCards: HomeCard
         </Link>
 
         {/* Mobile: horizontally scrollable, snapping row. md+: three columns. */}
-        <ul className="mt-7 lg:mt-9 flex gap-4 overflow-x-auto snap-x snap-mandatory -mx-4 px-4 sm:-mx-6 sm:px-6 pb-2 scroll-px-4 sm:scroll-px-6 md:grid md:grid-cols-3 md:gap-8 md:overflow-visible md:mx-0 md:px-0 md:pb-0">
-          {destinations.map(d => (
-            <li key={d.id} className="w-[82%] shrink-0 snap-start md:w-auto">
-              <Link
-                href={d.href}
-                className="group block h-full rounded-2xl focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-gold"
-              >
-                <div className="relative overflow-hidden rounded-2xl aspect-[4/3] bg-white/10">
-                  {d.img && (
-                    <SafeImage
-                      src={d.img}
-                      alt=""
-                      fill
-                      loading="lazy"
-                      sizes="(max-width: 768px) 82vw, 31vw"
-                      className="object-cover transition-transform duration-500 group-hover:scale-105 group-focus-visible:scale-105"
-                      style={{ willChange: 'transform' }}
-                    />
-                  )}
+        <ul
+          aria-busy={regions ? undefined : true}
+          className="mt-7 lg:mt-9 flex gap-4 overflow-x-auto snap-x snap-mandatory -mx-4 px-4 sm:-mx-6 sm:px-6 pb-2 scroll-px-4 sm:scroll-px-6 md:grid md:grid-cols-3 md:gap-8 md:overflow-visible md:mx-0 md:px-0 md:pb-0"
+        >
+          {regions
+            ? destinations.map(r => (
+              <li key={r.id} className="w-[82%] shrink-0 snap-start md:w-auto">
+                <Link
+                  href={`/regions/${r.slug}`}
+                  className="group block h-full rounded-2xl focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-gold"
+                >
+                  <div className="relative overflow-hidden rounded-2xl aspect-[4/3] bg-white/10">
+                    {r.heroImage && (
+                      <SafeImage
+                        src={r.heroImage}
+                        alt=""
+                        fill
+                        loading="lazy"
+                        sizes="(max-width: 768px) 82vw, 31vw"
+                        className="object-cover transition-transform duration-500 group-hover:scale-105 group-focus-visible:scale-105"
+                        style={{ ...objectPositionStyle(r.heroImagePosition), willChange: 'transform' }}
+                      />
+                    )}
+                  </div>
+                  <div className="pt-5">
+                    {r.tagline && (
+                      <p className="font-sans text-[10px] tracking-[0.15em] uppercase text-gold mb-1">{r.tagline}</p>
+                    )}
+                    <h3 className="font-sans font-semibold text-xl lg:text-2xl text-white mb-2 group-hover:text-gold transition-colors">{r.name}</h3>
+                    {r.overview && <p className="font-sans text-sm text-white/60 leading-relaxed line-clamp-3">{r.overview}</p>}
+                  </div>
+                </Link>
+              </li>
+            ))
+            : TOP_DESTINATIONS.map(name => (
+              // Placeholder blocks only — no stand-in text or photos.
+              <li key={name} aria-hidden="true" className="w-[82%] shrink-0 snap-start md:w-auto">
+                <div className="rounded-2xl aspect-[4/3] bg-white/10 animate-skeleton" />
+                <div className="pt-5 space-y-2">
+                  <div className="h-2.5 w-1/2 bg-white/10 animate-skeleton" />
+                  <div className="h-5 w-2/3 bg-white/10 animate-skeleton" />
+                  <div className="h-3 w-full bg-white/10 animate-skeleton" />
                 </div>
-                <div className="pt-5">
-                  {d.subtitle && (
-                    <p className="font-sans text-[10px] tracking-[0.15em] uppercase text-gold mb-1">{d.subtitle}</p>
-                  )}
-                  <h3 className="font-sans font-semibold text-xl lg:text-2xl text-white mb-2 group-hover:text-gold transition-colors">{d.name}</h3>
-                  {d.desc && <p className="font-sans text-sm text-white/60 leading-relaxed">{d.desc}</p>}
-                </div>
-              </Link>
-            </li>
-          ))}
+              </li>
+            ))}
         </ul>
       </div>
     </section>
