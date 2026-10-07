@@ -212,7 +212,10 @@ function TransportForm({ idBase }: { idBase: string }) {
   const [from, setFrom] = useState(MAJOR_HUBS[0].name)
   const [to, setTo] = useState('')
   const [date, setDate] = useState(booking.checkIn || '')
-  const [passengers, setPassengers] = useState('1')
+  // Start from the trip's party size (clamped to /shuttles' 1–20), as the
+  // direct /shuttles flow does — the URL value takes precedence there, so a
+  // hard-coded 1 would quote a multi-guest trip for one passenger.
+  const [passengers, setPassengers] = useState(String(Math.min(20, Math.max(1, booking.guests || 1))))
 
   useEffect(() => {
     getTowns(publicSupabase).then(setTowns).catch(() => {})
