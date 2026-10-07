@@ -11,9 +11,14 @@ import {
   Info, Backpack, Clock, UserCircle, Send, Star,
 } from 'lucide-react'
 import { getBookingById, type SavedBooking } from '@/lib/bookings'
-import { getTours, resolveItinerary, type Tour } from '@/lib/tours'
+import { getTours, type Tour } from '@/lib/tours'
 import { getDepartures, type Departure } from '@/lib/departures'
 import { getTrailSummaries, type Trail } from '@/lib/trails'
+import { getTripRequestById, type TripRequest } from '@/lib/custom-trips'
+import {
+  resolveDefaultItinerary, effectiveItineraryDays, getBookingItineraries, tripRequestIdForItem,
+  type ResolvedItinerary, type BookingItinerary,
+} from '@/lib/booking-itinerary'
 import { getPropertyById } from '@/lib/properties'
 import { supabase } from '@/lib/auth'
 import {
@@ -21,7 +26,6 @@ import {
   type MessageThread,
 } from '@/lib/messages'
 import SupplierMessageBlock from '@/components/messaging/SupplierMessageBlock'
-import { resolveLivePackages } from '@/components/tours/PackageEditor'
 import { formatMoney, formatRate } from '@/lib/allocation'
 
 /* ── helpers ────────────────────────────────────────────── */
@@ -188,18 +192,18 @@ function MessagePanel({
 
 /* ── experience section ─────────────────────────────────── */
 function ExperienceSection({
-  addon, departure, tour, trail, booking, currentUser,
+  addon, resolved, override, booking, currentUser,
 }: {
   addon: SavedBooking['addons'][0]
-  departure: Departure | null
-  tour: Tour | null
-  trail: Trail | null
+  resolved: ResolvedItinerary
+  override: BookingItinerary | null
   booking: SavedBooking
   currentUser: { id: string; name: string; email: string } | null
 }) {
   const [showMsg, setShowMsg] = useState(false)
   const [thread, setThread] = useState<MessageThread | null>(null)
   const [threadLoading, setThreadLoading] = useState(false)
+  const { departure, tour, trail } = resolved
 
   // Resolve supplier identity: the addon carries the supplier it was booked
   // with; departure/tour are fallbacks for legacy bookings. Empty string =
@@ -210,21 +214,14 @@ function ExperienceSection({
   // Which rate package this guest actually booked (if any), so the
   // day-by-day itinerary below — and the duration/date facts — show exactly
   // what they paid for: the trail's default plan (edited at /admin/trails),
-  // narrowed/customized/extended by that package's pricing tier.
-  const livePackages = departure?.packages ? resolveLivePackages(departure.packages, tour ?? undefined) : []
-  const bookedPackage = livePackages.find(p => p.id === addon.packageId)
-  const itineraryDays = resolveItinerary(trail?.days, tour?.pricingTiers, bookedPackage)
+  // narrowed/customized/extended by that package's pricing tier. When the
+  // operator has set this guest's itinerary themselves (/supplier/bookings),
+  // theirs replaces it — see lib/booking-itinerary.ts.
+  const itineraryDays = effectiveItineraryDays(resolved, override)
   const displayDays = itineraryDays.length || tour?.days || departure?.tourDays
-  // addon.date is the departure's "hiking date" (the anchor every day's
-  // dateOffset is measured from) — a tier's extra day before it can push
-  // the guest's actual trip start earlier than that.
-  function dateForOffset(offset: number): string {
-    if (!addon.date) return ''
-    const d = new Date(addon.date)
-    d.setDate(d.getDate() + offset)
-    return d.toISOString().slice(0, 10)
-  }
-  const tripStartDate = itineraryDays.length > 0 ? dateForOffset(itineraryDays[0].dateOffset) : addon.date
+  const tripStartDate = itineraryDays[0]?.date || addon.date
+  const meetingPoint = override?.meetingPoint || tour?.meetingPoint
+  const guide = override?.guide || departure?.guide
 
   async function openMessages() {
     if (!currentUser) return
@@ -286,19 +283,20 @@ function ExperienceSection({
         </div>
 
         {/* ── Meeting point + GPS ── */}
-        {(tour?.meetingPoint || gpsUrl) && (
+        {(meetingPoint || gpsUrl) && (
           <div className="border border-[#2d6a4f]/20 bg-[#2d6a4f]/5 p-4">
             <p className="font-sans text-[10px] uppercase tracking-wider text-[#2d6a4f] mb-2 flex items-center gap-1.5">
               <Navigation size={11} />Meeting Point
             </p>
             <p className="font-sans text-sm text-gray-800 font-medium leading-relaxed">
-              {tour?.meetingPoint || 'Trailhead, confirmed by operator before departure'}
+              {meetingPoint || 'Trailhead, confirmed by operator before departure'}
             </p>
-            {/* Meeting time placeholder — operators should confirm */}
             <div className="flex items-center gap-2 mt-2">
               <Clock size={12} className="text-[#2d6a4f]" />
               <p className="font-sans text-xs text-[#2d6a4f]">
-                Meeting time will be confirmed by the operator 24 hrs before your departure.
+                {override?.meetingTime
+                  ? `Meeting time: ${override.meetingTime}`
+                  : 'Meeting time will be confirmed by the operator 24 hrs before your departure.'}
               </p>
             </div>
             {gpsUrl && (
@@ -323,12 +321,12 @@ function ExperienceSection({
         )}
 
         {/* ── Guide info ── */}
-        {departure?.guide && (
+        {guide && (
           <div className="flex items-center gap-3 border border-gray-200 px-4 py-3">
             <UserCircle size={20} className="text-[#2d6a4f] shrink-0" />
             <div>
               <p className="font-sans text-[10px] uppercase tracking-wider text-gray-400 mb-0.5">Your Guide</p>
-              <p className="font-sans text-sm font-medium text-gray-800">{departure.guide}</p>
+              <p className="font-sans text-sm font-medium text-gray-800">{guide}</p>
             </div>
             <Star size={14} className="text-[#C9A96E] ml-auto shrink-0" />
           </div>
@@ -342,18 +340,27 @@ function ExperienceSection({
           </div>
         )}
 
+        {/* ── Note from the operator on this guest's itinerary ── */}
+        {override?.notes && (
+          <div className="border-l-2 border-[#2d6a4f] bg-[#2d6a4f]/5 px-4 py-3">
+            <p className="font-sans text-[10px] uppercase tracking-wider text-[#2d6a4f] mb-1">From your operator</p>
+            <p className="font-sans text-sm text-gray-700 leading-relaxed whitespace-pre-line">{override.notes}</p>
+          </div>
+        )}
+
         {/* ── Day-by-day itinerary — scoped to the package this guest booked ── */}
         {itineraryDays.length > 0 && (
           <div>
             <p className="font-sans text-[10px] uppercase tracking-wider text-gray-400 mb-2 flex items-center gap-1.5">
-              <Clock size={11} />Day-by-Day Itinerary{bookedPackage ? ` — ${bookedPackage.name}` : ''}
+              <Clock size={11} />Day-by-Day Itinerary
+              {override?.days.length ? ' — confirmed by your operator' : resolved.packageName ? ` — ${resolved.packageName}` : ''}
             </p>
             <div className="space-y-3">
               {itineraryDays.map((day, i) => (
                 <div key={i} className="border border-gray-200 p-4">
                   <div className="flex items-baseline gap-3 mb-1 flex-wrap">
                     <span className="font-display italic text-base text-[#2d6a4f] shrink-0">Day {i + 1}</span>
-                    <span className="font-sans text-xs text-gray-400">{fmtLong(dateForOffset(day.dateOffset))}</span>
+                    {day.date && <span className="font-sans text-xs text-gray-400">{fmtLong(day.date)}</span>}
                     {day.label && <span className="font-sans text-sm font-medium text-gray-800">{day.label}</span>}
                   </div>
                   {day.description && <p className="font-sans text-sm text-gray-600 leading-relaxed">{day.description}</p>}
@@ -487,9 +494,9 @@ function ExperienceSection({
             <div className="flex items-start justify-between gap-4 flex-wrap">
               <div>
                 <p className="font-display italic text-xl mb-1">{addon.operator || tour?.supplierName || departure?.supplierName || 'Operator'}</p>
-                {tour?.meetingPoint && (
+                {meetingPoint && (
                   <p className="font-sans text-xs text-white/50 flex items-center gap-1">
-                    <MapPin size={10} />{tour.meetingPoint}
+                    <MapPin size={10} />{meetingPoint}
                   </p>
                 )}
               </div>
@@ -539,6 +546,8 @@ function ItineraryInner() {
   const [tours, setTours] = useState<Tour[]>([])
   const [departures, setDepartures] = useState<Departure[]>([])
   const [trails, setTrails] = useState<Trail[]>([])
+  const [tripRequests, setTripRequests] = useState<Record<string, TripRequest>>({})
+  const [overrides, setOverrides] = useState<BookingItinerary[]>([])
   const [currentUser, setCurrentUser] = useState<{ id: string; name: string; email: string } | null>(null)
   const [staySupplierId, setStaySupplierId] = useState('')
   const [loading, setLoading] = useState(true)
@@ -550,12 +559,21 @@ function ItineraryInner() {
       getTours(),
       getDepartures(),
       getTrailSummaries(),
+      getBookingItineraries(id),
       supabase.auth.getUser(),
-    ]).then(async ([b, t, d, tr, { data: { user } }]) => {
+    ]).then(async ([b, t, d, tr, its, { data: { user } }]) => {
       setBooking(b)
       setTours(t)
       setDepartures(d)
       setTrails(tr)
+      setOverrides(its)
+      // A private trip has no departure: its itinerary comes from the
+      // request's own trail (see resolveDefaultItinerary()).
+      const requestIds = (b?.addons ?? []).map(a => tripRequestIdForItem(a.id)).filter((x): x is string => !!x)
+      if (requestIds.length) {
+        const found = await Promise.all(requestIds.map(getTripRequestById))
+        setTripRequests(Object.fromEntries(found.filter((r): r is TripRequest => !!r).map(r => [r.id, r])))
+      }
       if (user) {
         setCurrentUser({
           id: user.id,
@@ -591,24 +609,6 @@ function ItineraryInner() {
         <Link href="/account" className="font-sans text-sm text-[#2d6a4f] hover:underline">Back to My Bookings</Link>
       </div>
     )
-  }
-
-  // Match each addon to its departure (addon.id === departure.id)
-  function depForAddon(a: SavedBooking['addons'][0]) {
-    return departures.find(d => d.id === a.id) ?? null
-  }
-  // Match departure → tour → trail
-  function tourForDep(dep: Departure | null) {
-    if (!dep) return null
-    return tours.find(t => t.id === dep.tourId) ?? null
-  }
-  function trailForTour(t: Tour | null) {
-    if (!t) return null
-    return trails.find(tr => tr.id === t.trailId) ?? null
-  }
-  // Fallback: match tour by name/operator if no departure
-  function tourFallback(a: SavedBooking['addons'][0]) {
-    return tours.find(t => t.name === a.title || (a.operator && t.supplierName === a.operator)) ?? null
   }
 
   const pageUrl = typeof window !== 'undefined' ? window.location.href : ''
@@ -713,16 +713,16 @@ function ItineraryInner() {
 
         {/* ── Each experience with full tour/trail/departure data ── */}
         {booking.addons.map(a => {
-          const dep = depForAddon(a)
-          const tour = dep ? tourForDep(dep) : tourFallback(a)
-          const trail = trailForTour(tour)
+          const requestId = tripRequestIdForItem(a.id)
+          const resolved = resolveDefaultItinerary(a, {
+            departures, tours, trails, tripRequest: requestId ? tripRequests[requestId] : null,
+          })
           return (
             <ExperienceSection
               key={a.id}
               addon={a}
-              departure={dep}
-              tour={tour}
-              trail={trail}
+              resolved={resolved}
+              override={overrides.find(o => o.itemId === a.id) ?? null}
               booking={booking}
               currentUser={currentUser}
             />
