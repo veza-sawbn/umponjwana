@@ -8,9 +8,20 @@ import { getActivities } from '@/lib/activities'
 import { getPackages } from '@/lib/packages'
 import { getTours } from '@/lib/tours'
 import { getRoutes, routeSlug } from '@/lib/transport-routes'
+import { getPublishedPosts } from '@/lib/blog-posts'
+import { getFieldGuideIndex } from '@/lib/field-guide'
+import { STATIC_ROUTES, EDITORIAL_FALLBACK_SLUGS } from '@/lib/seo-routes'
 import { publicSupabase } from '@/lib/supabase-public'
 
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://visitdrakensberg.com'
+
+// Regenerate hourly rather than only at build. Without this the sitemap is
+// prerendered once per deploy, so a lodge a supplier published on Tuesday
+// stays out of it until something else triggers a Vercel build — on a
+// platform where operators add listings themselves, that is the difference
+// between a page being discoverable the same afternoon and weeks later. The
+// same interval the CMS-backed public routes use.
+export const revalidate = 3600
 
 // Public, indexable routes. Detail pages backed by live Supabase data are
 // added incrementally as each entity type gets a real generateMetadata pass
@@ -20,56 +31,40 @@ const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://visitdrakensberg.c
 // logic in app/experiences/[id]/page.tsx) are intentionally left out of the
 // sitemap; a crawler reaches them via the trail/tour pages that link to them
 // instead.
-const STATIC_ROUTES = [
-  { path: '', priority: 1.0 },
-  { path: '/stays', priority: 0.9 },
-  { path: '/hikes', priority: 0.9 },
-  { path: '/activities', priority: 0.9 },
-  { path: '/tours', priority: 0.8 },
-  { path: '/transport', priority: 0.6 },
-  { path: '/search', priority: 0.8 },
-  { path: '/regions', priority: 0.8 },
-  { path: '/nature-reserves', priority: 0.7 },
-  { path: '/packages', priority: 0.7 },
-  { path: '/events', priority: 0.7 },
-  { path: '/shuttles', priority: 0.6 },
-  { path: '/guides', priority: 0.6 },
-  { path: '/plan', priority: 0.6 },
-  { path: '/mydrakensberg', priority: 0.6 },
-  { path: '/about', priority: 0.4 },
-  { path: '/list-with-us', priority: 0.4 },
-  // The supplier documents an operator is asked to accept, and the concern
-  // channel the Code of Conduct points people at. Indexed on purpose: a
-  // business deciding whether to list should be able to read the terms
-  // before starting the form, and find the concern channel without one.
-  // (Neither is blocked by robots.ts — the /supplier/ disallow carries a
-  // trailing slash, so it does not match /supplier-terms.)
-  { path: '/supplier-terms', priority: 0.3 },
-  { path: '/supplier-code-of-conduct', priority: 0.3 },
-  { path: '/report-a-concern', priority: 0.3 },
-  { path: '/privacy', priority: 0.2 },
-  { path: '/terms', priority: 0.2 },
-]
+//
+// The static route list itself lives in lib/seo-routes.ts, because the admin
+// Sitemap Control tool reports on the same set and used to keep its own copy.
 
-// Editorial article slugs defined in app/mydrakensberg/[slug]/page.tsx
-const STORY_SLUGS = [
-  'san-bushmen-rock-art-giants-castle',
-  'tugela-falls-chain-ladder-guide',
-  'bearded-vulture-lammergeier',
-  'zulu-cuisine-foothills',
-  'battle-of-isandlwana-history',
-  'conservation-umdoni-wetlands',
-]
+/**
+ * <lastmod> for an entry, or nothing at all when there is no real date behind
+ * it.
+ *
+ * The temptation is to fall back to `new Date()`, and this file used to. That
+ * was survivable while the sitemap was prerendered once per deploy; with the
+ * hourly revalidation above it means every static route, every trail and every
+ * entity missing a timestamp claims to have changed in the last hour, forever.
+ * Google treats a lastmod it can see is wrong as a reason to stop believing
+ * the whole file — so the honest omission is worth more than a filled-in
+ * field. The sitemaps.org schema makes <lastmod> optional precisely here.
+ *
+ * NaN is checked because an unparseable date string otherwise reaches the
+ * serialiser as an Invalid Date.
+ */
+function lastModified(value: string | Date | null | undefined): Date | undefined {
+  if (!value) return undefined
+  const date = value instanceof Date ? value : new Date(value)
+  return Number.isNaN(date.getTime()) ? undefined : date
+}
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  const now = new Date()
-
   // Session-less client (see lib/supabase-public.ts) — this runs at build/
   // request time outside any user's request context. Falls back to the same
   // DEFAULT_* content the live pages themselves fall back to on a read
   // failure, so the sitemap never silently drops URLs that the site is
   // still actually serving.
-  const [regions, reserves, towns, trails, properties, activities, packages, tours, routes] = await Promise.all([
+  const [
+    regions, reserves, towns, trails, properties, activities, packages, tours, routes, posts, fieldGuides,
+  ] = await Promise.all([
     getRegions(publicSupabase).catch(() => DEFAULT_REGIONS),
     getReserves(publicSupabase).catch(() => DEFAULT_RESERVES),
     getTowns(publicSupabase).catch(() => DEFAULT_TOWNS),
@@ -79,36 +74,68 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     getPackages(publicSupabase).catch(() => []),
     getTours(publicSupabase).catch(() => []),
     getRoutes(publicSupabase).catch(() => []),
+    getPublishedPosts(publicSupabase).catch(() => []),
+    getFieldGuideIndex(publicSupabase).catch(() => []),
   ])
+
+  // Editorial articles come from two places while the journal finishes moving
+  // into the CMS: published `blog_posts` rows, and the articles still compiled
+  // into app/mydrakensberg/[slug]/page.tsx. Both are served at the same URL
+  // shape, and the route prefers the CMS row, so a slug present in both is one
+  // URL — emit it once.
+  const storySlugs = [
+    ...posts.map(post => post.slug).filter(Boolean),
+    ...EDITORIAL_FALLBACK_SLUGS.filter(slug => !posts.some(post => post.slug === slug)),
+  ]
+  const storyLastModified = new Map(
+    posts.map(post => [post.slug, lastModified(post.updated_at || post.published_at || post.created_at)]),
+  )
 
   return [
     ...STATIC_ROUTES.map(r => ({
+      // The homepage entry is the bare origin, no trailing slash, because
+      // that is what the root layout's canonical renders as — Next resolves
+      // `alternates: { canonical: '/' }` against metadataBase and then strips
+      // the slash (14.1 kept it, 14.2 drops it, so this is worth re-checking
+      // on a Next upgrade: `curl -s / | grep canonical`). The two have to
+      // agree: a sitemap entry whose string differs from the page's own
+      // canonical is reported in Search Console as submitted but
+      // canonicalised elsewhere, which is a wasted submission.
       url: `${SITE_URL}${r.path}`,
-      lastModified: now,
       changeFrequency: 'weekly' as const,
       priority: r.priority,
     })),
-    ...STORY_SLUGS.map(slug => ({
+    ...storySlugs.map(slug => ({
       url: `${SITE_URL}/mydrakensberg/${slug}`,
-      lastModified: now,
+      // Set for a CMS post; absent for the articles compiled into the route,
+      // which have no modification date to report.
+      lastModified: storyLastModified.get(slug),
+      changeFrequency: 'monthly' as const,
+      priority: 0.5,
+    })),
+    // Published field guides. The index rows are what /field-guide itself
+    // renders, so anything listed there is live and has a detail page.
+    ...fieldGuides.map(guide => ({
+      url: `${SITE_URL}/field-guide/${guide.slug}`,
+      lastModified: lastModified(guide.publishedAt),
       changeFrequency: 'monthly' as const,
       priority: 0.5,
     })),
     ...regions.map(r => ({
       url: `${SITE_URL}/regions/${r.slug}`,
-      lastModified: r.updatedAt ? new Date(r.updatedAt) : now,
+      lastModified: lastModified(r.updatedAt),
       changeFrequency: 'monthly' as const,
       priority: 0.7,
     })),
     ...reserves.map(r => ({
       url: `${SITE_URL}/nature-reserves/${r.slug}`,
-      lastModified: r.updatedAt ? new Date(r.updatedAt) : now,
+      lastModified: lastModified(r.updatedAt),
       changeFrequency: 'monthly' as const,
       priority: 0.6,
     })),
     ...towns.map(t => ({
       url: `${SITE_URL}/towns/${t.slug}`,
-      lastModified: t.updatedAt ? new Date(t.updatedAt) : now,
+      lastModified: lastModified(t.updatedAt),
       changeFrequency: 'monthly' as const,
       priority: 0.5,
     })),
@@ -121,7 +148,8 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       .filter(t => t.status === 'published' && t.robotsIndex !== false)
       .map(t => ({
         url: `${SITE_URL}/hikes/${t.slug || t.id}`,
-        lastModified: now,
+        // Trails carry no per-trail timestamp — the whole trails row has one
+        // (lib/trails.ts), which says nothing about an individual trail.
         changeFrequency: 'monthly' as const,
         priority: 0.6,
       })),
@@ -129,7 +157,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       .filter(p => p.status === 'active' && p.robotsIndex !== false)
       .map(p => ({
         url: `${SITE_URL}/stays/${p.slug || p.id}`,
-        lastModified: new Date(p.createdAt),
+        lastModified: lastModified(p.createdAt),
         changeFrequency: 'weekly' as const,
         priority: 0.6,
       })),
@@ -137,7 +165,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       .filter(a => a.status === 'active' && a.robotsIndex !== false)
       .map(a => ({
         url: `${SITE_URL}/activities/${a.slug || a.id}`,
-        lastModified: new Date(a.createdAt),
+        lastModified: lastModified(a.createdAt),
         changeFrequency: 'weekly' as const,
         priority: 0.6,
       })),
@@ -145,7 +173,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       .filter(p => p.packageStatus === 'published' && p.robotsIndex !== false)
       .map(p => ({
         url: `${SITE_URL}/packages/${p.slug || p.id}`,
-        lastModified: p.updatedAt ? new Date(p.updatedAt) : new Date(p.createdAt),
+        lastModified: lastModified(p.updatedAt || p.createdAt),
         changeFrequency: 'weekly' as const,
         priority: 0.6,
       })),
@@ -153,7 +181,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       .filter(t => t.status === 'active' && t.robotsIndex !== false)
       .map(t => ({
         url: `${SITE_URL}/tours/${t.slug || t.id}`,
-        lastModified: new Date(t.createdAt),
+        lastModified: lastModified(t.createdAt),
         changeFrequency: 'weekly' as const,
         priority: 0.6,
       })),
@@ -161,7 +189,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       .filter(r => r.status === 'active' && r.robotsIndex !== false)
       .map(r => ({
         url: `${SITE_URL}/transport/${routeSlug(r)}`,
-        lastModified: r.updatedAt ? new Date(r.updatedAt) : new Date(r.createdAt),
+        lastModified: lastModified(r.updatedAt || r.createdAt),
         changeFrequency: 'monthly' as const,
         priority: 0.5,
       })),

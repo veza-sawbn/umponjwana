@@ -5,8 +5,9 @@
  *
  * Read-only diagnostic view of what is and isn't in the sitemap.
  * Mirrors the logic in app/sitemap.ts to compute accurate counts:
- *   - Static routes (hardcoded in sitemap.ts)
- *   - Editorial story slugs (hardcoded in sitemap.ts)
+ *   - Static routes (lib/seo-routes.ts, the list sitemap.ts emits)
+ *   - Editorial stories (published blog_posts, plus the articles still
+ *     compiled into the /mydrakensberg route) and published field guides
  *   - Dynamic entity pages (trails, properties, activities, packages,
  *     tours, regions, reserves, towns, routes)
  *
@@ -27,11 +28,17 @@ import { getActivities } from '@/lib/activities'
 import { getPackages } from '@/lib/packages'
 import { getTours } from '@/lib/tours'
 import { getRegions } from '@/lib/regions'
+import { getPublishedPosts } from '@/lib/blog-posts'
+import { getFieldGuideIndex } from '@/lib/field-guide'
+import { STATIC_ROUTES, EDITORIAL_FALLBACK_SLUGS } from '@/lib/seo-routes'
 
-// ── Constants mirrored from app/sitemap.ts ─────────────────────────────────
+// ── Shared with app/sitemap.ts ─────────────────────────────────────────────
 
-const STATIC_ROUTE_COUNT = 19   // matches STATIC_ROUTES array length in sitemap.ts
-const STORY_SLUG_COUNT   = 6    // matches STORY_SLUGS array length in sitemap.ts
+// Read from the same module app/sitemap.ts emits from, rather than mirrored
+// by hand — the previous hardcoded 19 had drifted from the 22 routes actually
+// being emitted. Editorial and field-guide counts are fetched below, because
+// the sitemap now reads both from the database.
+const STATIC_ROUTE_COUNT = STATIC_ROUTES.length
 
 const FOURTEEN_DAYS_MS = 14 * 24 * 60 * 60 * 1000
 
@@ -211,6 +218,8 @@ export default function SitemapControlPage() {
   const [loading, setLoading] = useState(true)
   const [summaries, setSummaries] = useState<EntitySummary[]>([])
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
+  const [storyCount, setStoryCount] = useState(EDITORIAL_FALLBACK_SLUGS.length)
+  const [fieldGuideCount, setFieldGuideCount] = useState(0)
 
   const toggleExpanded = (label: string) => {
     setExpanded(prev => {
@@ -224,14 +233,25 @@ export default function SitemapControlPage() {
     async function load() {
       setLoading(true)
       try {
-        const [trails, properties, activities, packages, tours, regions] = await Promise.all([
-          getTrails(),
-          getProperties(),
-          getActivities(),
-          getPackages(),
-          getTours(),
-          getRegions(),
-        ])
+        const [trails, properties, activities, packages, tours, regions, posts, fieldGuides] =
+          await Promise.all([
+            getTrails(),
+            getProperties(),
+            getActivities(),
+            getPackages(),
+            getTours(),
+            getRegions(),
+            getPublishedPosts().catch(() => []),
+            getFieldGuideIndex().catch(() => []),
+          ])
+
+        // Same union the sitemap emits: published CMS posts, plus the articles
+        // still compiled into the route, minus any the CMS has taken over.
+        setStoryCount(
+          posts.length +
+            EDITORIAL_FALLBACK_SLUGS.filter(slug => !posts.some(p => p.slug === slug)).length,
+        )
+        setFieldGuideCount(fieldGuides.length)
 
         // ── Trails ─────────────────────────────────────────────────────────
         const publishedTrails = trails.filter(t => t.status === 'published')
@@ -410,10 +430,11 @@ export default function SitemapControlPage() {
       }),
       { total: 0, withSlug: 0, uuidFallback: 0, noindex: 0, recent: 0 },
     )
-    const sitemapTotal = STATIC_ROUTE_COUNT + STORY_SLUG_COUNT + dynamic.total
-    const sitemapClean = STATIC_ROUTE_COUNT + STORY_SLUG_COUNT + dynamic.withSlug
+    const fixed = STATIC_ROUTE_COUNT + storyCount + fieldGuideCount
+    const sitemapTotal = fixed + dynamic.total
+    const sitemapClean = fixed + dynamic.withSlug
     return { ...dynamic, sitemapTotal, sitemapClean }
-  }, [summaries])
+  }, [summaries, storyCount, fieldGuideCount])
 
   // ── Render ─────────────────────────────────────────────────────────────────
   return (
@@ -454,10 +475,11 @@ export default function SitemapControlPage() {
                 <CheckCircle2 size={16} className="text-emerald-500 mt-0.5 shrink-0" />
                 <div>
                   <p className="font-sans text-sm text-gray-700 font-medium mb-0.5">
-                    {STATIC_ROUTE_COUNT} static routes + {STORY_SLUG_COUNT} editorial stories, always in sitemap
+                    {STATIC_ROUTE_COUNT} static routes + {storyCount} editorial stories
+                    {fieldGuideCount > 0 ? ` + ${fieldGuideCount} field guides` : ''}, always in sitemap
                   </p>
                   <p className="font-sans text-xs text-gray-400">
-                    These are hardcoded in <code className="bg-gray-100 px-1">app/sitemap.ts</code> and always included regardless of DB state.
+                    Static routes live in <code className="bg-gray-100 px-1">lib/seo-routes.ts</code> and are always included regardless of DB state.
                     Dynamic entity pages below are controlled by their status and robotsIndex flag.
                   </p>
                 </div>
