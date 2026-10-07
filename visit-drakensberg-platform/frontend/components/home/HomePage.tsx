@@ -16,6 +16,8 @@ import Footer from '@/components/layout/Footer'
 import TripPlanningTools from '@/components/home/TripPlanningTools'
 import TopDestinations from '@/components/home/TopDestinations'
 import RecommendedThisSeason from '@/components/home/RecommendedThisSeason'
+import { FeaturedExperiencesCarousel, CarouselNav, ViewAllLink, type FeaturedExperience } from '@/components/home/FeaturedExperiences'
+import type { Swiper as SwiperInstance } from 'swiper'
 import { loadSiteContent, SITE_CONTENT_DEFAULTS, type HomeCard, type SiteContent } from '@/lib/site-content'
 import type { Region } from '@/lib/regions'
 import { useSiteSection } from '@/lib/use-site-section'
@@ -65,16 +67,6 @@ type PublicEvent = {
 const EVENT_TYPE_BG: Record<PublicEvent['event_type'], string> = {
   event: '#1a1a2e',
   special: '#2d6a4f',
-}
-
-type MiniListItemData = {
-  id: string
-  href: string
-  title: string
-  meta: string
-  badgeLabel: string
-  badgeColor: string
-  img?: string
 }
 
 function fmtShortDate(iso: string) {
@@ -308,76 +300,6 @@ function JourneysCarousel({ journeys }: { journeys: MarketplacePackage[] }) {
   )
 }
 
-/* ─── What's on — offer-style cards ──────────────────────────────────────────
-   A single scrolling reel of "current offers" (scheduled hikes, events &
-   specials, experiences all mixed together) — image, a dark corner ribbon
-   for the category, and a clean card footer, the same anatomy as the
-   Curated Journeys cards below, just reusable across three source types. */
-
-function OfferCardBody({ item }: { item: MiniListItemData }) {
-  return (
-    <Link href={item.href} className="group block bg-white border border-black/8 hover:border-forest/30 transition-colors h-full">
-      <div className="relative overflow-hidden aspect-[4/3] bg-mist">
-        {/* The category colour always sits underneath, so a listing with no
-            photo — and one whose photo fails to load — shows the same
-            deliberate block rather than an empty frame. */}
-        <div className="absolute inset-0" style={{ background: item.badgeColor }} />
-        <SafeImage src={item.img} alt={item.title} fill loading="lazy"
-          sizes="(max-width: 640px) 88vw, (max-width: 1024px) 45vw, 30vw"
-          className="object-cover transition-transform duration-500 group-hover:scale-105"
-          style={{ willChange: 'transform' }} />
-        <span className="absolute top-3 left-3 font-sans text-[10px] tracking-[0.15em] uppercase bg-black/55 text-white px-2.5 py-1">
-          {item.badgeLabel}
-        </span>
-      </div>
-      <div className="p-5">
-        <h3 className="font-display text-xl text-forest mb-2 leading-snug line-clamp-2 group-hover:text-sage transition-colors">{item.title}</h3>
-        <div className="flex items-center justify-between pt-3 border-t border-black/6">
-          <span className="font-sans text-xs text-forest/50 truncate">{item.meta}</span>
-          <span className="font-sans text-xs text-forest group-hover:text-gold transition-colors inline-flex items-center gap-1 shrink-0 ml-3">
-            View <ArrowRight className="w-3 h-3" />
-          </span>
-        </div>
-      </div>
-    </Link>
-  )
-}
-
-/**
- * "What's on" carousel — same Swiper treatment as Curated Journeys below
- * (peek-next-card, grab-to-drag, gentle autoplay) so the two reels feel
- * like one design language rather than two different components.
- */
-function OffersCarousel({ items }: { items: MiniListItemData[] }) {
-  const editMode = useEditMode()
-  const inEditor = Boolean(editMode)
-  const canLoop = items.length > 3
-  const autoplay = useSwiperAutoplay({ slideCount: items.length, enabled: !inEditor })
-
-  return (
-    <Swiper
-      modules={[Autoplay]}
-      loop={canLoop}
-      speed={CAROUSEL_SPEED_MS}
-      {...autoplay}
-      spaceBetween={20}
-      grabCursor
-      slidesPerView={1.15}
-      breakpoints={{
-        640: { slidesPerView: 2.15 },
-        1024: { slidesPerView: 3.2 },
-      }}
-      className="!pb-1"
-    >
-      {items.map(item => (
-        <SwiperSlide key={item.id} className="h-auto self-stretch">
-          <OfferCardBody item={item} />
-        </SwiperSlide>
-      ))}
-    </Swiper>
-  )
-}
-
 /* ─── Component ─────────────────────────────────────────────────────────────── */
 
 /**
@@ -405,6 +327,7 @@ export default function HomePage({ initialContent, initialRegions }: { initialCo
   const [subscribing, setSubscribing] = useState(false)
   const [stories, setStories] = useState<BlogPost[]>([])
   const [journeys, setJourneys] = useState<MarketplacePackage[]>([])
+  const [experienceSwiper, setExperienceSwiper] = useState<SwiperInstance | null>(null)
 
   const trailImageById = useMemo(() => new Map(trails.map(t => [t.id, t.image])), [trails])
 
@@ -710,65 +633,83 @@ export default function HomePage({ initialContent, initialRegions }: { initialCo
     </EditableSection>
   )
 
-  const scheduledHikeItems: MiniListItemData[] = scheduledHikes.map(e => ({
+  const scheduledHikeItems: FeaturedExperience[] = scheduledHikes.map(e => ({
     id: e.id,
     href: `/experiences/${e.id}`,
     title: e.title,
-    meta: `${fmtShortDate(e.departureDate)} · ${e.durationDays} day${e.durationDays !== 1 ? 's' : ''}`,
-    badgeLabel: e.difficulty || 'Hike',
-    badgeColor: DIFF_COLOR[e.difficulty] || '#4A7251',
+    region: e.region || 'Drakensberg',
+    meta: [e.difficulty && `${e.difficulty} experience`, `${e.durationDays} day${e.durationDays !== 1 ? 's' : ''}`].filter(Boolean).join(', '),
+    date: e.departureDate,
+    price: e.pricePerPerson,
+    info: [
+      e.spacesAvailable > 0 ? `${e.spacesAvailable} of ${e.spacesTotal} spaces left` : 'Fully booked',
+      e.operator && `guided by ${e.operator}`,
+      e.meetingPoint && `meets at ${e.meetingPoint}`,
+    ].filter(Boolean).join(' · '),
     img: trailImageById.get(e.trailId),
+    fallbackColor: DIFF_COLOR[e.difficulty] || '#4A7251',
   }))
 
-  const eventItems: MiniListItemData[] = upcomingEvents.map(ev => ({
+  const eventItems: FeaturedExperience[] = upcomingEvents.map(ev => ({
     id: ev.id,
     href: '/events',
     title: ev.title,
-    meta: `${fmtShortDate(ev.starts_at)}${ev.location ? ' · ' + ev.location : ''}`,
-    badgeLabel: ev.event_type === 'special' ? 'Special' : 'Event',
-    badgeColor: EVENT_TYPE_BG[ev.event_type],
+    region: ev.location || 'Drakensberg',
+    meta: ev.event_type === 'special' ? 'Special' : 'Event',
+    date: ev.starts_at,
+    price: ev.ticket_price,
+    info: ev.location ? `Takes place at ${ev.location}` : undefined,
+    fallbackColor: EVENT_TYPE_BG[ev.event_type],
   }))
 
-  const activityItems: MiniListItemData[] = featuredActivities.map(a => ({
-    id: a.id,
-    href: `/activities/${a.id}`,
-    title: a.name,
-    meta: `${a.category}${a.pricePerPerson ? ' · ' + formatMoney(a.pricePerPerson) : ''}`,
-    badgeLabel: a.category || 'Experience',
-    badgeColor: '#C9A96E',
-    img: a.photos?.[0],
-  }))
+  const activityItems: FeaturedExperience[] = featuredActivities.map(a => {
+    const duration = [a.durationH && `${a.durationH}h`, a.durationM && `${a.durationM}m`].filter(Boolean).join(' ')
+    return {
+      id: a.id,
+      href: `/activities/${a.id}`,
+      title: a.name,
+      region: a.region || 'Drakensberg',
+      meta: [a.category && `${a.category} experience`, duration].filter(Boolean).join(', '),
+      price: a.pricePerPerson,
+      info: [a.supplierName && `Run by ${a.supplierName}`, a.minAge && `ages ${a.minAge}+`, a.maxGroup && `max ${a.maxGroup} per group`].filter(Boolean).join(' · ') || undefined,
+      img: a.photos?.[0],
+      fallbackColor: '#C9A96E',
+    }
+  })
 
   // One mixed reel — hikes, events/specials and experiences together — in
   // whichever order each list already comes in (soonest-first per source).
-  const offerItems: MiniListItemData[] = [...scheduledHikeItems, ...eventItems, ...activityItems]
+  const experienceItems: FeaturedExperience[] = [...scheduledHikeItems, ...eventItems, ...activityItems]
 
   const experiencesSection = (
-    <EditableSection key="experiences" id="experiences" label="Events & Experiences" className="bg-white">
+    <EditableSection key="experiences" id="experiences" label="Featured Experiences" className="bg-white">
       <div className="max-w-[1440px] mx-auto px-6 lg:px-12 py-20">
-        <div className="flex items-end justify-between gap-6 mb-10">
-          <div>
+        <div className="flex items-end justify-between gap-6 mb-12">
+          <div className="max-w-2xl">
             <Editable section="home_sections" fieldKey="experiences_eyebrow" value={hs.experiences_eyebrow} label="Experiences Eyebrow" type="text">
-              <p className="font-sans text-xs tracking-[0.2em] uppercase text-forest/40 mb-2">{hs.experiences_eyebrow}</p>
+              <p className="font-sans text-xs tracking-[0.25em] uppercase text-forest/60 mb-3">{hs.experiences_eyebrow}</p>
             </Editable>
             <Editable section="home_sections" fieldKey="experiences_heading" value={hs.experiences_heading} label="Experiences Heading" type="text">
-              <h2 className="font-display text-4xl text-forest">{hs.experiences_heading}</h2>
+              <h2 className="font-display text-4xl lg:text-5xl text-forest">{hs.experiences_heading}</h2>
+            </Editable>
+            <Editable section="home_sections" fieldKey="experiences_subheading" value={hs.experiences_subheading} label="Experiences Subheading" type="text">
+              <p className="font-sans text-base text-forest/60 mt-4">{hs.experiences_subheading}</p>
             </Editable>
           </div>
-          <div className="hidden sm:flex items-center gap-5 font-sans text-sm text-forest/50 shrink-0 mb-1">
-            <Link href="/hikes" className="hover:text-forest transition-colors">Hikes</Link>
-            <Link href="/events" className="hover:text-forest transition-colors">Events</Link>
-            <Link href="/activities" className="hover:text-forest transition-colors flex items-center gap-1.5">
-              Experiences <ArrowRight className="w-3.5 h-3.5" />
-            </Link>
+          <div className="hidden sm:flex flex-col items-end gap-6 shrink-0">
+            <ViewAllLink href="/activities" />
+            <CarouselNav swiper={experienceSwiper} count={experienceItems.length} />
           </div>
         </div>
 
-        {offerItems.length === 0 ? (
+        {experienceItems.length === 0 ? (
           <p className="font-sans text-sm text-forest/35 py-6">New hikes, events and experiences will appear here once they're scheduled.</p>
         ) : (
-          <OffersCarousel items={offerItems} />
+          <FeaturedExperiencesCarousel items={experienceItems} onSwiper={setExperienceSwiper} />
         )}
+        <div className="sm:hidden mt-8">
+          <ViewAllLink href="/activities" />
+        </div>
       </div>
     </EditableSection>
   )

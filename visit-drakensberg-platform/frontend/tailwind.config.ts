@@ -13,6 +13,8 @@ const config: Config = {
         gold: '#C9A96E',
         mist: '#F7F5F2',
         sage: '#4A7251',
+        // Price and link accent on the homepage Featured Experiences reel.
+        wine: '#8A1C2B',
         primary: {
           50: '#f2f7f3',
           100: '#deeee2',
