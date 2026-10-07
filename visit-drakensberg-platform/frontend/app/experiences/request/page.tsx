@@ -10,7 +10,7 @@ import {
   Star, ChevronRight, Info,
 } from 'lucide-react'
 import { supabase } from '@/lib/auth'
-import { getTrails, type Trail } from '@/lib/trails'
+import { getTrailSummaries, type Trail } from '@/lib/trails'
 import { getTours, type Tour } from '@/lib/tours'
 import {
   getOperators, getGuidesByOperator, getGuideById, getOperatorForGuide,
@@ -78,7 +78,7 @@ function RequestContent() {
   const set = (k: string, v: unknown) => setForm(f => ({ ...f, [k]: v }))
 
   useEffect(() => {
-    getTrails().then(all => setTrails(all.filter(t => t.status === 'published')))
+    getTrailSummaries().then(all => setTrails(all.filter(t => t.status === 'published')))
     supabase.auth.getUser().then(({ data: { user } }) => {
       setUserId(user?.id ?? null)
       const meta = user?.user_metadata ?? {}

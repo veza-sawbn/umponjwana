@@ -13,7 +13,7 @@ import {
 import { getBookingById, type SavedBooking } from '@/lib/bookings'
 import { getTours, resolveItinerary, type Tour } from '@/lib/tours'
 import { getDepartures, type Departure } from '@/lib/departures'
-import { getTrails, type Trail } from '@/lib/trails'
+import { getTrailSummaries, type Trail } from '@/lib/trails'
 import { getPropertyById } from '@/lib/properties'
 import { supabase } from '@/lib/auth'
 import {
@@ -549,7 +549,7 @@ function ItineraryInner() {
       getBookingById(id),
       getTours(),
       getDepartures(),
-      getTrails(),
+      getTrailSummaries(),
       supabase.auth.getUser(),
     ]).then(async ([b, t, d, tr, { data: { user } }]) => {
       setBooking(b)

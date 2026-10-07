@@ -5,7 +5,7 @@ import Footer from '@/components/layout/Footer'
 import EditablePageHeader from '@/components/editor/EditablePageHeader'
 import { Users, Star } from 'lucide-react'
 import { getTours, type Tour } from '@/lib/tours'
-import { getTrails, type Trail } from '@/lib/trails'
+import { getTrailsWithArtwork, type Trail } from '@/lib/trails'
 import { getOperators, type OperatorProfile } from '@/lib/operators'
 import { publicSupabase } from '@/lib/supabase-public'
 import { regionsMatch } from '@/lib/regions'
@@ -42,7 +42,7 @@ export default function ToursPage() {
     // Each tour is built on a Trail (lib/trails.ts) — fetched here so its
     // card can show the trail's real photo and route artwork, the same
     // image and design /hikes' trail cards show for that trail.
-    getTrails(publicSupabase).then(all => setTrails(all)).catch(() => setTrails([]))
+    getTrailsWithArtwork(publicSupabase).then(all => setTrails(all)).catch(() => setTrails([]))
     getOperators(publicSupabase).then(all => setOperators(all)).catch(() => setOperators([]))
   }, [])
 

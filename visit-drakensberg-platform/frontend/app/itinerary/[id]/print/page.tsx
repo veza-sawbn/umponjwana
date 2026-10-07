@@ -6,7 +6,7 @@ import { Printer, ArrowLeft } from 'lucide-react'
 import { getBookingById, type SavedBooking } from '@/lib/bookings'
 import { getTours, resolveItinerary, type Tour } from '@/lib/tours'
 import { getDepartures, type Departure } from '@/lib/departures'
-import { getTrails, type Trail } from '@/lib/trails'
+import { getTrailSummaries, type Trail } from '@/lib/trails'
 import { resolveLivePackages } from '@/components/tours/PackageEditor'
 import Logo from '@/components/Logo'
 import { formatMoney } from '@/lib/allocation'
@@ -132,7 +132,7 @@ export default function PrintableItineraryPage() {
       getBookingById(decodeURIComponent(params.id)),
       getDepartures(),
       getTours(),
-      getTrails(),
+      getTrailSummaries(),
     ]).then(([b, deps, trs, trls]) => {
       setBooking(b)
       setDepartures(deps)

@@ -1,5 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
-import { getTrails, trailStartPoint, type Trail } from './trails'
+import { getTrails, getTrailSummaries, trailStartPoint, type Trail } from './trails'
 import { getProperties, type Property } from './properties'
 import { getActivities, type Activity } from './activities'
 import { getPublishedRoutes, type Route } from './transport-routes'
@@ -127,7 +127,9 @@ export async function getSeasonalContent(
   client?: SupabaseClient,
 ): Promise<SeasonalTopicGroup[]> {
   const [trails, activities] = await Promise.all([
-    client ? getTrails(client) : getTrails(),
+    // Season pages read only seasons/topics/region and card fields — the
+    // summary read, not the multi-megabyte GPS/analytics row.
+    client ? getTrailSummaries(client) : getTrailSummaries(),
     client ? getActivities(client) : getActivities(),
   ])
 
