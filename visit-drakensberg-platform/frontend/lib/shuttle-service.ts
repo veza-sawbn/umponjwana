@@ -115,7 +115,7 @@ export function buildShuttleOption(params: {
 // Matrix *queries* (Google resolves them) — never as a route table. The
 // coordinates let the dispatch engine rank transport partners for the
 // suggested airport transfer.
-const MAJOR_HUBS = [
+export const MAJOR_HUBS = [
   { id: 'jnb-or-tambo', name: 'OR Tambo International Airport, Johannesburg', lat: '-26.1367', lng: '28.2411' },
   { id: 'dur-king-shaka', name: 'King Shaka International Airport, Durban', lat: '-29.6144', lng: '31.1197' },
 ]

@@ -26,8 +26,13 @@ export default function ActivitiesPage() {
   const [regionFilter, setRegionFilter] = useState('')
 
   useEffect(() => {
-    const regionParam = new URLSearchParams(window.location.search).get('region')
+    const params = new URLSearchParams(window.location.search)
+    const regionParam = params.get('region')
     if (regionParam) setRegionFilter(regionParam)
+    // ?category=<ActivityCategory> (e.g. from the homepage trip-planning
+    // tools) — only a recognised tab value is honoured.
+    const categoryParam = params.get('category')
+    if (categoryParam && CATEGORIES.some(c => c.slug === categoryParam)) setCategory(categoryParam)
     // publicSupabase (session-less) — a signed-in admin or ops session would
     // otherwise read past the public RLS gate and list suspended suppliers'
     // activities here. See lib/supabase-public.ts.
