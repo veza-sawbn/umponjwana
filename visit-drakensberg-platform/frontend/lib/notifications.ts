@@ -40,28 +40,40 @@ function rowToNotification(r: Row): Notification {
 
 // Notify another user (e.g. booking events target the supplier). Failures are
 // swallowed — a notification must never break the flow that triggered it.
+//
+// Goes through vd_notify (20261008_notify_rpc.sql), never a direct insert: a
+// direct `.insert().select('id')` is INSERT … RETURNING, which RLS rejects
+// outright when the row belongs to someone else — that silently dropped every
+// notification to another person after 20260913. Same rate limit and
+// provenance as before; the function returns the ids so they can be emailed.
+//
+// `includeManagers`: when the recipient is a supplier, also notify the VD
+// Operations staff who run that supplier's portal for them.
 export async function notify(
   userId: string,
   type: Notification['type'],
   title: string,
   body: string,
   link?: string,
+  options: { includeManagers?: boolean } = {},
 ): Promise<void> {
   if (!userId) return
 
-  let notificationId: string | null = null
+  let notificationIds: string[] = []
   try {
-    const { data } = await supabase.from('vd_notifications').insert({
-      user_id: userId,
-      type,
-      title,
-      body,
-      link: link ?? null,
-    }).select('id').maybeSingle()
-    notificationId = (data as { id: string } | null)?.id ?? null
+    const { data, error } = await supabase.rpc('vd_notify', {
+      p_user_id: userId,
+      p_type: type,
+      p_title: title,
+      p_body: body,
+      p_link: link ?? null,
+      p_include_managers: options.includeManagers ?? false,
+    })
+    if (error) console.warn('notify failed:', error.message)
+    notificationIds = Array.isArray(data) ? (data as string[]) : []
   } catch {}
 
-  // Mirror the in-app notification by email, fire-and-forget, so suppliers
+  // Mirror each in-app notification by email, fire-and-forget, so suppliers
   // and customers hear about it without having to be signed in. Skipped
   // gracefully if SMTP isn't configured or the recipient has no email on
   // file — see app/api/notifications/email.
@@ -69,14 +81,16 @@ export async function notify(
   // Only the id travels. The route reads the stored row and mails THAT, so
   // nobody can have us send wording that was never recorded — which is what
   // the old {userId, title, body, link} payload allowed (audit finding H5).
-  // No id means the insert was refused (rate limit, or no session), and there
-  // is nothing legitimate to email.
-  if (notificationId && typeof fetch === 'function') {
-    fetch('/api/notifications/email', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ notificationId }),
-    }).catch(() => {})
+  // No ids means the insert was refused (rate limit, or no session), and
+  // there is nothing legitimate to email.
+  if (typeof fetch === 'function') {
+    for (const notificationId of notificationIds) {
+      fetch('/api/notifications/email', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ notificationId }),
+      }).catch(() => {})
+    }
   }
 }
 

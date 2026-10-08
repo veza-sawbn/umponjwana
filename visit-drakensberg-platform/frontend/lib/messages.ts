@@ -181,7 +181,10 @@ export async function sendMessage(
   if (recipient && UUID_RE.test(recipient)) {
     await notify(recipient, 'message', `New message — ${thread.addonTitle || thread.bookingRef}`,
       `${senderName}: ${body.slice(0, 120)}`,
-      from === 'visitor' ? '/supplier/messages' : `/account/itinerary?id=${encodeURIComponent(thread.bookingId)}`)
+      from === 'visitor' ? '/supplier/messages' : `/account/itinerary?id=${encodeURIComponent(thread.bookingId)}`,
+      // A guest's message also reaches the VD Operations staff running this
+      // supplier's portal for them.
+      { includeManagers: from === 'visitor' })
   }
   return updated
 }

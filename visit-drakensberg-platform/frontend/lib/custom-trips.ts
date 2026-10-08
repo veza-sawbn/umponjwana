@@ -141,7 +141,7 @@ export async function createTripRequest(
     await notify(request.operatorId, 'approval',
       `Custom trip request ${request.reference}`,
       `${request.customerName} requested a private ${request.trailName} trip (${request.groupSize} guest${request.groupSize !== 1 ? 's' : ''}, ${request.startDate} → ${request.endDate})${request.preferredGuideName ? ` with ${request.preferredGuideName}` : ''}. Guide availability approval needed.`,
-      '/supplier/requests')
+      '/supplier/requests', { includeManagers: true })
   }
   return request
 }
@@ -284,7 +284,7 @@ export async function acceptQuote(request: TripRequest): Promise<TripRequest> {
     await notify(request.operatorId, 'approval',
       `Quote accepted — ${request.reference}`,
       `${request.customerName} accepted the quote for their ${request.trailName} trip (${request.startDate} → ${request.endDate}). Awaiting payment.`,
-      '/supplier/requests')
+      '/supplier/requests', { includeManagers: true })
   }
   return updated
 }
@@ -303,7 +303,7 @@ export async function cancelTripRequest(request: TripRequest): Promise<TripReque
     await notify(request.operatorId, 'cancellation',
       `Request cancelled — ${request.reference}`,
       `${request.customerName} withdrew their custom trip request for ${request.trailName}.`,
-      '/supplier/requests')
+      '/supplier/requests', { includeManagers: true })
   }
   return updated
 }
