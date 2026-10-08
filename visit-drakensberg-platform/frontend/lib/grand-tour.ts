@@ -1,4 +1,5 @@
-import type { Activity, ActivityTimeslot } from './activities'
+import { timeslotsForDate, slotRemaining, type Activity, type ActivityTimeslot } from './activities'
+import { todayISO } from './upcoming'
 
 // ─── Grand Tour Drakensberg ──────────────────────────────────────────────────
 //
@@ -58,6 +59,13 @@ export type GrandTourStage = {
   /** Rough driving time from the previous stage, shown between stages. */
   legFromPrevious?: string
   highlights: GrandTourHighlight[]
+  /** Trail ids of guided tours (lib/tours.ts) that start in this stage — the
+   *  bookable fallback shown while no day tour covers it. */
+  relatedTrailIds?: string[]
+  /** The stage that shows its area's other activities as that fallback, so
+   *  an activity in "Central Drakensberg" appears once, not on every
+   *  Central stage. */
+  areaHome?: boolean
 }
 
 const img = (id: string) => `https://images.unsplash.com/${id}?w=1800&q=80&auto=format&fit=crop`
@@ -65,6 +73,8 @@ const img = (id: string) => `https://images.unsplash.com/${id}?w=1800&q=80&auto=
 export const GRAND_TOUR_STAGES: GrandTourStage[] = [
   {
     id: 'royal-natal',
+    relatedTrailIds: ['thukela-falls', 'tugela-falls', 'northen-traverse', 'northern-traverse'],
+    areaHome: true,
     number: 1,
     area: 'Northern Drakensberg',
     regionSlug: 'north-berg',
@@ -81,6 +91,7 @@ export const GRAND_TOUR_STAGES: GrandTourStage[] = [
   },
   {
     id: 'cathedral-peak',
+    relatedTrailIds: ['mnweni-circuit', 'cathedral-peak'],
     number: 2,
     area: 'Northern Drakensberg',
     regionSlug: 'north-berg',
@@ -98,6 +109,8 @@ export const GRAND_TOUR_STAGES: GrandTourStage[] = [
   },
   {
     id: 'champagne-valley',
+    relatedTrailIds: ['champagne-castle', 'sterkhorn'],
+    areaHome: true,
     number: 3,
     area: 'Central Drakensberg',
     regionSlug: 'central-berg',
@@ -116,6 +129,7 @@ export const GRAND_TOUR_STAGES: GrandTourStage[] = [
   },
   {
     id: 'giants-castle',
+    relatedTrailIds: ['mafadi', 'giants-castle'],
     number: 4,
     area: 'Central Drakensberg',
     regionSlug: 'central-berg',
@@ -149,6 +163,7 @@ export const GRAND_TOUR_STAGES: GrandTourStage[] = [
   },
   {
     id: 'sani-pass',
+    areaHome: true,
     number: 6,
     area: 'Southern Drakensberg',
     regionSlug: 'south-berg',
@@ -224,4 +239,33 @@ export function allPickupNames(activities: Activity[]): string[] {
   const names = new Set<string>()
   for (const a of activities) for (const p of a.grandTour?.pickupPoints ?? []) if (p.name.trim()) names.add(p.name.trim())
   return Array.from(names).sort((a, b) => a.localeCompare(b))
+}
+
+/** Canonical public URL of a Grand Tour day tour. */
+export function dayTourHref(tour: Pick<Activity, 'id' | 'slug'>): string {
+  return `/grand-tour/${tour.slug || tour.id}`
+}
+
+export type UpcomingDeparture = { date: string; timeslotId: string; time: string; seatsLeft: number }
+
+function addDays(date: string, n: number): string {
+  const d = new Date(`${date}T00:00:00`)
+  d.setDate(d.getDate() + n)
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+
+/** The next departures that still have seats, from today (South African time). */
+export function upcomingDepartures(
+  tour: Pick<Activity, 'timeslots' | 'slotBookings'>,
+  { days = 60, limit = 8, from = todayISO() }: { days?: number; limit?: number; from?: string } = {},
+): UpcomingDeparture[] {
+  const out: UpcomingDeparture[] = []
+  for (let i = 0; i < days && out.length < limit; i++) {
+    const date = addDays(from, i)
+    for (const slot of timeslotsForDate(tour, date)) {
+      const seatsLeft = slotRemaining(tour, date, slot.id)
+      if (seatsLeft > 0 && out.length < limit) out.push({ date, timeslotId: slot.id, time: slot.time, seatsLeft })
+    }
+  }
+  return out
 }

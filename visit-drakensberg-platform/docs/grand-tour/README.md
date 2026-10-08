@@ -17,9 +17,15 @@ A Grand Tour day tour is an ordinary **Activity** (Experience and Activity suppl
 
 Stored as `Activity.grandTour` (`lib/activities.ts`).
 
+## Each day tour's own page — `/grand-tour/[slug]`
+
+- `app/grand-tour/[slug]/page.tsx` + `components/grand-tour/DayTourDetail.tsx`: hero, the day as a route (hotel pickups with times → the Grand Tour highlights it visits → back to the hotel), inclusions, and the booking panel. Indexed and bookable only when the activity is active, listed on the Grand Tour and has timeslots; otherwise it shows a "preview" notice with booking disabled.
+- `components/grand-tour/DayTourBooking.tsx`: departure chips, hotel pickup, adults/children, **Book now** (adds the seats and goes straight to `/checkout`) and **Add to trip**.
+- On `/grand-tour`, every stage ends in a bookable option: its day tours, or, while it has none, guided tours on its trails (`relatedTrailIds`) and live activities in its area (`areaHome`), built server-side in `app/grand-tour/page.tsx`.
+
 ## How a guest books
 
-`/activities/[id]`: pick a date, departure and hotel pickup (pre-filled when arriving from `/grand-tour`), then add to booking. Checkout holds the seats (`vd_hold_inventory`, kind `activity_slot`) like any timeslotted activity. The order line's `value` carries `activityId / slotDate / timeslotId / pickupPointId`.
+`/grand-tour/[slug]` (or `/activities/[id]`, which offers the same pickup choice): pick a date, departure and hotel pickup (pre-filled when arriving from `/grand-tour`), then book. Checkout holds the seats (`vd_hold_inventory`, kind `activity_slot`) like any timeslotted activity. The order line's `value` carries `activityId / slotDate / timeslotId / pickupPointId`.
 
 ## Tickets
 

@@ -6,12 +6,11 @@ import Link from 'next/link'
 import { motion, useReducedMotion, useScroll, useTransform, type Variants } from 'framer-motion'
 import { ArrowDown, Bus, Car, Clock, MapPin, QrCode, Ticket, CalendarDays, ChevronRight } from 'lucide-react'
 import Footer from '@/components/layout/Footer'
-import { timeslotsForDate, slotRemaining, type Activity } from '@/lib/activities'
+import type { Activity } from '@/lib/activities'
 import {
-  GRAND_TOUR_STAGES, stagesForActivity, highlightById, pickupTime, allPickupNames,
+  GRAND_TOUR_STAGES, stagesForActivity, highlightById, pickupTime, allPickupNames, dayTourHref, upcomingDepartures,
   type GrandTourStage,
 } from '@/lib/grand-tour'
-import { todayISO } from '@/lib/upcoming'
 import { formatMoney } from '@/lib/allocation'
 import { ease } from '@/lib/motion'
 
@@ -35,30 +34,22 @@ const stagger: Variants = {
 }
 
 const TOTAL_HIGHLIGHTS = GRAND_TOUR_STAGES.reduce((n, s) => n + s.highlights.length, 0)
-const LOOKAHEAD_DAYS = 21
-
-type NextDeparture = { date: string; timeslotId: string; time: string; seatsLeft: number }
-
-/** The next few departures with seats, starting today. */
-function nextDepartures(tour: Activity, limit = 3): NextDeparture[] {
-  const out: NextDeparture[] = []
-  const start = new Date(`${todayISO()}T00:00:00`)
-  for (let i = 0; i < LOOKAHEAD_DAYS && out.length < limit; i++) {
-    const d = new Date(start)
-    d.setDate(start.getDate() + i)
-    const date = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
-    for (const slot of timeslotsForDate(tour, date)) {
-      const seatsLeft = slotRemaining(tour, date, slot.id)
-      if (seatsLeft > 0 && out.length < limit) out.push({ date, timeslotId: slot.id, time: slot.time, seatsLeft })
-    }
-  }
-  return out
+/** Something else already bookable at a stage — a guided tour or activity
+ *  from the live catalogue — shown while no Grand Tour day tour covers it. */
+export type RelatedProduct = {
+  id: string
+  kind: 'Guided tour' | 'Activity'
+  name: string
+  href: string
+  image?: string
+  price?: number
+  detail?: string
 }
 
 const shortDate = (date: string) =>
   new Date(`${date}T00:00:00`).toLocaleDateString('en-ZA', { weekday: 'short', day: 'numeric', month: 'short' })
 
-export default function GrandTourExperience({ tours }: { tours: Activity[] }) {
+export default function GrandTourExperience({ tours, related = {} }: { tours: Activity[]; related?: Record<string, RelatedProduct[]> }) {
   const reduce = useReducedMotion()
   const [hotel, setHotel] = useState('')
   const [activeStage, setActiveStage] = useState(GRAND_TOUR_STAGES[0].id)
@@ -83,7 +74,6 @@ export default function GrandTourExperience({ tours }: { tours: Activity[] }) {
     for (const t of visibleTours) for (const s of stagesForActivity(t)) map.set(s.id, [...(map.get(s.id) ?? []), t])
     return map
   }, [visibleTours])
-  const unplacedTours = visibleTours.filter(t => stagesForActivity(t).length === 0)
 
   // Which stage is on screen, for the route rail.
   useEffect(() => {
@@ -145,6 +135,23 @@ export default function GrandTourExperience({ tours }: { tours: Activity[] }) {
             {hotels.map(h => <option key={h} value={h}>{h}</option>)}
           </select>
         </motion.div>
+
+        {/* Every bookable day tour, up front: a visitor who already knows
+            they want the Sani Pass should not have to scroll six stages. */}
+        {visibleTours.length > 0 && (
+          <div id="day-tours" className="max-w-6xl mx-auto mt-16 scroll-mt-24">
+            <motion.div
+              className="flex items-end justify-between gap-4 mb-6"
+              initial={reduce ? false : 'hidden'} whileInView="show" viewport={{ once: true, amount: 0.8 }} variants={reveal}
+            >
+              <h2 className="font-display italic text-3xl">Book a day tour</h2>
+              <p className="font-sans text-xs text-black/50">{visibleTours.length} tour{visibleTours.length === 1 ? '' : 's'}{hotel ? ` from ${hotel}` : ''}</p>
+            </motion.div>
+            <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-3">
+              {visibleTours.map(t => <TourCard key={t.id} tour={t} hotel={hotel} reduce={!!reduce} />)}
+            </div>
+          </div>
+        )}
       </section>
 
       {/* ── The route ──────────────────────────────────────────────────── */}
@@ -159,23 +166,13 @@ export default function GrandTourExperience({ tours }: { tours: Activity[] }) {
               stage={stage}
               reduce={!!reduce}
               tours={toursByStage.get(stage.id) ?? []}
+              related={related[stage.id] ?? []}
               hotel={hotel}
               flip={i % 2 === 1}
             />
           </div>
         ))}
       </div>
-
-      {unplacedTours.length > 0 && (
-        <section className="px-4 sm:px-6 lg:px-12 py-20 border-t border-black/10">
-          <div className="max-w-6xl mx-auto lg:pl-24">
-            <h2 className="font-display italic text-3xl mb-8">More Grand Tour day tours</h2>
-            <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-3">
-              {unplacedTours.map(t => <TourCard key={t.id} tour={t} hotel={hotel} reduce={!!reduce} />)}
-            </div>
-          </div>
-        </section>
-      )}
 
       <HowItWorks reduce={!!reduce} />
       <Footer />
@@ -226,6 +223,15 @@ function Hero({ reduce, tourCount }: { reduce: boolean; tourCount: number }) {
             An itinerary along the Dragon&apos;s back, with {tourCount > 0 ? `${tourCount} day tour${tourCount === 1 ? '' : 's'}` : 'day tours'} you
             can join from your hotel.
           </motion.p>
+          {tourCount > 0 && (
+            <motion.a
+              href="#day-tours"
+              initial={reduce ? false : { opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.8, delay: 0.9 }}
+              className="inline-flex items-center gap-2 mt-8 mr-6 bg-[#2d6a4f] text-white px-6 py-3 font-sans text-sm font-medium hover:bg-[#235a3f]"
+            >
+              <Ticket size={15} /> Book a day tour
+            </motion.a>
+          )}
           <motion.a
             href="#stage-royal-natal"
             initial={reduce ? false : { opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.8, delay: 1.1 }}
@@ -299,7 +305,7 @@ function Leg({ text, reduce }: { text: string; reduce: boolean }) {
 }
 
 // ─── A stage ──────────────────────────────────────────────────────────────────
-function StageScene({ stage, tours, hotel, reduce, flip }: { stage: GrandTourStage; tours: Activity[]; hotel: string; reduce: boolean; flip: boolean }) {
+function StageScene({ stage, tours, related, hotel, reduce, flip }: { stage: GrandTourStage; tours: Activity[]; related: RelatedProduct[]; hotel: string; reduce: boolean; flip: boolean }) {
   const ref = useRef<HTMLElement>(null)
   const { scrollYProgress } = useScroll({ target: ref, offset: ['start end', 'end start'] })
   const imgY = useTransform(scrollYProgress, [0, 1], reduce ? ['0%', '0%'] : ['-8%', '8%'])
@@ -359,11 +365,25 @@ function StageScene({ stage, tours, hotel, reduce, flip }: { stage: GrandTourSta
               {tours.map(t => <TourCard key={t.id} tour={t} hotel={hotel} reduce={reduce} highlightStage={stage.id} />)}
             </div>
           ) : (
-            <p className="font-sans text-sm text-black/45">
-              {hotel
-                ? `No day tours collect from ${hotel} for this stage yet. Choose “Any hotel” above to see every tour.`
-                : 'Day tours for this stage are coming soon. Operators can list one from their supplier dashboard.'}
-            </p>
+            <>
+              <p className="font-sans text-sm text-black/50 mb-6">
+                {hotel
+                  ? `No day tours collect from ${hotel} for this stage yet. Choose “Any hotel” above to see every tour.`
+                  : related.length > 0
+                    ? 'No scheduled day tour runs to this stage yet. You can still book these here:'
+                    : 'No scheduled day tour runs to this stage yet.'}
+              </p>
+              {!hotel && related.length > 0 && (
+                <div className="grid gap-4 sm:grid-cols-2">
+                  {related.map(p => <RelatedCard key={p.id} product={p} reduce={reduce} />)}
+                </div>
+              )}
+              {!hotel && related.length === 0 && (
+                <Link href={`/regions/${stage.regionSlug}`} className="inline-flex items-center gap-2 border border-black/20 px-5 py-2.5 font-sans text-sm hover:border-black/60">
+                  See what to book in the {stage.area} <ChevronRight size={14} />
+                </Link>
+              )}
+            </>
           )}
         </div>
       </div>
@@ -374,9 +394,9 @@ function StageScene({ stage, tours, hotel, reduce, flip }: { stage: GrandTourSta
 // ─── A bookable day tour ─────────────────────────────────────────────────────
 function TourCard({ tour, hotel, reduce, highlightStage }: { tour: Activity; hotel: string; reduce: boolean; highlightStage?: string }) {
   const gt = tour.grandTour!
-  const href = `/activities/${tour.slug || tour.id}`
+  const href = dayTourHref(tour)
   const pickup = hotel ? gt.pickupPoints.find(p => p.name.trim() === hotel) : undefined
-  const departures = useMemo(() => nextDepartures(tour), [tour])
+  const departures = useMemo(() => upcomingDepartures(tour, { days: 21, limit: 3 }), [tour])
   const visits = gt.highlightIds
     .map(id => ({ id, h: highlightById(id) }))
     .filter((x): x is { id: string; h: NonNullable<ReturnType<typeof highlightById>> } => !!x.h)
@@ -395,9 +415,9 @@ function TourCard({ tour, hotel, reduce, highlightStage }: { tour: Activity; hot
       initial={reduce ? false : 'hidden'} whileInView="show" viewport={{ once: true, amount: 0.3 }} variants={reveal}
     >
       {tour.photos?.[0] && (
-        <div className="relative aspect-[16/9] overflow-hidden">
-          <Image src={tour.photos[0]} alt={tour.name} fill sizes="(min-width: 768px) 40vw, 100vw" className="object-cover" />
-        </div>
+        <Link href={link()} className="relative block aspect-[16/9] overflow-hidden group" tabIndex={-1} aria-hidden="true">
+          <Image src={tour.photos[0]} alt="" fill sizes="(min-width: 768px) 40vw, 100vw" className="object-cover transition-transform duration-700 group-hover:scale-105" />
+        </Link>
       )}
       <div className="p-5 sm:p-6 flex flex-col flex-1">
         <p className="font-sans text-[10px] tracking-[0.18em] uppercase text-black/45">
@@ -453,12 +473,38 @@ function TourCard({ tour, hotel, reduce, highlightStage }: { tour: Activity; hot
           <p className="font-sans text-xs text-black/45">
             From <span className="font-display italic text-2xl text-[#2d6a4f]">{formatMoney(tour.pricePerPerson)}</span> per seat
           </p>
-          <Link href={link(departures[0]?.date)} className="bg-[#2d6a4f] text-white font-sans text-sm px-5 py-2.5 hover:bg-[#235a3f] transition-colors flex items-center gap-1.5 whitespace-nowrap shrink-0">
-            <Ticket size={14} /> Book seats
-          </Link>
+          <div className="flex items-center gap-2 shrink-0">
+            <Link href={link()} className="font-sans text-sm px-3 py-2.5 text-black/70 hover:text-black underline-offset-4 hover:underline whitespace-nowrap">View tour</Link>
+            <Link href={`${link(departures[0]?.date)}#book`} className="bg-[#2d6a4f] text-white font-sans text-sm px-5 py-2.5 hover:bg-[#235a3f] transition-colors flex items-center gap-1.5 whitespace-nowrap">
+              <Ticket size={14} /> Book seats
+            </Link>
+          </div>
         </div>
       </div>
     </motion.article>
+  )
+}
+
+// ─── Something else bookable at a stage ──────────────────────────────────────
+function RelatedCard({ product, reduce }: { product: RelatedProduct; reduce: boolean }) {
+  return (
+    <motion.div initial={reduce ? false : 'hidden'} whileInView="show" viewport={{ once: true, amount: 0.3 }} variants={reveal}>
+      <Link href={product.href} className="group bg-white border border-black/10 hover:border-black/30 flex items-stretch transition-colors h-full">
+        {product.image && (
+          <div className="relative w-28 shrink-0 overflow-hidden">
+            <Image src={product.image} alt="" fill sizes="112px" className="object-cover transition-transform duration-700 group-hover:scale-105" />
+          </div>
+        )}
+        <div className="p-4 flex-1 min-w-0">
+          <p className="font-sans text-[10px] tracking-[0.18em] uppercase text-black/45">{product.kind}{product.detail ? ` · ${product.detail}` : ''}</p>
+          <p className="font-display italic text-xl mt-1 group-hover:text-[#2d6a4f]">{product.name}</p>
+          <p className="font-sans text-xs text-black/55 mt-2 flex items-center justify-between gap-2">
+            <span>{product.price ? <>From <span className="text-[#2d6a4f] font-medium">{formatMoney(product.price)}</span> pp</> : 'See prices and dates'}</span>
+            <span className="text-[#2d6a4f] flex items-center gap-0.5 whitespace-nowrap">Book <ChevronRight size={12} /></span>
+          </p>
+        </div>
+      </Link>
+    </motion.div>
   )
 }
 

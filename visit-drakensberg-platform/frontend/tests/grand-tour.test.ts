@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import {
-  GRAND_TOUR_STAGES, pickupTime, grandTourActivities, stagesForActivity, allPickupNames, stageForHighlight,
+  GRAND_TOUR_STAGES, pickupTime, upcomingDepartures, dayTourHref, grandTourActivities, stagesForActivity, allPickupNames, stageForHighlight,
 } from '@/lib/grand-tour'
 import type { Activity } from '@/lib/activities'
 
@@ -70,5 +70,29 @@ describe('route content', () => {
   })
   it('numbers stages in order', () => {
     expect(GRAND_TOUR_STAGES.map(s => s.number)).toEqual(GRAND_TOUR_STAGES.map((_, i) => i + 1))
+  })
+})
+
+describe('upcomingDepartures', () => {
+  it('lists departures on the days they run, skipping full ones', () => {
+    // 2026-10-09 is a Friday (5), 10th Saturday (6), 12th Monday (1).
+    const t = tour({
+      timeslots: [{ id: 's', time: '07:30', capacity: 2, days: [1, 5, 6] }],
+      slotBookings: { '2026-10-10:s': 2 },
+    })
+    expect(upcomingDepartures(t, { from: '2026-10-08', days: 6, limit: 5 })).toEqual([
+      { date: '2026-10-09', timeslotId: 's', time: '07:30', seatsLeft: 2 },
+      { date: '2026-10-12', timeslotId: 's', time: '07:30', seatsLeft: 2 },
+    ])
+  })
+  it('stops at the limit', () => {
+    expect(upcomingDepartures(tour(), { from: '2026-10-08', limit: 3 })).toHaveLength(3)
+  })
+})
+
+describe('dayTourHref', () => {
+  it('prefers the slug', () => {
+    expect(dayTourHref({ id: 'act-1', slug: 'sani-pass' })).toBe('/grand-tour/sani-pass')
+    expect(dayTourHref({ id: 'act-1' })).toBe('/grand-tour/act-1')
   })
 })
