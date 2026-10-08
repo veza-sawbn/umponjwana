@@ -21,7 +21,13 @@
 --   4. vd_canonical_unit_price()'s 'event' branch extended to price a
 --      specific ticket tier (productId "<eventId>:<ticketTypeId>"), while
 --      staying backward compatible with a plain event id.
+--
+-- Written 2026-09-16 on a branch that was not merged at the time; renamed to
+-- its merge date so scripts/migrate.sh applies it after the migrations that
+-- landed in between. 20261008_grand_tour_boarding.sql runs after it and
+-- tightens the authorization on the RPCs below.
 -- ============================================================================
+-- @rollback: additive — new table and functions; the event backfill only adds keys (sessions/ticketTypes/capacity) and keeps the legacy fields, and vd_canonical_unit_price keeps its plain-event-id fallback
 
 -- ────────────────────────────────────────────────────────────────────────────
 -- 1. Backfill existing events into the sessions/ticketTypes/capacity shape

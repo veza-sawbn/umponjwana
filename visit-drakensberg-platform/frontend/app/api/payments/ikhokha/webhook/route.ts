@@ -160,7 +160,7 @@ export async function POST(req: Request) {
 
       // Mint the actual tickets now that payment is confirmed — this is what
       // makes an event's capacity real instead of decorative (see
-      // supabase/migrations/20260916_event_ticketing.sql). One order line
+      // supabase/migrations/20261008_event_ticketing.sql). One order line
       // can cover several tickets (quantity = party size); vd_issue_tickets
       // is atomic and capacity-checked, so this can never oversell a session
       // even under concurrent confirmations. Best-effort like the analytics
@@ -185,6 +185,34 @@ export async function POST(req: Request) {
           p_order_line_id: line.id,
         })
         if (ticketError) console.error('[ikhokha webhook] ticket issuance failed:', ticketError)
+      }
+
+      // Day tours and other timeslotted activities: one boarding ticket per
+      // paid seat, carrying the departure and (for a Grand Tour day tour) the
+      // hotel pickup, for the operator to scan before the bus leaves. Takes
+      // no capacity — the seats were held at checkout and are owned by the
+      // booking already — and is idempotent per order line, so a retried
+      // callback gets the same tickets back. See
+      // supabase/migrations/20261008_grand_tour_boarding.sql.
+      const { data: activityLines } = await admin
+        .from('vd_order_lines')
+        .select('id, quantity, value')
+        .eq('order_id', link.order_id)
+        .eq('category', 'activity')
+      for (const line of activityLines ?? []) {
+        const v = line.value as { activityId?: string; slotDate?: string; timeslotId?: string; pickupPointId?: string } | null
+        if (!v?.activityId || !v?.slotDate || !v?.timeslotId) continue
+        const { error: ticketError } = await admin.rpc('vd_issue_activity_tickets', {
+          p_activity_id: v.activityId,
+          p_slot_date: v.slotDate,
+          p_timeslot_id: v.timeslotId,
+          p_qty: Math.max(1, Math.floor(Number(line.quantity) || 1)),
+          p_booking_id: order.booking_id,
+          p_order_id: link.order_id,
+          p_order_line_id: line.id,
+          p_pickup_point_id: v.pickupPointId ?? null,
+        })
+        if (ticketError) console.error('[ikhokha webhook] day-tour ticket issuance failed:', ticketError)
       }
 
       // Supplier notifications wait for this point rather than firing at

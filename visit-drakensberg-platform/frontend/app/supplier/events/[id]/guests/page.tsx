@@ -163,7 +163,7 @@ export default function EventGuestsPage() {
               {visible.map(t => (
                 <tr key={t.id} className="border-b border-gray-50 last:border-0">
                   <td className="px-5 py-3 text-gray-700">{t.code}</td>
-                  <td className="px-5 py-3 text-gray-500">{tierName(t.ticketTypeId)}</td>
+                  <td className="px-5 py-3 text-gray-500">{tierName(t.ticketTypeId ?? '')}</td>
                   <td className="px-5 py-3">
                     {t.status === 'redeemed' ? (
                       <span className="inline-flex items-center gap-1.5 text-[#2d6a4f]">

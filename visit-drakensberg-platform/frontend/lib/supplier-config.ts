@@ -51,6 +51,7 @@ export const SUPPLIER_CONFIG: Record<SupplierType, SupplierTypeConfig> = {
     nav: [
       { href: '/supplier',            label: 'Overview',      icon: LayoutDashboard },
       { href: '/supplier/activities', label: 'Activities',    icon: Zap },
+      { href: '/supplier/check-in',   label: 'Check-in & Boarding', icon: QrCode },
       { href: '/supplier/waivers',    label: 'Waivers',       icon: FileSignature },
       ...SHARED_NAV,
     ],
@@ -94,7 +95,7 @@ export const SUPPLIER_CONFIG: Record<SupplierType, SupplierTypeConfig> = {
       { href: '/supplier/experiences',   label: 'Experiences',  icon: Sparkles },
       { href: '/supplier/packages',      label: 'Packages',     icon: List },
       { href: '/supplier/events',        label: 'Events & Tickets', icon: CalendarDays },
-      { href: '/supplier/check-in',      label: 'Check-in Scanner', icon: QrCode },
+      { href: '/supplier/check-in',      label: 'Check-in & Boarding', icon: QrCode },
       ...SHARED_NAV,
     ],
   },
