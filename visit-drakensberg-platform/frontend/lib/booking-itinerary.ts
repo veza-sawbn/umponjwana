@@ -124,6 +124,11 @@ export function resolveDefaultItinerary(
   return { departure, tour, trail, packageName: pkg?.name, days }
 }
 
+/** A day title worth showing — not one that just repeats "Day 2". */
+export function meaningfulDayLabel(label: string | undefined): string {
+  return label && !/^\s*day\s*\d+\s*$/i.test(label) ? label : ''
+}
+
 /** What the guest actually sees: the operator's version when there is one. */
 export function effectiveItineraryDays(resolved: ResolvedItinerary, override?: BookingItinerary | null): ItineraryDay[] {
   return override && override.days.length > 0 ? override.days : resolved.days

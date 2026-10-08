@@ -16,7 +16,7 @@ import { getDepartures, type Departure } from '@/lib/departures'
 import { getTrails, type Trail } from '@/lib/trails'
 import { getTripRequestById, type TripRequest } from '@/lib/custom-trips'
 import {
-  resolveDefaultItinerary, effectiveItineraryDays, getBookingItineraries, tripRequestIdForItem,
+  resolveDefaultItinerary, effectiveItineraryDays, getBookingItineraries, tripRequestIdForItem, meaningfulDayLabel,
   type ResolvedItinerary, type BookingItinerary,
 } from '@/lib/booking-itinerary'
 import { getPropertyById } from '@/lib/properties'
@@ -26,6 +26,7 @@ import {
   type MessageThread,
 } from '@/lib/messages'
 import SupplierMessageBlock from '@/components/messaging/SupplierMessageBlock'
+import FormattedText from '@/components/ui/FormattedText'
 import { formatMoney, formatRate } from '@/lib/allocation'
 
 /* ── helpers ────────────────────────────────────────────── */
@@ -344,7 +345,7 @@ function ExperienceSection({
         {override?.notes && (
           <div className="border-l-2 border-[#2d6a4f] bg-[#2d6a4f]/5 px-4 py-3">
             <p className="font-sans text-[10px] uppercase tracking-wider text-[#2d6a4f] mb-1">From your operator</p>
-            <p className="font-sans text-sm text-gray-700 leading-relaxed whitespace-pre-line">{override.notes}</p>
+            <FormattedText text={override.notes} className="text-gray-700" />
           </div>
         )}
 
@@ -361,9 +362,9 @@ function ExperienceSection({
                   <div className="flex items-baseline gap-3 mb-1 flex-wrap">
                     <span className="font-display italic text-base text-[#2d6a4f] shrink-0">Day {i + 1}</span>
                     {day.date && <span className="font-sans text-xs text-gray-400">{fmtLong(day.date)}</span>}
-                    {day.label && <span className="font-sans text-sm font-medium text-gray-800">{day.label}</span>}
+                    {meaningfulDayLabel(day.label) && <span className="font-sans text-sm font-medium text-gray-800">{day.label}</span>}
                   </div>
-                  {day.description && <p className="font-sans text-sm text-gray-600 leading-relaxed">{day.description}</p>}
+                  {day.description && <FormattedText text={day.description} className="text-gray-600 mt-2" />}
                   {(day.accommodation || day.transport || day.meals) && (
                     <div className="flex flex-wrap gap-x-5 gap-y-1.5 mt-2.5 pt-2.5 border-t border-gray-100">
                       {day.accommodation && (

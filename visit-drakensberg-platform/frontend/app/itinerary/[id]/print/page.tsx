@@ -14,6 +14,7 @@ import {
 } from '@/lib/booking-itinerary'
 import Logo from '@/components/Logo'
 import { formatMoney } from '@/lib/allocation'
+import FormattedText from '@/components/ui/FormattedText'
 
 // Printable trip itinerary — a proper travel document, not a screen dump:
 // trip summary, guest details, accommodation, a chronological day-by-day
@@ -36,7 +37,8 @@ const EMERGENCY = [
   ['ER24 Private', '084 124'],
 ]
 
-type DayEvent = { time: string; title: string; detail: string }
+// `body` is operator/trail-authored day text, rendered with its formatting.
+type DayEvent = { time: string; title: string; detail: string; body?: string }
 
 type ScheduleSources = {
   departures: Departure[]
@@ -89,8 +91,9 @@ function buildSchedule(b: SavedBooking, { departures, tours, trails, tripRequest
         push(day.date || a.date, {
           time: day.date === a.date ? 'Departure' : `Day ${i + 1}`,
           title: day.label || `${a.title} · Day ${i + 1}`,
-          detail: [day.description, day.accommodation ? `Overnight: ${day.accommodation}` : '', day.transport || '', day.meals || '']
+          detail: [day.accommodation ? `Overnight: ${day.accommodation}` : '', day.transport || '', day.meals || '']
             .filter(Boolean).join(' · '),
+          body: day.description,
         })
       })
     } else {
@@ -254,6 +257,7 @@ export default function PrintableItineraryPage() {
                           </div>
                           <div className="border-l-2 border-[#2d6a4f]/30 pl-4 pb-1">
                             <p className="font-sans text-sm font-medium text-gray-800">{ev.title}</p>
+                            {ev.body && <FormattedText text={ev.body} size="xs" className="text-gray-600 mt-1" />}
                             {ev.detail && <p className="font-sans text-xs text-gray-500 mt-0.5">{ev.detail}</p>}
                           </div>
                         </div>

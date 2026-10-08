@@ -12,9 +12,11 @@ import type { Trail } from '@/lib/trails'
 import { getTripRequestById, type TripRequest } from '@/lib/custom-trips'
 import {
   resolveDefaultItinerary, effectiveItineraryDays, getBookingItineraries, getSupplierBookingItem,
-  saveBookingItinerary, resetBookingItinerary, tripRequestIdForItem,
+  saveBookingItinerary, resetBookingItinerary, tripRequestIdForItem, meaningfulDayLabel,
   type BookingItinerary, type ItineraryDay, type ResolvedItinerary,
 } from '@/lib/booking-itinerary'
+import FormattedText from '@/components/ui/FormattedText'
+import FormattedTextArea from '@/components/ui/FormattedTextArea'
 
 export type ItineraryCatalog = { departures: Departure[]; tours: Tour[]; trails: Trail[] }
 
@@ -209,7 +211,7 @@ export default function BookingItineraryEditor({
         </div>
         <div>
           <label className={label}>Note to the guest (shown above the plan)</label>
-          <textarea rows={2} className={`${input} resize-none`} value={draft.notes} onChange={e => setDraft({ ...draft, notes: e.target.value })} placeholder="e.g. We've moved the summit day to avoid forecast storms." />
+          <FormattedTextArea rows={3} value={draft.notes} onChange={notes => setDraft({ ...draft, notes })} placeholder="e.g. We've moved the summit day to avoid forecast storms." ariaLabel="Note to the guest" />
         </div>
 
         <div className="space-y-3">
@@ -225,7 +227,13 @@ export default function BookingItineraryEditor({
                   <button type="button" onClick={() => setDraft({ ...draft, days: draft.days.filter((_, j) => j !== i) })} disabled={draft.days.length === 1} className="p-1.5 border border-red-200 text-red-400 hover:bg-red-50 disabled:opacity-30" aria-label="Remove day"><Trash2 size={12} /></button>
                 </div>
               </div>
-              <textarea rows={2} className={`${input} resize-none`} value={day.description ?? ''} onChange={e => updateDay(i, { description: e.target.value })} placeholder="What happens on this day" aria-label={`Day ${i + 1} description`} />
+              <FormattedTextArea
+                rows={6}
+                value={day.description ?? ''}
+                onChange={description => updateDay(i, { description })}
+                placeholder={'What happens on this day.\n\nLeave a blank line between paragraphs. Use the toolbar for headings, bold, highlights and lists.'}
+                ariaLabel={`Day ${i + 1} description`}
+              />
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                 <input className={input} value={day.accommodation ?? ''} onChange={e => updateDay(i, { accommodation: e.target.value })} placeholder="Overnight" aria-label={`Day ${i + 1} overnight`} />
                 <input className={input} value={day.transport ?? ''} onChange={e => updateDay(i, { transport: e.target.value })} placeholder="Transport" aria-label={`Day ${i + 1} transport`} />
@@ -292,7 +300,7 @@ export default function BookingItineraryEditor({
       )}
 
       {override?.notes && (
-        <p className="font-sans text-sm text-black/70 border-l-2 border-[#2d6a4f] pl-3 whitespace-pre-line">{override.notes}</p>
+        <FormattedText text={override.notes} className="text-black/70 border-l-2 border-[#2d6a4f] pl-3" />
       )}
 
       {days.length === 0 ? (
@@ -306,9 +314,9 @@ export default function BookingItineraryEditor({
               <div className="flex items-baseline gap-2 flex-wrap">
                 <span className="font-display italic text-sm text-[#2d6a4f]">Day {i + 1}</span>
                 {day.date && <span className="font-sans text-[11px] text-black/40">{fmt(day.date)}</span>}
-                {day.label && <span className="font-sans text-sm text-black/80 font-medium">{day.label}</span>}
+                {meaningfulDayLabel(day.label) && <span className="font-sans text-sm text-black/80 font-medium">{day.label}</span>}
               </div>
-              {day.description && <p className="font-sans text-xs text-black/60 mt-0.5 leading-relaxed">{day.description}</p>}
+              {day.description && <FormattedText text={day.description} size="xs" className="text-black/60 mt-1" />}
               {(day.accommodation || day.transport || day.meals) && (
                 <p className="font-sans text-[11px] text-black/45 mt-1">
                   {[day.accommodation && `Overnight: ${day.accommodation}`, day.transport && `Transport: ${day.transport}`, day.meals && `Meals: ${day.meals}`].filter(Boolean).join(' · ')}
