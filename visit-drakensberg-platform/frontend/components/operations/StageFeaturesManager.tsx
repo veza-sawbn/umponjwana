@@ -16,7 +16,7 @@ import { getSupplierEntities } from '@/lib/supplier-entities'
 import type { Event } from '@/lib/events'
 import { isEventUpcoming } from '@/lib/upcoming'
 import { formatMoney } from '@/lib/allocation'
-import { GRAND_TOUR_STAGES } from '@/lib/grand-tour'
+import { useGrandTourStages } from '@/lib/use-grand-tour-stages'
 import {
   getGrandTourFeatures, addGrandTourFeature, removeGrandTourFeature, updateGrandTourFeature,
   activityItem, eventItem, tourItem,
@@ -31,7 +31,8 @@ const KIND_FILTERS: { key: 'all' | FeatureKind; label: string }[] = [
 ]
 
 export default function StageFeaturesManager() {
-  const [stageId, setStageId] = useState(GRAND_TOUR_STAGES[0].id)
+  const stages = useGrandTourStages()
+  const [stageId, setStageId] = useState(stages[0]?.id ?? '')
   const [features, setFeatures] = useState<GrandTourFeature[]>([])
   const [catalogue, setCatalogue] = useState<CatalogueItem[]>([])
   const [loading, setLoading] = useState(true)
@@ -58,9 +59,11 @@ export default function StageFeaturesManager() {
     }).finally(() => setLoading(false))
   }, [])
 
-  const stage = GRAND_TOUR_STAGES.find(s => s.id === stageId)!
+  // Stages load after first render; fall back to the first until one is chosen.
+  const stage = stages.find(s => s.id === stageId) ?? stages[0]
+  const activeId = stage?.id ?? ''
   const byKey = useMemo(() => new Map(catalogue.map(i => [`${i.kind}:${i.id}`, i])), [catalogue])
-  const onStage = features.filter(f => f.stageId === stageId).sort((a, b) => a.position - b.position)
+  const onStage = features.filter(f => f.stageId === activeId).sort((a, b) => a.position - b.position)
   const featuredKeys = new Set(onStage.map(f => `${f.kind}:${f.entityId}`))
 
   const results = useMemo(() => {
@@ -80,7 +83,7 @@ export default function StageFeaturesManager() {
 
   const add = (item: CatalogueItem) => run(`add:${item.kind}:${item.id}`, async () => {
     const position = onStage.length ? Math.max(...onStage.map(f => f.position)) + 1 : 0
-    const created = await addGrandTourFeature({ stageId, kind: item.kind, entityId: item.id, position })
+    const created = await addGrandTourFeature({ stageId: activeId, kind: item.kind, entityId: item.id, position })
     setFeatures(fs => [...fs, created])
   })
 
@@ -112,15 +115,15 @@ export default function StageFeaturesManager() {
     <div className="grid gap-6 lg:grid-cols-[220px_1fr]">
       {/* Stages */}
       <nav aria-label="Stages" className="lg:sticky lg:top-6 h-fit">
-        <select value={stageId} onChange={e => setStageId(e.target.value)} className="lg:hidden w-full border border-gray-200 bg-white px-3 py-2 font-sans text-sm" aria-label="Stage">
-          {GRAND_TOUR_STAGES.map(s => <option key={s.id} value={s.id}>{s.number}. {s.name}</option>)}
+        <select value={activeId} onChange={e => setStageId(e.target.value)} className="lg:hidden w-full border border-gray-200 bg-white px-3 py-2 font-sans text-sm" aria-label="Stage">
+          {stages.map(s => <option key={s.id} value={s.id}>{s.number}. {s.name}</option>)}
         </select>
         <ol className="hidden lg:block border border-gray-200 bg-white divide-y divide-gray-100">
-          {GRAND_TOUR_STAGES.map(s => {
+          {stages.map(s => {
             const count = features.filter(f => f.stageId === s.id).length
             return (
               <li key={s.id}>
-                <button onClick={() => setStageId(s.id)} className={`w-full text-left px-4 py-3 font-sans text-sm flex justify-between gap-2 ${s.id === stageId ? 'bg-[#2d6a4f]/8 text-[#2d6a4f] font-medium' : 'text-gray-600 hover:bg-gray-50'}`}>
+                <button onClick={() => setStageId(s.id)} className={`w-full text-left px-4 py-3 font-sans text-sm flex justify-between gap-2 ${s.id === activeId ? 'bg-[#2d6a4f]/8 text-[#2d6a4f] font-medium' : 'text-gray-600 hover:bg-gray-50'}`}>
                   <span>{s.number}. {s.name}</span>
                   {count > 0 && <span className="text-xs text-gray-400 tabular-nums">{count}</span>}
                 </button>

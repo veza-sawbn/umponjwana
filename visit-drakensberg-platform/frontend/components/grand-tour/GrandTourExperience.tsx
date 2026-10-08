@@ -8,11 +8,13 @@ import { ArrowDown, Bus, Car, Clock, MapPin, QrCode, Ticket, CalendarDays, Chevr
 import Footer from '@/components/layout/Footer'
 import type { Activity } from '@/lib/activities'
 import {
-  GRAND_TOUR_STAGES, stagesForActivity, highlightById, pickupTime, allPickupNames, dayTourHref, upcomingDepartures,
+  stagesForActivity, highlightById, pickupTime, allPickupNames, dayTourHref, upcomingDepartures,
   type GrandTourStage,
 } from '@/lib/grand-tour'
+import type { GrandTourContent } from '@/lib/grand-tour-content'
 import { formatMoney } from '@/lib/allocation'
 import { ease } from '@/lib/motion'
+import { isOptimizableImageHost } from '@/lib/image-url'
 
 // ─── Grand Tour Drakensberg ──────────────────────────────────────────────────
 // An itinerary the visitor reads by scrolling: each stage arrives as a
@@ -33,9 +35,8 @@ const stagger: Variants = {
   show: { transition: { staggerChildren: 0.14, delayChildren: 0.1 } },
 }
 
-const TOTAL_HIGHLIGHTS = GRAND_TOUR_STAGES.reduce((n, s) => n + s.highlights.length, 0)
-/** Something else already bookable at a stage — a guided tour or activity
- *  from the live catalogue — shown while no Grand Tour day tour covers it. */
+/** Something VD Operations featured at a stage from the live catalogue: an
+ *  activity or experience, an event, or a guided tour. */
 export type RelatedProduct = {
   id: string
   kind: 'Guided tour' | 'Activity' | 'Event'
@@ -51,10 +52,14 @@ export type RelatedProduct = {
 const shortDate = (date: string) =>
   new Date(`${date}T00:00:00`).toLocaleDateString('en-ZA', { weekday: 'short', day: 'numeric', month: 'short' })
 
-export default function GrandTourExperience({ tours, related = {}, featured = {} }: { tours: Activity[]; related?: Record<string, RelatedProduct[]>; featured?: Record<string, RelatedProduct[]> }) {
+/** Paragraphs from an admin-edited text field: blank lines separate them. */
+const paragraphs = (text: string) => text.split(/\n\s*\n/).map(t => t.trim()).filter(Boolean)
+
+export default function GrandTourExperience({ tours, featured = {}, content }: { tours: Activity[]; featured?: Record<string, RelatedProduct[]>; content: GrandTourContent }) {
   const reduce = useReducedMotion()
+  const stages = content.stages
   const [hotel, setHotel] = useState('')
-  const [activeStage, setActiveStage] = useState(GRAND_TOUR_STAGES[0].id)
+  const [activeStage, setActiveStage] = useState(stages[0]?.id ?? '')
   const routeRef = useRef<HTMLDivElement>(null)
 
   // Remember the visitor's hotel across visits — a convenience only.
@@ -73,13 +78,13 @@ export default function GrandTourExperience({ tours, related = {}, featured = {}
   )
   const toursByStage = useMemo(() => {
     const map = new Map<string, Activity[]>()
-    for (const t of visibleTours) for (const s of stagesForActivity(t)) map.set(s.id, [...(map.get(s.id) ?? []), t])
+    for (const t of visibleTours) for (const s of stagesForActivity(t, stages)) map.set(s.id, [...(map.get(s.id) ?? []), t])
     return map
-  }, [visibleTours])
+  }, [visibleTours, stages])
 
   // Which stage is on screen, for the route rail.
   useEffect(() => {
-    const els = GRAND_TOUR_STAGES.map(s => document.getElementById(`stage-${s.id}`)).filter((e): e is HTMLElement => !!e)
+    const els = stages.map(s => document.getElementById(`stage-${s.id}`)).filter((e): e is HTMLElement => !!e)
     const io = new IntersectionObserver(
       entries => {
         const visible = entries.filter(e => e.isIntersecting).sort((a, b) => b.intersectionRatio - a.intersectionRatio)[0]
@@ -89,13 +94,13 @@ export default function GrandTourExperience({ tours, related = {}, featured = {}
     )
     els.forEach(e => io.observe(e))
     return () => io.disconnect()
-  }, [])
+  }, [stages])
 
   const { scrollYProgress } = useScroll({ target: routeRef, offset: ['start center', 'end center'] })
 
   return (
     <div className="bg-[#F7F5F2] text-black">
-      <Hero reduce={!!reduce} tourCount={tours.length} />
+      <Hero reduce={!!reduce} tourCount={tours.length} content={content} />
 
       {/* ── Intro and hotel filter ─────────────────────────────────────── */}
       <section className="px-4 sm:px-6 lg:px-12 py-20 sm:py-28">
@@ -103,15 +108,11 @@ export default function GrandTourExperience({ tours, related = {}, featured = {}
           className="max-w-3xl mx-auto text-center"
           initial={reduce ? false : 'hidden'} whileInView="show" viewport={{ once: true, amount: 0.4 }} variants={stagger}
         >
-          <motion.p variants={reveal} className="font-sans text-[11px] tracking-[0.28em] uppercase text-[#C9A96E] mb-5">The route</motion.p>
-          <motion.h2 variants={reveal} className="font-display italic text-3xl sm:text-5xl leading-tight">
-            A wall of basalt from horizon to horizon, one stage at a time.
-          </motion.h2>
-          <motion.p variants={reveal} className="font-sans text-base sm:text-lg text-black/60 mt-6 leading-relaxed">
-            The Grand Tour follows the uKhahlamba-Drakensberg, a UNESCO World Heritage Site, from the Amphitheatre in the north to
-            Garden Castle in the south. Drive it yourself, or join a day tour at any stage. Many collect you from your hotel, so
-            you can explore the Southern Berg while staying in Champagne Valley.
-          </motion.p>
+          {content.intro.kicker && <motion.p variants={reveal} className="font-sans text-[11px] tracking-[0.28em] uppercase text-[#C9A96E] mb-5">{content.intro.kicker}</motion.p>}
+          <motion.h2 variants={reveal} className="font-display italic text-3xl sm:text-5xl leading-tight">{content.intro.heading}</motion.h2>
+          {paragraphs(content.intro.body).map((para, i) => (
+            <motion.p key={i} variants={reveal} className="font-sans text-base sm:text-lg text-black/60 mt-6 leading-relaxed">{para}</motion.p>
+          ))}
         </motion.div>
 
         <motion.div
@@ -150,7 +151,7 @@ export default function GrandTourExperience({ tours, related = {}, featured = {}
               <p className="font-sans text-xs text-black/50">{visibleTours.length} tour{visibleTours.length === 1 ? '' : 's'}{hotel ? ` from ${hotel}` : ''}</p>
             </motion.div>
             <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-3">
-              {visibleTours.map(t => <TourCard key={t.id} tour={t} hotel={hotel} reduce={!!reduce} />)}
+              {visibleTours.map(t => <TourCard key={t.id} tour={t} hotel={hotel} reduce={!!reduce} stages={stages} />)}
             </div>
           </div>
         )}
@@ -158,33 +159,37 @@ export default function GrandTourExperience({ tours, related = {}, featured = {}
 
       {/* ── The route ──────────────────────────────────────────────────── */}
       <div ref={routeRef} className="relative">
-        <RouteRail progress={scrollYProgress} active={activeStage} reduce={!!reduce} />
-        <MobileStageBar progress={scrollYProgress} active={activeStage} />
+        <RouteRail progress={scrollYProgress} active={activeStage} reduce={!!reduce} stages={stages} />
+        <MobileStageBar progress={scrollYProgress} active={activeStage} stages={stages} />
 
-        {GRAND_TOUR_STAGES.map((stage, i) => (
+        {stages.map((stage, i) => (
           <div key={stage.id}>
             {stage.legFromPrevious && <Leg text={stage.legFromPrevious} reduce={!!reduce} />}
             <StageScene
               stage={stage}
               reduce={!!reduce}
               tours={toursByStage.get(stage.id) ?? []}
-              related={related[stage.id] ?? []}
               featured={featured[stage.id] ?? []}
               hotel={hotel}
+              stages={stages}
               flip={i % 2 === 1}
             />
           </div>
         ))}
       </div>
 
-      <HowItWorks reduce={!!reduce} />
+      <HowItWorks reduce={!!reduce} content={content.howItWorks} />
       <Footer />
     </div>
   )
 }
 
 // ─── Hero ─────────────────────────────────────────────────────────────────────
-function Hero({ reduce, tourCount }: { reduce: boolean; tourCount: number }) {
+function Hero({ reduce, tourCount, content }: { reduce: boolean; tourCount: number; content: GrandTourContent }) {
+  const { hero, stages } = content
+  const highlightCount = stages.reduce((n, s) => n + s.highlights.length, 0)
+  // An empty eyebrow means "work it out from the route".
+  const eyebrow = hero.eyebrow.trim() || `North to south · ${stages.length} stage${stages.length === 1 ? '' : 's'} · ${highlightCount} highlights`
   const ref = useRef<HTMLElement>(null)
   const { scrollYProgress } = useScroll({ target: ref, offset: ['start start', 'end start'] })
   const imgY = useTransform(scrollYProgress, [0, 1], ['0%', reduce ? '0%' : '18%'])
@@ -200,7 +205,7 @@ function Hero({ reduce, tourCount }: { reduce: boolean; tourCount: number }) {
           animate={{ scale: 1 }}
           transition={{ duration: 6, ease: ease.out }}
         >
-          <Image src={GRAND_TOUR_STAGES[0].image} alt="The Amphitheatre in the Northern Drakensberg" fill priority sizes="100vw" className="object-cover" />
+          {hero.image && <Image src={hero.image} unoptimized={!isOptimizableImageHost(hero.image)} alt={hero.imageAlt} fill priority sizes="100vw" className="object-cover" />}
         </motion.div>
       </motion.div>
       <div className="absolute inset-0 bg-gradient-to-b from-black/45 via-black/25 to-black/70" />
@@ -211,20 +216,19 @@ function Hero({ reduce, tourCount }: { reduce: boolean; tourCount: number }) {
             initial={reduce ? false : { opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.8, delay: 0.3 }}
             className="font-sans text-[11px] sm:text-xs tracking-[0.32em] uppercase text-[#C9A96E] mb-4"
           >
-            North to south · {GRAND_TOUR_STAGES.length} stages · {TOTAL_HIGHLIGHTS} highlights
+            {eyebrow}
           </motion.p>
           <motion.h1
             initial={reduce ? false : { opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 1, delay: 0.45 }}
-            className="font-display italic text-5xl sm:text-7xl lg:text-8xl leading-[0.95]"
+            className="font-display italic text-5xl sm:text-7xl lg:text-8xl leading-[0.95] max-w-4xl"
           >
-            Grand Tour<br />Drakensberg
+            {hero.title}
           </motion.h1>
           <motion.p
             initial={reduce ? false : { opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.8, delay: 0.7 }}
             className="font-sans text-base sm:text-xl text-white/80 max-w-xl mt-6"
           >
-            An itinerary along the Dragon&apos;s back, with {tourCount > 0 ? `${tourCount} day tour${tourCount === 1 ? '' : 's'}` : 'day tours'} you
-            can join from your hotel.
+            {hero.subtitle}
           </motion.p>
           {tourCount > 0 && (
             <motion.a
@@ -236,7 +240,7 @@ function Hero({ reduce, tourCount }: { reduce: boolean; tourCount: number }) {
             </motion.a>
           )}
           <motion.a
-            href="#stage-royal-natal"
+            href={stages[0] ? `#stage-${stages[0].id}` : '#day-tours'}
             initial={reduce ? false : { opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.8, delay: 1.1 }}
             className="inline-flex items-center gap-2 mt-10 font-sans text-sm text-white/80 hover:text-white"
           >
@@ -252,7 +256,7 @@ function Hero({ reduce, tourCount }: { reduce: boolean; tourCount: number }) {
 }
 
 // ─── Route rail (desktop) and stage bar (mobile) ─────────────────────────────
-function RouteRail({ progress, active, reduce }: { progress: ReturnType<typeof useScroll>['scrollYProgress']; active: string; reduce: boolean }) {
+function RouteRail({ progress, active, reduce, stages }: { progress: ReturnType<typeof useScroll>['scrollYProgress']; active: string; reduce: boolean; stages: GrandTourStage[] }) {
   const scaleY = useTransform(progress, [0, 1], [0, 1])
   return (
     <nav aria-label="Grand Tour stages" className="hidden lg:block absolute inset-y-0 left-6 xl:left-10 z-20 pointer-events-none">
@@ -261,7 +265,7 @@ function RouteRail({ progress, active, reduce }: { progress: ReturnType<typeof u
           <div className="absolute left-[5px] top-2 bottom-2 w-px bg-black/15" />
           <motion.div className="absolute left-[5px] top-2 bottom-2 w-px bg-[#2d6a4f] origin-top" style={{ scaleY: reduce ? 1 : scaleY }} />
           <ol className="space-y-5">
-            {GRAND_TOUR_STAGES.map(s => {
+            {stages.map(s => {
               const on = s.id === active
               return (
                 <li key={s.id} className="relative">
@@ -280,13 +284,14 @@ function RouteRail({ progress, active, reduce }: { progress: ReturnType<typeof u
   )
 }
 
-function MobileStageBar({ progress, active }: { progress: ReturnType<typeof useScroll>['scrollYProgress']; active: string }) {
+function MobileStageBar({ progress, active, stages }: { progress: ReturnType<typeof useScroll>['scrollYProgress']; active: string; stages: GrandTourStage[] }) {
   const scaleX = useTransform(progress, [0, 1], [0, 1])
-  const stage = GRAND_TOUR_STAGES.find(s => s.id === active) ?? GRAND_TOUR_STAGES[0]
+  const stage = stages.find(s => s.id === active) ?? stages[0]
+  if (!stage) return null
   return (
     <div className="lg:hidden sticky top-16 z-20 bg-[#F7F5F2]/95 backdrop-blur border-b border-black/10">
       <div className="px-4 py-2.5 flex items-center justify-between gap-3 font-sans text-xs">
-        <span className="text-black/45 tabular-nums">Stage {stage.number} of {GRAND_TOUR_STAGES.length}</span>
+        <span className="text-black/45 tabular-nums">Stage {stage.number} of {stages.length}</span>
         <span className="font-medium truncate">{stage.name}</span>
       </div>
       <motion.div className="h-0.5 bg-[#2d6a4f] origin-left" style={{ scaleX }} />
@@ -308,7 +313,10 @@ function Leg({ text, reduce }: { text: string; reduce: boolean }) {
 }
 
 // ─── A stage ──────────────────────────────────────────────────────────────────
-function StageScene({ stage, tours, related, featured, hotel, reduce, flip }: { stage: GrandTourStage; tours: Activity[]; related: RelatedProduct[]; featured: RelatedProduct[]; hotel: string; reduce: boolean; flip: boolean }) {
+function StageScene({ stage, tours, featured, hotel, reduce, flip, stages }: { stage: GrandTourStage; tours: Activity[]; featured: RelatedProduct[]; hotel: string; reduce: boolean; flip: boolean; stages: GrandTourStage[] }) {
+  // The bookable block shows only when there is something to book here (or a
+  // hotel filter to explain). A stage with neither is pure story.
+  const hasBookable = tours.length > 0 || featured.length > 0
   const ref = useRef<HTMLElement>(null)
   const { scrollYProgress } = useScroll({ target: ref, offset: ['start end', 'end start'] })
   const imgY = useTransform(scrollYProgress, [0, 1], reduce ? ['0%', '0%'] : ['-8%', '8%'])
@@ -318,7 +326,7 @@ function StageScene({ stage, tours, related, featured, hotel, reduce, flip }: { 
       {/* Scene */}
       <div className="relative h-[72svh] min-h-[460px] overflow-hidden bg-black">
         <motion.div className="absolute -inset-y-[10%] inset-x-0" style={{ y: imgY }}>
-          <Image src={stage.image} alt={stage.name} fill sizes="(min-width: 1024px) 85vw, 100vw" className="object-cover" />
+          {stage.image && <Image src={stage.image} unoptimized={!isOptimizableImageHost(stage.image)} alt={stage.name} fill sizes="(min-width: 1024px) 85vw, 100vw" className="object-cover" />}
         </motion.div>
         <div className={`absolute inset-0 ${flip ? 'bg-gradient-to-l' : 'bg-gradient-to-r'} from-black/70 via-black/30 to-transparent`} />
         <motion.div
@@ -329,7 +337,7 @@ function StageScene({ stage, tours, related, featured, hotel, reduce, flip }: { 
             {String(stage.number).padStart(2, '0')}
           </motion.span>
           <motion.p variants={reveal} className="font-sans text-[11px] tracking-[0.28em] uppercase text-[#C9A96E] mt-2">
-            {stage.area} · {stage.kicker}
+            {[stage.area, stage.kicker].filter(Boolean).join(' · ')}
           </motion.p>
           <motion.h2 variants={reveal} className="font-display italic text-4xl sm:text-6xl leading-tight mt-2">{stage.name}</motion.h2>
           <motion.p variants={reveal} className="font-sans text-sm sm:text-base text-white/80 mt-4 leading-relaxed">{stage.intro}</motion.p>
@@ -352,7 +360,8 @@ function StageScene({ stage, tours, related, featured, hotel, reduce, flip }: { 
           ))}
         </motion.ol>
 
-        {/* Day tours */}
+        {/* Day tours and hand-picked features */}
+        {(hasBookable || hotel) && (
         <div className="max-w-5xl mt-16">
           <motion.div
             className="flex items-end justify-between gap-4 mb-6 border-b border-black/10 pb-3"
@@ -361,41 +370,26 @@ function StageScene({ stage, tours, related, featured, hotel, reduce, flip }: { 
             <h3 className="font-sans text-[11px] tracking-[0.24em] uppercase text-black/55">
               {tours.length > 0 || featured.length === 0 ? `Day tours to ${stage.name}` : `Book at ${stage.name}`}
             </h3>
-            <Link href={`/regions/${stage.regionSlug}`} className="font-sans text-xs text-[#2d6a4f] hover:underline flex items-center gap-1 shrink-0">
-              Explore the {stage.area.split(' ')[0]} Berg <ChevronRight size={12} />
-            </Link>
+            {stage.regionSlug && (
+              <Link href={`/regions/${stage.regionSlug}`} className="font-sans text-xs text-[#2d6a4f] hover:underline flex items-center gap-1 shrink-0">
+                Explore the region <ChevronRight size={12} />
+              </Link>
+            )}
           </motion.div>
           {tours.length > 0 ? (
             <div className="grid gap-5 md:grid-cols-2">
-              {tours.map(t => <TourCard key={t.id} tour={t} hotel={hotel} reduce={reduce} highlightStage={stage.id} />)}
+              {tours.map(t => <TourCard key={t.id} tour={t} hotel={hotel} reduce={reduce} highlightStage={stage.id} stages={stages} />)}
             </div>
-          ) : featured.length > 0 && !hotel ? null : (
-            <>
-              <p className="font-sans text-sm text-black/50 mb-6">
-                {hotel
-                  ? `No day tours collect from ${hotel} for this stage yet. Choose “Any hotel” above to see every tour.`
-                  : related.length > 0
-                    ? 'No scheduled day tour runs to this stage yet. You can still book these here:'
-                    : 'No scheduled day tour runs to this stage yet.'}
-              </p>
-              {!hotel && related.length > 0 && (
-                <div className="grid gap-4 sm:grid-cols-2">
-                  {related.map(p => <RelatedCard key={p.id} product={p} reduce={reduce} />)}
-                </div>
-              )}
-              {!hotel && related.length === 0 && (
-                <Link href={`/regions/${stage.regionSlug}`} className="inline-flex items-center gap-2 border border-black/20 px-5 py-2.5 font-sans text-sm hover:border-black/60">
-                  See what to book in the {stage.area} <ChevronRight size={14} />
-                </Link>
-              )}
-            </>
-          )}
+          ) : hotel ? (
+            <p className="font-sans text-sm text-black/50 mb-6">
+              No day tours collect from {hotel} for this stage yet. Choose “Any hotel” above to see every tour.
+            </p>
+          ) : null}
 
-          {/* Hand-picked by VD Operations: shown whether or not the stage
-              has day tours, and in place of the automatic suggestions. */}
+          {/* Hand-picked by VD Operations / admin, beside any day tours. */}
           {featured.length > 0 && (
-            <div className={tours.length > 0 ? 'mt-12' : ''}>
-              {tours.length > 0 && <motion.h3
+            <div className={tours.length > 0 || hotel ? 'mt-12' : ''}>
+              {(tours.length > 0 || hotel) && <motion.h3
                 className="font-sans text-[11px] tracking-[0.24em] uppercase text-black/55 mb-4"
                 initial={reduce ? false : 'hidden'} whileInView="show" viewport={{ once: true, amount: 0.8 }} variants={reveal}
               >
@@ -407,19 +401,20 @@ function StageScene({ stage, tours, related, featured, hotel, reduce, flip }: { 
             </div>
           )}
         </div>
+        )}
       </div>
     </section>
   )
 }
 
 // ─── A bookable day tour ─────────────────────────────────────────────────────
-function TourCard({ tour, hotel, reduce, highlightStage }: { tour: Activity; hotel: string; reduce: boolean; highlightStage?: string }) {
+function TourCard({ tour, hotel, reduce, highlightStage, stages }: { tour: Activity; hotel: string; reduce: boolean; highlightStage?: string; stages: GrandTourStage[] }) {
   const gt = tour.grandTour!
   const href = dayTourHref(tour)
   const pickup = hotel ? gt.pickupPoints.find(p => p.name.trim() === hotel) : undefined
   const departures = useMemo(() => upcomingDepartures(tour, { days: 21, limit: 3 }), [tour])
   const visits = gt.highlightIds
-    .map(id => ({ id, h: highlightById(id) }))
+    .map(id => ({ id, h: highlightById(id, stages) }))
     .filter((x): x is { id: string; h: NonNullable<ReturnType<typeof highlightById>> } => !!x.h)
   const duration = [tour.durationH ? `${tour.durationH} h` : '', tour.durationM ? `${tour.durationM} min` : ''].filter(Boolean).join(' ')
   const link = (date?: string) => {
@@ -437,7 +432,7 @@ function TourCard({ tour, hotel, reduce, highlightStage }: { tour: Activity; hot
     >
       {tour.photos?.[0] && (
         <Link href={link()} className="relative block aspect-[16/9] overflow-hidden group" tabIndex={-1} aria-hidden="true">
-          <Image src={tour.photos[0]} alt="" fill sizes="(min-width: 768px) 40vw, 100vw" className="object-cover transition-transform duration-700 group-hover:scale-105" />
+          <Image src={tour.photos[0]} unoptimized={!isOptimizableImageHost(tour.photos[0])} alt="" fill sizes="(min-width: 768px) 40vw, 100vw" className="object-cover transition-transform duration-700 group-hover:scale-105" />
         </Link>
       )}
       <div className="p-5 sm:p-6 flex flex-col flex-1">
@@ -457,7 +452,7 @@ function TourCard({ tour, hotel, reduce, highlightStage }: { tour: Activity; hot
             Visits{' '}
             {visits.map((v, i) => (
               <span key={v.id}>
-                <span className={highlightStage && GRAND_TOUR_STAGES.find(s => s.id === highlightStage)?.highlights.some(h => h.id === v.id) ? 'text-black font-medium' : ''}>{v.h.name}</span>
+                <span className={highlightStage && stages.find(s => s.id === highlightStage)?.highlights.some(h => h.id === v.id) ? 'text-black font-medium' : ''}>{v.h.name}</span>
                 {i < visits.length - 1 ? ', ' : ''}
               </span>
             ))}
@@ -513,7 +508,7 @@ function RelatedCard({ product, reduce }: { product: RelatedProduct; reduce: boo
       <Link href={product.href} className="group bg-white border border-black/10 hover:border-black/30 flex items-stretch transition-colors h-full">
         {product.image && (
           <div className="relative w-28 shrink-0 overflow-hidden">
-            <Image src={product.image} alt="" fill sizes="112px" className="object-cover transition-transform duration-700 group-hover:scale-105" />
+            <Image src={product.image} unoptimized={!isOptimizableImageHost(product.image)} alt="" fill sizes="112px" className="object-cover transition-transform duration-700 group-hover:scale-105" />
           </div>
         )}
         <div className="p-4 flex-1 min-w-0">
@@ -531,23 +526,20 @@ function RelatedCard({ product, reduce }: { product: RelatedProduct; reduce: boo
 }
 
 // ─── How it works ─────────────────────────────────────────────────────────────
-function HowItWorks({ reduce }: { reduce: boolean }) {
-  const steps = [
-    { icon: CalendarDays, title: 'Choose a departure', text: 'Pick a day tour, a date and the hotel you’re staying at. Seats are held while you check out.' },
-    { icon: Ticket, title: 'Get your tickets', text: 'Once payment clears, every seat gets its own QR ticket in My Tickets and in your receipt email.' },
-    { icon: QrCode, title: 'Scan and board', text: 'Be at reception for your pickup time. Your operator scans each ticket before the bus leaves.' },
-  ]
+function HowItWorks({ reduce, content }: { reduce: boolean; content: GrandTourContent['howItWorks'] }) {
+  const icons = [CalendarDays, Ticket, QrCode]
+  const steps = content.steps.filter(st => st.title || st.text).map((st, i) => ({ ...st, icon: icons[i % icons.length] }))
   return (
     <section className="bg-[#000000] text-white px-4 sm:px-6 lg:px-12 py-20 sm:py-28 mt-10">
       <motion.div
         className="max-w-5xl mx-auto"
         initial={reduce ? false : 'hidden'} whileInView="show" viewport={{ once: true, amount: 0.3 }} variants={stagger}
       >
-        <motion.p variants={reveal} className="font-sans text-[11px] tracking-[0.28em] uppercase text-[#C9A96E] mb-4">How booking works</motion.p>
-        <motion.h2 variants={reveal} className="font-display italic text-3xl sm:text-5xl">From your hotel to the escarpment</motion.h2>
+        {content.kicker && <motion.p variants={reveal} className="font-sans text-[11px] tracking-[0.28em] uppercase text-[#C9A96E] mb-4">{content.kicker}</motion.p>}
+        <motion.h2 variants={reveal} className="font-display italic text-3xl sm:text-5xl">{content.heading}</motion.h2>
         <div className="grid gap-10 sm:grid-cols-3 mt-14">
           {steps.map((s, i) => (
-            <motion.div key={s.title} variants={reveal}>
+            <motion.div key={i} variants={reveal}>
               <s.icon size={22} className="text-[#C9A96E]" />
               <p className="font-sans text-[11px] tracking-[0.2em] uppercase text-white/40 mt-5">Step {i + 1}</p>
               <h3 className="font-display italic text-2xl mt-1">{s.title}</h3>
@@ -556,10 +548,12 @@ function HowItWorks({ reduce }: { reduce: boolean }) {
           ))}
         </div>
         <motion.div variants={reveal} className="mt-16 pt-8 border-t border-white/15 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <p className="font-sans text-sm text-white/65">Run day tours in the Drakensberg? List with Visit Drakensberg and we’ll feature them on the Grand Tour.</p>
-          <Link href="/list-with-us" className="font-sans text-sm border border-white/40 px-5 py-2.5 hover:bg-white hover:text-black transition-colors text-center">
-            List your day tour
-          </Link>
+          <p className="font-sans text-sm text-white/65">{content.supplierLine}</p>
+          {content.supplierCta && (
+            <Link href="/list-with-us" className="font-sans text-sm border border-white/40 px-5 py-2.5 hover:bg-white hover:text-black transition-colors text-center">
+              {content.supplierCta}
+            </Link>
+          )}
         </motion.div>
       </motion.div>
     </section>

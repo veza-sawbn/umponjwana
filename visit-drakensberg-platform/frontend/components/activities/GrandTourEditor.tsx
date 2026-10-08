@@ -1,7 +1,8 @@
 'use client'
 import { Plus, Trash2, Mountain } from 'lucide-react'
 import { newEntityId } from '@/lib/entities'
-import { GRAND_TOUR_STAGES, type GrandTourListing, type PickupPoint } from '@/lib/grand-tour'
+import type { GrandTourListing, PickupPoint } from '@/lib/grand-tour'
+import { useGrandTourStages } from '@/lib/use-grand-tour-stages'
 
 /**
  * "List this as a Grand Tour Drakensberg day tour" — VD Operations' editor
@@ -25,6 +26,7 @@ export function GrandTourEditor({
   onChange: (v: GrandTourListing) => void
   hasTimeslots: boolean
 }) {
+  const stages = useGrandTourStages()
   const set = <K extends keyof GrandTourListing>(k: K, v: GrandTourListing[K]) => onChange({ ...value, [k]: v })
   const inp = 'w-full border border-black/12 rounded-lg px-3 py-2 font-sans text-sm text-black/80 focus:outline-none focus:border-[#C9A96E]'
 
@@ -72,7 +74,7 @@ export function GrandTourEditor({
             <p className="font-sans text-xs font-medium text-black/60 mb-1">Highlights this tour visits</p>
             <p className="font-sans text-[11px] text-black/40 mb-2">Places the tour on the Grand Tour itinerary under these stops.</p>
             <div className="space-y-3">
-              {GRAND_TOUR_STAGES.map(stage => (
+              {stages.map(stage => (
                 <fieldset key={stage.id}>
                   <legend className="font-sans text-[11px] uppercase tracking-wider text-black/40 mb-1.5">{stage.number}. {stage.name}</legend>
                   <div className="flex flex-wrap gap-2">

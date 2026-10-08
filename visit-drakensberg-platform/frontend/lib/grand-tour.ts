@@ -50,7 +50,8 @@ export type GrandTourStage = {
   id: string
   /** 1-based position on the route. */
   number: number
-  area: 'Northern Drakensberg' | 'Central Drakensberg' | 'Southern Drakensberg'
+  /** Region name, e.g. "Southern Drakensberg" — matches Activity.region. */
+  area: string
   regionSlug: string
   name: string
   kicker: string
@@ -59,13 +60,6 @@ export type GrandTourStage = {
   /** Rough driving time from the previous stage, shown between stages. */
   legFromPrevious?: string
   highlights: GrandTourHighlight[]
-  /** Trail ids of guided tours (lib/tours.ts) that start in this stage — the
-   *  bookable fallback shown while no day tour covers it. */
-  relatedTrailIds?: string[]
-  /** The stage that shows its area's other activities as that fallback, so
-   *  an activity in "Central Drakensberg" appears once, not on every
-   *  Central stage. */
-  areaHome?: boolean
 }
 
 const img = (id: string) => `https://images.unsplash.com/${id}?w=1800&q=80&auto=format&fit=crop`
@@ -73,8 +67,6 @@ const img = (id: string) => `https://images.unsplash.com/${id}?w=1800&q=80&auto=
 export const GRAND_TOUR_STAGES: GrandTourStage[] = [
   {
     id: 'royal-natal',
-    relatedTrailIds: ['thukela-falls', 'tugela-falls', 'northen-traverse', 'northern-traverse'],
-    areaHome: true,
     number: 1,
     area: 'Northern Drakensberg',
     regionSlug: 'north-berg',
@@ -91,7 +83,6 @@ export const GRAND_TOUR_STAGES: GrandTourStage[] = [
   },
   {
     id: 'cathedral-peak',
-    relatedTrailIds: ['mnweni-circuit', 'cathedral-peak'],
     number: 2,
     area: 'Northern Drakensberg',
     regionSlug: 'north-berg',
@@ -109,8 +100,6 @@ export const GRAND_TOUR_STAGES: GrandTourStage[] = [
   },
   {
     id: 'champagne-valley',
-    relatedTrailIds: ['champagne-castle', 'sterkhorn'],
-    areaHome: true,
     number: 3,
     area: 'Central Drakensberg',
     regionSlug: 'central-berg',
@@ -129,7 +118,6 @@ export const GRAND_TOUR_STAGES: GrandTourStage[] = [
   },
   {
     id: 'giants-castle',
-    relatedTrailIds: ['mafadi', 'giants-castle'],
     number: 4,
     area: 'Central Drakensberg',
     regionSlug: 'central-berg',
@@ -163,7 +151,6 @@ export const GRAND_TOUR_STAGES: GrandTourStage[] = [
   },
   {
     id: 'sani-pass',
-    areaHome: true,
     number: 6,
     area: 'Southern Drakensberg',
     regionSlug: 'south-berg',
@@ -197,19 +184,17 @@ export const GRAND_TOUR_STAGES: GrandTourStage[] = [
   },
 ]
 
-const HIGHLIGHT_STAGE = new Map<string, GrandTourStage>(
-  GRAND_TOUR_STAGES.flatMap(s => s.highlights.map(h => [h.id, s] as const)),
-)
-
-export function stageForHighlight(highlightId: string): GrandTourStage | undefined {
-  return HIGHLIGHT_STAGE.get(highlightId)
+/** The stage a highlight belongs to. `stages` is the page's current content
+ *  (lib/grand-tour-content.ts) — admins can edit it — and defaults to the
+ *  built-in route. */
+export function stageForHighlight(highlightId: string, stages: GrandTourStage[] = GRAND_TOUR_STAGES): GrandTourStage | undefined {
+  return stages.find(s => s.highlights.some(h => h.id === highlightId))
 }
 
-export function highlightById(highlightId: string): GrandTourHighlight | undefined {
-  return HIGHLIGHT_STAGE.get(highlightId)?.highlights.find(h => h.id === highlightId)
+export function highlightById(highlightId: string, stages: GrandTourStage[] = GRAND_TOUR_STAGES): GrandTourHighlight | undefined {
+  return stageForHighlight(highlightId, stages)?.highlights.find(h => h.id === highlightId)
 }
 
-/** Live, bookable Grand Tour day tours among a set of activities. */
 export function grandTourActivities(activities: Activity[]): Activity[] {
   return activities.filter(a =>
     a.status === 'active' && a.grandTour?.enabled && (a.timeslots?.length ?? 0) > 0,
@@ -217,13 +202,9 @@ export function grandTourActivities(activities: Activity[]): Activity[] {
 }
 
 /** The stages a day tour visits, in route order. */
-export function stagesForActivity(activity: Pick<Activity, 'grandTour'>): GrandTourStage[] {
-  const ids = new Set(
-    (activity.grandTour?.highlightIds ?? [])
-      .map(id => stageForHighlight(id)?.id)
-      .filter((id): id is string => !!id),
-  )
-  return GRAND_TOUR_STAGES.filter(s => ids.has(s.id))
+export function stagesForActivity(activity: Pick<Activity, 'grandTour'>, stages: GrandTourStage[] = GRAND_TOUR_STAGES): GrandTourStage[] {
+  const ids = new Set(activity.grandTour?.highlightIds ?? [])
+  return stages.filter(s => s.highlights.some(h => ids.has(h.id)))
 }
 
 /** Clock time the bus is at a pickup for a given departure ("07:30" − 45 min → "06:45"). */

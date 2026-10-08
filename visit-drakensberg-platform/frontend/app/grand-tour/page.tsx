@@ -2,67 +2,53 @@ import type { Metadata } from 'next'
 import { getActivities } from '@/lib/activities'
 import { getTours } from '@/lib/tours'
 import { publicSupabase } from '@/lib/supabase-public'
-import { grandTourActivities, GRAND_TOUR_STAGES } from '@/lib/grand-tour'
+import { grandTourActivities } from '@/lib/grand-tour'
+import { getGrandTourContent } from '@/lib/grand-tour-content'
 import { getSupplierEntities } from '@/lib/supplier-entities'
 import type { Event } from '@/lib/events'
 import { isEventUpcoming } from '@/lib/upcoming'
 import { getGrandTourFeatures, activityItem, eventItem, tourItem, type CatalogueItem } from '@/lib/grand-tour-features'
 import GrandTourExperience, { type RelatedProduct } from '@/components/grand-tour/GrandTourExperience'
 
-// Server shell: the editorial route is static (lib/grand-tour.ts), the day
-// tours on it are live supplier listings. Same short ISR window as the
-// activity pages, since seat counts and departures change through the day.
-export const revalidate = 300
+// Rendered on every request, never from a cache. The page is three live
+// things — the day tours VD Operations publishes, their seat counts, and the
+// copy an admin edits at /admin/grand-tour — and each must show the moment
+// it changes. `revalidate = 300` was not enough: on Next 14.2 the Supabase
+// reads still went to the Data Cache, so a day tour published after the
+// cache filled never appeared. Same fix as app/experiences/[id]/page.tsx.
+export const dynamic = 'force-dynamic'
+export const fetchCache = 'force-no-store'
 
-export const metadata: Metadata = {
-  title: 'Grand Tour Drakensberg',
-  description:
-    'The Drakensberg from north to south in seven stages: the Amphitheatre, Cathedral Peak, Champagne Valley, Giant’s Castle, Kamberg, Sani Pass and Garden Castle. Book a seat on a day tour with pickup from your hotel.',
-  alternates: { canonical: '/grand-tour' },
-  openGraph: {
-    title: 'Grand Tour Drakensberg',
-    description: 'Seven stages along the escarpment, and day tours that collect you from your hotel.',
-    images: [{ url: GRAND_TOUR_STAGES[0].image }],
-  },
+export async function generateMetadata(): Promise<Metadata> {
+  const content = await getGrandTourContent(publicSupabase)
+  const description =
+    `The Drakensberg from north to south in ${content.stages.length} stages: ${content.stages.map(s => s.name).join(', ')}. Book a seat on a day tour with pickup from your hotel.`
+  return {
+    title: content.hero.title || 'Grand Tour Drakensberg',
+    description,
+    alternates: { canonical: '/grand-tour' },
+    openGraph: {
+      title: content.hero.title || 'Grand Tour Drakensberg',
+      description: content.hero.subtitle || description,
+      images: content.hero.image ? [{ url: content.hero.image }] : undefined,
+    },
+  }
 }
 
 export default async function GrandTourPage() {
-  const [activities, guidedTours, events, features] = await Promise.all([
+  const [content, activities, guidedTours, events, features] = await Promise.all([
+    getGrandTourContent(publicSupabase),
     getActivities(publicSupabase).catch(() => []),
     getTours(publicSupabase).catch(() => []),
     getSupplierEntities<Event>('events', undefined, publicSupabase).catch(() => [] as Event[]),
     getGrandTourFeatures(publicSupabase),
   ])
   const tours = grandTourActivities(activities)
-  const dayTourIds = new Set(tours.map(t => t.id))
 
-  // A stage no day tour covers yet still offers what IS bookable there: the
-  // guided tours that start on its trails, and (on the stage that is home to
-  // its area) the area's other live activities. Every stage then ends in
-  // something a visitor can actually buy.
-  const related: Record<string, RelatedProduct[]> = {}
-  for (const stage of GRAND_TOUR_STAGES) {
-    const trailIds = new Set(stage.relatedTrailIds ?? [])
-    const fromTours: RelatedProduct[] = guidedTours
-      .filter(t => t.status === 'active' && trailIds.has(t.trailId))
-      .map(t => ({
-        id: t.id, kind: 'Guided tour', name: t.name.trim(), href: `/tours/${t.slug || t.id}`,
-        price: t.pricePerPerson || undefined, detail: t.days ? `${t.days} day${t.days === 1 ? '' : 's'}` : undefined,
-      }))
-    const fromActivities: RelatedProduct[] = stage.areaHome
-      ? activities
-          .filter(a => a.status === 'active' && !dayTourIds.has(a.id) && a.region === stage.area)
-          .map(a => ({
-            id: a.id, kind: 'Activity', name: a.name, href: `/activities/${a.slug || a.id}`,
-            image: a.photos?.[0], price: a.pricePerPerson || undefined, detail: a.category || undefined,
-          }))
-      : []
-    related[stage.id] = [...fromTours, ...fromActivities].slice(0, 4)
-  }
-
-  // What VD Operations hand-picked for each stage (/operations/grand-tour).
-  // Resolved against the live catalogue on every render, so a feature whose
-  // listing went to draft, or an event that has passed, simply drops out.
+  // Only what VD Operations or an admin hand-picked for each stage — nothing
+  // is added automatically. Resolved against the live catalogue on every
+  // request, so a feature whose listing went to draft, or an event that has
+  // passed, simply drops out.
   const catalogue = new Map<string, CatalogueItem>()
   for (const a of activities) catalogue.set(`activity:${a.id}`, activityItem(a))
   for (const t of guidedTours) catalogue.set(`tour:${t.id}`, tourItem(t))
@@ -80,5 +66,5 @@ export default async function GrandTourPage() {
     })
   }
 
-  return <GrandTourExperience tours={tours} related={related} featured={featured} />
+  return <GrandTourExperience tours={tours} featured={featured} content={content} />
 }

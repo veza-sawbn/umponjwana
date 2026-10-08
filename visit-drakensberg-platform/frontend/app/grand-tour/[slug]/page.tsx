@@ -3,14 +3,18 @@ import { notFound } from 'next/navigation'
 import { getActivityById, type Activity } from '@/lib/activities'
 import { publicSupabase } from '@/lib/supabase-public'
 import { dayTourHref } from '@/lib/grand-tour'
+import { getGrandTourContent } from '@/lib/grand-tour-content'
 import DayTourDetail from '@/components/grand-tour/DayTourDetail'
 import TrackView from '@/components/analytics/TrackView'
 import JsonLd from '@/components/seo/JsonLd'
 
 // One Grand Tour day tour: its own page, itinerary and booking panel. The
 // product is an Activity carrying a `grandTour` listing (lib/grand-tour.ts).
-// Same short ISR window as the activity pages, since seats change all day.
-export const revalidate = 300
+// Never cached: seat counts change all day, and a tour VD Operations has just
+// published must be bookable at once (see app/grand-tour/page.tsx for why
+// `revalidate` alone left new tours invisible).
+export const dynamic = 'force-dynamic'
+export const fetchCache = 'force-no-store'
 
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://visitdrakensberg.com'
 
@@ -40,7 +44,7 @@ export async function generateMetadata({ params }: { params: { slug: string } })
 }
 
 export default async function DayTourPage({ params }: { params: { slug: string } }) {
-  const tour = await resolve(params.slug)
+  const [tour, content] = await Promise.all([resolve(params.slug), getGrandTourContent(publicSupabase)])
   if (!tour) notFound()
   const bookable = isBookable(tour)
   const url = `${SITE_URL}${dayTourHref(tour)}`
@@ -70,7 +74,7 @@ export default async function DayTourPage({ params }: { params: { slug: string }
         ],
       }} />
       <TrackView event="grand_tour_view" properties={{ id: tour.id, name: tour.name, region: tour.region }} />
-      <DayTourDetail tour={tour} bookable={bookable} />
+      <DayTourDetail tour={tour} bookable={bookable} stages={content.stages} />
     </>
   )
 }

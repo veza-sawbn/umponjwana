@@ -6,9 +6,10 @@ import { motion, useReducedMotion, type Variants } from 'framer-motion'
 import { ArrowLeft, Bus, Clock, MapPin, Users, CheckCircle, ShieldCheck, Shirt, Mountain, Flag } from 'lucide-react'
 import Footer from '@/components/layout/Footer'
 import type { Activity } from '@/lib/activities'
-import { highlightById, stageForHighlight, stagesForActivity, pickupTime, upcomingDepartures, GRAND_TOUR_STAGES } from '@/lib/grand-tour'
+import { highlightById, stageForHighlight, stagesForActivity, pickupTime, upcomingDepartures, type GrandTourStage } from '@/lib/grand-tour'
 import { formatMoney } from '@/lib/allocation'
 import { ease } from '@/lib/motion'
+import { isOptimizableImageHost } from '@/lib/image-url'
 import DayTourBooking from './DayTourBooking'
 
 const reveal: Variants = {
@@ -17,13 +18,13 @@ const reveal: Variants = {
 }
 const stagger: Variants = { hidden: {}, show: { transition: { staggerChildren: 0.12 } } }
 
-export default function DayTourDetail({ tour, bookable }: { tour: Activity; bookable: boolean }) {
+export default function DayTourDetail({ tour, bookable, stages: allStages }: { tour: Activity; bookable: boolean; stages: GrandTourStage[] }) {
   const reduce = useReducedMotion()
   const gt = tour.grandTour
-  const stages = stagesForActivity(tour)
-  const hero = tour.photos?.[0] || stages[0]?.image || GRAND_TOUR_STAGES[0].image
+  const stages = stagesForActivity(tour, allStages)
+  const hero = tour.photos?.[0] || stages[0]?.image || allStages[0]?.image || ''
   const stops = (gt?.highlightIds ?? [])
-    .map(id => ({ id, h: highlightById(id), stage: stageForHighlight(id) }))
+    .map(id => ({ id, h: highlightById(id, allStages), stage: stageForHighlight(id, allStages) }))
     .filter(s => s.h && s.stage)
   const pickups = gt?.pickupPoints ?? []
   const firstDeparture = (tour.timeslots ?? []).slice().sort((a, b) => a.time.localeCompare(b.time))[0]
@@ -36,7 +37,7 @@ export default function DayTourDetail({ tour, bookable }: { tour: Activity; book
       {/* Hero */}
       <section className="relative h-[62svh] min-h-[440px] mt-16 overflow-hidden bg-black">
         <motion.div className="absolute inset-0" initial={reduce ? false : { scale: 1.08 }} animate={{ scale: 1 }} transition={{ duration: 5, ease: ease.out }}>
-          <Image src={hero} alt={tour.name} fill priority sizes="100vw" className="object-cover" />
+          {hero && <Image src={hero} unoptimized={!isOptimizableImageHost(hero)} alt={tour.name} fill priority sizes="100vw" className="object-cover" />}
         </motion.div>
         <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-black/20" />
         <div className="relative h-full max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-12 flex flex-col justify-between py-8 text-white">
@@ -143,7 +144,7 @@ export default function DayTourDetail({ tour, bookable }: { tour: Activity; book
                 <Mountain size={15} className="text-[#C9A96E] mt-0.5 shrink-0" />
                 <span>
                   Part of the <Link href="/grand-tour" className="text-[#2d6a4f] underline underline-offset-4">Grand Tour Drakensberg</Link>
-                  {' '}— stage{stages.length > 1 ? 's' : ''} {stages.map(s => s.number).join(' & ')} of {GRAND_TOUR_STAGES.length}.
+                  {' '}— stage{stages.length > 1 ? 's' : ''} {stages.map(s => s.number).join(' & ')} of {allStages.length}.
                 </span>
               </p>
             </motion.section>

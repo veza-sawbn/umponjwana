@@ -4,9 +4,13 @@ Where the pieces live, for the next person (or session) looking for them.
 
 ## The Grand Tour page — `/grand-tour`
 
-- `app/grand-tour/page.tsx`: server shell (ISR, 5 min). Loads live activities and keeps the Grand Tour ones.
-- `components/grand-tour/GrandTourExperience.tsx`: the scroll itinerary. Hero, seven stages north to south, highlights that fade in, a route rail that fills as you scroll (desktop) or a stage bar (mobile), and the bookable day tours under each stage. Includes a "pick up from my hotel" filter.
-- `lib/grand-tour.ts`: the editorial route (stages and highlights) and helpers. Edit stage copy and images here.
+- `app/grand-tour/page.tsx`: server shell, rendered on every request with no caching (`force-dynamic` + `fetchCache = 'force-no-store'`). With `revalidate` alone, Next 14.2 kept serving Supabase reads from its Data Cache and a newly published day tour never appeared.
+- `components/grand-tour/GrandTourExperience.tsx`: the scroll itinerary. Hero, the stages north to south, highlights that fade in, a route rail that fills as you scroll (desktop) or a stage bar (mobile), the day tours under each stage, and what was hand-picked for it. Includes a "pick up from my hotel" filter. Nothing is added automatically: a stage with no day tour and no features is just its story.
+- **Content is edited by admins at `/admin/grand-tour` → Page content**: hero, introduction, every stage (name, tagline, area, region link, intro, image, travel time) and its highlights, and the closing "how booking works" band. Stored as one row in `site_content` (key `grand_tour_page`, admin-only write) via `lib/grand-tour-content.ts`; `lib/grand-tour.ts` holds the original text, used until something is saved. Ids survive edits, so renaming a highlight never detaches the day tours that visit it.
+
+## Admin: `/admin/grand-tour`
+
+Three tabs, for admins (no ops assignment needed): **Page content** (above), **Day tours** (create day tours for any approved operator, list activities on the Grand Tour, publish; the same `components/grand-tour-admin/DayToursManager.tsx` the ops panel uses) and **Featured on stages**.
 
 ## Who runs it: VD Operations
 
@@ -32,7 +36,6 @@ The listing is stored as `Activity.grandTour` (`lib/activities.ts`); the editor 
 
 - `app/grand-tour/[slug]/page.tsx` + `components/grand-tour/DayTourDetail.tsx`: hero, the day as a route (hotel pickups with times → the Grand Tour highlights it visits → back to the hotel), inclusions, and the booking panel. Indexed and bookable only when the activity is active, listed on the Grand Tour and has timeslots; otherwise it shows a "preview" notice with booking disabled.
 - `components/grand-tour/DayTourBooking.tsx`: departure chips, hotel pickup, adults/children, **Book now** (adds the seats and goes straight to `/checkout`) and **Add to trip**.
-- On `/grand-tour`, every stage ends in a bookable option: its day tours, or, while it has none, guided tours on its trails (`relatedTrailIds`) and live activities in its area (`areaHome`), built server-side in `app/grand-tour/page.tsx`.
 
 ## How a guest books
 
