@@ -26,6 +26,7 @@ const STATIC_ROUTES = [
   { path: '/hikes', priority: 0.9 },
   { path: '/activities', priority: 0.9 },
   { path: '/tours', priority: 0.8 },
+  { path: '/grand-tour', priority: 0.8 },
   { path: '/transport', priority: 0.6 },
   { path: '/search', priority: 0.8 },
   { path: '/regions', priority: 0.8 },

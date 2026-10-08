@@ -9,6 +9,8 @@ import { GoogleAddressField } from '@/components/maps/GoogleAddressField'
 import { supplierMediaSource } from '@/lib/supplier-media'
 import { MediaGalleryPicker } from '@/components/media/MediaPicker'
 import { TimeslotEditor } from '@/components/activities/TimeslotEditor'
+import { GrandTourEditor, emptyGrandTour, cleanGrandTour } from '@/components/activities/GrandTourEditor'
+import type { GrandTourListing } from '@/lib/grand-tour'
 import { VehicleToggle } from '@/components/activities/VehicleToggle'
 import { addSupplierType } from '@/lib/supplier-types'
 
@@ -22,6 +24,7 @@ type FormState = {
   description: string; whatToWear: string; photos: string[]; included: string[]; safetyNotes: string;
   pricePerPerson: number; priceGroup: number; childPrice: number; childMaxAge: number;
   timeslots: ActivityTimeslot[]; depositRequired: boolean; depositPercent: string;
+  grandTour: GrandTourListing;
   status: 'active' | 'draft'
   seasons: Season[]; topics: SeasonTopic[]
 }
@@ -32,6 +35,7 @@ const EMPTY: FormState = {
   usesOwnVehicles: false,
   description: '', whatToWear: '', photos: [], included: [], safetyNotes: '',
   pricePerPerson: 0, priceGroup: 0, childPrice: 0, childMaxAge: 0, timeslots: [],
+  grandTour: emptyGrandTour(),
   depositRequired: false, depositPercent: '30',
   status: 'active',
   seasons: [], topics: [],
@@ -77,6 +81,7 @@ export default function EditActivityPage() {
           included: a.included, safetyNotes: a.safetyNotes,
           pricePerPerson: a.pricePerPerson, priceGroup: a.priceGroup,
           childPrice: a.childPrice ?? 0, childMaxAge: a.childMaxAge ?? 0, timeslots: a.timeslots ?? [],
+          grandTour: a.grandTour ? { ...emptyGrandTour(), ...a.grandTour } : emptyGrandTour(),
           depositRequired: a.depositRequired, depositPercent: a.depositPercent,
           status: a.status,
           seasons: a.seasons ?? [], topics: a.topics ?? [],
@@ -101,7 +106,9 @@ export default function EditActivityPage() {
     setError('')
     setSaving(true)
     try {
-      await updateActivity(id, form)
+      // Always written, even switched off, so unticking the Grand Tour box
+      // actually takes the tour off /grand-tour.
+      await updateActivity(id, { ...form, grandTour: cleanGrandTour(form.grandTour) ?? emptyGrandTour() })
       // Best-effort, like the revalidate in lib/activities.ts: the edit is
       // already saved, so a failure here costs the supplier the fleet tools,
       // never their listing.
@@ -224,6 +231,10 @@ export default function EditActivityPage() {
         <div className="pt-2 border-t border-black/8">
           <p className="font-sans text-sm font-medium text-black/70 mb-2">Timeslots</p>
           <TimeslotEditor timeslots={form.timeslots} onChange={v => set('timeslots', v)} />
+        </div>
+
+        <div className="pt-2 border-t border-black/8">
+          <GrandTourEditor value={form.grandTour} onChange={v => set('grandTour', v)} hasTimeslots={form.timeslots.length > 0} />
         </div>
 
         <div className="space-y-3 pt-2 border-t border-black/8">

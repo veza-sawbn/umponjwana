@@ -50,6 +50,13 @@ export type BookingAddon = {
   eventId?: string
   sessionId?: string
   ticketTypeId?: string
+  // Grand Tour day tours (lib/grand-tour.ts): the hotel or meeting point the
+  // guest is collected from, and the clock time the bus is there. The id is
+  // what the payment webhook passes on when it mints the seat tickets; the
+  // name and time are display copies for the cart and itinerary.
+  pickupPointId?: string
+  pickupPointName?: string
+  pickupTime?: string
 }
 
 /** Human-readable party size for a cart/order line — "2 adults, 1 child"

@@ -39,11 +39,18 @@ html {
 /* Lock the page to the device width on mobile — nothing (hero media,
    absolutely-positioned decor, off-canvas panels, wide flex rows, etc.)
    is allowed to push the viewport sideways. Local scrollers (tables,
-   carousels) keep working since this only clips the page itself. */
+   carousels) keep working since this only clips the page itself.
+
+   `clip`, not `hidden`: with both html and body set to `hidden`, body becomes
+   a scroll container that never scrolls, and every `position: sticky` on
+   the site sticks to it instead of the viewport — i.e. never sticks. `clip`
+   clips the same way without creating a scroll container. `hidden` stays
+   first as the fallback for browsers without `clip` (Safari < 16). */
 html,
 body {
   max-width: 100%;
   overflow-x: hidden;
+  overflow-x: clip;
   overscroll-behavior-x: none;
 }
 

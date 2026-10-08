@@ -276,6 +276,19 @@ export async function buildOrderLinesFromBooking(booking: SavedBooking): Promise
       ...(a.eventId && a.sessionId && a.ticketTypeId
         ? { value: { eventId: a.eventId, sessionId: a.sessionId, ticketTypeId: a.ticketTypeId } }
         : {}),
+      // A timeslotted activity line carries the departure it booked, so the
+      // payment webhook can mint one ticket per seat for it — and, for a
+      // Grand Tour day tour, the pickup point printed on those tickets.
+      ...(a.type === 'activity' && a.activityId && a.timeslotId && a.date
+        ? {
+            value: {
+              activityId: a.activityId,
+              slotDate: a.date,
+              timeslotId: a.timeslotId,
+              ...(a.pickupPointId ? { pickupPointId: a.pickupPointId } : {}),
+            },
+          }
+        : {}),
     })
   }
 

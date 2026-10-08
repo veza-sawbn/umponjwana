@@ -4,6 +4,7 @@ import { slugify, uniqueSlug } from './slugify'
 import type { Season, SeasonTopic } from './seasons'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { supabase } from './auth'
+import type { GrandTourListing } from './grand-tour'
 
 // Single canonical activity-category vocabulary — imported by both the
 // supplier creation/edit forms and the public /activities filter tabs.
@@ -91,6 +92,11 @@ export type Activity = {
    *  what reveals the fleet tools: Transport Company, Vehicles, Drivers and
    *  Transport Jobs. Absent on every activity saved before this existed. */
   usesOwnVehicles?: boolean
+  /** Lists this activity as a Grand Tour Drakensberg day tour (/grand-tour):
+   *  which highlights it visits and which hotels it collects guests from.
+   *  Needs timeslots — they are the tour's scheduled departures. Absent on
+   *  every activity saved before the Grand Tour existed. */
+  grandTour?: GrandTourListing
   status: 'active' | 'draft'
   createdAt: string
   /** Which seasons this activity suits — powers the region "When to Go"

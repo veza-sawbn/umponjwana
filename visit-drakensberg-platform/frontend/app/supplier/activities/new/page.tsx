@@ -14,6 +14,7 @@ import { supplierMediaSource } from '@/lib/supplier-media'
 import { MediaGalleryPicker } from '@/components/media/MediaPicker'
 import { TimeslotEditor } from '@/components/activities/TimeslotEditor'
 import { VehicleToggle } from '@/components/activities/VehicleToggle'
+import { GrandTourEditor, emptyGrandTour, cleanGrandTour } from '@/components/activities/GrandTourEditor'
 
 const STEPS = ['Activity Details', 'Logistics', 'Inclusions & Safety', 'Pricing & Timeslots', 'Review']
 
@@ -40,6 +41,7 @@ export default function NewActivityPage() {
     pricePerPerson: '', priceGroup: '', childPrice: '', childMaxAge: '',
     depositRequired: false, depositPercent: '30',
     timeslots: [] as ActivityTimeslot[],
+    grandTour: emptyGrandTour(),
     seasons: [] as Season[], topics: [] as SeasonTopic[],
   })
 
@@ -89,6 +91,7 @@ export default function NewActivityPage() {
         childPrice: form.childMaxAge ? (+form.childPrice || 0) : undefined,
         childMaxAge: form.childMaxAge ? +form.childMaxAge : undefined,
         timeslots: form.timeslots,
+        grandTour: cleanGrandTour(form.grandTour),
         depositRequired: form.depositRequired,
         depositPercent: form.depositPercent,
         usesOwnVehicles: form.usesOwnVehicles,
@@ -229,6 +232,10 @@ export default function NewActivityPage() {
             <div className="pt-2 border-t border-black/8">
               <p className="font-sans text-sm font-medium text-black/70 mb-2">Timeslots</p>
               <TimeslotEditor timeslots={form.timeslots} onChange={v => set('timeslots', v)} />
+            </div>
+
+            <div className="pt-2 border-t border-black/8">
+              <GrandTourEditor value={form.grandTour} onChange={v => set('grandTour', v)} hasTimeslots={form.timeslots.length > 0} />
             </div>
 
             <div className="flex items-center gap-3 pt-2 border-t border-black/8">

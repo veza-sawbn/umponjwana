@@ -415,6 +415,7 @@ export default function CheckoutPage() {
                         <span className="truncate mr-2">
                           {a.title}
                           {a.adults !== undefined && <span className="block text-white/35 text-[11px]">{describeAddonParty(a)}{a.timeslotTime && ` · ${a.timeslotTime}`}</span>}
+                          {a.pickupPointName && <span className="block text-white/35 text-[11px]">Pickup {a.pickupPointName}{a.pickupTime && ` · ${a.pickupTime}`}</span>}
                         </span>
                         <span className="shrink-0">{formatMoney(a.price_per_person * a.guests)}</span>
                       </div>
