@@ -1,7 +1,7 @@
 import {
   LayoutDashboard, List, Building2, BedDouble, Zap, Map, Users, Truck,
   Sparkles, CalendarDays, Tag, BarChart2, Image, MessageSquare, Star, Clock,
-  Calculator, CalendarPlus, Wallet, FileSignature, BookUser,
+  Calculator, CalendarPlus, Wallet, FileSignature, BookUser, QrCode,
   type LucideIcon,
 } from 'lucide-react'
 
@@ -93,6 +93,8 @@ export const SUPPLIER_CONFIG: Record<SupplierType, SupplierTypeConfig> = {
       { href: '/supplier',               label: 'Overview',     icon: LayoutDashboard },
       { href: '/supplier/experiences',   label: 'Experiences',  icon: Sparkles },
       { href: '/supplier/packages',      label: 'Packages',     icon: List },
+      { href: '/supplier/events',        label: 'Events & Tickets', icon: CalendarDays },
+      { href: '/supplier/check-in',      label: 'Check-in Scanner', icon: QrCode },
       ...SHARED_NAV,
     ],
   },
