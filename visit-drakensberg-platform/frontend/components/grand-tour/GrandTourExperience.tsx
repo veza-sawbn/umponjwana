@@ -38,18 +38,20 @@ const TOTAL_HIGHLIGHTS = GRAND_TOUR_STAGES.reduce((n, s) => n + s.highlights.len
  *  from the live catalogue — shown while no Grand Tour day tour covers it. */
 export type RelatedProduct = {
   id: string
-  kind: 'Guided tour' | 'Activity'
+  kind: 'Guided tour' | 'Activity' | 'Event'
   name: string
   href: string
   image?: string
   price?: number
   detail?: string
+  /** A curator's one-line reason, on hand-picked features. */
+  note?: string
 }
 
 const shortDate = (date: string) =>
   new Date(`${date}T00:00:00`).toLocaleDateString('en-ZA', { weekday: 'short', day: 'numeric', month: 'short' })
 
-export default function GrandTourExperience({ tours, related = {} }: { tours: Activity[]; related?: Record<string, RelatedProduct[]> }) {
+export default function GrandTourExperience({ tours, related = {}, featured = {} }: { tours: Activity[]; related?: Record<string, RelatedProduct[]>; featured?: Record<string, RelatedProduct[]> }) {
   const reduce = useReducedMotion()
   const [hotel, setHotel] = useState('')
   const [activeStage, setActiveStage] = useState(GRAND_TOUR_STAGES[0].id)
@@ -167,6 +169,7 @@ export default function GrandTourExperience({ tours, related = {} }: { tours: Ac
               reduce={!!reduce}
               tours={toursByStage.get(stage.id) ?? []}
               related={related[stage.id] ?? []}
+              featured={featured[stage.id] ?? []}
               hotel={hotel}
               flip={i % 2 === 1}
             />
@@ -305,7 +308,7 @@ function Leg({ text, reduce }: { text: string; reduce: boolean }) {
 }
 
 // ─── A stage ──────────────────────────────────────────────────────────────────
-function StageScene({ stage, tours, related, hotel, reduce, flip }: { stage: GrandTourStage; tours: Activity[]; related: RelatedProduct[]; hotel: string; reduce: boolean; flip: boolean }) {
+function StageScene({ stage, tours, related, featured, hotel, reduce, flip }: { stage: GrandTourStage; tours: Activity[]; related: RelatedProduct[]; featured: RelatedProduct[]; hotel: string; reduce: boolean; flip: boolean }) {
   const ref = useRef<HTMLElement>(null)
   const { scrollYProgress } = useScroll({ target: ref, offset: ['start end', 'end start'] })
   const imgY = useTransform(scrollYProgress, [0, 1], reduce ? ['0%', '0%'] : ['-8%', '8%'])
@@ -355,7 +358,9 @@ function StageScene({ stage, tours, related, hotel, reduce, flip }: { stage: Gra
             className="flex items-end justify-between gap-4 mb-6 border-b border-black/10 pb-3"
             initial={reduce ? false : 'hidden'} whileInView="show" viewport={{ once: true, amount: 0.8 }} variants={reveal}
           >
-            <h3 className="font-sans text-[11px] tracking-[0.24em] uppercase text-black/55">Day tours to {stage.name}</h3>
+            <h3 className="font-sans text-[11px] tracking-[0.24em] uppercase text-black/55">
+              {tours.length > 0 || featured.length === 0 ? `Day tours to ${stage.name}` : `Book at ${stage.name}`}
+            </h3>
             <Link href={`/regions/${stage.regionSlug}`} className="font-sans text-xs text-[#2d6a4f] hover:underline flex items-center gap-1 shrink-0">
               Explore the {stage.area.split(' ')[0]} Berg <ChevronRight size={12} />
             </Link>
@@ -364,7 +369,7 @@ function StageScene({ stage, tours, related, hotel, reduce, flip }: { stage: Gra
             <div className="grid gap-5 md:grid-cols-2">
               {tours.map(t => <TourCard key={t.id} tour={t} hotel={hotel} reduce={reduce} highlightStage={stage.id} />)}
             </div>
-          ) : (
+          ) : featured.length > 0 && !hotel ? null : (
             <>
               <p className="font-sans text-sm text-black/50 mb-6">
                 {hotel
@@ -384,6 +389,22 @@ function StageScene({ stage, tours, related, hotel, reduce, flip }: { stage: Gra
                 </Link>
               )}
             </>
+          )}
+
+          {/* Hand-picked by VD Operations: shown whether or not the stage
+              has day tours, and in place of the automatic suggestions. */}
+          {featured.length > 0 && (
+            <div className={tours.length > 0 ? 'mt-12' : ''}>
+              {tours.length > 0 && <motion.h3
+                className="font-sans text-[11px] tracking-[0.24em] uppercase text-black/55 mb-4"
+                initial={reduce ? false : 'hidden'} whileInView="show" viewport={{ once: true, amount: 0.8 }} variants={reveal}
+              >
+                Also at {stage.name}
+              </motion.h3>}
+              <div className="grid gap-4 sm:grid-cols-2">
+                {featured.map(p => <RelatedCard key={p.id} product={p} reduce={reduce} />)}
+              </div>
+            </div>
           )}
         </div>
       </div>
@@ -498,6 +519,7 @@ function RelatedCard({ product, reduce }: { product: RelatedProduct; reduce: boo
         <div className="p-4 flex-1 min-w-0">
           <p className="font-sans text-[10px] tracking-[0.18em] uppercase text-black/45">{product.kind}{product.detail ? ` · ${product.detail}` : ''}</p>
           <p className="font-display italic text-xl mt-1 group-hover:text-[#2d6a4f]">{product.name}</p>
+          {product.note && <p className="font-sans text-xs text-black/60 mt-1">{product.note}</p>}
           <p className="font-sans text-xs text-black/55 mt-2 flex items-center justify-between gap-2">
             <span>{product.price ? <>From <span className="text-[#2d6a4f] font-medium">{formatMoney(product.price)}</span> pp</> : 'See prices and dates'}</span>
             <span className="text-[#2d6a4f] flex items-center gap-0.5 whitespace-nowrap">Book <ChevronRight size={12} /></span>

@@ -144,7 +144,7 @@ function EventCard({ event }: { event: Event }) {
   }
 
   return (
-    <div className="bg-white border border-gray-200 group flex flex-col">
+    <div id={`event-${event.id}`} className="bg-white border border-gray-200 group flex flex-col scroll-mt-24">
       <div className={`relative aspect-[4/3] ${TYPE_BG[event.event_type]} flex items-end p-6 overflow-hidden`}>
         <div className="absolute inset-0 bg-black/20" />
         <div className="relative z-10 flex items-center justify-between w-full">

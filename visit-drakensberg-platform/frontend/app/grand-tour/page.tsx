@@ -3,6 +3,10 @@ import { getActivities } from '@/lib/activities'
 import { getTours } from '@/lib/tours'
 import { publicSupabase } from '@/lib/supabase-public'
 import { grandTourActivities, GRAND_TOUR_STAGES } from '@/lib/grand-tour'
+import { getSupplierEntities } from '@/lib/supplier-entities'
+import type { Event } from '@/lib/events'
+import { isEventUpcoming } from '@/lib/upcoming'
+import { getGrandTourFeatures, activityItem, eventItem, tourItem, type CatalogueItem } from '@/lib/grand-tour-features'
 import GrandTourExperience, { type RelatedProduct } from '@/components/grand-tour/GrandTourExperience'
 
 // Server shell: the editorial route is static (lib/grand-tour.ts), the day
@@ -23,9 +27,11 @@ export const metadata: Metadata = {
 }
 
 export default async function GrandTourPage() {
-  const [activities, guidedTours] = await Promise.all([
+  const [activities, guidedTours, events, features] = await Promise.all([
     getActivities(publicSupabase).catch(() => []),
     getTours(publicSupabase).catch(() => []),
+    getSupplierEntities<Event>('events', undefined, publicSupabase).catch(() => [] as Event[]),
+    getGrandTourFeatures(publicSupabase),
   ])
   const tours = grandTourActivities(activities)
   const dayTourIds = new Set(tours.map(t => t.id))
@@ -54,5 +60,25 @@ export default async function GrandTourPage() {
     related[stage.id] = [...fromTours, ...fromActivities].slice(0, 4)
   }
 
-  return <GrandTourExperience tours={tours} related={related} />
+  // What VD Operations hand-picked for each stage (/operations/grand-tour).
+  // Resolved against the live catalogue on every render, so a feature whose
+  // listing went to draft, or an event that has passed, simply drops out.
+  const catalogue = new Map<string, CatalogueItem>()
+  for (const a of activities) catalogue.set(`activity:${a.id}`, activityItem(a))
+  for (const t of guidedTours) catalogue.set(`tour:${t.id}`, tourItem(t))
+  for (const e of events) {
+    const upcoming = (e.sessions ?? []).some(s => s.status === 'active' && isEventUpcoming(s)) || isEventUpcoming(e)
+    if (upcoming) catalogue.set(`event:${e.id}`, eventItem(e))
+  }
+  const featured: Record<string, RelatedProduct[]> = {}
+  for (const f of features) {
+    const item = catalogue.get(`${f.kind}:${f.entityId}`)
+    if (!item?.live) continue
+    ;(featured[f.stageId] ??= []).push({
+      id: item.id, kind: item.kindLabel, name: item.name, href: item.href,
+      image: item.image, price: item.price, detail: item.detail, note: f.note ?? undefined,
+    })
+  }
+
+  return <GrandTourExperience tours={tours} related={related} featured={featured} />
 }

@@ -14,15 +14,18 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
-import { Mountain, AlertCircle, ExternalLink, Search, Bus, CalendarDays, Check } from 'lucide-react'
+import { Mountain, AlertCircle, ExternalLink, Search, Bus, CalendarDays, Check, Plus, Sparkles } from 'lucide-react'
 import { useOperations } from '@/lib/operations-context'
 import { getActivitiesBySupplier, updateActivity, type Activity } from '@/lib/activities'
 import { dayTourHref, stagesForActivity, upcomingDepartures } from '@/lib/grand-tour'
 import { GrandTourEditor, emptyGrandTour, cleanGrandTour } from '@/components/activities/GrandTourEditor'
 import type { GrandTourListing } from '@/lib/grand-tour'
+import NewDayTourForm from '@/components/operations/NewDayTourForm'
+import StageFeaturesManager from '@/components/operations/StageFeaturesManager'
 
 type Row = Activity & { supplierLabel: string }
 type Filter = 'listed' | 'all'
+type Tab = 'tours' | 'features'
 
 /** Why a listed tour is not yet bookable on /grand-tour, if it isn't. */
 function blockers(a: Activity): string[] {
@@ -46,6 +49,8 @@ export default function OperationsGrandTourPage() {
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const [savedId, setSavedId] = useState<string | null>(null)
+  const [tab, setTab] = useState<Tab>('tours')
+  const [creating, setCreating] = useState(false)
 
   useEffect(() => {
     if (ctxLoading) return
@@ -108,21 +113,59 @@ export default function OperationsGrandTourPage() {
           <Mountain size={22} className="text-[#C9A96E]" /> Grand Tour
         </h1>
         <p className="font-sans text-sm text-gray-500 mt-1">
-          Choose which day tours appear on <Link href="/grand-tour" className="text-[#2d6a4f] underline underline-offset-2">/grand-tour</Link>,
-          the highlights they visit and the hotels they collect from. Guests book seats; you board them from{' '}
-          <Link href="/operations/boarding" className="text-[#2d6a4f] underline underline-offset-2">Boarding &amp; Check-in</Link>.
+          Build what visitors see on <Link href="/grand-tour" className="text-[#2d6a4f] underline underline-offset-2">/grand-tour</Link>:
+          day tours guests book seats on, and the activities, events and guided tours featured at each stage. You board
+          day-tour guests from <Link href="/operations/boarding" className="text-[#2d6a4f] underline underline-offset-2">Boarding &amp; Check-in</Link>.
         </p>
       </div>
 
-      {managed.length === 0 ? (
+      <div role="tablist" className="flex border-b border-gray-200 mb-6">
+        {([['tours', 'Day tours', Bus], ['features', 'Featured on stages', Sparkles]] as const).map(([key, label, Icon]) => (
+          <button
+            key={key}
+            role="tab"
+            aria-selected={tab === key}
+            onClick={() => setTab(key)}
+            className={`px-4 py-2.5 -mb-px border-b-2 font-sans text-sm flex items-center gap-2 ${tab === key ? 'border-[#2d6a4f] text-[#2d6a4f]' : 'border-transparent text-gray-500 hover:text-black'}`}
+          >
+            <Icon size={14} /> {label}
+          </button>
+        ))}
+      </div>
+
+      {tab === 'features' ? (
+        <StageFeaturesManager />
+      ) : managed.length === 0 ? (
         <div className="flex items-start gap-3 border border-amber-200 bg-amber-50 px-4 py-4 max-w-xl">
           <AlertCircle size={16} className="text-amber-600 shrink-0 mt-0.5" />
           <p className="font-sans text-sm text-amber-800">
-            You need the Manage Inventory permission on at least one supplier to manage Grand Tour listings.
+            Day tours belong to an operator, so creating or editing one needs the Manage Inventory permission on that
+            supplier. Ask an administrator to assign you, or use “Featured on stages”, which needs no assignment.
           </p>
         </div>
+      ) : creating ? (
+        <NewDayTourForm
+          operators={managed.map(s => ({ id: s.supplier_id, name: s.supplier_name ?? 'Supplier' }))}
+          onCancel={() => setCreating(false)}
+          onCreated={a => {
+            const label = managed.find(s => s.supplier_id === a.supplierId)?.supplier_name ?? a.supplierName
+            setRows(rs => [{ ...a, supplierLabel: label }, ...rs])
+            setFilter('listed')
+            setCreating(false)
+            setSavedId(a.id)
+          }}
+        />
       ) : (
         <>
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-5 bg-white border border-gray-200 p-4">
+            <div>
+              <p className="font-sans text-sm font-medium text-gray-900">Add a day tour</p>
+              <p className="font-sans text-xs text-gray-500">Create a new one for an operator, or put one of their existing activities on the Grand Tour from the list below.</p>
+            </div>
+            <button onClick={() => setCreating(true)} className="bg-[#2d6a4f] text-white font-sans text-sm px-4 py-2.5 hover:bg-[#235a3f] flex items-center gap-1.5 shrink-0">
+              <Plus size={14} /> New day tour
+            </button>
+          </div>
           <div className="flex flex-col sm:flex-row gap-3 sm:items-center justify-between mb-4">
             <div className="inline-flex border border-gray-200 bg-white">
               {(['listed', 'all'] as const).map(f => (

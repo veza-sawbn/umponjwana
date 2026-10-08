@@ -12,10 +12,15 @@ Where the pieces live, for the next person (or session) looking for them.
 
 The Grand Tour is run by Visit Drakensberg, not by each supplier. Suppliers list and price their activities and add timeslots (the departures) as usual; **VD Operations** puts them on the Grand Tour and boards the guests. Both tools live in the operations panel and appear for an ops employee holding the permission on at least one supplier:
 
-| Tool | Route | Permission | What it does |
+| Tool | Route | Who | What it does |
 |---|---|---|---|
-| Grand Tour | `/operations/grand-tour` | Manage Inventory | Add an activity to the Grand Tour, choose its highlights, where it departs from and its **hotel pickups** (each with "minutes before departure", so a 07:30 Sani Pass departure with a 45-minute lead prints a 06:45 pickup at Champagne Sports Resort), and publish or unpublish it. Flags anything stopping it from being bookable. |
+| Grand Tour → **Day tours** | `/operations/grand-tour` | Manage Inventory on the operator | **New day tour**: creates a bookable activity under its operator in one form (price, child rate, departures with seat capacity, highlights, hotel pickups, photos, inclusions, publish). Or put an operator's existing activity on the Grand Tour, edit its listing, publish/unpublish. Flags anything stopping a tour from being bookable. |
+| Grand Tour → **Featured on stages** | `/operations/grand-tour` | Any ops employee | Pick live activities and experiences, upcoming events and guided tours from the catalogue for each stage, order them, and add a one-line note. Shown on `/grand-tour` as "Also at {stage}". |
 | Boarding & Check-in | `/operations/boarding` | Manage Bookings | Pick the departure, scan tickets or type codes, and work the passenger list grouped by hotel pickup. |
+
+The Grand Tour tool shows in the ops sidebar for every ops employee (`openToAllOps` in `lib/ops-permissions.ts`); the day-tour tab explains when an assignment is missing.
+
+Stage features live in `vd_grand_tour_features` (`supabase/migrations/20261009_grand_tour_features.sql`, client `lib/grand-tour-features.ts`). A feature only points at a catalogue row, so names, prices and photos stay current, and anything that goes to draft, passes (events) or is deleted drops off the page by itself. Anyone can read the table; only staff and VD Operations employees can change it.
 
 The listing is stored as `Activity.grandTour` (`lib/activities.ts`); the editor is `components/activities/GrandTourEditor.tsx`, and the scanner is `components/boarding/BoardingConsole.tsx`.
 

@@ -126,6 +126,9 @@ export interface ConsolidatedTool {
   icon: LucideIcon
   /** Permission that must be held on at least one supplier for this to appear. */
   permission: string
+  /** Shown to every ops employee even without that permission anywhere: the
+   *  tool also has work that needs no supplier assignment. */
+  openToAllOps?: boolean
 }
 
 export const CONSOLIDATED_TOOLS: ConsolidatedTool[] = [
@@ -169,9 +172,12 @@ export const CONSOLIDATED_TOOLS: ConsolidatedTool[] = [
   {
     href: '/operations/grand-tour',
     label: 'Grand Tour',
-    description: 'Put day tours on the Grand Tour: highlights, hotel pickups and publishing.',
+    description: 'Day tours, hotel pickups and what each stage features.',
     icon: Mountain,
+    // Day tours need manage_inventory on their operator; featuring catalogue
+    // items on a stage needs no assignment, so every ops employee sees it.
     permission: 'manage_inventory',
+    openToAllOps: true,
   },
   {
     href: '/operations/boarding',
@@ -210,7 +216,7 @@ export function consolidatedToolsFor(
         .filter(a => a.permissions.includes(tool.permission))
         .map(a => a.supplier_id),
     }))
-    .filter(tool => tool.supplierIds.length > 0)
+    .filter(tool => tool.supplierIds.length > 0 || tool.openToAllOps)
 }
 
 /** True when the employee holds `permission` on at least one supplier. */
