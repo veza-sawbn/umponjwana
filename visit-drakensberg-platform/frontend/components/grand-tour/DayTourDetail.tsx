@@ -60,7 +60,7 @@ export default function DayTourDetail({ tour, bookable }: { tour: Activity; book
 
       {!bookable && (
         <div className="bg-amber-50 border-b border-amber-200 px-4 py-3 text-center font-sans text-sm text-amber-800">
-          Preview: this tour isn’t published yet, so it can’t be booked. Publish it and switch on the Grand Tour listing from your supplier dashboard.
+          Preview: this tour isn’t open for booking yet. VD Operations publishes it and lists it on the Grand Tour from the operations panel.
         </div>
       )}
 

@@ -22,7 +22,7 @@
  */
 
 import {
-  CalendarDays, Clock, Wallet, Users, Building2, Tag, FileSignature,
+  CalendarDays, Clock, Wallet, Users, Building2, Tag, FileSignature, Mountain, QrCode,
   type LucideIcon,
 } from 'lucide-react'
 import type { NavItem, SupplierType } from './supplier-config'
@@ -163,6 +163,22 @@ export const CONSOLIDATED_TOOLS: ConsolidatedTool[] = [
     description: 'Signed and outstanding participant waivers across your suppliers.',
     icon: FileSignature,
     permission: 'view_customers',
+  },
+  // Grand Tour Drakensberg is run by VD Operations, not by the suppliers whose
+  // activities are on it (see supabase/migrations/20261008_grand_tour_ops_only.sql).
+  {
+    href: '/operations/grand-tour',
+    label: 'Grand Tour',
+    description: 'Put day tours on the Grand Tour: highlights, hotel pickups and publishing.',
+    icon: Mountain,
+    permission: 'manage_inventory',
+  },
+  {
+    href: '/operations/boarding',
+    label: 'Boarding & Check-in',
+    description: 'Scan Grand Tour tickets and work each departure’s passenger list.',
+    icon: QrCode,
+    permission: 'manage_bookings',
   },
   {
     href: '/operations/financials',

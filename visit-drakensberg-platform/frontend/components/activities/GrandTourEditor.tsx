@@ -4,8 +4,10 @@ import { newEntityId } from '@/lib/entities'
 import { GRAND_TOUR_STAGES, type GrandTourListing, type PickupPoint } from '@/lib/grand-tour'
 
 /**
- * "List this as a Grand Tour Drakensberg day tour", shared by the supplier
- * activity create and edit forms, the same way TimeslotEditor is.
+ * "List this as a Grand Tour Drakensberg day tour" — VD Operations' editor
+ * (/operations/grand-tour). Suppliers do not see it; the database ignores a
+ * Grand Tour listing written by anyone else
+ * (supabase/migrations/20261008_grand_tour_ops_only.sql).
  *
  * Stores Activity.grandTour: the highlights the tour visits (which places it
  * on the /grand-tour itinerary) and the hotels it collects guests from. The
@@ -52,8 +54,8 @@ export function GrandTourEditor({
             <Mountain size={14} className="text-[#C9A96E]" /> List on the Grand Tour Drakensberg
           </span>
           <span className="block font-sans text-[11px] text-black/40 mt-0.5">
-            A scheduled day tour guests book seats on, with optional hotel pickups. Each seat becomes a ticket you
-            scan at boarding.
+            A scheduled day tour guests book seats on, with optional hotel pickups. Each seat becomes a ticket VD
+            Operations scans at boarding.
           </span>
         </label>
       </div>
@@ -62,7 +64,7 @@ export function GrandTourEditor({
         <div className="pl-7 space-y-5">
           {!hasTimeslots && (
             <p className="font-sans text-[11px] text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
-              Add at least one timeslot: those are this tour’s departures. Without one, it can’t be booked.
+              This activity has no timeslots yet, and timeslots are its departures. Until the supplier adds one, it can’t be booked.
             </p>
           )}
 

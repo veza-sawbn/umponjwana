@@ -534,7 +534,7 @@ function HowItWorks({ reduce }: { reduce: boolean }) {
           ))}
         </div>
         <motion.div variants={reveal} className="mt-16 pt-8 border-t border-white/15 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <p className="font-sans text-sm text-white/65">Run day tours in the Drakensberg? List them on the Grand Tour from your supplier dashboard.</p>
+          <p className="font-sans text-sm text-white/65">Run day tours in the Drakensberg? List with Visit Drakensberg and we’ll feature them on the Grand Tour.</p>
           <Link href="/list-with-us" className="font-sans text-sm border border-white/40 px-5 py-2.5 hover:bg-white hover:text-black transition-colors text-center">
             List your day tour
           </Link>
