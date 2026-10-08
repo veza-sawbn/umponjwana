@@ -1,6 +1,7 @@
 'use client'
 import { useRef, useState } from 'react'
 import Link from 'next/link'
+import AuthPhoto from '@/components/auth/AuthPhoto'
 import { useRouter } from 'next/navigation'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
@@ -85,18 +86,14 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen bg-mist flex">
+    <div className="min-h-screen bg-mist flex pt-16">
       {/* Left — image */}
-      <div className="hidden lg:block relative w-1/2">
-        <img
-          src="https://images.unsplash.com/photo-1590098563548-8f14eed3a47f?w=1200&q=85"
-          alt="Drakensberg"
-          className="absolute inset-0 w-full h-full object-cover"
-        />
+      <div className="hidden lg:block relative w-1/2 bg-forest overflow-hidden">
+        <AuthPhoto src="https://images.unsplash.com/photo-1590098563548-8f14eed3a47f?w=1200&q=85" />
         <div className="absolute inset-0 bg-forest/40" />
         <div className="absolute bottom-12 left-12 right-12">
           <Link href="/" className="font-display italic text-2xl text-gold">Visit Drakensberg</Link>
-          <p className="font-sans text-sm text-white/60 mt-3 leading-relaxed">
+          <p className="font-sans text-sm text-white/80 mt-3 leading-relaxed">
             Africa&apos;s highest mountain range. Book stays, hikes, and experiences across the Drakensberg escarpment.
           </p>
         </div>

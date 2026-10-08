@@ -259,7 +259,11 @@ export default function Navbar() {
     router.push('/')
   }
 
-  const transparent = !scrolled && !menuOpen
+  // Auth pages are a split layout (photo | white form) with no dark hero
+  // under the header — a transparent gold header there straddles both
+  // halves and its controls vanish against the white side.
+  const solidRoute  = pathname.startsWith('/auth')
+  const transparent = !scrolled && !menuOpen && !solidRoute
   const activeItem  = NAV_ITEMS.find(i => i.href === hoveredItem) ?? NAV_ITEMS[0]
 
   // Resolve image: admin override → NAV_ITEMS default
