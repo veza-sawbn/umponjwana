@@ -9,6 +9,10 @@ import { getEffectiveSupplierId } from './effective-supplier'
  *   vd_waiver_requests    — one per participant, carrying the public token
  *   vd_waiver_submissions — the signed record, immutable once written
  *
+ * plus vd_waiver_links (see 20261010_waiver_group_links.sql): one shareable
+ * link per trip that any number of participants can open and sign. Each
+ * signature through a link becomes an ordinary, already-signed request.
+ *
  * The participant-facing calls (openWaiver / submitWaiver) go through
  * SECURITY DEFINER functions rather than table access: an unsigned visitor
  * holding a token can read exactly one request and write exactly one
@@ -63,6 +67,25 @@ export type WaiverRequestDetails = {
   signed_name: string | null
   signed_at: string | null
   guardian_name: string | null
+  /** Set when the participant signed through a shared group link. */
+  link_id: string | null
+}
+
+/** A shareable group link, with how many people have signed through it. */
+export type WaiverLinkDetails = {
+  id: string
+  token: string
+  template_id: string
+  supplier_id: string
+  activity_name: string
+  service_date: string | null
+  booking_reference: string | null
+  expires_at: string | null
+  max_signatures: number | null
+  is_active: boolean
+  created_at: string
+  template_title: string
+  signature_count: number
 }
 
 export type WaiverSubmission = {
@@ -102,8 +125,11 @@ export type OpenWaiver =
         minorAge: number
       }
       supplierName: string
+      /** True for a group link: the participant enters their own details,
+       *  and the same link can be signed again by the next person. */
+      shared?: boolean
     }
-  | { ok: false; reason: 'not_found' | 'expired' | 'already_signed' | 'void' }
+  | { ok: false; reason: 'not_found' | 'expired' | 'already_signed' | 'void' | 'closed' | 'full' }
 
 export const WAIVER_FIELD_LABELS: { key: keyof WaiverFields; label: string; hint: string }[] = [
   { key: 'dateOfBirth',      label: 'Date of birth',     hint: 'Also determines whether a guardian must countersign.' },
@@ -257,6 +283,57 @@ export async function voidWaiverRequest(id: string): Promise<void> {
   if (error) throw new Error(error.message || 'Could not withdraw this waiver.')
 }
 
+// ─── Group links ──────────────────────────────────────────────────────────────
+
+export async function getMyWaiverLinks(): Promise<WaiverLinkDetails[]> {
+  const supplierId = await getEffectiveSupplierId()
+  if (!supplierId) return []
+  const { data } = await supabase
+    .from('vd_waiver_link_details')
+    .select('*')
+    .eq('supplier_id', supplierId)
+    .order('created_at', { ascending: false })
+  return (data ?? []) as WaiverLinkDetails[]
+}
+
+export async function createWaiverLink(input: {
+  templateId: string
+  activityName: string
+  serviceDate?: string | null
+  bookingReference?: string | null
+  expiresAt?: string | null
+  maxSignatures?: number | null
+}): Promise<{ id: string; token: string }> {
+  const supplierId = await getEffectiveSupplierId()
+  if (!supplierId) throw new Error('You need to be signed in to create a link.')
+
+  const { data, error } = await supabase
+    .from('vd_waiver_links')
+    .insert({
+      token: newToken(),
+      template_id: input.templateId,
+      supplier_id: supplierId,
+      activity_name: input.activityName.trim(),
+      service_date: input.serviceDate || null,
+      booking_reference: input.bookingReference?.trim() || null,
+      expires_at: input.expiresAt || null,
+      max_signatures: input.maxSignatures ?? null,
+    })
+    .select('id, token')
+    .maybeSingle()
+  if (error || !data) throw new Error(error?.message || 'Could not create the link.')
+  return data as { id: string; token: string }
+}
+
+/** Closing a link stops new signatures; everything already signed is kept. */
+export async function setWaiverLinkActive(id: string, isActive: boolean): Promise<void> {
+  const { error } = await supabase
+    .from('vd_waiver_links')
+    .update({ is_active: isActive, updated_at: new Date().toISOString() })
+    .eq('id', id)
+  if (error) throw new Error(error.message || 'Could not update this link.')
+}
+
 export async function getWaiverSubmission(requestId: string): Promise<WaiverSubmission | null> {
   const { data } = await supabase
     .from('vd_waiver_submissions').select('*').eq('request_id', requestId).maybeSingle()
@@ -287,6 +364,28 @@ export async function submitWaiver(input: {
 }): Promise<void> {
   const { error } = await supabase.rpc('vd_waiver_submit', {
     p_token: input.token,
+    p_answers: input.answers,
+    p_acknowledged: input.acknowledged,
+    p_signed_name: input.signedName,
+    p_signature: input.signature ?? null,
+    p_guardian_name: input.guardianName ?? null,
+  })
+  if (error) throw new Error(error.message || 'Could not submit this waiver.')
+}
+
+/** Sign through a shared group link. Each call records one participant. */
+export async function submitSharedWaiver(input: {
+  token: string
+  participantEmail: string
+  answers: Record<string, string>
+  acknowledged: Record<string, boolean>
+  signedName: string
+  signature?: string | null
+  guardianName?: string | null
+}): Promise<void> {
+  const { error } = await supabase.rpc('vd_waiver_link_submit', {
+    p_token: input.token,
+    p_participant_email: input.participantEmail,
     p_answers: input.answers,
     p_acknowledged: input.acknowledged,
     p_signed_name: input.signedName,
