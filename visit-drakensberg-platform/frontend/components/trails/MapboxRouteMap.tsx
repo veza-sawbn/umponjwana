@@ -30,7 +30,7 @@ function endpointMarker(mapboxgl: typeof import('mapbox-gl').default, label: str
   const el = document.createElement('div')
   el.setAttribute('role', 'img')
   el.setAttribute('aria-label', label === 'S' ? 'Start' : 'Finish')
-  el.style.cssText = `width:22px;height:22px;border-radius:50%;background:${color};border:2px solid #fff;box-shadow:0 1px 3px rgba(0,0,0,.4);display:flex;align-items:center;justify-content:center;font:700 11px/1 'DM Sans',system-ui,sans-serif;color:#fff;`
+  el.style.cssText = `width:22px;height:22px;border-radius:50%;background:${color};border:2px solid #fff;box-shadow:0 1px 3px rgba(0,0,0,.4);display:flex;align-items:center;justify-content:center;font:700 11px/1 'Inter',system-ui,sans-serif;color:#fff;`
   el.textContent = label
   return new mapboxgl.Marker({ element: el })
 }

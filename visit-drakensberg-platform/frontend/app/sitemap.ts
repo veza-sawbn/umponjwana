@@ -2,7 +2,7 @@ import type { MetadataRoute } from 'next'
 import { getRegions, DEFAULT_REGIONS } from '@/lib/regions'
 import { getReserves, DEFAULT_RESERVES } from '@/lib/reserves'
 import { getTowns, DEFAULT_TOWNS } from '@/lib/towns'
-import { getTrails, DEFAULT_TRAILS } from '@/lib/trails'
+import { getTrailSummaries, DEFAULT_TRAILS } from '@/lib/trails'
 import { getProperties } from '@/lib/properties'
 import { getActivities } from '@/lib/activities'
 import { getPackages } from '@/lib/packages'
@@ -73,7 +73,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     getRegions(publicSupabase).catch(() => DEFAULT_REGIONS),
     getReserves(publicSupabase).catch(() => DEFAULT_RESERVES),
     getTowns(publicSupabase).catch(() => DEFAULT_TOWNS),
-    getTrails(publicSupabase).catch(() => DEFAULT_TRAILS),
+    getTrailSummaries(publicSupabase).catch(() => DEFAULT_TRAILS),
     getProperties(publicSupabase).catch(() => []),
     getActivities(publicSupabase).catch(() => []),
     getPackages(publicSupabase).catch(() => []),

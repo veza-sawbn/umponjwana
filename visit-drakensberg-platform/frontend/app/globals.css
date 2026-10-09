@@ -1,4 +1,5 @@
-@import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;0,9..40,800;1,9..40,300;1,9..40,400&display=swap');
+/* Brand typefaces: Outfit (headings, .font-display) and Inter (body, .font-sans). */
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Inter:ital,opsz,wght@0,14..32,300;0,14..32,400;0,14..32,500;0,14..32,600;0,14..32,700;0,14..32,800;1,14..32,300;1,14..32,400;1,14..32,500&display=swap');
 
 @tailwind base;
 @tailwind components;
@@ -49,14 +50,17 @@ body {
 
 body {
   @apply antialiased;
-  font-family: 'DM Sans', system-ui, sans-serif;
+  font-family: 'Inter', system-ui, sans-serif;
   background-color: #F7F5F2;
   color: #000000;
   width: 100%;
 }
 
 .font-display {
-  font-family: 'DM Serif Display', Georgia, serif;
+  font-family: 'Outfit', system-ui, sans-serif;
+  /* Outfit has no italic face. Headings marked `italic` render upright
+     rather than as a browser-faked slant of a geometric sans. */
+  font-synthesis-style: none;
 }
 
 /* Custom scrollbar */
@@ -105,7 +109,7 @@ body {
     @apply bg-white rounded-2xl shadow-card hover:shadow-card-hover transition-shadow;
   }
   .section-title {
-    font-family: 'DM Serif Display', Georgia, serif;
+    font-family: 'Outfit', system-ui, sans-serif;
     @apply text-4xl font-bold text-black mb-2;
   }
   .section-subtitle {

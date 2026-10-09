@@ -54,8 +54,8 @@ const config: Config = {
         },
       },
       fontFamily: {
-        display: ['DM Serif Display', 'Georgia', 'serif'],
-        sans: ['DM Sans', 'system-ui', 'sans-serif'],
+        display: ['Outfit', 'system-ui', 'sans-serif'],
+        sans: ['Inter', 'system-ui', 'sans-serif'],
       },
       boxShadow: {
         card: '0 2px 16px rgba(0,0,0,0.08)',

@@ -1,7 +1,7 @@
 import type { Metadata } from 'next'
 import { notFound } from 'next/navigation'
 import { getTours, type Tour } from '@/lib/tours'
-import { getTrails } from '@/lib/trails'
+import { getTrailSummaries } from '@/lib/trails'
 import { publicSupabase } from '@/lib/supabase-public'
 import { getNearbyStays, type NearbyStayResult } from '@/lib/modules'
 import TourDetail from './TourDetail'
@@ -32,7 +32,7 @@ async function resolveTour(id: string): Promise<Tour | null> {
 // runs on, same relationship Departure/TrekkingExperience use elsewhere.
 async function resolveTourRegion(tour: Tour): Promise<string> {
   if (!tour.trailId) return ''
-  const trails = await getTrails(publicSupabase)
+  const trails = await getTrailSummaries(publicSupabase)
   return trails.find(t => t.id === tour.trailId)?.region ?? ''
 }
 

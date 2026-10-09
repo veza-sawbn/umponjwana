@@ -6,7 +6,7 @@ import { Printer, ArrowLeft } from 'lucide-react'
 import { getBookingById, type SavedBooking } from '@/lib/bookings'
 import { getTours, type Tour } from '@/lib/tours'
 import { getDepartures, type Departure } from '@/lib/departures'
-import { getTrails, type Trail } from '@/lib/trails'
+import { getTrailSummaries, type Trail } from '@/lib/trails'
 import { getTripRequestById, type TripRequest } from '@/lib/custom-trips'
 import {
   resolveDefaultItinerary, effectiveItineraryDays, getBookingItineraries, tripRequestIdForItem,
@@ -142,7 +142,7 @@ export default function PrintableItineraryPage() {
       getBookingById(bookingId),
       getDepartures(),
       getTours(),
-      getTrails(),
+      getTrailSummaries(),
       getBookingItineraries(bookingId),
     ]).then(async ([b, deps, trs, trls, its]) => {
       const requestIds = (b?.addons ?? []).map(a => tripRequestIdForItem(a.id)).filter((x): x is string => !!x)

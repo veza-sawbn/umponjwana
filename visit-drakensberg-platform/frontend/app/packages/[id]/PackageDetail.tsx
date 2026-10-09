@@ -17,7 +17,7 @@ import {
   type MarketplacePackage,
 } from '@/lib/packages'
 import { bookPackage } from '@/lib/package-bookings'
-import { getTrails, type Trail } from '@/lib/trails'
+import { getTrailSummaries, type Trail } from '@/lib/trails'
 import { formatMoney } from '@/lib/allocation'
 import { objectPositionStyle } from '@/lib/image-position'
 import SaveButton from '@/components/ui/SaveButton'
@@ -50,7 +50,7 @@ export default function PackageDetail({ pkg, id }: { pkg: MarketplacePackage; id
   const [done, setDone] = useState<{ reference: string } | null>(null)
 
   useEffect(() => {
-    getTrails().then(setTrails)
+    getTrailSummaries().then(setTrails)
     supabase.auth.getUser().then(({ data: { user } }) => {
       setUserId(user?.id ?? null)
       const meta = user?.user_metadata ?? {}

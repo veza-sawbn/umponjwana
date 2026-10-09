@@ -6,7 +6,7 @@ import Link from 'next/link'
 import Footer from '@/components/layout/Footer'
 import { ArrowLeft, Star, Check, X, GitCompareArrows, Award } from 'lucide-react'
 import { getExperiencesByTrail, type TrekkingExperience } from '@/lib/experiences'
-import { getTrails, type Trail } from '@/lib/trails'
+import { getTrailSummaries, type Trail } from '@/lib/trails'
 import { formatMoney } from '@/lib/allocation'
 
 // Side-by-side comparison of departures. Comparison is only available between
@@ -29,7 +29,7 @@ function CompareContent() {
 
   useEffect(() => {
     if (!trailId) { setLoaded(true); return }
-    Promise.all([getExperiencesByTrail(trailId), getTrails()]).then(([exps, trails]) => {
+    Promise.all([getExperiencesByTrail(trailId), getTrailSummaries()]).then(([exps, trails]) => {
       setAll(exps)
       setTrail(trails.find(t => t.id === trailId) ?? null)
       setSelected(prev => {
