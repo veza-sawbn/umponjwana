@@ -1,7 +1,7 @@
 import {
   LayoutDashboard, List, Building2, BedDouble, Zap, Map, Users, Truck,
   Sparkles, CalendarDays, Tag, BarChart2, Image, MessageSquare, Star, Clock,
-  Calculator, CalendarPlus, Wallet, FileSignature, BookUser, QrCode,
+  Calculator, CalendarPlus, Wallet, FileSignature, BookUser, QrCode, BadgePercent,
   type LucideIcon,
 } from 'lucide-react'
 
@@ -25,6 +25,7 @@ const SHARED_NAV: NavItem[] = [
   { href: '/supplier/contacts',     label: 'Contacts',      icon: BookUser },
   { href: '/supplier/earnings',     label: 'Earnings',      icon: Wallet },
   { href: '/supplier/availability', label: 'Availability',  icon: Clock },
+  { href: '/supplier/offers',       label: 'Offers',        icon: BadgePercent },
   { href: '/supplier/discounts',    label: 'Discounts',     icon: Tag },
   { href: '/supplier/reviews',      label: 'Reviews',       icon: Star },
   { href: '/supplier/media',        label: 'Media',         icon: Image },

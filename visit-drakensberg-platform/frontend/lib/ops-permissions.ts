@@ -52,6 +52,7 @@ const ROUTE_PERMISSION: Record<string, string> = {
   '/supplier/departures':    'view_availability',
 
   // Rates & pricing
+  '/supplier/offers':        'view_rates',
   '/supplier/discounts':     'view_rates',
   '/supplier/estimator':     'view_rates',
 
@@ -148,7 +149,7 @@ export const CONSOLIDATED_TOOLS: ConsolidatedTool[] = [
   },
   {
     href: '/operations/rates',
-    label: 'Rates & Discounts',
+    label: 'Rates, Offers & Discounts',
     description: 'Compare and adjust pricing across your portfolio.',
     icon: Tag,
     permission: 'view_rates',

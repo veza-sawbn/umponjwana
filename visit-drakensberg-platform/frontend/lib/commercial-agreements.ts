@@ -58,6 +58,28 @@ export async function getSupplierTerms(supplierId: string): Promise<CommercialTe
   }
 }
 
+/**
+ * The commission rate (a fraction, e.g. 0.12) a supplier's bookings are
+ * charged — the same precedence vd_create_order() uses: their own terms,
+ * else vd_finance_settings.default_commission_rate, else the seeded 12%.
+ * Display only; the server applies the rate when an order is created.
+ */
+export async function getSupplierCommissionRate(supplierId: string): Promise<number> {
+  const terms = await getSupplierTerms(supplierId)
+  if (terms?.commission_rate != null) return Number(terms.commission_rate)
+  try {
+    const { data } = await supabase
+      .from('vd_finance_settings')
+      .select('value')
+      .eq('key', 'default_commission_rate')
+      .maybeSingle()
+    const v = (data as { value: unknown } | null)?.value
+    const n = v == null || v === '' ? NaN : Number(v)
+    if (Number.isFinite(n) && n >= 0) return n
+  } catch {}
+  return 0.12
+}
+
 /** Get all supplier terms with profile data — for the admin commercial view. */
 export async function getAllSupplierTerms(): Promise<(CommercialTerms & {
   supplier_name: string | null

@@ -5,7 +5,13 @@ import { ArrowRight, AlertCircle } from 'lucide-react'
 import { useSupplier } from '@/lib/supplier-context'
 import { getMyOrders, type SupplierOrder } from '@/lib/booking-orders'
 import { supabase } from '@/lib/auth'
-import { formatMoney } from '@/lib/allocation'
+import { formatMoney, formatRate } from '@/lib/allocation'
+import { effectiveSupplierId } from '@/lib/effective-supplier'
+import { getSupplierEntities } from '@/lib/supplier-entities'
+import { getSupplierCommissionRate } from '@/lib/commercial-agreements'
+import { offerState, type Offer } from '@/lib/offers'
+import { todayISO } from '@/lib/upcoming'
+import CommissionReminder from '@/components/supplier/CommissionReminder'
 
 const STATUS_STYLES: Record<SupplierOrder['status'], string> = {
   requested:  'bg-blue-100 text-blue-700',
@@ -63,6 +69,8 @@ export default function SupplierOverview() {
   const { config, supplierTypes, nav, isApproved, loading } = useSupplier()
   const [orders, setOrders] = useState<SupplierOrder[]>([])
   const [ordersLoading, setOrdersLoading] = useState(true)
+  const [offers, setOffers] = useState<Offer[]>([])
+  const [commissionRate, setCommissionRate] = useState<number | null>(null)
 
   useEffect(() => {
     supabase.auth.getUser().then(async ({ data: { user } }) => {
@@ -74,11 +82,23 @@ export default function SupplierOverview() {
       // now names the supplier it means; the comment there has the detail.
       setOrders(await getMyOrders())
       setOrdersLoading(false)
+      // Running or upcoming offers get a standing commission reminder below.
+      const supplierId = effectiveSupplierId(user.id)
+      const [mine, rate] = await Promise.all([
+        getSupplierEntities<Offer>('offers', supplierId).catch(() => [] as Offer[]),
+        getSupplierCommissionRate(supplierId),
+      ])
+      setOffers(mine)
+      setCommissionRate(rate)
     })
   }, [])
 
   const stats = useMemo(() => buildStats(orders), [orders])
   const recentBookings = useMemo(() => orders.slice(0, 5), [orders])
+  const activeOffers = useMemo(() => {
+    const today = todayISO()
+    return offers.filter(o => ['live', 'scheduled'].includes(offerState(o, today)))
+  }, [offers])
 
   if (loading) {
     return (
@@ -108,7 +128,7 @@ export default function SupplierOverview() {
   // Quick-links: first type-specific nav items (skip Overview and shared tail)
   const typeSpecificLinks = nav.filter(item =>
     item.href !== '/supplier' &&
-    !['/supplier/bookings', '/supplier/availability', '/supplier/discounts',
+    !['/supplier/bookings', '/supplier/availability', '/supplier/offers', '/supplier/discounts',
       '/supplier/reviews', '/supplier/media', '/supplier/analytics', '/supplier/messages',
     ].includes(item.href)
   )
@@ -124,6 +144,16 @@ export default function SupplierOverview() {
         </p>
         <h1 className="font-display italic text-3xl text-black/90">Dashboard Overview</h1>
       </div>
+
+      {activeOffers.length > 0 && (
+        <div className="space-y-2">
+          <CommissionReminder rateLabel={commissionRate == null ? 'your commission rate' : formatRate(commissionRate)} />
+          <p className="font-sans text-xs text-black/50">
+            You have {activeOffers.length} live or scheduled offer{activeOffers.length === 1 ? '' : 's'}.{' '}
+            <Link href="/supplier/offers" className="text-[#C9A96E] hover:underline">Manage offers</Link>
+          </p>
+        </div>
+      )}
 
       {/* Stats — derived from this supplier's own orders, see buildStats */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">

@@ -6,12 +6,12 @@ import ConsolidatedLauncher from '@/components/operations/ConsolidatedLauncher'
 export default function ConsolidatedRatesPage() {
   return (
     <ConsolidatedLauncher
-      title="Rates & Discounts"
-      description="Pricing and discount tools for each supplier in your portfolio."
+      title="Rates, Offers & Discounts"
+      description="Pricing, scheduled offer and discount tools for each supplier in your portfolio."
       icon={Tag}
       permission="view_rates"
       permissionLabel="View Rates"
-      routes={['/supplier/discounts', '/supplier/estimator']}
+      routes={['/supplier/offers', '/supplier/discounts', '/supplier/estimator']}
     />
   )
 }
