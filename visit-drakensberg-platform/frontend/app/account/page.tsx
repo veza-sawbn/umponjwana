@@ -9,6 +9,7 @@ import { releaseBookingInventory } from '@/lib/inventory-holds'
 import { supabase } from '@/lib/auth'
 import { formatMoney } from '@/lib/allocation'
 import { holdDeadlineLabel, holdHasLapsed } from '@/lib/stay-requests'
+import { getMyCreditBalance } from '@/lib/guest-credit'
 
 const STATUS_STYLE: Record<string, string> = {
   confirmed: 'bg-[#2d6a4f]/10 text-[#2d6a4f]',
@@ -129,12 +130,14 @@ export default function AccountBookingsPage() {
   const [tab, setTab] = useState<'upcoming' | 'past'>('upcoming')
   const [bookings, setBookings] = useState<SavedBooking[]>([])
   const [loading, setLoading] = useState(true)
+  const [credit, setCredit] = useState(0)
   const today = new Date().toISOString().slice(0, 10)
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => {
       if (!data.user) { setLoading(false); return }
       getBookingsByUser(data.user.id).then(bs => { setBookings(bs); setLoading(false) })
+      getMyCreditBalance().then(setCredit)
     })
   }, [])
 
@@ -177,6 +180,15 @@ export default function AccountBookingsPage() {
         <h1 className="font-display italic text-3xl text-[#000000]">My Bookings</h1>
         <p className="font-sans text-sm text-gray-400 mt-1">{upcoming.length} upcoming · {past.length} past</p>
       </div>
+
+      {/* Issued when a paid booking is cancelled and the payment is kept as credit. */}
+      {credit > 0 && (
+        <div className="bg-[#2d6a4f]/5 border border-[#2d6a4f]/20 p-4 mb-6">
+          <p className="font-sans text-[10px] tracking-[0.12em] uppercase text-[#2d6a4f]">Account credit</p>
+          <p className="font-display italic text-2xl text-[#000000] mt-0.5">{formatMoney(credit)}</p>
+          <p className="font-sans text-xs text-gray-500 mt-1">From a cancelled booking. Contact us to put it towards your next trip.</p>
+        </div>
+      )}
 
       <div className="flex gap-0 border-b border-gray-200 mb-6">
         {(['upcoming', 'past'] as const).map(t => (

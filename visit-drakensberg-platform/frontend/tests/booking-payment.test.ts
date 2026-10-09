@@ -49,3 +49,15 @@ describe('ordersByBooking', () => {
     expect(map.size).toBe(2)
   })
 })
+
+describe('settled cancellations', () => {
+  it('reads credited once the refund went onto the guest account', () => {
+    expect(bookingPayment({ status: 'cancelled' }, [order({ payment_status: 'credited', amount_paid: 1000 })]).state)
+      .toBe('credited')
+  })
+
+  it('stays refund due while only part has been settled', () => {
+    expect(bookingPayment({ status: 'cancelled' }, [order({ payment_status: 'paid', amount_paid: 1000, refund_balance: 400 })]))
+      .toMatchObject({ state: 'refund_due', refundDue: 400 })
+  })
+})

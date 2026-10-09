@@ -294,7 +294,7 @@ export async function updateBookingStatus(
     await releaseTicketsForBooking(id).catch(err => console.error('[bookings] ticket release failed:', err))
     if (opts?.notifyUser) {
       await notify(booking.userId, 'cancellation', `Booking ${booking.reference} cancelled`,
-        'Your booking has been cancelled by the supplier. If you were charged, a refund will follow within 5 business days.',
+        'Your booking has been cancelled by the supplier. If you were charged, we will refund you or credit your account — you will be notified once it is processed.',
         '/account')
     }
     if (opts?.notifySuppliers) {

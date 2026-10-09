@@ -6,7 +6,8 @@
 // webhook or a staff receipt) and vd_cancel_order. A booking reads "paid" only
 // once the full order value has been captured AND the booking still stands:
 // cancelling a paid booking moves amount_paid into refund_balance, so it reads
-// "refund due" until the refund is recorded, then "refunded".
+// "refund due" until finance settles it (lib/guest-credit.ts) — then
+// "refunded", or "credited" when the money went onto the guest's account.
 
 export type BookingPaymentState =
   | 'paid'
@@ -14,6 +15,7 @@ export type BookingPaymentState =
   | 'unpaid'
   | 'refund_due'
   | 'refunded'
+  | 'credited'
   | 'not_due'
 
 export type OrderMoney = {
@@ -40,6 +42,7 @@ export const PAYMENT_STATE_LABEL: Record<BookingPaymentState, string> = {
   unpaid: 'Unpaid',
   refund_due: 'Refund due',
   refunded: 'Refunded',
+  credited: 'Credited to guest',
   not_due: '—',
 }
 
@@ -56,11 +59,15 @@ export function bookingPayment(
   const due = orders.reduce((s, o) => s + num(o.total_value), 0)
   const paidIn = orders.reduce((s, o) => s + num(o.amount_paid), 0)
   const refundDue = orders.reduce((s, o) => s + num(o.refund_balance), 0)
-  const refunded = orders.length > 0 && orders.every(o => o.payment_status === 'refunded')
+  const settledAs = (status: string) => orders.length > 0 && orders.every(o => o.payment_status === status)
+  const refunded = settledAs('refunded')
 
   if (booking.status === 'cancelled') {
     if (refundDue > 0) return { state: 'refund_due', captured: 0, due, refundDue }
     if (refunded) return { state: 'refunded', captured: 0, due, refundDue: 0 }
+    if (settledAs('credited')) return { state: 'credited', captured: 0, due, refundDue: 0 }
+    // A mix of refunded and credited orders on one booking.
+    if (paidIn > 0) return { state: 'refunded', captured: 0, due, refundDue: 0 }
     return { state: 'not_due', captured: 0, due, refundDue: 0 }
   }
 
@@ -80,6 +87,12 @@ export function bookingPayment(
   if (fullyCaptured) return { state: 'paid', captured, due, refundDue: 0 }
   if (captured > 0) return { state: 'partial', captured, due, refundDue: 0 }
   return { state: 'unpaid', captured: 0, due, refundDue: 0 }
+}
+
+/** Money was taken for this booking at some point — so it must not simply be
+ *  re-confirmed: the payment has been (or is being) given back. */
+export function hadCapturedPayment(p: BookingPayment): boolean {
+  return p.state === 'refund_due' || p.state === 'refunded' || p.state === 'credited'
 }
 
 /** Group orders by the booking they belong to. */
