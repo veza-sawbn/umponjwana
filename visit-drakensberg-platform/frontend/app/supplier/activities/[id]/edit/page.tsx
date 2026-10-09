@@ -101,6 +101,8 @@ export default function EditActivityPage() {
     setError('')
     setSaving(true)
     try {
+      // `form` never carries grandTour, so a supplier save leaves the Grand
+      // Tour listing VD Operations set untouched (updateEntity merges keys).
       await updateActivity(id, form)
       // Best-effort, like the revalidate in lib/activities.ts: the edit is
       // already saved, so a failure here costs the supplier the fleet tools,

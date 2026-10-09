@@ -41,6 +41,10 @@ function receiptHtml(o: {
   balance: number
   invoiceUrl: string
   origin: string
+  /** Set when this order has issued tickets (event tickets or day-tour
+   *  boarding passes) — links to the buyer's QR ticket wallet alongside the
+   *  invoice. */
+  ticketsUrl?: string
 }) {
   return emailShell({
     origin: o.origin,
@@ -66,6 +70,7 @@ function receiptHtml(o: {
         ['Total paid to date', money(o.totalPaid, o.currency)],
       ], ['Balance due', money(o.balance, o.currency)])}
       ${ctaButton(o.invoiceUrl, 'View your invoice')}
+      ${o.ticketsUrl ? ctaButton(o.ticketsUrl, 'View your tickets') : ''}
       ${finePrint(`This receipt covers your single trip invoice with Visit Drakensberg — all accommodation,
         activities, transfers and extras appear on one document. Keep this email for your records.`)}`,
   })
@@ -109,6 +114,14 @@ export async function sendOrderReceipt(
   // to sign in with.
   const invoiceUrl = `${input.origin}/invoices/${invoice?.id ?? order.id}`
 
+  // Tickets, unlike the invoice, live behind a signed-in account (they carry
+  // a redeemable QR) — so this is only a pointer, never a login bypass, and
+  // only worth showing once the order actually has tickets. The payment
+  // webhook mints them before it sends this receipt.
+  const { data: ticket } = await client
+    .from('vd_tickets').select('id').eq('order_id', input.orderId).limit(1).maybeSingle()
+  const ticketsUrl = ticket ? `${input.origin}/account/tickets` : undefined
+
   let sent = false
   let sendError: string | null = null
 
@@ -132,6 +145,7 @@ export async function sendOrderReceipt(
         totalPaid: Number(order.amount_paid),
         balance: Number(order.outstanding_balance),
         invoiceUrl,
+        ticketsUrl,
         origin: input.origin,
       }),
     })

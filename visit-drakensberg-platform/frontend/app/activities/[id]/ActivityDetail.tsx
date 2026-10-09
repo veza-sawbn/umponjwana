@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import Footer from '@/components/layout/Footer'
-import { ArrowLeft, Clock, Users, CheckCircle, Calendar, MapPin } from 'lucide-react'
+import { ArrowLeft, Clock, Users, CheckCircle, Calendar, MapPin, Bus, Mountain } from 'lucide-react'
 import UpcomingDepartures from '@/components/tours/UpcomingDepartures'
 import { getTourDates } from '@/lib/tour-dates'
 import { useBooking } from '@/lib/booking-context'
@@ -11,6 +11,7 @@ import { Check, Plus } from 'lucide-react'
 import type { Activity } from '@/lib/activities'
 import { timeslotsForDate, slotRemaining } from '@/lib/activities'
 import { formatMoney } from '@/lib/allocation'
+import { pickupTime } from '@/lib/grand-tour'
 import ReadMoreText from '@/components/ui/ReadMoreText'
 import SaveButton from '@/components/ui/SaveButton'
 
@@ -66,6 +67,25 @@ export default function ActivityDetail({ activityData, id }: { activityData: Act
   const [adults, setAdults] = useState(booking.guests || 2)
   const [children, setChildren] = useState(0)
 
+  // Grand Tour day tours collect guests from hotels. The guest picks one (or
+  // says they will make their own way to the meeting point); the ticket
+  // prints that pickup and its time. SELF is the "own way" choice.
+  const grandTour = activityData.grandTour?.enabled ? activityData.grandTour : undefined
+  const pickups = grandTour?.pickupPoints ?? []
+  const SELF = 'self'
+  const [pickupChoice, setPickupChoice] = useState('')
+
+  // /grand-tour links here with ?date=&pickup= when the visitor already said
+  // which hotel they are at. Read once from the URL rather than through
+  // useSearchParams, which would opt this ISR page out of static rendering.
+  useEffect(() => {
+    const q = new URLSearchParams(window.location.search)
+    const qDate = q.get('date')
+    if (qDate && /^\d{4}-\d{2}-\d{2}$/.test(qDate)) setDate(qDate)
+    const qPickup = q.get('pickup')
+    if (qPickup && pickups.some(p => p.id === qPickup)) setPickupChoice(qPickup)
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
   const dayTimeslots = date ? timeslotsForDate(activityData, date) : []
   // Reset a stale timeslot selection when the date changes or the previously
   // picked slot doesn't run on the newly picked date.
@@ -81,9 +101,14 @@ export default function ActivityDetail({ activityData, id }: { activityData: Act
   const remaining = selectedSlot ? slotRemaining(activityData, date, selectedSlot.id) : Infinity
   const overCapacity = selectedSlot ? guests > remaining : false
 
-  const addonId = `activity-${id}-${date}${timeslotId ? `-${timeslotId}` : ''}`
+  const pickup = pickups.find(p => p.id === pickupChoice)
+  const needsPickupChoice = pickups.length > 0 && !pickupChoice
+
+  // The pickup is part of the cart key: a party split across two hotels on
+  // the same bus is two lines, each printing its own pickup on its tickets.
+  const addonId = `activity-${id}-${date}${timeslotId ? `-${timeslotId}` : ''}${pickup ? `-${pickup.id}` : ''}`
   const isAdded = booking.addons.some((a: any) => a.id === addonId)
-  const canAdd = !!date && guests > 0 && (!hasTimeslots || !!timeslotId) && !overCapacity
+  const canAdd = !!date && guests > 0 && (!hasTimeslots || !!timeslotId) && !overCapacity && !needsPickupChoice
 
   function toggleAddon() {
     if (isAdded) {
@@ -103,6 +128,9 @@ export default function ActivityDetail({ activityData, id }: { activityData: Act
         lng: activity.gpsLng || undefined,
         ...(hasChildRate ? { adults: finalAdults, children: finalChildren } : {}),
         ...(selectedSlot ? { activityId: id, timeslotId: selectedSlot.id, timeslotTime: selectedSlot.time } : {}),
+        ...(pickup && selectedSlot
+          ? { pickupPointId: pickup.id, pickupPointName: pickup.name, pickupTime: pickupTime(selectedSlot, pickup) }
+          : {}),
       })
     }
   }
@@ -194,6 +222,17 @@ export default function ActivityDetail({ activityData, id }: { activityData: Act
 
           <div>
             <div className="bg-white border border-gray-200 p-6 sticky top-24">
+              {grandTour && (
+                <Link href="/grand-tour" className="flex items-start gap-2 mb-5 pb-4 border-b border-gray-100 group">
+                  <Mountain size={16} className="text-[#C9A96E] mt-0.5 shrink-0" />
+                  <span>
+                    <span className="block font-sans text-[10px] tracking-[0.18em] uppercase text-[#C9A96E]">Grand Tour Drakensberg</span>
+                    <span className="block font-sans text-xs text-gray-500 group-hover:text-black">
+                      Day tour{grandTour.departsFrom ? ` departing ${grandTour.departsFrom}` : ''}{pickups.length > 0 ? ' · hotel pickups' : ''}
+                    </span>
+                  </span>
+                </Link>
+              )}
               <div className="mb-5">
                 <p className="font-sans text-[10px] tracking-[0.12em] uppercase text-gray-400">{hasChildRate ? 'Adult / Child' : 'Per person'}</p>
                 <p className="font-display italic text-3xl text-[#2d6a4f]">
@@ -212,7 +251,7 @@ export default function ActivityDetail({ activityData, id }: { activityData: Act
 
                 {hasTimeslots && (
                   <div>
-                    <label className="block font-sans text-xs uppercase text-gray-400 mb-1.5">Select Timeslot</label>
+                    <label className="block font-sans text-xs uppercase text-gray-400 mb-1.5">{grandTour ? 'Select Departure' : 'Select Timeslot'}</label>
                     {!date ? (
                       <p className="font-sans text-xs text-gray-400">Choose a date first.</p>
                     ) : dayTimeslots.length === 0 ? (
@@ -225,6 +264,26 @@ export default function ActivityDetail({ activityData, id }: { activityData: Act
                           return <option key={t.id} value={t.id} disabled={left <= 0}>{t.time}{left <= 0 ? ' · Fully booked' : ` · ${left} seat${left === 1 ? '' : 's'} left`}</option>
                         })}
                       </select>
+                    )}
+                  </div>
+                )}
+
+                {pickups.length > 0 && (
+                  <div>
+                    <label htmlFor="pickup" className="block font-sans text-xs uppercase text-gray-400 mb-1.5">Hotel Pickup</label>
+                    <select id="pickup" value={pickupChoice} onChange={e => setPickupChoice(e.target.value)} className="w-full border border-gray-300 px-3 py-2.5 font-sans text-sm focus:outline-none">
+                      <option value="">Where should we collect you?</option>
+                      {pickups.map(p => (
+                        <option key={p.id} value={p.id}>
+                          {p.name}{p.area ? `, ${p.area}` : ''}{selectedSlot ? ` · ${pickupTime(selectedSlot, p)}` : ''}
+                        </option>
+                      ))}
+                      <option value={SELF}>I&apos;ll meet the tour{activity.location ? ` at ${activity.location}` : ''}</option>
+                    </select>
+                    {pickup && selectedSlot && (
+                      <p className="font-sans text-xs text-[#2d6a4f] mt-1.5 flex items-center gap-1.5">
+                        <Bus size={12} /> Collected at {pickup.name} at {pickupTime(selectedSlot, pickup)}
+                      </p>
                     )}
                   </div>
                 )}
@@ -281,6 +340,9 @@ export default function ActivityDetail({ activityData, id }: { activityData: Act
               )}
               {date && hasTimeslots && !timeslotId && dayTimeslots.length > 0 && (
                 <p className="font-sans text-xs text-amber-600 mb-2">Please select a timeslot to add this activity.</p>
+              )}
+              {date && (!hasTimeslots || timeslotId) && needsPickupChoice && (
+                <p className="font-sans text-xs text-amber-600 mb-2">Please choose your hotel pickup.</p>
               )}
               {overCapacity && (
                 <p className="font-sans text-xs text-red-500 mb-2">Only {remaining} seat{remaining === 1 ? '' : 's'} left in this timeslot.</p>

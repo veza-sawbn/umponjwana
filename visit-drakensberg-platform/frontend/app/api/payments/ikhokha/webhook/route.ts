@@ -158,6 +158,63 @@ export async function POST(req: Request) {
       await admin.from('vd_orders').update({ booking_status: 'confirmed' }).eq('id', link.order_id)
       await admin.from('vd_booking_orders').update({ status: 'confirmed' }).eq('booking_id', order.booking_id)
 
+      // Mint the actual tickets now that payment is confirmed — this is what
+      // makes an event's capacity real instead of decorative (see
+      // supabase/migrations/20261008_event_ticketing.sql). One order line
+      // can cover several tickets (quantity = party size); vd_issue_tickets
+      // is atomic and capacity-checked, so this can never oversell a session
+      // even under concurrent confirmations. Best-effort like the analytics
+      // block below: a rare failure here shouldn't fail a payment that has
+      // already been taken and confirmed — a supplier can always record a
+      // walk-in ticket manually (lib/tickets.ts addManualTicket) as a fallback.
+      const { data: eventLines } = await admin
+        .from('vd_order_lines')
+        .select('id, quantity, value')
+        .eq('order_id', link.order_id)
+        .eq('category', 'event')
+      for (const line of eventLines ?? []) {
+        const v = line.value as { eventId?: string; sessionId?: string; ticketTypeId?: string } | null
+        if (!v?.eventId || !v?.sessionId || !v?.ticketTypeId) continue
+        const { error: ticketError } = await admin.rpc('vd_issue_tickets', {
+          p_event_id: v.eventId,
+          p_session_id: v.sessionId,
+          p_ticket_type_id: v.ticketTypeId,
+          p_qty: Math.max(1, Math.floor(Number(line.quantity) || 1)),
+          p_booking_id: order.booking_id,
+          p_order_id: link.order_id,
+          p_order_line_id: line.id,
+        })
+        if (ticketError) console.error('[ikhokha webhook] ticket issuance failed:', ticketError)
+      }
+
+      // Day tours and other timeslotted activities: one boarding ticket per
+      // paid seat, carrying the departure and (for a Grand Tour day tour) the
+      // hotel pickup, for the operator to scan before the bus leaves. Takes
+      // no capacity — the seats were held at checkout and are owned by the
+      // booking already — and is idempotent per order line, so a retried
+      // callback gets the same tickets back. See
+      // supabase/migrations/20261008_grand_tour_boarding.sql.
+      const { data: activityLines } = await admin
+        .from('vd_order_lines')
+        .select('id, quantity, value')
+        .eq('order_id', link.order_id)
+        .eq('category', 'activity')
+      for (const line of activityLines ?? []) {
+        const v = line.value as { activityId?: string; slotDate?: string; timeslotId?: string; pickupPointId?: string } | null
+        if (!v?.activityId || !v?.slotDate || !v?.timeslotId) continue
+        const { error: ticketError } = await admin.rpc('vd_issue_activity_tickets', {
+          p_activity_id: v.activityId,
+          p_slot_date: v.slotDate,
+          p_timeslot_id: v.timeslotId,
+          p_qty: Math.max(1, Math.floor(Number(line.quantity) || 1)),
+          p_booking_id: order.booking_id,
+          p_order_id: link.order_id,
+          p_order_line_id: line.id,
+          p_pickup_point_id: v.pickupPointId ?? null,
+        })
+        if (ticketError) console.error('[ikhokha webhook] day-tour ticket issuance failed:', ticketError)
+      }
+
       // Supplier notifications wait for this point rather than firing at
       // booking creation (see lib/bookings.ts) — inserted directly with the
       // service-role client since there's no customer session here to

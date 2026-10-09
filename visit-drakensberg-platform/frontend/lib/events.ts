@@ -16,6 +16,29 @@ import type { GraphFields } from './graph-fields'
 // this kind via `getSupplierEntities<any>('events', ...)`. This module is a
 // typed wrapper around the same underlying rows, not a new storage location,
 // so no existing event data is orphaned by its introduction.
+export type EventSession = {
+  id: string
+  starts_at: string
+  ends_at: string
+  status: 'active' | 'cancelled'
+}
+
+export type EventTicketType = {
+  id: string
+  name: string
+  price: number
+  description?: string
+}
+
+export type EventTicketCapacity = { total: number; sold: number }
+
+// [sessionId][ticketTypeId] — mirrors the nested-jsonb capacity shape
+// activities use for timeslots (value.slotBookings, 20260829_activity_
+// timeslots.sql), so the same `for update`-locked RPC pattern applies here.
+// `sold` is only ever written by vd_issue_tickets/vd_release_tickets — never
+// set it directly through updateEvent().
+export type EventCapacityMap = Record<string, Record<string, EventTicketCapacity>>
+
 export type Event = {
   id: string
   supplierId: string
@@ -29,11 +52,24 @@ export type Event = {
   region: string
   gpsLat: string
   gpsLng: string
+  /** Earliest session's start/end — kept for list sort/display only; never
+   *  the source of truth for capacity (see `sessions`/`capacity` below). */
   starts_at: string
   ends_at: string
+  /** Legacy flat price/capacity from before ticket tiers existed. Kept only
+   *  so very old rows still display something; a row with `ticketTypes` set
+   *  ignores these in favour of the tier prices below. */
   ticket_price: number
   total_tickets: number
   tickets_sold: number
+  /** Dated occurrences of this event (Wix-Events-style: one listing, many
+   *  sessions to choose from at checkout). */
+  sessions: EventSession[]
+  /** Price tiers (e.g. General/VIP), shared across every session. */
+  ticketTypes: EventTicketType[]
+  /** Per-session, per-tier capacity — the only source of truth for how many
+   *  tickets remain; mutated exclusively via vd_issue_tickets/vd_release_tickets. */
+  capacity: EventCapacityMap
   is_published: boolean
   status: 'active' | 'draft'
   createdAt: string
@@ -41,6 +77,85 @@ export type Event = {
 } & GraphFields
 
 const ENTITY = 'events'
+
+/** Tickets already sold for one session/tier combination. */
+export function ticketsSold(event: Pick<Event, 'capacity'>, sessionId: string, ticketTypeId: string): number {
+  return event.capacity?.[sessionId]?.[ticketTypeId]?.sold ?? 0
+}
+
+/** Tickets still available for one session/tier combination. */
+export function ticketsRemaining(event: Pick<Event, 'capacity'>, sessionId: string, ticketTypeId: string): number {
+  const cap = event.capacity?.[sessionId]?.[ticketTypeId]
+  if (!cap) return 0
+  return Math.max(cap.total - cap.sold, 0)
+}
+
+/** Total remaining tickets across every tier for one session. */
+export function sessionRemaining(event: Pick<Event, 'capacity'>, sessionId: string): number {
+  const tiers = event.capacity?.[sessionId] ?? {}
+  return Object.values(tiers).reduce((sum, c) => sum + Math.max(c.total - c.sold, 0), 0)
+}
+
+/** Cheapest ticket tier's price, for "From R___" display. */
+export function eventFromPrice(event: Pick<Event, 'ticketTypes' | 'ticket_price'>): number {
+  if (event.ticketTypes?.length) return Math.min(...event.ticketTypes.map(t => t.price))
+  return event.ticket_price ?? 0
+}
+
+function newSubId(prefix: string): string {
+  const uuid = typeof crypto !== 'undefined' && 'randomUUID' in crypto
+    ? crypto.randomUUID().slice(0, 8)
+    : Math.random().toString(36).slice(2, 10)
+  return `${prefix}-${uuid}`
+}
+
+/**
+ * Adds a dated session to an event and persists it. Read-modify-write on the
+ * event's editorial content (title, sessions list, tier list) — same
+ * last-write-wins posture the rest of the supplier portal already accepts
+ * for entity edits; `capacity[...].sold` is never touched here.
+ */
+export async function addEventSession(event: Event, session: Omit<EventSession, 'id'>): Promise<EventSession> {
+  const newSession: EventSession = { id: newSubId('sess'), ...session }
+  const sessions = [...(event.sessions ?? []), newSession]
+  await updateEvent(event.id, { sessions })
+  return newSession
+}
+
+export async function removeEventSession(event: Event, sessionId: string): Promise<void> {
+  const sessions = (event.sessions ?? []).filter(s => s.id !== sessionId)
+  const capacity = { ...(event.capacity ?? {}) }
+  delete capacity[sessionId]
+  await updateEvent(event.id, { sessions, capacity })
+}
+
+export async function addEventTicketType(event: Event, ticketType: Omit<EventTicketType, 'id'>): Promise<EventTicketType> {
+  const newType: EventTicketType = { id: newSubId('tier'), ...ticketType }
+  const ticketTypes = [...(event.ticketTypes ?? []), newType]
+  await updateEvent(event.id, { ticketTypes })
+  return newType
+}
+
+export async function removeEventTicketType(event: Event, ticketTypeId: string): Promise<void> {
+  const ticketTypes = (event.ticketTypes ?? []).filter(t => t.id !== ticketTypeId)
+  const capacity: EventCapacityMap = {}
+  for (const [sessionId, tiers] of Object.entries(event.capacity ?? {})) {
+    const { [ticketTypeId]: _removed, ...rest } = tiers
+    capacity[sessionId] = rest
+  }
+  await updateEvent(event.id, { ticketTypes, capacity })
+}
+
+/** Sets how many tickets a session/tier combination can sell in total. Never
+ *  touches `sold` — that only ever moves through vd_issue_tickets/vd_release_tickets. */
+export async function setEventCapacity(event: Event, sessionId: string, ticketTypeId: string, total: number): Promise<void> {
+  const capacity: EventCapacityMap = { ...(event.capacity ?? {}) }
+  const forSession = { ...(capacity[sessionId] ?? {}) }
+  const existing = forSession[ticketTypeId]
+  forSession[ticketTypeId] = { total: Math.max(0, Math.floor(total)), sold: existing?.sold ?? 0 }
+  capacity[sessionId] = forSession
+  await updateEvent(event.id, { capacity })
+}
 
 export async function getEvents(): Promise<Event[]> {
   return getSupplierEntities<Event>(ENTITY)

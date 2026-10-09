@@ -46,6 +46,7 @@ export const ADMIN_NAV: AdminNavItem[] = [
   { href: '/admin/blog', label: 'Blog & Content', icon: FileText },
   { href: '/admin/field-guide', label: 'Layered Field Guide', short: 'Field Guide', icon: Feather },
   { href: '/admin/editor', label: 'Visual Editor', icon: Globe },
+  { href: '/admin/grand-tour', label: 'Grand Tour', icon: Mountain },
   { href: '/admin/website', label: 'Website Settings', icon: Settings },
   { href: '/admin/trails', label: 'Hiking Trails', icon: Mountain },
   { href: '/admin/regions', label: 'Regions', icon: MapPin },
@@ -76,7 +77,7 @@ export const ADMIN_NAV_GROUPS = [
   ]),
   group('Money', ['/admin/finance', '/admin/settlements']),
   group('Supply', ['/admin/listings', '/admin/listing-applications', '/admin/suppliers', '/admin/verification', '/admin/compliance', '/admin/concerns', '/admin/marketplace', '/admin/packages']),
-  group('Content', ['/admin/blog', '/admin/field-guide', '/admin/editor', '/admin/website', '/admin/media', '/admin/seo']),
+  group('Content', ['/admin/blog', '/admin/field-guide', '/admin/editor', '/admin/grand-tour', '/admin/website', '/admin/media', '/admin/seo']),
   group('Places', ['/admin/trails', '/admin/regions', '/admin/reserves', '/admin/towns']),
   group('Platform', ['/admin/analytics', '/admin/roles', '/admin/settings']),
 ]

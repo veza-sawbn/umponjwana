@@ -122,6 +122,7 @@ export default function TripPage() {
                           <p className="font-sans text-xs text-black/40 mt-0.5 flex items-center gap-3 flex-wrap">
                             {a.date && <span className="flex items-center gap-1"><Calendar size={10} />{formatDate(a.date)}{a.timeslotTime && ` · ${a.timeslotTime}`}</span>}
                             <span className="flex items-center gap-1"><Users size={10} />{describeAddonParty(a)}</span>
+                            {a.pickupPointName && <span>Pickup {a.pickupPointName}{a.pickupTime && ` · ${a.pickupTime}`}</span>}
                           </p>
                         </div>
                       </div>

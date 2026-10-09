@@ -5,6 +5,7 @@ import { getTowns, DEFAULT_TOWNS } from '@/lib/towns'
 import { getTrails, DEFAULT_TRAILS } from '@/lib/trails'
 import { getProperties } from '@/lib/properties'
 import { getActivities } from '@/lib/activities'
+import { grandTourActivities, dayTourHref } from '@/lib/grand-tour'
 import { getPackages } from '@/lib/packages'
 import { getTours } from '@/lib/tours'
 import { getRoutes, routeSlug } from '@/lib/transport-routes'
@@ -26,6 +27,7 @@ const STATIC_ROUTES = [
   { path: '/hikes', priority: 0.9 },
   { path: '/activities', priority: 0.9 },
   { path: '/tours', priority: 0.8 },
+  { path: '/grand-tour', priority: 0.8 },
   { path: '/transport', priority: 0.6 },
   { path: '/search', priority: 0.8 },
   { path: '/regions', priority: 0.8 },
@@ -140,6 +142,14 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
         lastModified: new Date(a.createdAt),
         changeFrequency: 'weekly' as const,
         priority: 0.6,
+      })),
+    ...grandTourActivities(activities)
+      .filter(a => a.robotsIndex !== false)
+      .map(a => ({
+        url: `${SITE_URL}${dayTourHref(a)}`,
+        lastModified: new Date(a.createdAt),
+        changeFrequency: 'daily' as const,
+        priority: 0.7,
       })),
     ...packages
       .filter(p => p.packageStatus === 'published' && p.robotsIndex !== false)

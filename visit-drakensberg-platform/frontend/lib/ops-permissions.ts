@@ -22,7 +22,7 @@
  */
 
 import {
-  CalendarDays, Clock, Wallet, Users, Building2, Tag, FileSignature,
+  CalendarDays, Clock, Wallet, Users, Building2, Tag, FileSignature, Mountain, QrCode,
   type LucideIcon,
 } from 'lucide-react'
 import type { NavItem, SupplierType } from './supplier-config'
@@ -126,6 +126,9 @@ export interface ConsolidatedTool {
   icon: LucideIcon
   /** Permission that must be held on at least one supplier for this to appear. */
   permission: string
+  /** Shown to every ops employee even without that permission anywhere: the
+   *  tool also has work that needs no supplier assignment. */
+  openToAllOps?: boolean
 }
 
 export const CONSOLIDATED_TOOLS: ConsolidatedTool[] = [
@@ -164,6 +167,25 @@ export const CONSOLIDATED_TOOLS: ConsolidatedTool[] = [
     icon: FileSignature,
     permission: 'view_customers',
   },
+  // Grand Tour Drakensberg is run by VD Operations, not by the suppliers whose
+  // activities are on it (see supabase/migrations/20261008_grand_tour_ops_only.sql).
+  {
+    href: '/operations/grand-tour',
+    label: 'Grand Tour',
+    description: 'Day tours, hotel pickups and what each stage features.',
+    icon: Mountain,
+    // Day tours need manage_inventory on their operator; featuring catalogue
+    // items on a stage needs no assignment, so every ops employee sees it.
+    permission: 'manage_inventory',
+    openToAllOps: true,
+  },
+  {
+    href: '/operations/boarding',
+    label: 'Boarding & Check-in',
+    description: 'Scan Grand Tour tickets and work each departure’s passenger list.',
+    icon: QrCode,
+    permission: 'manage_bookings',
+  },
   {
     href: '/operations/financials',
     label: 'Financials',
@@ -194,7 +216,7 @@ export function consolidatedToolsFor(
         .filter(a => a.permissions.includes(tool.permission))
         .map(a => a.supplier_id),
     }))
-    .filter(tool => tool.supplierIds.length > 0)
+    .filter(tool => tool.supplierIds.length > 0 || tool.openToAllOps)
 }
 
 /** True when the employee holds `permission` on at least one supplier. */

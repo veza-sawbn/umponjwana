@@ -144,6 +144,12 @@ export const DESTINATION_GRAPH_NAV: NavNode[] = [
     label: 'Tours', href: '/tours', type: 'landing_page', status: 'live',
     children: [
       { label: 'Guided Tours', href: '/tours', type: 'landing_page', status: 'live' },
+      // Hidden from the menu while the Grand Tour is built out for launch; the
+      // page itself stays reachable at /grand-tour. Set back to 'live' to list it.
+      {
+        label: 'Grand Tour Drakensberg', href: '/grand-tour', type: 'landing_page', status: 'planned',
+        requires: 'Grand Tour content and day tours ready for launch',
+      },
       { label: 'Curated Journeys', href: '/packages', type: 'landing_page', status: 'live' },
     ],
   },

@@ -4,6 +4,11 @@ import { slugify, uniqueSlug } from './slugify'
 import type { Season, SeasonTopic } from './seasons'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { supabase } from './auth'
+import type { GrandTourListing } from './grand-tour'
+import type { ActivityTimeslot } from './activity-slots'
+
+export type { ActivityTimeslot } from './activity-slots'
+export { timeslotsForDate, slotBookedCount, slotRemaining } from './activity-slots'
 
 // Single canonical activity-category vocabulary — imported by both the
 // supplier creation/edit forms and the public /activities filter tabs.
@@ -30,23 +35,6 @@ export const ACTIVITY_INCLUSIONS = [
   'Helmet & Harness', 'Guide', 'Safety Briefing', 'Refreshments',
   'Transport to Site', 'Photos/Video', 'Equipment',
 ]
-
-// A recurring time-of-day this activity departs, independent of any
-// specific date — e.g. "09:00" and "13:30" every day, or "07:00" on
-// weekends only. Suppliers configure these on the listing; visitors pick
-// one alongside a date at booking time (ActivityDetail.tsx). Capacity is
-// tracked per (date, timeslot) via slotBookings below, kept accurate with
-// the atomic vd_book_activity_slot()/vd_release_activity_slot() RPCs — see
-// supabase/migrations/20260829_activity_timeslots.sql — the same pattern
-// lib/departures.ts uses for tour seats.
-export type ActivityTimeslot = {
-  id: string
-  /** 24-hour "HH:mm". */
-  time: string
-  capacity: number
-  /** Days this slot runs, 0=Sun..6=Sat. Empty = every day. */
-  days: number[]
-}
 
 export type Activity = {
   id: string
@@ -91,6 +79,11 @@ export type Activity = {
    *  what reveals the fleet tools: Transport Company, Vehicles, Drivers and
    *  Transport Jobs. Absent on every activity saved before this existed. */
   usesOwnVehicles?: boolean
+  /** Lists this activity as a Grand Tour Drakensberg day tour (/grand-tour):
+   *  which highlights it visits and which hotels it collects guests from.
+   *  Needs timeslots — they are the tour's scheduled departures. Absent on
+   *  every activity saved before the Grand Tour existed. */
+  grandTour?: GrandTourListing
   status: 'active' | 'draft'
   createdAt: string
   /** Which seasons this activity suits — powers the region "When to Go"
@@ -105,27 +98,6 @@ const KIND = 'activity'
 
 export function newActivityTimeslotId(): string {
   return newEntityId('slot')
-}
-
-/** The timeslots (if any) that run on the given day, in time order. */
-export function timeslotsForDate(activity: Pick<Activity, 'timeslots'>, dateStr: string): ActivityTimeslot[] {
-  if (!activity.timeslots?.length || !dateStr) return []
-  const day = new Date(`${dateStr}T00:00:00`).getDay()
-  return activity.timeslots
-    .filter(t => !t.days?.length || t.days.includes(day))
-    .sort((a, b) => a.time.localeCompare(b.time))
-}
-
-export function slotBookedCount(activity: Pick<Activity, 'slotBookings'>, dateStr: string, timeslotId: string): number {
-  return activity.slotBookings?.[`${dateStr}:${timeslotId}`] ?? 0
-}
-
-/** Best-effort remaining seats for display — the source of truth is the
- *  atomic RPC checked at checkout, same as tour departures. */
-export function slotRemaining(activity: Pick<Activity, 'timeslots' | 'slotBookings'>, dateStr: string, timeslotId: string): number {
-  const slot = activity.timeslots?.find(t => t.id === timeslotId)
-  if (!slot) return 0
-  return Math.max(slot.capacity - slotBookedCount(activity, dateStr, timeslotId), 0)
 }
 
 /** OPERATOR-side booking: a permanent, capacity-checked take on a timeslot of
