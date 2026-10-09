@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { normaliseGrandTourContent, DEFAULT_GRAND_TOUR_CONTENT, contentId } from '@/lib/grand-tour-content'
+import { normaliseGrandTourContent, DEFAULT_GRAND_TOUR_CONTENT, contentId } from '@/lib/grand-tour-content-model'
 
 describe('normaliseGrandTourContent', () => {
   it('falls back to the built-in content when nothing is saved', () => {

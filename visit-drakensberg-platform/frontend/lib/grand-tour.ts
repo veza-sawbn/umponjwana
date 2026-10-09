@@ -1,4 +1,7 @@
-import { timeslotsForDate, slotRemaining, type Activity, type ActivityTimeslot } from './activities'
+// Type-only import from ./activities (erased at build), so this module never
+// loads the Supabase client; the slot helpers come from the pure module.
+import type { Activity } from './activities'
+import { timeslotsForDate, slotRemaining, type ActivityTimeslot } from './activity-slots'
 import { todayISO } from './upcoming'
 
 // ─── Grand Tour Drakensberg ──────────────────────────────────────────────────
