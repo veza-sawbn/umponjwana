@@ -87,3 +87,24 @@ export function formatRate(rate: number): string {
   const pct = rate * 100
   return `${pct.toFixed(Math.abs(pct % 1) < 1e-9 ? 0 : 1)}%`
 }
+
+/**
+ * Rates are stored as fractions (0.15) — vd_create_order() multiplies the
+ * line's net by them directly — but admins type them as percentages ("15").
+ * These convert between the two so a form can never save 15 meaning 15%
+ * (which the server would charge as 1500%).
+ */
+export function rateToPercentInput(rate: number | null | undefined): string {
+  if (rate == null || !Number.isFinite(Number(rate))) return ''
+  return String(Math.round(Number(rate) * 100 * 1000) / 1000)
+}
+
+/** A percentage typed into a form ("15", "12.5") as a stored rate (0.15, 0.125);
+ *  null when blank or not a percentage from 0 up to (not including) 100. */
+export function percentInputToRate(input: string): number | null {
+  const s = input.trim()
+  if (!s) return null
+  const pct = Number(s)
+  if (!Number.isFinite(pct) || pct < 0 || pct >= 100) return null
+  return Math.round(pct * 1000) / 100000
+}

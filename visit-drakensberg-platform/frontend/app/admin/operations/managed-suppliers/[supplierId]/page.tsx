@@ -47,6 +47,7 @@ import {
   type AgreementType,
 } from '@/lib/commercial-agreements'
 import { SUPPLIER_CONFIG } from '@/lib/supplier-config'
+import { formatRate, rateToPercentInput, percentInputToRate } from '@/lib/allocation'
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
 
@@ -135,9 +136,9 @@ function CommercialTermsPanel({
   const [model, setModel]             = useState<ManagementModel>(terms?.management_model ?? 'supplier_managed')
   const [status, setStatus]           = useState<ManagementStatus>(terms?.management_status ?? 'active')
   const [agreementType, setAgreementType] = useState<AgreementType | ''>(terms?.agreement_type ?? '')
-  const [commission, setCommission]   = useState(terms?.commission_rate?.toString() ?? '')
+  const [commission, setCommission]   = useState(rateToPercentInput(terms?.commission_rate))
   const [mgmtFee, setMgmtFee]         = useState(terms?.management_fee?.toString() ?? '')
-  const [platformFee, setPlatformFee] = useState(terms?.platform_fee_rate?.toString() ?? '')
+  const [platformFee, setPlatformFee] = useState(rateToPercentInput(terms?.platform_fee_rate))
   const [settlement, setSettlement]   = useState(terms?.settlement_frequency ?? 'monthly')
   const [effectiveDate, setEffectiveDate] = useState(terms?.agreement_effective_date ?? '')
   const [expiryDate, setExpiryDate]   = useState(terms?.agreement_expiry_date ?? '')
@@ -148,9 +149,9 @@ function CommercialTermsPanel({
     setModel(terms?.management_model ?? 'supplier_managed')
     setStatus(terms?.management_status ?? 'active')
     setAgreementType(terms?.agreement_type ?? '')
-    setCommission(terms?.commission_rate?.toString() ?? '')
+    setCommission(rateToPercentInput(terms?.commission_rate))
     setMgmtFee(terms?.management_fee?.toString() ?? '')
-    setPlatformFee(terms?.platform_fee_rate?.toString() ?? '')
+    setPlatformFee(rateToPercentInput(terms?.platform_fee_rate))
     setSettlement(terms?.settlement_frequency ?? 'monthly')
     setEffectiveDate(terms?.agreement_effective_date ?? '')
     setExpiryDate(terms?.agreement_expiry_date ?? '')
@@ -160,15 +161,20 @@ function CommercialTermsPanel({
   }
 
   async function save() {
+    // Typed as percentages, stored as fractions — see percentInputToRate.
+    const commissionRate = percentInputToRate(commission)
+    const platformFeeRate = percentInputToRate(platformFee)
+    if (commission.trim() && commissionRate == null) { toast.error('Commission must be a percentage from 0 to below 100.'); return }
+    if (platformFee.trim() && platformFeeRate == null) { toast.error('Platform fee must be a percentage from 0 to below 100.'); return }
     setSaving(true)
     try {
       await upsertSupplierTerms(supplierId, {
         management_model: model,
         management_status: status,
         agreement_type: agreementType || null,
-        commission_rate: commission ? parseFloat(commission) : null,
+        commission_rate: commissionRate,
         management_fee: mgmtFee ? parseFloat(mgmtFee) : null,
-        platform_fee_rate: platformFee ? parseFloat(platformFee) : null,
+        platform_fee_rate: platformFeeRate,
         settlement_frequency: settlement,
         agreement_effective_date: effectiveDate || null,
         agreement_expiry_date: expiryDate || null,
@@ -287,7 +293,7 @@ function CommercialTermsPanel({
               <input type="number" min="0" max="100" step="0.1" value={commission} onChange={e => setCommission(e.target.value)} placeholder="e.g. 15" className={inputCls} />
             ) : (
               <p className="font-sans text-sm text-gray-700">
-                {terms?.commission_rate != null ? `${terms.commission_rate}%` : <span className="text-gray-400">—</span>}
+                {terms?.commission_rate != null ? formatRate(Number(terms.commission_rate)) : <span className="text-gray-400">—</span>}
               </p>
             )}
           </div>
@@ -307,7 +313,7 @@ function CommercialTermsPanel({
               <input type="number" min="0" max="100" step="0.1" value={platformFee} onChange={e => setPlatformFee(e.target.value)} placeholder="e.g. 2.5" className={inputCls} />
             ) : (
               <p className="font-sans text-sm text-gray-700">
-                {terms?.platform_fee_rate != null ? `${terms.platform_fee_rate}%` : <span className="text-gray-400">—</span>}
+                {terms?.platform_fee_rate != null ? formatRate(Number(terms.platform_fee_rate)) : <span className="text-gray-400">—</span>}
               </p>
             )}
           </div>

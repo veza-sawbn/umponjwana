@@ -12,6 +12,7 @@ import Link from 'next/link'
 import { Building2, ChevronRight } from 'lucide-react'
 import { useOperations } from '@/lib/operations-context'
 import { ALL_PERMISSIONS } from '@/lib/ops-assignments'
+import { formatRate } from '@/lib/allocation'
 import {
   MANAGEMENT_MODEL_LABEL, MANAGEMENT_STATUS_LABEL,
 } from '@/lib/commercial-agreements'
@@ -99,7 +100,7 @@ export default function PortfolioPage() {
                   </p>
                   <p className="font-sans text-sm text-gray-900">
                     {canSeeContract
-                      ? (s.commission_rate != null ? `${s.commission_rate}%` : '—')
+                      ? (s.commission_rate != null ? formatRate(Number(s.commission_rate)) : '—')
                       : <span className="text-gray-300">Not visible</span>}
                   </p>
                 </div>
