@@ -317,7 +317,7 @@ export default function StayDetail({ property, rooms: roomsData, id }: { propert
                             <button
                               type="button"
                               onClick={e => { e.stopPropagation(); setDetailRoom(room) }}
-                              className="relative block w-full aspect-[4/3] overflow-hidden bg-gray-100"
+                              className="relative block w-full aspect-[4/3] overflow-hidden bg-gray-100 rounded-2xl"
                             >
                               <Image src={room.images[0]} alt={room.name} fill loading="lazy" sizes="160px" className="object-cover hover:opacity-90 transition-opacity" />
                             </button>
@@ -328,7 +328,7 @@ export default function StayDetail({ property, rooms: roomsData, id }: { propert
                                     key={i}
                                     type="button"
                                     onClick={e => { e.stopPropagation(); setDetailRoom(room) }}
-                                    className="relative aspect-square overflow-hidden bg-gray-100"
+                                    className="relative aspect-square overflow-hidden bg-gray-100 rounded-2xl"
                                   >
                                     <Image src={url} alt="" fill loading="lazy" sizes="53px" className="object-cover hover:opacity-90 transition-opacity" />
                                     {i === 2 && room.images.length > 4 && (

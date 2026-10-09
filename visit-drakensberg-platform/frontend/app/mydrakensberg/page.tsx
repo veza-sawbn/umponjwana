@@ -113,7 +113,7 @@ export default function MyDrakensbergPage() {
             {/* Featured article */}
             {featured && (
               <Link href={`/mydrakensberg/${featured.slug}`} className="group block mb-14">
-                <div className="grid grid-cols-1 lg:grid-cols-5 gap-0 overflow-hidden border border-gray-200">
+                <div className="grid grid-cols-1 lg:grid-cols-5 gap-0 overflow-hidden border border-gray-200 rounded-2xl">
                   <div className="relative lg:col-span-3 h-64 lg:h-auto overflow-hidden bg-gray-100">
                     {featured.image && (
                       <Image src={featured.image} alt={featured.title} fill priority sizes="(max-width: 1024px) 100vw, 60vw" className="object-cover group-hover:scale-105 transition-transform duration-700" />
@@ -148,7 +148,7 @@ export default function MyDrakensbergPage() {
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {filtered.map(article => (
-                  <Link key={article.slug} href={`/mydrakensberg/${article.slug}`} className="group bg-white border border-gray-200 overflow-hidden hover:border-[#2d6a4f] transition-colors">
+                  <Link key={article.slug} href={`/mydrakensberg/${article.slug}`} className="group bg-white border border-gray-200 overflow-hidden hover:border-gold transition-colors rounded-2xl">
                     <div className="relative h-52 overflow-hidden bg-gray-100">
                       {article.image && (
                         <Image src={article.image} alt={article.title} fill loading="lazy" sizes="(max-width: 768px) 100vw, (max-width: 1024px) 50vw, 33vw" className="object-cover group-hover:scale-105 transition-transform duration-500" />
@@ -156,7 +156,7 @@ export default function MyDrakensbergPage() {
                     </div>
                     <div className="p-6">
                       <span className="font-sans text-[10px] tracking-[0.14em] uppercase text-[#C9A96E] mb-3 block">{article.category}</span>
-                      <h3 className="font-display italic text-xl text-[#000000] mb-3 leading-tight group-hover:text-[#2d6a4f] transition-colors">{article.title}</h3>
+                      <h3 className="font-display italic text-xl text-[#000000] mb-3 leading-tight group-hover:text-brown-700 transition-colors">{article.title}</h3>
                       <p className="font-sans text-sm text-gray-500 leading-relaxed line-clamp-3">{article.excerpt}</p>
                       <div className="flex items-center justify-between mt-5 pt-4 border-t border-gray-100">
                         <div>

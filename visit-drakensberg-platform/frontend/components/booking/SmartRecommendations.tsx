@@ -190,14 +190,14 @@ export default function SmartRecommendations({ region, excludeListingId, originL
               <button
                 key={shuttle.id}
                 onClick={() => booking.addShuttle(shuttle)}
-                className="w-full text-left group flex gap-3 bg-white border border-[#2d6a4f]/30 hover:border-[#2d6a4f] transition-colors p-3"
+                className="w-full text-left group flex gap-3 bg-white border border-[#2d6a4f]/30 hover:border-gold transition-colors p-3 rounded-2xl"
               >
                 <div className="w-14 h-14 shrink-0 bg-[#2d6a4f]/10 flex items-center justify-center text-[#2d6a4f]">
                   <Bus size={20} />
                 </div>
                 <div className="min-w-0 flex-1">
                   <span className="inline-flex items-center gap-1 font-sans text-[9px] tracking-[0.12em] uppercase text-[#2d6a4f]">Private Transfer Available</span>
-                  <p className="font-display italic text-sm text-[#000000] leading-tight group-hover:text-[#2d6a4f] transition-colors">{shuttle.label}</p>
+                  <p className="font-display italic text-sm text-[#000000] leading-tight group-hover:text-brown-700 transition-colors">{shuttle.label}</p>
                   <p className="font-sans text-[10px] text-gray-400 mt-1">Travel date: {shuttle.date} · {shuttle.passengers} passenger{shuttle.passengers !== 1 ? 's' : ''}</p>
                   {origin && (
                     <p className="font-sans text-[10px] text-[#2d6a4f]/70 mt-0.5 flex items-center gap-1">
@@ -226,7 +226,7 @@ export default function SmartRecommendations({ region, excludeListingId, originL
               <Link
                 key={item.href}
                 href={item.href}
-                className="group flex gap-3 bg-white border border-gray-200 hover:border-[#2d6a4f] transition-colors p-3"
+                className="group flex gap-3 bg-white border border-gray-200 hover:border-gold transition-colors p-3 rounded-2xl"
               >
                 <div className="relative w-14 h-14 shrink-0 overflow-hidden">
                   <Image src={item.image} alt={item.title} fill loading="lazy" sizes="56px" className="object-cover group-hover:scale-105 transition-transform duration-500" />
@@ -241,7 +241,7 @@ export default function SmartRecommendations({ region, excludeListingId, originL
                       <span className="font-sans text-[9px] text-gray-300">{distanceLabel}</span>
                     )}
                   </div>
-                  <p className="font-display italic text-sm text-[#000000] leading-tight group-hover:text-[#2d6a4f] transition-colors">{item.title}</p>
+                  <p className="font-display italic text-sm text-[#000000] leading-tight group-hover:text-brown-700 transition-colors">{item.title}</p>
                   <div className="flex items-center justify-between mt-1">
                     <p className="font-sans text-[10px] text-gray-400 flex items-center gap-0.5">
                       <MapPin size={8} />{item.location}

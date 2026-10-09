@@ -33,13 +33,13 @@ export default function NearbyStaysModule({
       </div>
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {stays.map(p => (
-          <Link key={p.id} href={`/stays/${p.slug || p.id}`} className="group bg-white border border-gray-200 overflow-hidden hover:border-[#2d6a4f] transition-colors flex flex-col">
+          <Link key={p.id} href={`/stays/${p.slug || p.id}`} className="group bg-white border border-gray-200 overflow-hidden hover:border-gold transition-colors flex flex-col rounded-2xl">
             <div className="relative aspect-[4/3] overflow-hidden bg-[#2d6a4f]/10">
               <Image src={p.photos[0] || FALLBACK} alt={p.name} fill loading="lazy" sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw" className="object-cover group-hover:scale-105 transition-transform duration-500" />
             </div>
             <div className="p-3 flex flex-col flex-1">
               <p className="font-sans text-[9px] tracking-[0.12em] uppercase text-[#C9A96E] mb-1">{p.type}</p>
-              <h3 className="font-display italic text-base text-[#000000] leading-tight group-hover:text-[#2d6a4f] transition-colors truncate">{p.name}</h3>
+              <h3 className="font-display italic text-base text-[#000000] leading-tight group-hover:text-brown-700 transition-colors truncate">{p.name}</h3>
               {p.distanceKm !== undefined && (
                 <p className="font-sans text-[10px] text-gray-400 flex items-center gap-1 mt-1.5">
                   <Navigation size={9} /> {p.distanceKm} km away

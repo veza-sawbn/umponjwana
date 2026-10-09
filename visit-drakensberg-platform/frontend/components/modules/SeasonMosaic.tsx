@@ -29,7 +29,7 @@ export default function SeasonMosaic({ regionSlug, heroImage, heroImagePosition 
           <Link
             key={season}
             href={`/regions/${regionSlug}/${season}`}
-            className="group relative block aspect-[3/4] overflow-hidden"
+            className="group relative block aspect-[3/4] overflow-hidden rounded-2xl"
           >
             <img
               src={heroImage}

@@ -89,7 +89,7 @@ function StayTile({ stay }: { stay: StayCard }) {
     // that lives inside the thing it isn't meant to activate.
     <div className="relative shrink-0 snap-start w-[260px] sm:w-[280px]">
     <Link href={`/stays/${stay.id}`} className="group block">
-      <div className="relative overflow-hidden aspect-[4/3] mb-4 bg-[#2d6a4f]/10">
+      <div className="relative overflow-hidden aspect-[4/3] mb-4 bg-[#2d6a4f]/10 rounded-2xl">
         {stay.img ? (
           <Image src={stay.img} alt={stay.title} fill loading="lazy" sizes="280px"
             className="object-cover transition-transform duration-700 group-hover:scale-105" />
@@ -110,7 +110,7 @@ function StayTile({ stay }: { stay: StayCard }) {
         )}
       </div>
       <p className="font-sans text-[10px] tracking-[0.15em] uppercase text-gold mb-1">{stay.category} · {stay.location}</p>
-      <h3 className="font-display text-xl text-forest leading-snug mb-2 group-hover:text-sage transition-colors">{stay.title}</h3>
+      <h3 className="font-display text-xl text-forest leading-snug mb-2 group-hover:text-brown-700 transition-colors">{stay.title}</h3>
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-1">
           {stay.rating ? (

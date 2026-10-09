@@ -27,7 +27,7 @@ export default function ShuttleRoutesModule({
           <Link
             key={r.id}
             href={`/transport/${routeSlug(r)}`}
-            className="group bg-white border border-gray-200 p-4 hover:border-[#2d6a4f] transition-colors flex items-center justify-between gap-4"
+            className="group bg-white border border-gray-200 p-4 hover:border-gold transition-colors flex items-center justify-between gap-4 rounded-2xl"
           >
             <div className="min-w-0">
               <div className="flex items-center gap-2 font-sans text-sm font-medium text-[#000000] truncate">

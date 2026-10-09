@@ -46,7 +46,7 @@ export default function ExploreCard({
     // an <a> is invalid HTML and confuses keyboard/screen-reader navigation.
     <div className="relative">
     <Link href={href} className="group block">
-      <div className="relative overflow-hidden aspect-[4/3] mb-4 bg-forest/10">
+      <div className="relative overflow-hidden aspect-[4/3] mb-4 bg-forest/10 rounded-2xl">
         {image ? (
           isOptimizableImageHost(image) ? (
             <Image src={image} alt={imageAlt} fill loading="lazy"
@@ -89,7 +89,7 @@ export default function ExploreCard({
         )}
       </div>
       <p className="font-sans text-[10px] tracking-[0.15em] uppercase text-gold mb-1">{eyebrow}</p>
-      <h3 className="font-display text-xl text-forest leading-snug mb-2 group-hover:text-sage transition-colors">{title}</h3>
+      <h3 className="font-display text-xl text-forest leading-snug mb-2 group-hover:text-brown-700 transition-colors">{title}</h3>
       {meta}
     </Link>
       {saveListing && <SaveButton listing={saveListing} />}

@@ -19,7 +19,7 @@ function GuideCard({ g }: { g: GuideProfile }) {
   return (
     <Link
       href={`/guides/${g.id}`}
-      className="group flex h-full flex-col bg-white border border-gray-200 hover:border-[#2d6a4f] transition-colors"
+      className="group flex h-full flex-col bg-white border border-gray-200 hover:border-gold transition-colors rounded-2xl overflow-hidden"
     >
       <div className="relative aspect-[3/4] bg-[#2d6a4f]/10 overflow-hidden">
         {g.portrait ? (

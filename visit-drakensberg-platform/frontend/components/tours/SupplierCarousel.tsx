@@ -9,7 +9,7 @@ function SupplierCard({ o }: { o: OperatorProfile }) {
   return (
     <Link
       href={`/guides/operators/${o.id}`}
-      className="group block bg-white border border-black/8 hover:border-forest transition-colors shrink-0 w-[240px] snap-start"
+      className="group block bg-white border border-black/8 hover:border-forest transition-colors shrink-0 w-[240px] snap-start rounded-2xl overflow-hidden"
     >
       <div className="relative aspect-[4/3] bg-forest/10 overflow-hidden">
         {o.logo ? (
@@ -27,7 +27,7 @@ function SupplierCard({ o }: { o: OperatorProfile }) {
         )}
       </div>
       <div className="p-4">
-        <h3 className="font-display text-lg text-forest leading-snug mb-1 group-hover:text-sage transition-colors truncate">
+        <h3 className="font-display text-lg text-forest leading-snug mb-1 group-hover:text-brown-700 transition-colors truncate">
           {o.companyName}
         </h3>
         <p className="font-sans text-xs text-forest/40 flex items-center gap-1 mb-2 truncate">

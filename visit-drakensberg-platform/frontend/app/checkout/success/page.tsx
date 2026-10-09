@@ -367,15 +367,15 @@ function SuccessInner() {
               <div className="space-y-2">
                 <Link href="/account" className="flex items-center justify-between py-2.5 border-b border-gray-100 group">
                   <span className="font-sans text-sm text-gray-700">View My Bookings</span>
-                  <ArrowRight size={13} className="text-gray-400 group-hover:text-[#2d6a4f] transition-colors" />
+                  <ArrowRight size={13} className="text-gray-400 group-hover:text-brown-700 transition-colors" />
                 </Link>
                 <Link href={`/account/itinerary?id=${booking.id}`} className="flex items-center justify-between py-2.5 border-b border-gray-100 group">
                   <span className="font-sans text-sm text-gray-700">View Full Itinerary</span>
-                  <ArrowRight size={13} className="text-gray-400 group-hover:text-[#2d6a4f] transition-colors" />
+                  <ArrowRight size={13} className="text-gray-400 group-hover:text-brown-700 transition-colors" />
                 </Link>
                 <Link href="/stays" className="flex items-center justify-between py-2.5 group">
                   <span className="font-sans text-sm text-gray-700">Continue Planning</span>
-                  <ArrowRight size={13} className="text-gray-400 group-hover:text-[#2d6a4f] transition-colors" />
+                  <ArrowRight size={13} className="text-gray-400 group-hover:text-brown-700 transition-colors" />
                 </Link>
               </div>
             </div>

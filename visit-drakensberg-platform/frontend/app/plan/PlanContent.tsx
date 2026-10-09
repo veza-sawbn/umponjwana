@@ -258,7 +258,7 @@ export default function PlanContent() {
                     <Link
                       key={r.id}
                       href={r.href}
-                      className="bg-white border border-black/8 p-5 hover:border-gold/60 transition-colors group"
+                      className="bg-white border border-black/8 p-5 hover:border-gold/60 transition-colors group rounded-2xl"
                     >
                       <p className="font-sans text-[10px] text-gold uppercase tracking-widest mb-1.5">
                         {r.kind === 'tour-departure' ? 'Guided tour' : r.kind === 'stay' ? 'Stay' : 'Activity'}

@@ -54,7 +54,7 @@ const config: Config = {
         },
       },
       fontFamily: {
-        display: ['DM Serif Display', 'Georgia', 'serif'],
+        display: ['DM Sans', 'system-ui', 'sans-serif'],
         sans: ['DM Sans', 'system-ui', 'sans-serif'],
       },
       boxShadow: {

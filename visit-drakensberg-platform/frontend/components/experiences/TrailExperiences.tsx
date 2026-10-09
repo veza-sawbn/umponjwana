@@ -85,7 +85,7 @@ export default function TrailExperiences({
           const full = e.spacesAvailable === 0
           const checked = selected.includes(e.id)
           return (
-            <div key={e.id} className={`bg-white border p-5 ${full ? 'border-gray-100 opacity-60' : checked ? 'border-[#2d6a4f]' : 'border-gray-200'}`}>
+            <div key={e.id} className={`bg-white border rounded-2xl p-5 ${full ? 'border-gray-100 opacity-60' : checked ? 'border-[#2d6a4f]' : 'border-gray-200'}`}>
               <div className="flex items-start justify-between gap-4 flex-wrap">
                 <div className="flex items-start gap-4 min-w-0">
                   <div className="text-center shrink-0 bg-[#F7F5F2] px-3 py-2 min-w-[56px]">

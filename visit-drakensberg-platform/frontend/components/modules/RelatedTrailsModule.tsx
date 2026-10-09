@@ -34,13 +34,13 @@ export default function RelatedTrailsModule({
       </div>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {trails.map(t => (
-          <Link key={t.id} href={`/hikes/${t.slug || t.id}`} className="group bg-white border border-gray-200 overflow-hidden hover:border-[#2d6a4f] transition-colors flex gap-0">
+          <Link key={t.id} href={`/hikes/${t.slug || t.id}`} className="group bg-white border border-gray-200 overflow-hidden hover:border-gold transition-colors flex gap-0 rounded-2xl">
             <div className="relative w-28 shrink-0 overflow-hidden">
               <Image src={t.image || FALLBACK} alt={t.name} fill loading="lazy" sizes="112px" className="object-cover group-hover:scale-105 transition-transform duration-500" />
             </div>
             <div className="p-4 flex flex-col justify-between flex-1 min-w-0">
               <div>
-                <h3 className="font-display italic text-lg text-[#000000] leading-tight group-hover:text-[#2d6a4f] transition-colors truncate">{t.name}</h3>
+                <h3 className="font-display italic text-lg text-[#000000] leading-tight group-hover:text-brown-700 transition-colors truncate">{t.name}</h3>
                 <p className="font-sans text-xs text-gray-400 mt-0.5">{t.distance} · {t.difficulty}</p>
               </div>
               {t.distanceKm !== undefined && (

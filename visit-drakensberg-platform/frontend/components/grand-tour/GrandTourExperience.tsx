@@ -431,7 +431,7 @@ function TourCard({ tour, hotel, reduce, highlightStage, stages }: { tour: Activ
       initial={reduce ? false : 'hidden'} whileInView="show" viewport={{ once: true, amount: 0.3 }} variants={reveal}
     >
       {tour.photos?.[0] && (
-        <Link href={link()} className="relative block aspect-[16/9] overflow-hidden group" tabIndex={-1} aria-hidden="true">
+        <Link href={link()} className="relative block aspect-[16/9] overflow-hidden group rounded-2xl" tabIndex={-1} aria-hidden="true">
           <Image src={tour.photos[0]} unoptimized={!isOptimizableImageHost(tour.photos[0])} alt="" fill sizes="(min-width: 768px) 40vw, 100vw" className="object-cover transition-transform duration-700 group-hover:scale-105" />
         </Link>
       )}
@@ -505,7 +505,7 @@ function TourCard({ tour, hotel, reduce, highlightStage, stages }: { tour: Activ
 function RelatedCard({ product, reduce }: { product: RelatedProduct; reduce: boolean }) {
   return (
     <motion.div initial={reduce ? false : 'hidden'} whileInView="show" viewport={{ once: true, amount: 0.3 }} variants={reveal}>
-      <Link href={product.href} className="group bg-white border border-black/10 hover:border-black/30 flex items-stretch transition-colors h-full">
+      <Link href={product.href} className="group bg-white border border-black/10 hover:border-black/30 flex items-stretch transition-colors h-full rounded-2xl overflow-hidden">
         {product.image && (
           <div className="relative w-28 shrink-0 overflow-hidden">
             <Image src={product.image} unoptimized={!isOptimizableImageHost(product.image)} alt="" fill sizes="112px" className="object-cover transition-transform duration-700 group-hover:scale-105" />
@@ -513,7 +513,7 @@ function RelatedCard({ product, reduce }: { product: RelatedProduct; reduce: boo
         )}
         <div className="p-4 flex-1 min-w-0">
           <p className="font-sans text-[10px] tracking-[0.18em] uppercase text-black/45">{product.kind}{product.detail ? ` · ${product.detail}` : ''}</p>
-          <p className="font-display italic text-xl mt-1 group-hover:text-[#2d6a4f]">{product.name}</p>
+          <p className="font-display italic text-xl mt-1 group-hover:text-brown-700">{product.name}</p>
           {product.note && <p className="font-sans text-xs text-black/60 mt-1">{product.note}</p>}
           <p className="font-sans text-xs text-black/55 mt-2 flex items-center justify-between gap-2">
             <span>{product.price ? <>From <span className="text-[#2d6a4f] font-medium">{formatMoney(product.price)}</span> pp</> : 'See prices and dates'}</span>

@@ -291,7 +291,7 @@ export default function HikeDetail({
                   {/* Hero image as first gallery cell if no dedicated gallery */}
                   {trail.gallery.length === 0 && trail.image && (
                     <div
-                      className="aspect-[4/3] bg-cover cursor-pointer col-span-3"
+                      className="aspect-[4/3] bg-cover cursor-pointer col-span-3 rounded-2xl"
                       style={{ backgroundImage: `url(${trail.image})`, ...backgroundPositionStyle(trail.imagePosition) }}
                       onClick={() => setLightboxImg(trail.image)}
                     />
@@ -299,7 +299,7 @@ export default function HikeDetail({
                   {trail.gallery.map((url, i) => (
                     <div
                       key={i}
-                      className={`aspect-[4/3] bg-cover bg-center cursor-pointer hover:opacity-90 transition-opacity ${i === 0 && trail.gallery.length >= 3 ? 'col-span-2 row-span-2' : ''}`}
+                      className={`aspect-[4/3] bg-cover bg-center cursor-pointer hover:opacity-90 transition-opacity ${i === 0 && trail.gallery.length >= 3 ? 'col-span-2 row-span-2' : ''} rounded-2xl`}
                       style={{ backgroundImage: `url(${url})` }}
                       onClick={() => setLightboxImg(url)}
                     />
@@ -335,7 +335,7 @@ export default function HikeDetail({
                     <Link
                       key={p.id}
                       href={`/stays/${p.slug || p.id}`}
-                      className="block bg-white border border-gray-200 hover:border-[#C9A96E] transition-colors group overflow-hidden"
+                      className="block bg-white border border-gray-200 hover:border-[#C9A96E] transition-colors group overflow-hidden rounded-2xl"
                     >
                       {p.photos?.[0] && (
                         <div
@@ -344,7 +344,7 @@ export default function HikeDetail({
                         />
                       )}
                       <div className="p-4">
-                        <p className="font-display italic text-lg text-[#000000] group-hover:text-[#2d6a4f] transition-colors mb-0.5">
+                        <p className="font-display italic text-lg text-[#000000] group-hover:text-brown-700 transition-colors mb-0.5">
                           {p.name}
                         </p>
                         <p className="font-sans text-xs text-gray-500">
@@ -370,9 +370,9 @@ export default function HikeDetail({
                     <Link
                       key={a.id}
                       href={`/activities/${a.slug || a.id}`}
-                      className="block bg-white border border-gray-200 hover:border-[#C9A96E] transition-colors group p-4"
+                      className="block bg-white border border-gray-200 hover:border-[#C9A96E] transition-colors group p-4 rounded-2xl"
                     >
-                      <p className="font-display italic text-lg text-[#000000] group-hover:text-[#2d6a4f] transition-colors mb-0.5">
+                      <p className="font-display italic text-lg text-[#000000] group-hover:text-brown-700 transition-colors mb-0.5">
                         {a.name}
                       </p>
                       <p className="font-sans text-xs text-gray-500">

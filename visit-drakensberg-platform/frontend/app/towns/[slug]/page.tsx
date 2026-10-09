@@ -122,7 +122,7 @@ export default async function TownPage({ params }: { params: { slug: string } })
           <div className="grid lg:grid-cols-[2fr_1fr] gap-12 items-start">
             <div>
               {town.image && (
-                <div className="relative aspect-[16/9] overflow-hidden bg-forest/10 mb-8">
+                <div className="relative aspect-[16/9] overflow-hidden bg-forest/10 mb-8 rounded-2xl">
                   <Image src={town.image} alt={town.name} fill priority sizes="(max-width: 1024px) 100vw, 66vw" className="object-cover" style={objectPositionStyle(town.imagePosition)} />
                 </div>
               )}

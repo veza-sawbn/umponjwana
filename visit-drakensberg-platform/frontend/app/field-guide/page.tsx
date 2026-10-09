@@ -45,7 +45,7 @@ export default async function FieldGuideIndexPage() {
               <Link
                 key={guide.slug}
                 href={`/field-guide/${guide.slug}`}
-                className="group block bg-white border border-black/8 hover:border-gold transition-colors"
+                className="group block bg-white border border-black/8 hover:border-gold transition-colors rounded-2xl overflow-hidden"
               >
                 <div className="aspect-[4/3] overflow-hidden bg-forest/5">
                   {guide.coverUrl ? (

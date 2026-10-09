@@ -455,7 +455,7 @@ function SearchResults() {
               {visibleStays.map(stay => {
                 const isSelected = booking.stay?.id === stay.id
                 return (
-                  <div key={stay.id} className={`group bg-white flex flex-col ${!stay.available ? 'opacity-60' : ''} border ${isSelected ? 'border-[#2d6a4f]' : 'border-transparent'}`}>
+                  <div key={stay.id} className={`group bg-white flex flex-col ${!stay.available ? 'opacity-60' : ''} border ${isSelected ? 'border-[#2d6a4f]' : 'border-transparent'} rounded-2xl overflow-hidden`}>
                     <Link href={`/stays/${stay.id}?check_in=${checkIn}&check_out=${checkOut}&guests=${guests}`}>
                       <div className="aspect-[4/3] overflow-hidden relative bg-[#2d6a4f]/10">
                         {stay.img ? (
@@ -535,7 +535,7 @@ function SearchResults() {
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
               {visibleHikes.map(h => (
                 <Link key={h.id} href={`/hikes/${h.id}`} className="group bg-white">
-                  <div className="aspect-[4/3] overflow-hidden relative bg-[#2d6a4f]/10">
+                  <div className="aspect-[4/3] overflow-hidden relative bg-[#2d6a4f]/10 rounded-2xl">
                     {h.img ? (
                       <Image src={h.img} alt={h.title} fill loading="lazy" sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw" className="object-cover group-hover:scale-105 transition-transform duration-700" />
                     ) : (
@@ -567,7 +567,7 @@ function SearchResults() {
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
               {visibleActivities.map(a => (
                 <Link key={a.id} href={`/activities/${a.id}`} className="group bg-white">
-                  <div className="aspect-[4/3] overflow-hidden relative bg-[#C9A96E]/10">
+                  <div className="aspect-[4/3] overflow-hidden relative bg-[#C9A96E]/10 rounded-2xl">
                     {a.img ? (
                       <Image src={a.img} alt={a.title} fill loading="lazy" sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw" className="object-cover group-hover:scale-105 transition-transform duration-700" />
                     ) : (
@@ -601,12 +601,12 @@ function SearchResults() {
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
               {visibleEvents.map(ev => (
                 <Link key={ev.id} href="/events" className="group bg-white">
-                  <div className={`aspect-[3/2] overflow-hidden flex items-center justify-center ${ev.event_type === 'special' ? 'bg-[#2d6a4f]' : 'bg-[#1a1a2e]'}`}>
+                  <div className={`aspect-[3/2] overflow-hidden flex items-center justify-center ${ev.event_type === 'special' ? 'bg-[#2d6a4f]' : 'bg-[#1a1a2e]'} rounded-2xl`}>
                     <span className="font-display italic text-lg text-white/70 px-4 text-center">{ev.title}</span>
                   </div>
                   <div className="p-4">
                     <p className="font-sans text-[10px] tracking-[0.12em] uppercase text-[#C9A96E] mb-1">{fmt(ev.starts_at)}</p>
-                    <h3 className="font-display italic text-base mb-1 group-hover:text-[#2d6a4f] transition-colors">{ev.title}</h3>
+                    <h3 className="font-display italic text-base mb-1 group-hover:text-brown-700 transition-colors">{ev.title}</h3>
                     {ev.location && <p className="font-sans text-xs text-gray-400 mb-2">{ev.location}</p>}
                     <p className="font-display italic text-lg text-[#2d6a4f]">{formatMoney(ev.ticket_price)}</p>
                   </div>

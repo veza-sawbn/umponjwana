@@ -71,7 +71,7 @@ export default function RecommendationsPage() {
           </div>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
             {pastBookings.map(b => (
-              <Link key={b.id} href={`/account/itinerary?id=${b.id}`} className="group bg-white border border-gray-200 p-4 hover:border-[#2d6a4f] transition-colors">
+              <Link key={b.id} href={`/account/itinerary?id=${b.id}`} className="group bg-white border border-gray-200 p-4 hover:border-gold transition-colors rounded-2xl">
                 <span className="font-sans text-[9px] tracking-[0.12em] uppercase text-[#C9A96E]">{b.reference}</span>
                 <p className="font-display italic text-base leading-tight mt-0.5 truncate">
                   {b.stay?.title || b.addons[0]?.title || 'Trip'}
@@ -110,7 +110,7 @@ export default function RecommendationsPage() {
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {recs.map(item => (
-              <Link key={item.id} href={item.href} className="group bg-white border border-gray-200 overflow-hidden flex hover:border-[#2d6a4f] transition-colors">
+              <Link key={item.id} href={item.href} className="group bg-white border border-gray-200 overflow-hidden flex hover:border-gold transition-colors rounded-2xl">
                 <div className="relative w-28 h-28 shrink-0 overflow-hidden bg-[#2d6a4f]/10">
                   {item.image ? (
                     <Image src={item.image} alt={item.title} fill loading="lazy" sizes="112px" className="object-cover group-hover:scale-105 transition-transform duration-500" />

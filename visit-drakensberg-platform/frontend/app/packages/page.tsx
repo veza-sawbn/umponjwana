@@ -111,7 +111,7 @@ export default function PackagesPage() {
             // The heart is a sibling of the Link, not a child — a <button>
             // inside an <a> is invalid HTML.
             <div key={p.id} className="relative">
-            <Link href={`/packages/${p.id}`} className="group bg-white border border-black/8 block hover:border-forest/30 transition-colors">
+            <Link href={`/packages/${p.id}`} className="group bg-white border border-black/8 block hover:border-forest/30 transition-colors rounded-2xl overflow-hidden">
               <div className="relative overflow-hidden aspect-[16/9]">
                 <Image src={p.img} alt={p.title} fill loading="lazy" sizes="(max-width: 1024px) 100vw, 50vw"
                   className="object-cover transition-transform duration-700 group-hover:scale-104" />
@@ -131,7 +131,7 @@ export default function PackagesPage() {
                 <div className="flex items-start justify-between gap-4 mb-4">
                   <div>
                     <p className="font-sans text-[10px] tracking-[0.15em] uppercase text-gold mb-1">{p.location} · {p.duration}</p>
-                    <h3 className="font-display text-2xl text-forest group-hover:text-sage transition-colors">{p.title}</h3>
+                    <h3 className="font-display text-2xl text-forest group-hover:text-brown-700 transition-colors">{p.title}</h3>
                   </div>
                   <div className="text-right shrink-0">
                     {p.originalPrice && (

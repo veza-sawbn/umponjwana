@@ -231,7 +231,7 @@ export default function TripPage() {
 
                 <Link
                   href={`/stays${checkIn ? `?check_in=${checkIn}&check_out=${checkOut}&guests=${guests}` : ''}`}
-                  className="flex items-center justify-between bg-white border border-black/8 rounded-xl p-6 hover:border-[#C9A96E]/50 transition-colors group"
+                  className="flex items-center justify-between bg-white border border-black/8 rounded-2xl p-6 hover:border-[#C9A96E]/50 transition-colors group"
                 >
                   <div>
                     <p className="font-sans font-medium text-sm text-black/80 mb-1">
@@ -260,7 +260,7 @@ export default function TripPage() {
                 </p>
                 <Link
                   href="/checkout/shuttle"
-                  className="flex items-center justify-between bg-white border border-black/8 rounded-xl p-6 hover:border-[#C9A96E]/50 transition-colors group"
+                  className="flex items-center justify-between bg-white border border-black/8 rounded-2xl p-6 hover:border-[#C9A96E]/50 transition-colors group"
                 >
                   <div>
                     <p className="font-sans font-medium text-sm text-black/80 mb-1">Add a shuttle transfer</p>
@@ -288,7 +288,7 @@ export default function TripPage() {
                     <Link
                       key={s.id}
                       href={s.href}
-                      className="bg-white border border-black/8 rounded-xl p-5 hover:border-[#C9A96E]/50 transition-colors group"
+                      className="bg-white border border-black/8 rounded-2xl p-5 hover:border-[#C9A96E]/50 transition-colors group"
                     >
                       <p className="font-sans text-[10px] text-[#C9A96E] uppercase tracking-widest mb-1.5">
                         {s.kind === 'tour-departure' ? 'Guided tour' : 'Activity'}{s.region ? ` · ${s.region}` : ''}

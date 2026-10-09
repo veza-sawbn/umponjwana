@@ -94,7 +94,7 @@ const pillCls = (active: boolean) =>
 
 function SavedCard({ item, onRemove }: { item: SavedListing; onRemove: () => void }) {
   return (
-    <div className="bg-white border border-gray-200 overflow-hidden group">
+    <div className="bg-white border border-gray-200 overflow-hidden group rounded-2xl">
       <div className="relative h-44 overflow-hidden bg-[#2d6a4f]/8">
         {item.image ? (
           // The snapshot's image URL comes from whichever catalogue the

@@ -38,7 +38,7 @@ function RegionCard({ region: r, index, onSelect }: { region: Region; index: num
 
   return (
     <Link href={`/hikes?region=${encodeURIComponent(r.name)}`} onClick={handleClick} className="group block">
-      <div className="relative overflow-hidden aspect-[4/3] mb-4">
+      <div className="relative overflow-hidden aspect-[4/3] mb-4 rounded-2xl">
         {isOptimizableImageHost(regionImage(r, index)) ? (
           <Image
             src={regionImage(r, index)}

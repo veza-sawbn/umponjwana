@@ -131,7 +131,7 @@ function StayCard({ prop, minPrice }: { prop: Property; minPrice: number | null 
   return (
     <Link
       href={`/stays/${prop.slug || prop.id}`}
-      className="group bg-white border border-gray-200 overflow-hidden hover:border-[#2d6a4f] transition-colors flex flex-col"
+      className="group bg-white border border-gray-200 overflow-hidden hover:border-gold transition-colors flex flex-col rounded-2xl"
     >
       <div className="relative h-44 overflow-hidden">
         <img
@@ -147,7 +147,7 @@ function StayCard({ prop, minPrice }: { prop: Property; minPrice: number | null 
         <p className="font-sans text-[10px] tracking-[0.12em] uppercase text-[#C9A96E] mb-1 flex items-center gap-1">
           <MapPin size={9} /> {prop.region || prop.address}
         </p>
-        <h3 className="font-display italic text-xl text-[#000000] leading-tight mb-2 group-hover:text-[#2d6a4f] transition-colors">
+        <h3 className="font-display italic text-xl text-[#000000] leading-tight mb-2 group-hover:text-brown-700 transition-colors">
           {prop.name}
         </h3>
         <p className="font-sans text-xs text-gray-400 line-clamp-2 mb-3 flex-1">{prop.description}</p>
@@ -171,7 +171,7 @@ function TrailCard({ trail }: { trail: Trail }) {
   return (
     <Link
       href={`/hikes/${trail.slug || trail.id}`}
-      className="group bg-white border border-gray-200 overflow-hidden hover:border-[#2d6a4f] transition-colors flex gap-0"
+      className="group bg-white border border-gray-200 overflow-hidden hover:border-gold transition-colors flex gap-0 rounded-2xl"
     >
       <div className="relative w-28 shrink-0 overflow-hidden">
         <img
@@ -187,7 +187,7 @@ function TrailCard({ trail }: { trail: Trail }) {
               {trail.difficulty}
             </span>
           </div>
-          <h3 className="font-display italic text-lg text-[#000000] leading-tight group-hover:text-[#2d6a4f] transition-colors truncate">
+          <h3 className="font-display italic text-lg text-[#000000] leading-tight group-hover:text-brown-700 transition-colors truncate">
             {trail.name}
           </h3>
         </div>
@@ -209,7 +209,7 @@ function ActivityCard({ activity }: { activity: Activity }) {
   return (
     <Link
       href={`/activities/${activity.slug || activity.id}`}
-      className="group bg-white border border-gray-200 overflow-hidden hover:border-[#C9A96E] transition-colors flex gap-0"
+      className="group bg-white border border-gray-200 overflow-hidden hover:border-[#C9A96E] transition-colors flex gap-0 rounded-2xl"
     >
       <div className="relative w-28 shrink-0 overflow-hidden">
         <img

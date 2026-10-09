@@ -47,7 +47,7 @@ export default function TransportPage() {
         ) : (
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {routes.map(r => (
-              <Link key={r.id} href={`/transport/${routeSlug(r)}`} className="group block border border-forest/10 bg-white hover:border-gold/40 transition-colors p-5">
+              <Link key={r.id} href={`/transport/${routeSlug(r)}`} className="group block border border-forest/10 bg-white hover:border-gold/40 transition-colors p-5 rounded-2xl">
                 <div className="flex items-center gap-2 font-sans text-base font-medium text-forest">
                   <MapPin className="w-4 h-4 text-forest/30 shrink-0" />
                   <span className="truncate">{r.from}</span>
@@ -63,7 +63,7 @@ export default function TransportPage() {
                     <Bus size={12} /> {companyName(r.supplierId)}
                   </p>
                 )}
-                <p className="mt-4 font-display italic text-xl text-forest group-hover:text-sage transition-colors">
+                <p className="mt-4 font-display italic text-xl text-forest group-hover:text-brown-700 transition-colors">
                   {formatMoney(routePrice(r))}<span className="font-sans text-xs text-forest/40 not-italic"> pp</span>
                 </p>
               </Link>

@@ -121,7 +121,7 @@ export function OperatorTypeCarousel() {
             return (
               <article
                 key={key}
-                className="snap-start shrink-0 w-[86%] sm:w-[60%] lg:w-[calc((100%-2rem)/3)] flex flex-col bg-white"
+                className="snap-start shrink-0 w-[86%] sm:w-[60%] lg:w-[calc((100%-2rem)/3)] flex flex-col bg-white rounded-2xl overflow-hidden"
               >
                 {/* The illustration band: the shape of the journey at a
                     glance — a plane leaving the city, a road across the

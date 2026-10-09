@@ -302,7 +302,7 @@ export default async function ArticleDetailPage({ params }: { params: { slug: st
                 <h3 className="font-display italic text-2xl text-[#000000] mb-6">More Stories</h3>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   {article.relatedArticles.map(rel => (
-                    <Link key={rel.slug} href={`/mydrakensberg/${rel.slug}`} className="group bg-white border border-gray-200 overflow-hidden hover:border-[#2d6a4f] transition-colors">
+                    <Link key={rel.slug} href={`/mydrakensberg/${rel.slug}`} className="group bg-white border border-gray-200 overflow-hidden hover:border-gold transition-colors rounded-2xl">
                       {rel.image && (
                         <div className="relative h-36 overflow-hidden">
                           <Image src={rel.image} alt={rel.title} fill loading="lazy" sizes="(max-width: 768px) 100vw, 33vw" className="object-cover group-hover:scale-105 transition-transform duration-500" />
@@ -310,7 +310,7 @@ export default async function ArticleDetailPage({ params }: { params: { slug: st
                       )}
                       <div className="p-4">
                         <span className="font-sans text-[10px] tracking-[0.14em] uppercase text-[#C9A96E] mb-2 block">{rel.category}</span>
-                        <p className="font-display italic text-base text-[#000000] leading-tight group-hover:text-[#2d6a4f] transition-colors">{rel.title}</p>
+                        <p className="font-display italic text-base text-[#000000] leading-tight group-hover:text-brown-700 transition-colors">{rel.title}</p>
                       </div>
                     </Link>
                   ))}
@@ -339,7 +339,7 @@ export default async function ArticleDetailPage({ params }: { params: { slug: st
                 <p className="font-display italic text-xl mb-5">Listings mentioned in this article</p>
                 <div className="space-y-3">
                   {article.relatedListings.map(listing => (
-                    <Link key={listing.href + listing.title} href={listing.href} className="group flex gap-3 border border-white/10 hover:border-[#C9A96E] transition-colors p-3">
+                    <Link key={listing.href + listing.title} href={listing.href} className="group flex gap-3 border border-white/10 hover:border-[#C9A96E] transition-colors p-3 rounded-2xl">
                       <div className="relative w-16 h-16 shrink-0 overflow-hidden">
                         <Image src={listing.image} alt={listing.title} fill loading="lazy" sizes="64px" className="object-cover group-hover:scale-105 transition-transform duration-500" />
                       </div>

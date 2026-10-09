@@ -837,9 +837,9 @@ function ItineraryInner() {
             { href: '/stays', label: 'Browse Stays' },
           ].map(l => (
             <Link key={l.href} href={l.href}
-              className="group bg-white border border-gray-200 hover:border-[#2d6a4f] transition-colors p-4 flex items-center justify-between">
+              className="group bg-white border border-gray-200 hover:border-gold transition-colors p-4 flex items-center justify-between rounded-2xl">
               <span className="font-sans text-sm text-gray-700">{l.label}</span>
-              <ArrowRight size={13} className="text-gray-400 group-hover:text-[#2d6a4f] transition-colors" />
+              <ArrowRight size={13} className="text-gray-400 group-hover:text-brown-700 transition-colors" />
             </Link>
           ))}
         </div>

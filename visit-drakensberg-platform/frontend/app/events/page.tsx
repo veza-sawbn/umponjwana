@@ -144,7 +144,7 @@ function EventCard({ event }: { event: Event }) {
   }
 
   return (
-    <div id={`event-${event.id}`} className="bg-white border border-gray-200 group flex flex-col scroll-mt-24">
+    <div id={`event-${event.id}`} className="bg-white border border-gray-200 group flex flex-col scroll-mt-24 rounded-2xl overflow-hidden">
       <div className={`relative aspect-[4/3] ${TYPE_BG[event.event_type]} flex items-end p-6 overflow-hidden`}>
         <div className="absolute inset-0 bg-black/20" />
         <div className="relative z-10 flex items-center justify-between w-full">
@@ -156,7 +156,7 @@ function EventCard({ event }: { event: Event }) {
       </div>
 
       <div className="p-6 flex-1 flex flex-col">
-        <h3 className="font-display italic text-xl text-[#000000] mb-2 group-hover:text-[#2d6a4f] transition-colors">{event.title}</h3>
+        <h3 className="font-display italic text-xl text-[#000000] mb-2 group-hover:text-brown-700 transition-colors">{event.title}</h3>
         {event.description && <p className="font-sans text-sm text-gray-600 mb-4 line-clamp-2">{event.description}</p>}
 
         <div className="space-y-1.5 mb-5">

@@ -11,7 +11,7 @@ export default function SeasonListingCard({ card, variant = 'default' }: { card:
   return (
     <Link
       href={card.href}
-      className="group bg-white border border-gray-200 overflow-hidden hover:border-[#2d6a4f] transition-colors flex flex-col h-full"
+      className="group bg-white border border-gray-200 overflow-hidden hover:border-gold transition-colors flex flex-col h-full rounded-2xl"
     >
       <div className="relative aspect-[4/3] overflow-hidden bg-mist">
         <SafeImage src={card.image} alt="" fill loading="lazy" sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw" className="object-cover group-hover:scale-105 transition-transform duration-500" />
@@ -21,7 +21,7 @@ export default function SeasonListingCard({ card, variant = 'default' }: { card:
       </div>
       <div className="p-4 flex flex-col flex-1">
         <p className="font-sans text-[9.5px] tracking-[0.12em] uppercase text-[#C9A96E] mb-1">{card.eyebrow}</p>
-        <h3 className="font-display italic text-lg text-[#000000] leading-tight mb-1.5 group-hover:text-[#2d6a4f] transition-colors">
+        <h3 className="font-display italic text-lg text-[#000000] leading-tight mb-1.5 group-hover:text-brown-700 transition-colors">
           {card.title}
         </h3>
         <p className="font-sans text-xs text-gray-400 line-clamp-2 mb-3 flex-1">{card.description}</p>

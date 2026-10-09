@@ -92,7 +92,7 @@ export default function ActivitiesPage() {
                   // <button> inside an <a> is invalid HTML.
                   <div key={a.id} className="relative">
                   <Link href={`/activities/${a.id}`} className="group block">
-                    <div className="relative overflow-hidden aspect-square mb-4 bg-[#1a1a2e]">
+                    <div className="relative overflow-hidden aspect-[4/3] mb-4 bg-[#1a1a2e] rounded-2xl">
                       {a.photos?.[0] && (
                         <img
                           src={a.photos[0]}
@@ -110,7 +110,7 @@ export default function ActivitiesPage() {
                       {a.meetingPoint || 'Drakensberg'}{durationLabel ? ` · ${durationLabel}` : ''}
                     </p>
                     <StayDistance lat={a.gpsLat} lng={a.gpsLng} className="mb-1" />
-                    <h3 className="font-display text-lg text-forest leading-snug mb-2 group-hover:text-sage transition-colors">{a.name}</h3>
+                    <h3 className="font-display text-lg text-forest leading-snug mb-2 group-hover:text-brown-700 transition-colors">{a.name}</h3>
                     <div className="flex items-center justify-between">
                       <span className="font-sans text-xs text-forest/40">{a.difficulty}</span>
                       <span className="font-display text-base text-forest">

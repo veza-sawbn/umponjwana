@@ -262,7 +262,7 @@ export default function StaysPage() {
                     setRegionFilter(active ? '' : r.name)
                     resultsTopRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
                   }}
-                  className={`group relative aspect-[4/5] overflow-hidden text-left transition-all ${active ? 'ring-2 ring-forest' : ''}`}
+                  className={`group relative aspect-[4/5] overflow-hidden text-left transition-all ${active ? 'ring-2 ring-forest' : ''} rounded-2xl`}
                 >
                   <img
                     src={regionImage(r, i)}

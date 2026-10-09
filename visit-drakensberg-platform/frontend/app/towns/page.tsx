@@ -57,7 +57,7 @@ export default function TownsPage() {
 
               <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
                 {group.towns.map(town => (
-                  <div key={town.id} className="group border border-forest/10 bg-mist/40 hover:border-gold/40 transition-colors overflow-hidden">
+                  <div key={town.id} className="group border border-forest/10 bg-mist/40 hover:border-gold/40 transition-colors overflow-hidden rounded-2xl">
                     <Link href={`/towns/${town.slug}`}>
                       {town.image && (
                         <div className="relative aspect-[16/9] overflow-hidden bg-forest/10">
@@ -68,7 +68,7 @@ export default function TownsPage() {
                     <div className="p-5">
                       {town.gateway && <p className="font-sans text-[10px] tracking-[0.15em] uppercase text-gold mb-2">{town.gateway}</p>}
                       <Link href={`/towns/${town.slug}`}>
-                        <h3 className="font-display text-xl text-forest mb-2 flex items-center gap-2 group-hover:text-sage transition-colors">
+                        <h3 className="font-display text-xl text-forest mb-2 flex items-center gap-2 group-hover:text-brown-700 transition-colors">
                           <MapPin className="w-4 h-4 text-forest/30" /> {town.name}
                         </h3>
                       </Link>
