@@ -22,7 +22,7 @@ import SeasonListingCard from './SeasonListingCard'
  * than its first listing without the visitor having to swipe; it holds
  * still the moment they take over. See lib/carousel-autoplay.ts.
  */
-export default function TopicListingCarousel({ cards }: { cards: SeasonCard[] }) {
+export default function TopicListingCarousel({ cards, variant }: { cards: SeasonCard[]; variant?: 'default' | 'home' }) {
   const canLoop = cards.length > 2
   const autoplay = useSwiperAutoplay({ slideCount: cards.length })
 
@@ -39,7 +39,7 @@ export default function TopicListingCarousel({ cards }: { cards: SeasonCard[] })
     >
       {cards.map(card => (
         <SwiperSlide key={card.id} className="h-auto self-stretch">
-          <SeasonListingCard card={card} />
+          <SeasonListingCard card={card} variant={variant} />
         </SwiperSlide>
       ))}
     </Swiper>

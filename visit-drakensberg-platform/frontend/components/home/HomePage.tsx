@@ -16,7 +16,7 @@ import Footer from '@/components/layout/Footer'
 import TripPlanningTools from '@/components/home/TripPlanningTools'
 import TopDestinations from '@/components/home/TopDestinations'
 import RecommendedThisSeason from '@/components/home/RecommendedThisSeason'
-import { FeaturedExperiencesCarousel, CarouselNav, ViewAllLink, type FeaturedExperience } from '@/components/home/FeaturedExperiences'
+import { FeaturedExperiencesCarousel, CarouselNav, type FeaturedExperience } from '@/components/home/FeaturedExperiences'
 import type { Swiper as SwiperInstance } from 'swiper'
 import { loadSiteContent, SITE_CONTENT_DEFAULTS, type HomeCard, type SiteContent } from '@/lib/site-content'
 import type { Region } from '@/lib/regions'
@@ -27,6 +27,7 @@ import { useEditMode } from '@/lib/edit-mode-context'
 import Editable from '@/components/editor/Editable'
 import EditableSection from '@/components/editor/EditableSection'
 import EditableCard from '@/components/editor/EditableCard'
+import { ExploreLink, homeContainer, homeTone, homeType } from '@/components/home/home-style'
 import { getTrailSummaries, type Trail } from '@/lib/trails'
 import { getFeaturedAttractions, ATTRACTION_KIND_LABEL, type Attraction } from '@/lib/attractions'
 import { getUpcomingExperiences, type TrekkingExperience } from '@/lib/experiences'
@@ -173,7 +174,7 @@ function HeroSection({ hero }: { hero: typeof SITE_CONTENT_DEFAULTS.hero }) {
           </motion.p>
         </Editable>
         <Editable section="hero" fieldKey="headline" value={headline} label="Headline" type="textarea">
-          <motion.h1 variants={fadeUp} className="font-display text-4xl sm:text-7xl lg:text-8xl text-white leading-[0.9] mb-6 max-w-3xl" style={{ whiteSpace: 'pre-line' }}>
+          <motion.h1 variants={fadeUp} className="font-sans font-bold text-4xl sm:text-7xl lg:text-8xl tracking-[-0.03em] text-white leading-[0.95] mb-6 max-w-3xl" style={{ whiteSpace: 'pre-line' }}>
             {headline}
           </motion.h1>
         </Editable>
@@ -193,26 +194,69 @@ function HeroSection({ hero }: { hero: typeof SITE_CONTENT_DEFAULTS.hero }) {
 
 /* ─── Regions ────────────────────────────────────────────────────────────────── */
 
+const light = homeTone.light
+const dark = homeTone.dark
+
 // Shared by the mobile carousel and the desktop grid so both render the
 // exact same card — only the surrounding layout differs.
 function RegionCardBody({ region: r }: { region: HomeCard }) {
   return (
-    <Link href={String(r.href || '/regions')} className="group block">
-      <div className="relative overflow-hidden aspect-[4/3] mb-4">
+    <Link href={String(r.href || '/regions')} className={`${homeType.cardLink} ${light.focus}`}>
+      <div className={`${homeType.media} ${light.media}`}>
         <SafeImage
           src={String(r.img)}
           alt={String(r.name)}
           fill
           loading="lazy"
           sizes="(max-width: 640px) 90vw, 31vw"
-          className="object-cover transition-transform duration-500 group-hover:scale-105"
+          className={homeType.image}
           style={{ willChange: 'transform' }}
         />
       </div>
-      <p className="font-sans text-[10px] tracking-[0.15em] uppercase text-gold mb-1">{r.subtitle}</p>
-      <h3 className="font-display text-2xl text-forest mb-2">{r.name}</h3>
-      <p className="font-sans text-sm text-forest/55 leading-relaxed">{r.desc}</p>
+      <div className="pt-5">
+        {r.subtitle && <p className={`${homeType.eyebrow} ${light.eyebrow} mb-1`}>{r.subtitle}</p>}
+        <h3 className={`${homeType.cardTitle} ${light.title} mb-2`}>{r.name}</h3>
+        {r.desc && <p className={`${homeType.cardBody} ${light.body} line-clamp-3`}>{r.desc}</p>}
+      </div>
     </Link>
+  )
+}
+
+/* ─── Section header ─────────────────────────────────────────────────────────── */
+
+/**
+ * The shared homepage band header: a small eyebrow, the bold heading and,
+ * under it, the "Explore all →" link — the Top Destinations layout. Copy is
+ * CMS-editable via home_sections.<id>_eyebrow / <id>_heading.
+ */
+function SectionHeader({ id, label, hs, tone, link, subheadingKey, aside }: {
+  id: string
+  label: string
+  hs: Record<string, string>
+  tone: 'light' | 'dark'
+  link?: { href: string; label?: string }
+  subheadingKey?: string
+  aside?: React.ReactNode
+}) {
+  const t = homeTone[tone]
+  return (
+    <div className="flex items-end justify-between gap-6 mb-7 lg:mb-9">
+      <div className="max-w-3xl">
+        <Editable section="home_sections" fieldKey={`${id}_eyebrow`} value={hs[`${id}_eyebrow`]} label={`${label} Eyebrow`} type="text">
+          <p className={`font-sans text-xs tracking-[0.2em] uppercase ${t.eyebrow} mb-3`}>{hs[`${id}_eyebrow`]}</p>
+        </Editable>
+        <Editable section="home_sections" fieldKey={`${id}_heading`} value={hs[`${id}_heading`]} label={`${label} Heading`} type="text">
+          <h2 className={`${homeType.heading} ${t.heading}`}>{hs[`${id}_heading`]}</h2>
+        </Editable>
+        {subheadingKey && (
+          <Editable section="home_sections" fieldKey={subheadingKey} value={hs[subheadingKey]} label={`${label} Subheading`} type="text">
+            <p className={`font-sans text-base ${t.subheading} mt-4`}>{hs[subheadingKey]}</p>
+          </Editable>
+        )}
+        {link && <ExploreLink href={link.href} tone={tone} className="mt-3 lg:mt-4">{link.label ?? 'Explore all'}</ExploreLink>}
+      </div>
+      {aside}
+    </div>
   )
 }
 
@@ -221,38 +265,38 @@ function RegionCardBody({ region: r }: { region: HomeCard }) {
 function JourneyCardBody({ pkg }: { pkg: MarketplacePackage }) {
   const nights = pkg.durationNights
   return (
-    <Link href={`/packages/${pkg.id}`} className="group block bg-white border border-black/8 hover:border-forest/30 transition-colors h-full">
+    <Link href={`/packages/${pkg.id}`} className={`${homeType.cardLink} ${light.focus}`}>
       {/* A package without its own photo shows a plain block, not a stock image. */}
-      <div className="relative overflow-hidden aspect-[4/3] bg-mist">
+      <div className={`${homeType.media} bg-mist`}>
         <SafeImage
           src={pkg.image}
           alt={pkg.title}
           fill
           loading="lazy"
           sizes="(max-width: 640px) 88vw, (max-width: 1024px) 45vw, 30vw"
-          className="object-cover transition-transform duration-500 group-hover:scale-105"
+          className={homeType.image}
           style={{ willChange: 'transform' }}
         />
         {pkg.tag && (
-          <span className="absolute top-3 left-3 font-sans text-[10px] tracking-[0.15em] uppercase bg-gold text-forest px-2.5 py-1">
+          <span className="absolute top-3 left-3 font-sans text-[10px] tracking-[0.15em] uppercase bg-gold text-forest rounded-full px-3 py-1">
             {pkg.tag}
           </span>
         )}
       </div>
-      <div className="p-5">
-        <p className="font-sans text-[10px] tracking-[0.15em] uppercase text-gold mb-1">
+      <div className="pt-5">
+        <p className={`${homeType.eyebrow} ${light.eyebrow} mb-1`}>
           {pkg.region || 'Drakensberg'} · {nights} night{nights !== 1 ? 's' : ''}
         </p>
-        <h3 className="font-display text-xl text-forest mb-2 group-hover:text-sage transition-colors">{pkg.title}</h3>
-        <div className="flex items-center justify-between pt-3 border-t border-black/6">
+        <h3 className={`${homeType.cardTitle} ${light.title} mb-3`}>{pkg.title}</h3>
+        <div className="flex items-center justify-between">
           <span>
             {pkg.originalPrice && (
               <span className="font-sans text-xs text-forest/30 line-through mr-1.5">{formatMoney(pkg.originalPrice)}</span>
             )}
-            <span className="font-display text-lg text-forest">{formatMoney(packageHeadlinePrice(pkg))}</span>
+            <span className="font-sans font-semibold text-lg text-forest">{formatMoney(packageHeadlinePrice(pkg))}</span>
             <span className="font-sans text-xs text-forest/40"> {isGroupPriced(pkg) ? `/ ${packageGroupSize(pkg)} guests` : 'pp'}</span>
           </span>
-          <span className="font-sans text-xs text-forest group-hover:text-gold transition-colors inline-flex items-center gap-1">
+          <span className="font-sans text-sm text-forest/60 group-hover:text-brown-700 transition-colors inline-flex items-center gap-1">
             View <ArrowRight className="w-3 h-3" />
           </span>
         </div>
@@ -282,12 +326,12 @@ function JourneysCarousel({ journeys }: { journeys: MarketplacePackage[] }) {
       loop={canLoop}
       speed={CAROUSEL_SPEED_MS}
       {...autoplay}
-      spaceBetween={20}
+      spaceBetween={32}
       grabCursor
       slidesPerView={1.15}
       breakpoints={{
         640: { slidesPerView: 2.15 },
-        1024: { slidesPerView: 3.2 },
+        1024: { slidesPerView: 3 },
       }}
       className="!pb-1"
     >
@@ -409,7 +453,7 @@ export default function HomePage({ initialContent, initialRegions }: { initialCo
   const statsSection = (
     <EditableSection key="stats" id="stats" label="Stats Strip" className="bg-forest text-white">
       <motion.div
-        className="max-w-[1440px] mx-auto px-6 lg:px-12 py-10 grid grid-cols-2 md:grid-cols-4 gap-8"
+        className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-[69px] py-10 lg:py-14 grid grid-cols-2 md:grid-cols-4 gap-8"
         variants={staggerContainer(0.07)}
         initial="hidden"
         whileInView="show"
@@ -418,10 +462,10 @@ export default function HomePage({ initialContent, initialRegions }: { initialCo
         {[1, 2, 3, 4].map((i) => (
           <motion.div key={i} variants={staggerChild}>
             <Editable section="home_sections" fieldKey={`stat_${i}_value`} value={hs[`stat_${i}_value`]} label={`Stat ${i} Value`} type="text">
-              <p className="font-display text-3xl text-gold">{hs[`stat_${i}_value`]}</p>
+              <p className="font-sans font-bold text-3xl lg:text-[40px] tracking-[-0.02em] text-gold">{hs[`stat_${i}_value`]}</p>
             </Editable>
             <Editable section="home_sections" fieldKey={`stat_${i}_label`} value={hs[`stat_${i}_label`]} label={`Stat ${i} Label`} type="text">
-              <p className="font-sans text-xs text-white/40 mt-1 tracking-wide uppercase">{hs[`stat_${i}_label`]}</p>
+              <p className="font-sans text-[11px] text-white/60 mt-1 tracking-[0.15em] uppercase">{hs[`stat_${i}_label`]}</p>
             </Editable>
           </motion.div>
         ))}
@@ -431,37 +475,31 @@ export default function HomePage({ initialContent, initialRegions }: { initialCo
 
   const categoriesSection = (
     <EditableSection key="categories" id="categories" label="Categories" className="bg-mist">
-      <div className="max-w-[1440px] mx-auto px-6 lg:px-12 py-20">
-        <div className="mb-10">
-          <Editable section="home_sections" fieldKey="categories_eyebrow" value={hs.categories_eyebrow} label="Categories Eyebrow" type="text">
-            <p className="font-sans text-xs tracking-[0.2em] uppercase text-forest/40 mb-2">{hs.categories_eyebrow}</p>
-          </Editable>
-          <Editable section="home_sections" fieldKey="categories_heading" value={hs.categories_heading} label="Categories Heading" type="text">
-            <h2 className="font-display text-4xl text-forest">{hs.categories_heading}</h2>
-          </Editable>
-        </div>
+      <div className={homeContainer}>
+        <SectionHeader id="categories" label="Categories" hs={hs} tone="light" />
         <motion.div
-          className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3"
+          className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-x-4 gap-y-8 lg:gap-x-6"
           variants={staggerContainer(0.06)}
           initial="hidden"
           whileInView="show"
           viewport={{ once: true, margin: '-80px' }}
         >
           {categories.map((cat, index) => (
-            <motion.div key={cat.id} variants={staggerChild} whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }} transition={{ duration: 0.2, ease: [0, 0, 0.2, 1] }} className={cardDimClass(cat, inEditor)}>
+            <motion.div key={cat.id} variants={staggerChild} className={cardDimClass(cat, inEditor)}>
               <EditableCard contentKey="home_cards" fieldKey="categories" index={index} label={String(cat.label ?? 'Category Card')}>
-                <Link href={String(cat.href || '/')} className="group relative overflow-hidden aspect-[3/4] block">
-                  <SafeImage
-                    src={String(cat.img)}
-                    alt={String(cat.label)}
-                    fill
-                    loading="lazy"
-                    sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 20vw"
-                    className="object-cover transition-transform duration-500 group-hover:scale-105"
-                    style={{ willChange: 'transform' }}
-                  />
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/10 to-transparent" />
-                  <span className="absolute bottom-4 left-4 font-display text-xl text-white">{cat.label}</span>
+                <Link href={String(cat.href || '/')} className={`${homeType.cardLink} ${light.focus}`}>
+                  <div className={`${homeType.media} ${light.media}`}>
+                    <SafeImage
+                      src={String(cat.img)}
+                      alt=""
+                      fill
+                      loading="lazy"
+                      sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 20vw"
+                      className={homeType.image}
+                      style={{ willChange: 'transform' }}
+                    />
+                  </div>
+                  <h3 className={`pt-4 font-sans font-semibold text-lg lg:text-xl leading-snug transition-colors ${light.title}`}>{cat.label}</h3>
                 </Link>
               </EditableCard>
             </motion.div>
@@ -473,24 +511,12 @@ export default function HomePage({ initialContent, initialRegions }: { initialCo
 
   const regionsSection = (
     <EditableSection key="regions" id="regions" label="Regions" className="bg-white">
-      <div className="max-w-[1440px] mx-auto px-6 lg:px-12 py-20">
-        <div className="flex items-end justify-between mb-10">
-          <div>
-            <Editable section="home_sections" fieldKey="regions_eyebrow" value={hs.regions_eyebrow} label="Regions Eyebrow" type="text">
-              <p className="font-sans text-xs tracking-[0.2em] uppercase text-forest/40 mb-2">{hs.regions_eyebrow}</p>
-            </Editable>
-            <Editable section="home_sections" fieldKey="regions_heading" value={hs.regions_heading} label="Regions Heading" type="text">
-              <h2 className="font-display text-4xl text-forest">{hs.regions_heading}</h2>
-            </Editable>
-          </div>
-          <Link href="/regions" className="hidden sm:flex items-center gap-2 font-sans text-sm text-forest/50 hover:text-forest transition-colors">
-            All regions <ArrowRight className="w-4 h-4" />
-          </Link>
-        </div>
+      <div className={homeContainer}>
+        <SectionHeader id="regions" label="Regions" hs={hs} tone="light" link={{ href: '/regions' }} />
 
         {/* Tablet/desktop: static grid */}
         <motion.div
-          className="hidden sm:grid sm:grid-cols-3 gap-6"
+          className="hidden sm:grid sm:grid-cols-3 gap-6 lg:gap-8"
           variants={staggerContainer(0.08)}
           initial="hidden"
           whileInView="show"
@@ -515,23 +541,11 @@ export default function HomePage({ initialContent, initialRegions }: { initialCo
 
   const storiesSection = (
     <EditableSection key="stories" id="stories" label="Stories" className="bg-white">
-      <div className="max-w-[1440px] mx-auto px-6 lg:px-12 py-20">
-        <div className="flex items-end justify-between mb-10">
-          <div>
-            <Editable section="home_sections" fieldKey="stories_eyebrow" value={hs.stories_eyebrow} label="Stories Eyebrow" type="text">
-              <p className="font-sans text-xs tracking-[0.2em] uppercase text-forest/40 mb-2">{hs.stories_eyebrow}</p>
-            </Editable>
-            <Editable section="home_sections" fieldKey="stories_heading" value={hs.stories_heading} label="Stories Heading" type="text">
-              <h2 className="font-display text-4xl text-forest">{hs.stories_heading}</h2>
-            </Editable>
-          </div>
-          <Link href="/mydrakensberg" className="hidden sm:flex items-center gap-2 font-sans text-sm text-forest/50 hover:text-forest transition-colors">
-            All stories <ArrowRight className="w-4 h-4" />
-          </Link>
-        </div>
+      <div className={homeContainer}>
+        <SectionHeader id="stories" label="Stories" hs={hs} tone="light" link={{ href: '/mydrakensberg' }} />
 
         {stories.length === 0 ? (
-          <p className="font-sans text-sm text-forest/40 py-6">
+          <p className="font-sans text-sm text-forest/60 py-6">
             No stories published yet. Publish one under Admin → Blog & Content.
           </p>
         ) : (
@@ -543,17 +557,20 @@ export default function HomePage({ initialContent, initialRegions }: { initialCo
             viewport={{ once: true, margin: '-80px' }}
           >
             {stories.map(s => (
-              <motion.div key={s.id} variants={staggerChild} whileHover={{ y: -3 }} transition={{ duration: 0.2, ease: [0, 0, 0.2, 1] }}>
-                <Link href={`/mydrakensberg/${s.slug}`} className="group block">
-                  <div className="relative overflow-hidden aspect-[3/2] mb-4 bg-forest/5">
+              <motion.div key={s.id} variants={staggerChild}>
+                <Link href={`/mydrakensberg/${s.slug}`} className={`${homeType.cardLink} ${light.focus}`}>
+                  <div className={`${homeType.media} ${light.media}`}>
                     {s.featured_image && (
-                      <SafeImage src={s.featured_image} alt={s.title} fill loading="lazy" sizes="(max-width: 768px) 100vw, 33vw" className="object-cover transition-transform duration-500 group-hover:scale-105" style={{ willChange: 'transform' }} />
+                      <SafeImage src={s.featured_image} alt="" fill loading="lazy" sizes="(max-width: 768px) 100vw, 33vw" className={homeType.image} style={{ willChange: 'transform' }} />
                     )}
                   </div>
-                  <p className="font-sans text-[10px] tracking-[0.15em] uppercase text-gold mb-2">
-                    {s.category}{s.published_at ? ` · ${new Date(s.published_at).toLocaleDateString('en-ZA', { month: 'long', year: 'numeric' })}` : ''}
-                  </p>
-                  <h3 className="font-display text-xl text-forest leading-snug group-hover:text-sage transition-colors">{s.title}</h3>
+                  <div className="pt-5">
+                    <p className={`${homeType.eyebrow} ${light.eyebrow} mb-1`}>
+                      {s.category}{s.published_at ? ` · ${new Date(s.published_at).toLocaleDateString('en-ZA', { month: 'long', year: 'numeric' })}` : ''}
+                    </p>
+                    <h3 className={`${homeType.cardTitle} ${light.title} mb-2`}>{s.title}</h3>
+                    {s.excerpt && <p className={`${homeType.cardBody} ${light.body} line-clamp-3`}>{s.excerpt}</p>}
+                  </div>
                 </Link>
               </motion.div>
             ))}
@@ -578,23 +595,11 @@ export default function HomePage({ initialContent, initialRegions }: { initialCo
   // record that was actually read from the store it links into.
   const attractionsSection = (
     <EditableSection key="attractions" id="attractions" label="Top Attractions" className="bg-forest">
-      <div className="max-w-[1440px] mx-auto px-6 lg:px-12 py-20">
-        <div className="flex items-end justify-between mb-10">
-          <div>
-            <Editable section="home_sections" fieldKey="attractions_eyebrow" value={hs.attractions_eyebrow} label="Attractions Eyebrow" type="text">
-              <p className="font-sans text-xs tracking-[0.2em] uppercase text-white/30 mb-2">{hs.attractions_eyebrow}</p>
-            </Editable>
-            <Editable section="home_sections" fieldKey="attractions_heading" value={hs.attractions_heading} label="Attractions Heading" type="text">
-              <h2 className="font-display text-4xl text-white">{hs.attractions_heading}</h2>
-            </Editable>
-          </div>
-          <Link href="/plan" className="hidden sm:flex items-center gap-2 font-sans text-sm text-white/40 hover:text-white transition-colors">
-            Plan your trip <ArrowRight className="w-4 h-4" />
-          </Link>
-        </div>
+      <div className={homeContainer}>
+        <SectionHeader id="attractions" label="Attractions" hs={hs} tone="dark" link={{ href: '/plan', label: 'Plan your trip' }} />
 
         {attractions.length === 0 ? (
-          <p className="font-sans text-sm text-white/30 py-8">
+          <p className="font-sans text-sm text-white/60 py-8">
             Nothing featured yet. Tick &ldquo;Featured on Homepage&rdquo; on a trail, nature reserve or town in the admin console.
           </p>
         ) : (
@@ -602,10 +607,10 @@ export default function HomePage({ initialContent, initialRegions }: { initialCo
             {attractions.slice(0, 6).map((a, i) => (
               <Link key={`${a.kind}:${a.id}`} href={a.href} className="group flex items-center justify-between py-5 hover:pl-2 transition-all duration-200">
                 <div className="flex items-center gap-6 min-w-0">
-                  <span className="font-sans text-2xl text-white/15 font-light tabular-nums w-8 shrink-0">{String(i + 1).padStart(2, '0')}</span>
+                  <span className="font-sans text-2xl text-gold/60 font-light tabular-nums w-8 shrink-0">{String(i + 1).padStart(2, '0')}</span>
                   <div className="min-w-0">
-                    <h3 className="font-display text-lg text-white group-hover:text-gold transition-colors truncate">{a.name}</h3>
-                    <p className="font-sans text-xs text-white/35 mt-0.5 truncate">{a.meta}</p>
+                    <h3 className={`font-sans font-semibold text-lg lg:text-xl transition-colors truncate ${dark.title}`}>{a.name}</h3>
+                    <p className={`font-sans text-sm mt-0.5 truncate ${dark.body}`}>{a.meta}</p>
                   </div>
                 </div>
                 <div className="flex items-center gap-4 shrink-0 ml-4">
@@ -613,17 +618,17 @@ export default function HomePage({ initialContent, initialRegions }: { initialCo
                       town it is the kind, so a visitor knows what they'd open. */}
                   {a.difficulty ? (
                     <span
-                      className="font-sans text-xs px-2.5 py-1 hidden sm:inline"
+                      className="font-sans text-xs rounded-full px-3 py-1 hidden sm:inline"
                       style={{ color: DIFF_COLOR[a.difficulty] ?? '#4A7251', background: (DIFF_COLOR[a.difficulty] ?? '#4A7251') + '22' }}
                     >
                       {a.difficulty}
                     </span>
                   ) : (
-                    <span className="font-sans text-xs px-2.5 py-1 text-white/50 bg-white/10 hidden sm:inline">
+                    <span className="font-sans text-xs rounded-full px-3 py-1 text-white/60 bg-white/10 hidden sm:inline">
                       {ATTRACTION_KIND_LABEL[a.kind]}
                     </span>
                   )}
-                  <ArrowRight className="w-4 h-4 text-white/20 group-hover:text-gold transition-colors" />
+                  <ArrowRight className="w-4 h-4 text-white/40 group-hover:text-gold transition-colors" />
                 </div>
               </Link>
             ))}
@@ -683,56 +688,33 @@ export default function HomePage({ initialContent, initialRegions }: { initialCo
 
   const experiencesSection = (
     <EditableSection key="experiences" id="experiences" label="Featured Experiences" className="bg-white">
-      <div className="max-w-[1440px] mx-auto px-6 lg:px-12 py-20">
-        <div className="flex items-end justify-between gap-6 mb-12">
-          <div className="max-w-2xl">
-            <Editable section="home_sections" fieldKey="experiences_eyebrow" value={hs.experiences_eyebrow} label="Experiences Eyebrow" type="text">
-              <p className="font-sans text-xs tracking-[0.25em] uppercase text-forest/60 mb-3">{hs.experiences_eyebrow}</p>
-            </Editable>
-            <Editable section="home_sections" fieldKey="experiences_heading" value={hs.experiences_heading} label="Experiences Heading" type="text">
-              <h2 className="font-display text-4xl lg:text-5xl text-forest">{hs.experiences_heading}</h2>
-            </Editable>
-            <Editable section="home_sections" fieldKey="experiences_subheading" value={hs.experiences_subheading} label="Experiences Subheading" type="text">
-              <p className="font-sans text-base text-forest/60 mt-4">{hs.experiences_subheading}</p>
-            </Editable>
-          </div>
-          <div className="hidden sm:flex flex-col items-end gap-6 shrink-0">
-            <ViewAllLink href="/activities" />
-            <CarouselNav swiper={experienceSwiper} count={experienceItems.length} />
-          </div>
-        </div>
+      <div className={homeContainer}>
+        <SectionHeader
+          id="experiences"
+          label="Experiences"
+          hs={hs}
+          tone="light"
+          subheadingKey="experiences_subheading"
+          link={{ href: '/activities' }}
+          aside={<div className="hidden sm:block shrink-0"><CarouselNav swiper={experienceSwiper} count={experienceItems.length} /></div>}
+        />
 
         {experienceItems.length === 0 ? (
-          <p className="font-sans text-sm text-forest/35 py-6">New hikes, events and experiences will appear here once they're scheduled.</p>
+          <p className="font-sans text-sm text-forest/60 py-6">New hikes, events and experiences will appear here once they're scheduled.</p>
         ) : (
           <FeaturedExperiencesCarousel items={experienceItems} onSwiper={setExperienceSwiper} />
         )}
-        <div className="sm:hidden mt-8">
-          <ViewAllLink href="/activities" />
-        </div>
       </div>
     </EditableSection>
   )
 
   const journeysSection = (
     <EditableSection key="journeys" id="journeys" label="Curated Journeys" className="bg-white">
-      <div className="max-w-[1440px] mx-auto px-6 lg:px-12 py-20">
-        <div className="flex items-end justify-between mb-10">
-          <div>
-            <Editable section="home_sections" fieldKey="journeys_eyebrow" value={hs.journeys_eyebrow} label="Journeys Eyebrow" type="text">
-              <p className="font-sans text-xs tracking-[0.2em] uppercase text-forest/40 mb-2">{hs.journeys_eyebrow}</p>
-            </Editable>
-            <Editable section="home_sections" fieldKey="journeys_heading" value={hs.journeys_heading} label="Journeys Heading" type="text">
-              <h2 className="font-display text-4xl text-forest">{hs.journeys_heading}</h2>
-            </Editable>
-          </div>
-          <Link href="/packages" className="hidden sm:flex items-center gap-2 font-sans text-sm text-forest/50 hover:text-forest transition-colors">
-            All packages <ArrowRight className="w-4 h-4" />
-          </Link>
-        </div>
+      <div className={homeContainer}>
+        <SectionHeader id="journeys" label="Journeys" hs={hs} tone="light" link={{ href: '/packages' }} />
 
         {journeys.length === 0 ? (
-          <p className="font-sans text-sm text-forest/40 py-8">No packages published yet. Please check back soon.</p>
+          <p className="font-sans text-sm text-forest/60 py-8">No packages published yet. Please check back soon.</p>
         ) : (
           <JourneysCarousel journeys={journeys} />
         )}
@@ -742,20 +724,20 @@ export default function HomePage({ initialContent, initialRegions }: { initialCo
 
   const newsletterSection = (
     <EditableSection key="newsletter" id="newsletter" label="Newsletter" className="bg-mist">
-      <div className="max-w-[1440px] mx-auto px-6 lg:px-12 py-20">
+      <div className={homeContainer}>
         <div className="max-w-xl">
           <Editable section="home_sections" fieldKey="newsletter_eyebrow" value={hs.newsletter_eyebrow} label="Newsletter Eyebrow" type="text">
-            <p className="font-sans text-xs tracking-[0.2em] uppercase text-forest/40 mb-3">{hs.newsletter_eyebrow}</p>
+            <p className={`font-sans text-xs tracking-[0.2em] uppercase ${light.eyebrow} mb-3`}>{hs.newsletter_eyebrow}</p>
           </Editable>
           <Editable section="home_sections" fieldKey="newsletter_heading" value={hs.newsletter_heading} label="Newsletter Heading" type="text">
-            <h2 className="font-display text-4xl text-forest mb-4">{hs.newsletter_heading}</h2>
+            <h2 className={`${homeType.heading} ${light.heading} mb-4`}>{hs.newsletter_heading}</h2>
           </Editable>
           <Editable section="home_sections" fieldKey="newsletter_body" value={hs.newsletter_body} label="Newsletter Body" type="textarea">
-            <p className="font-sans text-sm text-forest/55 mb-8 leading-relaxed">
+            <p className={`font-sans text-base ${light.body} mb-8 leading-relaxed`}>
               {hs.newsletter_body}
             </p>
           </Editable>
-          <form className="flex gap-0 max-w-md" onSubmit={subscribeNewsletter}>
+          <form className="flex gap-2 max-w-md" onSubmit={subscribeNewsletter}>
             <label htmlFor="newsletter-email" className="sr-only">Email address</label>
             <input
               id="newsletter-email"
@@ -764,12 +746,12 @@ export default function HomePage({ initialContent, initialRegions }: { initialCo
               value={newsletterEmail}
               onChange={(e) => setNewsletterEmail(e.target.value)}
               placeholder="Your email address"
-              className="flex-1 px-4 py-3 bg-white border border-black/10 font-sans text-sm text-forest placeholder:text-forest/30 focus:outline-none focus:border-forest transition-colors"
+              className="flex-1 min-w-0 px-4 py-3 bg-white border border-black/10 rounded-xl font-sans text-sm text-forest placeholder:text-forest/40 focus:outline-none focus:border-forest transition-colors"
             />
             <button
               type="submit"
               disabled={subscribing}
-              className="px-6 py-3 bg-forest text-white font-sans text-sm hover:bg-sage transition-colors whitespace-nowrap disabled:opacity-60"
+              className="px-6 py-3 rounded-xl bg-gold text-forest font-sans font-semibold text-sm hover:bg-brown-600 transition-colors whitespace-nowrap disabled:opacity-60"
             >
               {subscribing ? 'Subscribing…' : 'Subscribe'}
             </button>

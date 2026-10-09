@@ -1,7 +1,7 @@
 'use client'
 import { useState } from 'react'
 import Link from 'next/link'
-import { ArrowRight, ChevronLeft, ChevronRight } from 'lucide-react'
+import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { Swiper, SwiperSlide } from 'swiper/react'
 import { Autoplay } from 'swiper/modules'
 import type { Swiper as SwiperInstance } from 'swiper'
@@ -9,6 +9,9 @@ import 'swiper/css'
 import SafeImage from '@/components/ui/SafeImage'
 import { useSwiperAutoplay, CAROUSEL_SPEED_MS } from '@/lib/carousel-autoplay'
 import { useEditMode } from '@/lib/edit-mode-context'
+import { homeTone, homeType } from '@/components/home/home-style'
+
+const light = homeTone.light
 
 /**
  * One card in the homepage "Featured Experiences" reel. Hikes, events and
@@ -53,33 +56,33 @@ function ExperienceCard({ item }: { item: FeaturedExperience }) {
 
   return (
     <article className="group h-full">
-      <Link href={item.href} className="block">
-        <div className="relative overflow-hidden aspect-square rounded-2xl bg-mist">
+      <Link href={item.href} className={`${homeType.cardLink} ${light.focus}`}>
+        <div className={`${homeType.media} bg-mist`}>
           <div className="absolute inset-0" style={{ background: item.fallbackColor }} />
           <SafeImage src={item.img} alt={item.title} fill loading="lazy"
             sizes="(max-width: 640px) 88vw, (max-width: 1024px) 45vw, 30vw"
-            className="object-cover transition-transform duration-500 group-hover:scale-105"
+            className={homeType.image}
             style={{ willChange: 'transform' }} />
           {departure && (
-            <div className="absolute left-5 bottom-5 bg-white rounded-xl shadow-card px-5 py-3 min-w-[5.5rem] text-center">
-              <span className="block font-sans text-xs text-forest/60">From</span>
-              <strong className="block font-sans text-3xl font-bold text-forest leading-tight">{departure.day}</strong>
-              <span className="block font-sans text-base text-forest">{departure.month}</span>
+            <div className="absolute left-4 bottom-4 bg-white rounded-xl shadow-card px-4 py-2 min-w-[4.5rem] text-center">
+              <span className="block font-sans text-[10px] tracking-[0.15em] uppercase text-forest/60">From</span>
+              <strong className="block font-sans text-2xl font-bold text-forest leading-tight">{departure.day}</strong>
+              <span className="block font-sans text-sm text-forest">{departure.month}</span>
             </div>
           )}
         </div>
       </Link>
 
-      <div className="pt-6 px-2">
-        <span className="block font-sans text-[11px] tracking-[0.2em] uppercase text-forest/60 mb-2">{item.region}</span>
+      <div className="pt-5">
+        <span className={`block ${homeType.eyebrow} ${light.eyebrow} mb-1`}>{item.region}</span>
         <Link href={item.href}>
-          <h3 className="font-display text-2xl text-forest leading-snug line-clamp-2 group-hover:text-sage transition-colors">{item.title}</h3>
+          <h3 className={`${homeType.cardTitle} ${light.title} line-clamp-2`}>{item.title}</h3>
         </Link>
-        {item.meta && <p className="font-sans text-sm text-forest/55 mt-1.5">{item.meta}</p>}
+        {item.meta && <p className={`${homeType.cardBody} ${light.body} mt-2`}>{item.meta}</p>}
 
         {item.price ? (
           <div className="flex items-center gap-4 mt-3">
-            <span className="font-sans text-lg font-semibold text-wine">from {formatFromPrice(item.price)}</span>
+            <span className="font-sans text-lg font-semibold text-forest">from {formatFromPrice(item.price)}</span>
             {item.info && (
               <button
                 type="button"
@@ -122,7 +125,7 @@ export function FeaturedExperiencesCarousel({ items, onSwiper }: {
       speed={CAROUSEL_SPEED_MS}
       {...autoplay}
       onSwiper={onSwiper}
-      spaceBetween={28}
+      spaceBetween={32}
       grabCursor
       slidesPerView={1.15}
       breakpoints={{
@@ -152,13 +155,5 @@ export function CarouselNav({ swiper, count }: { swiper: SwiperInstance | null; 
         <ChevronRight className="w-4 h-4" />
       </button>
     </div>
-  )
-}
-
-export function ViewAllLink({ href }: { href: string }) {
-  return (
-    <Link href={href} className="font-sans text-sm text-wine hover:opacity-80 transition-opacity inline-flex items-center gap-2">
-      View all experiences <ArrowRight className="w-4 h-4" />
-    </Link>
   )
 }

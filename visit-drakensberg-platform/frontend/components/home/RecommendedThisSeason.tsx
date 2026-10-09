@@ -12,6 +12,7 @@ import { toSeasonCard, type SeasonCard } from '@/lib/season-cards'
 import type { SeasonalItem } from '@/lib/modules'
 import SeasonListingCard from '@/components/modules/SeasonListingCard'
 import TopicListingCarousel from '@/components/modules/TopicListingCarousel'
+import { homeContainer, homeTone, homeType } from '@/components/home/home-style'
 
 /* ─── Recommended this season ───────────────────────────────────────────────
    Published trails and active activities that their admin/supplier tagged
@@ -82,23 +83,23 @@ export default function RecommendedThisSeason() {
 
   return (
     <section aria-labelledby={headingId} className="bg-white">
-      <div className="max-w-[1440px] mx-auto px-6 lg:px-12 py-20">
-        <div className="mb-10">
-          <p className="font-sans text-xs tracking-[0.2em] uppercase text-forest/40 mb-2">
+      <div className={homeContainer}>
+        <div className="mb-7 lg:mb-9 max-w-3xl">
+          <p className={`font-sans text-xs tracking-[0.2em] uppercase ${homeTone.light.eyebrow} mb-3`}>
             {meta.label} · {meta.range}
           </p>
-          <h2 id={headingId} className="font-display text-4xl text-forest">Recommended this season</h2>
-          <p className="font-sans text-sm text-forest/55 mt-3 max-w-xl leading-relaxed">{meta.blurb}</p>
+          <h2 id={headingId} className={`${homeType.heading} ${homeTone.light.heading}`}>Recommended this season</h2>
+          <p className={`font-sans text-base ${homeTone.light.subheading} mt-4 max-w-xl leading-relaxed`}>{meta.blurb}</p>
         </div>
 
         {/* Desktop/tablet: static grid */}
-        <div className="hidden sm:grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          {cards.map(card => <SeasonListingCard key={`${card.kind}:${card.id}`} card={card} />)}
+        <div className="hidden sm:grid sm:grid-cols-2 lg:grid-cols-4 gap-x-6 gap-y-10">
+          {cards.map(card => <SeasonListingCard key={`${card.kind}:${card.id}`} card={card} variant="home" />)}
         </div>
 
         {/* Mobile: swipeable carousel (same as the season pages) */}
         <div className="sm:hidden">
-          <TopicListingCarousel cards={cards} />
+          <TopicListingCarousel cards={cards} variant="home" />
         </div>
 
         {regionLinks.length > 0 && (
@@ -107,7 +108,7 @@ export default function RecommendedThisSeason() {
               <Link
                 key={r.href}
                 href={`${r.href}/${data.season}`}
-                className="inline-flex items-center gap-2 font-sans text-sm text-forest/60 hover:text-forest transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-forest"
+                className="inline-flex items-center gap-2 font-sans text-sm text-brown-700 hover:text-forest transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-forest"
               >
                 {r.label} in {meta.label.toLowerCase()} <ArrowRight className="w-4 h-4" aria-hidden="true" />
               </Link>
