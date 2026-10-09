@@ -6,6 +6,8 @@ import { getAdminBookings, setAdminBookingStatus } from '@/lib/admin-supabase'
 import type { SavedBooking } from '@/lib/bookings'
 import { useQuickParam } from '@/lib/admin-quick-param'
 import { formatMoney } from '@/lib/allocation'
+import { getOrders, type MasterOrder } from '@/lib/orders'
+import { bookingPayment, ordersByBooking, PAYMENT_STATE_LABEL, type BookingPayment, type BookingPaymentState } from '@/lib/booking-payment'
 
 const BOOKING_STATUS_STYLE: Record<string, string> = {
   confirmed: 'bg-[#2d6a4f]/10 text-[#2d6a4f]',
@@ -14,11 +16,25 @@ const BOOKING_STATUS_STYLE: Record<string, string> = {
   completed: 'bg-gray-100 text-gray-500',
 }
 
-const PAYMENT_STYLE: Record<string, string> = {
+const PAYMENT_STYLE: Record<BookingPaymentState, string> = {
   paid: 'text-[#2d6a4f]',
-  pending: 'text-[#C9A96E]',
+  partial: 'text-[#8B6914]',
+  unpaid: 'text-[#C9A96E]',
+  refund_due: 'text-red-400',
   refunded: 'text-gray-400',
-  failed: 'text-red-400',
+  not_due: 'text-gray-300',
+}
+
+function PaymentCell({ payment }: { payment: BookingPayment }) {
+  const detail = payment.state === 'partial' ? `${formatMoney(payment.captured)} of ${formatMoney(payment.due)}`
+    : payment.state === 'refund_due' ? formatMoney(payment.refundDue)
+    : ''
+  return (
+    <span className={`font-sans text-xs ${PAYMENT_STYLE[payment.state]}`}>
+      {PAYMENT_STATE_LABEL[payment.state]}
+      {detail && <span className="block text-[10px] text-gray-400">{detail}</span>}
+    </span>
+  )
 }
 
 function fmt(d: string) {
@@ -41,6 +57,7 @@ function bookingType(booking: SavedBooking) {
 
 export default function AdminBookingsPage() {
   const [bookings, setBookings] = useState<SavedBooking[]>([])
+  const [orders, setOrders] = useState<MasterOrder[]>([])
   const [search, setSearch] = useState('')
   const [filter, setFilter] = useState('all')
   const [loading, setLoading] = useState(true)
@@ -50,8 +67,10 @@ export default function AdminBookingsPage() {
     setLoading(true)
     setError('')
     try {
-      const data = await getAdminBookings()
+      // Payment facts live on the bookings' Master Orders, not the booking row.
+      const [data, orderRows] = await Promise.all([getAdminBookings(), getOrders()])
       setBookings(data.sort((a, b) => b.createdAt.localeCompare(a.createdAt)))
+      setOrders(orderRows)
     } catch {
       setError('Could not load bookings from Supabase.')
     } finally {
@@ -71,7 +90,15 @@ export default function AdminBookingsPage() {
     return matchSearch && matchFilter
   }), [bookings, filter, search])
 
-  const totalRevenue = bookings.filter(b => b.status === 'confirmed').reduce((sum, b) => sum + b.total, 0)
+  const payments = useMemo(() => {
+    const byBooking = ordersByBooking(orders)
+    return new Map(bookings.map(b => [b.id, bookingPayment(b, byBooking.get(b.id) ?? [])]))
+  }, [bookings, orders])
+  const paymentOf = (b: SavedBooking) => payments.get(b.id) ?? bookingPayment(b, [])
+
+  // Revenue is money actually captured on bookings that still stand — not the
+  // face value of confirmed bookings, and nothing from cancelled ones.
+  const totalRevenue = bookings.reduce((sum, b) => sum + paymentOf(b).captured, 0)
   const confirmed = bookings.filter(b => b.status === 'confirmed').length
   const pending = bookings.filter(b => (b.status as string) === 'pending').length
   const cancelled = bookings.filter(b => b.status === 'cancelled').length
@@ -128,7 +155,10 @@ export default function AdminBookingsPage() {
             </div>
             <div className="flex items-end justify-between gap-3 mt-3">
               <p className="font-sans text-xs text-gray-500">{fmt(b.checkIn)}{b.checkIn !== b.checkOut ? ` — ${fmt(b.checkOut)}` : ''} · {b.guests} {b.guests === 1 ? 'guest' : 'guests'}</p>
-              <p className="font-display italic text-xl text-[#2d6a4f]">{formatMoney(b.total)}</p>
+              <div className="text-right">
+                <p className="font-display italic text-xl text-[#2d6a4f]">{formatMoney(b.total)}</p>
+                <PaymentCell payment={paymentOf(b)} />
+              </div>
             </div>
             <div className="flex gap-2 mt-3">
               {b.status !== 'confirmed' && <button onClick={() => updateStatus(b.id, 'confirmed')} className="flex-1 border border-gray-200 py-2.5 font-sans text-sm text-[#2d6a4f]">Confirm</button>}
@@ -144,7 +174,7 @@ export default function AdminBookingsPage() {
         <table className="w-full min-w-[980px]">
           <thead><tr className="border-b border-gray-100">{['Booking Ref', 'Visitor', 'Listing', 'Dates', 'Guests', 'Total', 'Payment', 'Status', 'Actions'].map(h => <th key={h} className="text-left px-5 py-3 font-sans text-[10px] tracking-[0.12em] uppercase text-gray-400">{h}</th>)}</tr></thead>
           <tbody className="divide-y divide-gray-100">
-            {filtered.map(b => <tr key={b.id} className="hover:bg-[#F7F5F2] transition-colors"><td className="px-5 py-4 font-mono text-xs text-gray-400">{b.reference}</td><td className="px-5 py-4"><p className="font-sans text-sm font-medium">{b.customerName}</p><p className="font-sans text-xs text-gray-400">{b.customerEmail}</p></td><td className="px-5 py-4"><p className="font-sans text-sm text-gray-700">{listingName(b)}</p><p className="font-sans text-xs text-gray-400">{supplierName(b)} · {bookingType(b)}</p></td><td className="px-5 py-4 font-sans text-xs text-gray-500">{fmt(b.checkIn)}{b.checkIn !== b.checkOut ? ` — ${fmt(b.checkOut)}` : ''}</td><td className="px-5 py-4 font-sans text-sm text-gray-600">{b.guests}</td><td className="px-5 py-4 font-display italic text-[#2d6a4f]">{formatMoney(b.total)}</td><td className="px-5 py-4"><span className={`font-sans text-xs capitalize ${PAYMENT_STYLE.paid}`}>paid</span></td><td className="px-5 py-4"><span className={`font-sans text-[10px] tracking-[0.1em] uppercase px-2.5 py-1 ${BOOKING_STATUS_STYLE[b.status] ?? BOOKING_STATUS_STYLE.pending}`}>{b.status}</span></td><td className="px-5 py-4"><div className="flex gap-2">{b.status !== 'confirmed' && <button onClick={() => updateStatus(b.id, 'confirmed')} className="font-sans text-xs text-[#2d6a4f] hover:underline">Confirm</button>}{b.status !== 'cancelled' && <button onClick={() => updateStatus(b.id, 'cancelled')} className="font-sans text-xs text-red-400 hover:underline">Cancel</button>}</div></td></tr>)}
+            {filtered.map(b => <tr key={b.id} className="hover:bg-[#F7F5F2] transition-colors"><td className="px-5 py-4 font-mono text-xs text-gray-400">{b.reference}</td><td className="px-5 py-4"><p className="font-sans text-sm font-medium">{b.customerName}</p><p className="font-sans text-xs text-gray-400">{b.customerEmail}</p></td><td className="px-5 py-4"><p className="font-sans text-sm text-gray-700">{listingName(b)}</p><p className="font-sans text-xs text-gray-400">{supplierName(b)} · {bookingType(b)}</p></td><td className="px-5 py-4 font-sans text-xs text-gray-500">{fmt(b.checkIn)}{b.checkIn !== b.checkOut ? ` — ${fmt(b.checkOut)}` : ''}</td><td className="px-5 py-4 font-sans text-sm text-gray-600">{b.guests}</td><td className="px-5 py-4 font-display italic text-[#2d6a4f]">{formatMoney(b.total)}</td><td className="px-5 py-4"><PaymentCell payment={paymentOf(b)} /></td><td className="px-5 py-4"><span className={`font-sans text-[10px] tracking-[0.1em] uppercase px-2.5 py-1 ${BOOKING_STATUS_STYLE[b.status] ?? BOOKING_STATUS_STYLE.pending}`}>{b.status}</span></td><td className="px-5 py-4"><div className="flex gap-2">{b.status !== 'confirmed' && <button onClick={() => updateStatus(b.id, 'confirmed')} className="font-sans text-xs text-[#2d6a4f] hover:underline">Confirm</button>}{b.status !== 'cancelled' && <button onClick={() => updateStatus(b.id, 'cancelled')} className="font-sans text-xs text-red-400 hover:underline">Cancel</button>}</div></td></tr>)}
             {!loading && filtered.length === 0 && <tr><td colSpan={9} className="px-5 py-12 text-center font-sans text-sm text-gray-400">No bookings found.</td></tr>}
             {loading && <tr><td colSpan={9} className="px-5 py-12 text-center font-sans text-sm text-gray-400">Loading bookings…</td></tr>}
           </tbody>
