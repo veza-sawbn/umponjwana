@@ -16,7 +16,7 @@ import Footer from '@/components/layout/Footer'
 import TripPlanningTools from '@/components/home/TripPlanningTools'
 import TopDestinations from '@/components/home/TopDestinations'
 import RecommendedThisSeason from '@/components/home/RecommendedThisSeason'
-import { FeaturedExperiencesCarousel, CarouselNav, type FeaturedExperience } from '@/components/home/FeaturedExperiences'
+import { FeaturedExperiencesCarousel, CarouselNav, trekkingExperienceToFeatured, type FeaturedExperience } from '@/components/home/FeaturedExperiences'
 import type { Swiper as SwiperInstance } from 'swiper'
 import { loadSiteContent, SITE_CONTENT_DEFAULTS, type HomeCard, type SiteContent } from '@/lib/site-content'
 import type { Region } from '@/lib/regions'
@@ -638,22 +638,9 @@ export default function HomePage({ initialContent, initialRegions }: { initialCo
     </EditableSection>
   )
 
-  const scheduledHikeItems: FeaturedExperience[] = scheduledHikes.map(e => ({
-    id: e.id,
-    href: `/experiences/${e.id}`,
-    title: e.title,
-    region: e.region || 'Drakensberg',
-    meta: [e.difficulty && `${e.difficulty} experience`, `${e.durationDays} day${e.durationDays !== 1 ? 's' : ''}`].filter(Boolean).join(', '),
-    date: e.departureDate,
-    price: e.pricePerPerson,
-    info: [
-      e.spacesAvailable > 0 ? `${e.spacesAvailable} of ${e.spacesTotal} spaces left` : 'Fully booked',
-      e.operator && `guided by ${e.operator}`,
-      e.meetingPoint && `meets at ${e.meetingPoint}`,
-    ].filter(Boolean).join(' · '),
-    img: trailImageById.get(e.trailId),
-    fallbackColor: DIFF_COLOR[e.difficulty] || '#4A7251',
-  }))
+  const scheduledHikeItems: FeaturedExperience[] = scheduledHikes.map(e =>
+    trekkingExperienceToFeatured(e, trailImageById.get(e.trailId), DIFF_COLOR[e.difficulty] || '#4A7251'),
+  )
 
   const eventItems: FeaturedExperience[] = upcomingEvents.map(ev => ({
     id: ev.id,

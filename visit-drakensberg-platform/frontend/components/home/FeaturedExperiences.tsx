@@ -10,6 +10,7 @@ import SafeImage from '@/components/ui/SafeImage'
 import { useSwiperAutoplay, CAROUSEL_SPEED_MS } from '@/lib/carousel-autoplay'
 import { useEditMode } from '@/lib/edit-mode-context'
 import { homeTone, homeType } from '@/components/home/home-style'
+import type { TrekkingExperience } from '@/lib/experiences'
 
 const light = homeTone.light
 
@@ -34,6 +35,34 @@ export type FeaturedExperience = {
   img?: string
   /** Shown under the photo, and in place of one that's missing or broken. */
   fallbackColor: string
+}
+
+/**
+ * A scheduled trekking departure as a reel card — shared by the homepage
+ * reel and the "What's on" reel on /hikes so both read the same and both
+ * open the departure's /experiences page.
+ */
+export function trekkingExperienceToFeatured(
+  e: TrekkingExperience,
+  img: string | undefined,
+  fallbackColor: string,
+): FeaturedExperience {
+  return {
+    id: e.id,
+    href: `/experiences/${e.id}`,
+    title: e.title,
+    region: e.region || 'Drakensberg',
+    meta: [e.difficulty && `${e.difficulty} experience`, `${e.durationDays} day${e.durationDays !== 1 ? 's' : ''}`].filter(Boolean).join(', '),
+    date: e.departureDate,
+    price: e.pricePerPerson,
+    info: [
+      e.spacesAvailable > 0 ? `${e.spacesAvailable} of ${e.spacesTotal} spaces left` : 'Fully booked',
+      e.operator && `guided by ${e.operator}`,
+      e.meetingPoint && `meets at ${e.meetingPoint}`,
+    ].filter(Boolean).join(' · '),
+    img,
+    fallbackColor,
+  }
 }
 
 function dateParts(iso?: string) {

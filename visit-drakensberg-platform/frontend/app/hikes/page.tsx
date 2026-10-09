@@ -1,5 +1,6 @@
 'use client'
 import { useState, useEffect } from 'react'
+import type { Swiper as SwiperInstance } from 'swiper'
 import Link from 'next/link'
 import Footer from '@/components/layout/Footer'
 import { X, SlidersHorizontal, ChevronDown } from 'lucide-react'
@@ -10,7 +11,7 @@ import { getUpcomingExperiences, type TrekkingExperience } from '@/lib/experienc
 import { publicSupabase } from '@/lib/supabase-public'
 import TrailCardsCarousel from '@/components/trails/TrailCardsCarousel'
 import HikesRegionExplorer from '@/components/trails/HikesRegionExplorer'
-import TrailExperiencesCarousel from '@/components/experiences/TrailExperiencesCarousel'
+import { FeaturedExperiencesCarousel, CarouselNav, trekkingExperienceToFeatured } from '@/components/home/FeaturedExperiences'
 import HikesHero from '@/components/trails/HikesHero'
 import { ROUTE_TYPES } from '@/lib/gpx'
 
@@ -48,6 +49,7 @@ export default function HikesPage() {
   // behind a toggle by default — the category tabs above already narrow most
   // browsing, so a minimalist first view doesn't need every control exposed.
   const [filtersOpen, setFiltersOpen] = useState(false)
+  const [experienceSwiper, setExperienceSwiper] = useState<SwiperInstance | null>(null)
 
   useEffect(() => {
     // publicSupabase (session-less) — the departures behind these experiences
@@ -100,12 +102,14 @@ export default function HikesPage() {
     parseKm(t.distance) <= maxDist
   )
 
-  // Marketplace departures grouped per trail, following the active filters.
-  // Comparison stays scoped to one Trail ID, so each trail gets its own block.
-  const experienceGroups = filtered
-    .map(t => ({ trail: t, exps: experiences.filter(e => e.trailId === t.id) }))
-    .filter(g => g.exps.length > 0)
-    .sort((a, b) => a.exps[0].departureDate.localeCompare(b.exps[0].departureDate))
+  // Marketplace departures on the trails that pass the active filters,
+  // soonest first, as the same cards as the homepage reel — each opens
+  // its departure's /experiences page.
+  const filteredById = new Map(filtered.map(t => [t.id, t]))
+  const experienceItems = experiences
+    .filter(e => filteredById.has(e.trailId))
+    .sort((a, b) => a.departureDate.localeCompare(b.departureDate))
+    .map(e => trekkingExperienceToFeatured(e, filteredById.get(e.trailId)?.image, DIFF_COLOR[e.difficulty] || '#4A7251'))
 
   const allKms = trails.map(t => parseKm(t.distance))
   const sliderMax = allKms.length ? Math.max(...allKms) : 250
@@ -242,17 +246,20 @@ export default function HikesPage() {
             <HikesRegionExplorer onSelectRegion={setRegion} />
 
             {/* What's on: upcoming trekking experiences across these trails */}
-            {experienceGroups.length > 0 && (
+            {experienceItems.length > 0 && (
               <>
                 <div className="h-px bg-black/8 mt-12 mb-10" />
-                <div className="mb-8">
-                  <p className="font-sans text-xs tracking-[0.2em] uppercase text-gold mb-2">What's on</p>
-                  <h2 className="font-display text-3xl text-forest leading-none mb-2">Upcoming Trekking Experiences</h2>
-                  <p className="font-sans text-sm text-forest/50">
-                    departures offered by trusted suppliers on these trails - compare and book, or open a trail for the full route details
-                  </p>
+                <div className="flex items-end justify-between gap-6 mb-8">
+                  <div>
+                    <p className="font-sans text-xs tracking-[0.2em] uppercase text-gold mb-2">What's on</p>
+                    <h2 className="font-display text-3xl text-forest leading-none mb-2">Upcoming Trekking Experiences</h2>
+                    <p className="font-sans text-sm text-forest/50">
+                      departures offered by trusted suppliers on these trails - compare and book, or open a trail for the full route details
+                    </p>
+                  </div>
+                  <div className="hidden sm:block shrink-0"><CarouselNav swiper={experienceSwiper} count={experienceItems.length} /></div>
                 </div>
-                <TrailExperiencesCarousel groups={experienceGroups} />
+                <FeaturedExperiencesCarousel items={experienceItems} onSwiper={setExperienceSwiper} />
               </>
             )}
           </>
