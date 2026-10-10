@@ -1,5 +1,6 @@
 import { supabase } from './auth'
 import { DEFAULT_TIP_PRESETS } from './tips'
+import type { PaymentSchedule } from './payment-schedule'
 
 // Customer invoices & receipts. One invoice per Master Order — the customer
 // never receives multiple invoices because multiple suppliers are involved,
@@ -67,6 +68,12 @@ export type Invoice = {
   voided_at?: string | null
   /** The reason the staff member supplied when voiding the invoice. */
   void_reason?: string | null
+  /**
+   * Deposit or split terms set by staff. Null (or absent, on a database that
+   * hasn't run 20261011_invoice_payment_schedules.sql) means pay in full.
+   * Read it through parseSchedule() from lib/payment-schedule.
+   */
+  payment_schedule?: PaymentSchedule | null
 }
 
 /** The order header an invoice document prints — no allocation or payout data. */
@@ -395,6 +402,19 @@ export async function reissueInvoice(invoiceId: string): Promise<string> {
   if (error) throw new Error(error.message || 'Could not reissue this invoice')
   if (typeof data !== 'string' || !data) throw new Error('The database returned no new invoice id')
   return data
+}
+
+/**
+ * Sets (or, with null, clears) an invoice's deposit / split terms. Finance
+ * staff only; the database validates the schedule against the invoice total
+ * and audits the change. Works on an invoice that has already taken money.
+ */
+export async function setInvoicePaymentSchedule(invoiceId: string, schedule: PaymentSchedule | null): Promise<void> {
+  const { error } = await supabase.rpc('vd_set_invoice_payment_schedule', {
+    p_invoice_id: invoiceId,
+    p_schedule: schedule,
+  })
+  if (error) throw new Error(error.message || 'Could not save the payment schedule')
 }
 
 export async function getReceipts(orderId?: string): Promise<Receipt[]> {

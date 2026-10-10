@@ -1,5 +1,6 @@
 import { supabase } from './auth'
 import { newEntityId } from './entities'
+import type { PaymentSchedule } from './payment-schedule'
 
 // Saved-but-not-issued manual invoices.
 //
@@ -35,6 +36,8 @@ export type InvoiceDraft = {
   fee_override: string
   tax_override: string
   notes: string
+  /** Deposit / split terms to apply when the draft is issued. Null = pay in full. */
+  payment_schedule?: PaymentSchedule | null
   created_at: string
   updated_at: string
 }

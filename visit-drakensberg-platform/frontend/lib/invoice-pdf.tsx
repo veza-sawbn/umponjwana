@@ -6,6 +6,7 @@ import { Document, Page, View, Text, StyleSheet, renderToBuffer } from '@react-p
 import { LogoMark, BUSINESS_DETAILS_DEFAULTS } from './pdf-letterhead'
 export { BUSINESS_DETAILS_DEFAULTS }
 import { formatMoney } from './allocation'
+import { parseSchedule, resolveSchedule } from './payment-schedule'
 // Type-only: pulls in no runtime code, so this stays safe to import from a
 // server route — lib/invoices.ts constructs a browser-oriented Supabase
 // client (lib/auth.ts) as a module-level side effect, which has no business
@@ -127,6 +128,8 @@ function InvoiceDocument({ invoice, order, receipts, business, siteUrl }: Invoic
   const hasEft = Number(invoice.balance) > 0 && !!business.bank_account_number
   const st = statusStyle(invoice.status)
   const website = siteUrl ? siteUrl.replace(/^https?:\/\//, '') : ''
+  const schedule = invoice.status === 'void' ? null : parseSchedule(invoice.payment_schedule)
+  const instalments = schedule ? resolveSchedule(schedule, Number(invoice.total), Number(invoice.amount_paid)) : []
 
   return (
     <Document title={`Invoice ${invoice.invoice_number}`}>
@@ -224,6 +227,24 @@ function InvoiceDocument({ invoice, order, receipts, business, siteUrl }: Invoic
             </View>
           </View>
         </View>
+
+        {/* Deposit / split terms */}
+        {schedule && (
+          <View style={styles.section} wrap={false}>
+            <Text style={styles.label}>{schedule.kind === 'deposit' ? 'Deposit & Balance' : 'Payment Schedule'}</Text>
+            {instalments.map((inst, i) => (
+              <View style={styles.receiptRow} key={i}>
+                <Text style={styles.receiptText}>
+                  {inst.label} · {inst.dueDate ? `due ${fmtDate(inst.dueDate)}` : 'due on receipt'}
+                </Text>
+                <Text style={styles.receiptText}>
+                  {formatMoney(inst.amount, invoice.currency)}
+                  {inst.status === 'paid' ? ' · paid' : inst.status === 'part-paid' ? ` · ${formatMoney(inst.outstanding, invoice.currency)} to pay` : ''}
+                </Text>
+              </View>
+            ))}
+          </View>
+        )}
 
         {/* Receipts */}
         {receipts.length > 0 && (

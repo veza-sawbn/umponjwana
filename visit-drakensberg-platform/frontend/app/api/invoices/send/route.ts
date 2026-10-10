@@ -4,6 +4,7 @@ import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs'
 import { sendMail } from '@/lib/mailer'
 import { formatMoney as money } from '@/lib/allocation'
 import { emailShell, ctaButton, detailTable, esc, finePrint } from '@/lib/email-layout'
+import { amountDueNow, parseSchedule, scheduleSummary } from '@/lib/payment-schedule'
 
 export const dynamic = 'force-dynamic'
 
@@ -31,9 +32,14 @@ function invoiceHtml(o: {
   issuedAt: string
   invoiceUrl: string
   origin: string
+  /** Deposit / split terms, when the invoice has them. */
+  terms?: { summary: string; label: string; amount: number; dueDate: string | null } | null
 }) {
   const settled = o.balance <= 0
   const trip = o.tripName ? ` for ${esc(o.tripName)}` : ''
+  // Only worth calling out while the next instalment is less than everything owed.
+  const terms = !settled && o.terms && o.terms.amount < o.balance ? o.terms : null
+  const dueBy = terms?.dueDate ? ` by ${esc(fmtDate(terms.dueDate))}` : ' now'
 
   return emailShell({
     origin: o.origin,
@@ -41,13 +47,17 @@ function invoiceHtml(o: {
     heading: 'Your invoice',
     preheader: settled
       ? `Invoice ${o.invoiceNumber} is fully paid, with no payment due.`
-      : `Invoice ${o.invoiceNumber} has ${money(o.balance, o.currency)} outstanding.`,
+      : terms
+        ? `${terms.label} of ${money(terms.amount, o.currency)} is due on invoice ${o.invoiceNumber}.`
+        : `Invoice ${o.invoiceNumber} has ${money(o.balance, o.currency)} outstanding.`,
     bodyHtml: `
       <p style="margin:0 0 4px;">Dear ${esc(o.customerName || 'traveller')},</p>
       <p style="margin:0 0 20px;">
         ${settled
           ? `Here is invoice <strong>${esc(o.invoiceNumber)}</strong>${trip}. It is fully paid, so no further payment is due.`
-          : `Here is invoice <strong>${esc(o.invoiceNumber)}</strong>${trip}, with <strong>${esc(money(o.balance, o.currency))}</strong> still outstanding.`}
+          : terms
+            ? `Here is invoice <strong>${esc(o.invoiceNumber)}</strong>${trip}. It is payable in parts (${esc(terms.summary.toLowerCase())}): the <strong>${esc(terms.label.toLowerCase())}</strong> of <strong>${esc(money(terms.amount, o.currency))}</strong> is due${dueBy}.`
+            : `Here is invoice <strong>${esc(o.invoiceNumber)}</strong>${trip}, with <strong>${esc(money(o.balance, o.currency))}</strong> still outstanding.`}
       </p>
       ${detailTable([
         ['Invoice', o.invoiceNumber],
@@ -56,6 +66,7 @@ function invoiceHtml(o: {
         ['Issued', fmtDate(o.issuedAt)],
         ['Invoice total', money(o.total, o.currency)],
         ['Paid to date', money(o.amountPaid, o.currency)],
+        ...(terms ? [[`${terms.label} due${terms.dueDate ? ` ${fmtDate(terms.dueDate)}` : ''}`, money(terms.amount, o.currency)] as [string, string]] : []),
       ], ['Balance due', money(o.balance, o.currency)])}
       ${ctaButton(o.invoiceUrl, settled ? 'View your invoice' : 'View & pay your invoice')}
       ${finePrint(`This invoice covers your single trip with Visit Drakensberg. All accommodation,
@@ -105,6 +116,12 @@ export async function POST(req: Request) {
   // query string for a mail client or chat app to truncate away.
   const invoiceUrl = `${origin}/invoices/${invoice.id}`
 
+  const schedule = parseSchedule(invoice.payment_schedule)
+  const next = amountDueNow(schedule, Number(invoice.total), Number(invoice.amount_paid))
+  const terms = schedule && next.label
+    ? { summary: scheduleSummary(schedule), label: next.label, amount: next.amount, dueDate: next.dueDate }
+    : null
+
   const { sent, error } = await sendMail({
     to: email,
     subject: `Invoice ${invoice.invoice_number} from Visit Drakensberg`,
@@ -120,6 +137,7 @@ export async function POST(req: Request) {
       issuedAt: invoice.issued_at,
       invoiceUrl,
       origin,
+      terms,
     }),
   })
 
