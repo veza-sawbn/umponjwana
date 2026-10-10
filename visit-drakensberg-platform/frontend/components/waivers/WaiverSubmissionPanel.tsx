@@ -6,14 +6,20 @@
  * Renders the template snapshot stored at signing time rather than the live
  * template, so editing a form later never changes what a past participant is
  * shown to have agreed to.
+ *
+ * Printing while the panel is open prints WaiverPrintDocument on its own,
+ * not the dashboard behind the panel: see the `printing-waiver` rules in
+ * globals.css.
  */
 
 import { useEffect, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { X, FileSignature, Printer } from 'lucide-react'
 import {
-  getWaiverSubmission, WAIVER_FIELD_LABELS,
+  getWaiverSubmission, getWaiverOperatorName, WAIVER_FIELD_LABELS,
   type WaiverRequestDetails, type WaiverSubmission,
 } from '@/lib/waivers'
+import WaiverPrintDocument from './WaiverPrintDocument'
 
 function fmtDateTime(d: string | null) {
   if (!d) return '—'
@@ -30,10 +36,19 @@ export default function WaiverSubmissionPanel({
 }) {
   const [submission, setSubmission] = useState<WaiverSubmission | null>(null)
   const [loading, setLoading] = useState(true)
+  const [operatorName, setOperatorName] = useState<string | null>(null)
 
   useEffect(() => {
     getWaiverSubmission(request.id).then(s => { setSubmission(s); setLoading(false) })
-  }, [request.id])
+    getWaiverOperatorName(request.supplier_id).then(setOperatorName)
+  }, [request.id, request.supplier_id])
+
+  // While the panel is open, any print (button or browser menu) prints the
+  // waiver alone.
+  useEffect(() => {
+    document.body.classList.add('printing-waiver')
+    return () => document.body.classList.remove('printing-waiver')
+  }, [])
 
   const snap = submission?.template_snapshot
 
@@ -53,8 +68,9 @@ export default function WaiverSubmissionPanel({
           <div className="flex items-center gap-2 shrink-0">
             <button
               onClick={() => window.print()}
-              className="p-2 text-black/30 hover:text-black/70 transition-colors"
-              title="Print"
+              disabled={!submission}
+              className="p-2 text-black/30 hover:text-black/70 disabled:opacity-40 transition-colors"
+              title="Print or save as PDF"
             >
               <Printer size={16} />
             </button>
@@ -160,6 +176,10 @@ export default function WaiverSubmissionPanel({
           </div>
         )}
       </div>
+      {submission && createPortal(
+        <WaiverPrintDocument request={request} submission={submission} operatorName={operatorName} />,
+        document.body,
+      )}
     </div>
   )
 }

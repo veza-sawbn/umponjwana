@@ -26,6 +26,17 @@ const label = 'block font-sans text-[10px] tracking-[0.12em] uppercase text-blac
 
 type SharedLink = { token: string; activityName: string }
 
+/** A data: URL decoded to a PNG Blob, synchronously, so a share sheet opened
+ *  straight afterwards still counts as part of the user's tap. */
+function dataUrlToBlob(dataUrl: string): Blob {
+  const [meta, b64] = dataUrl.split(',')
+  const mime = /data:([^;]+)/.exec(meta)?.[1] ?? 'image/png'
+  const bin = atob(b64)
+  const bytes = new Uint8Array(bin.length)
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i)
+  return new Blob([bytes], { type: mime })
+}
+
 function ShareView({ link }: { link: SharedLink }) {
   const url = waiverUrl(link.token)
   const [qr, setQr] = useState<string | null>(null)
@@ -48,6 +59,40 @@ function ShareView({ link }: { link: SharedLink }) {
     } catch {
       toast.error('Could not copy the link.')
     }
+  }
+
+  /**
+   * An <a download> pointing at a data: URL doesn't save on iOS Safari: it
+   * asks, then opens the data: URL as a page. So the PNG is built as a real
+   * file. On a touch device it goes to the share sheet ("Save Image" puts it
+   * in Photos); everywhere else, or if sharing files isn't supported, it
+   * downloads through an object URL.
+   */
+  async function saveQr() {
+    if (!qr) return
+    const filename = `waiver-${link.activityName.replace(/[^a-z0-9]+/gi, '-').toLowerCase().replace(/^-+|-+$/g, '') || 'link'}.png`
+    const blob = dataUrlToBlob(qr)
+    const file = new File([blob], filename, { type: 'image/png' })
+
+    const touch = typeof window !== 'undefined' && window.matchMedia?.('(pointer: coarse)').matches
+    if (touch && typeof navigator.canShare === 'function' && navigator.canShare({ files: [file] })) {
+      try {
+        await navigator.share({ files: [file], title: `Waiver QR code — ${link.activityName}` })
+        return
+      } catch (e) {
+        // Dismissing the sheet is a choice, not a failure.
+        if (e instanceof DOMException && e.name === 'AbortError') return
+      }
+    }
+
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = filename
+    document.body.appendChild(a)
+    a.click()
+    a.remove()
+    setTimeout(() => URL.revokeObjectURL(url), 30_000)
   }
 
   async function share() {
@@ -94,13 +139,13 @@ function ShareView({ link }: { link: SharedLink }) {
           Participants can scan this to sign — handy at the meeting point.
         </p>
         {qr && (
-          <a
-            href={qr}
-            download={`waiver-${link.activityName.replace(/[^a-z0-9]+/gi, '-').toLowerCase() || 'link'}.png`}
+          <button
+            type="button"
+            onClick={saveQr}
             className="mt-2 inline-flex items-center gap-1 font-sans text-xs text-[#2d6a4f] hover:underline"
           >
             <Download size={12} /> Download QR code
-          </a>
+          </button>
         )}
       </div>
 
