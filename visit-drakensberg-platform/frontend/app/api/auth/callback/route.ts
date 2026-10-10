@@ -24,6 +24,8 @@ export const dynamic = 'force-dynamic'
  * URL PATTERNS
  *   Password reset:  ?code=xxx  → /auth/reset-password  (or ?next= override)
  *   Invite accept:   ?code=xxx  → /auth/reset-password  (set password on invite)
+ *   Email confirm:   ?code=xxx&flow=signup&next=/account  → next, or
+ *                    /auth/login?confirmed=1 if the exchange fails
  *
  * The redirectTo passed to Supabase's resetPasswordForEmail / inviteUserByEmail
  * should point here:  https://site.com/api/auth/callback
@@ -37,6 +39,8 @@ export async function GET(request: Request) {
   // set the session cookie and then forward the user off-site from our own
   // domain at the end of a flow they trust. See lib/safe-redirect.ts.
   const next = safeRedirectPath(url.searchParams.get('next'))
+  // flow=signup: the email-confirmation link (see confirmationRedirect in lib/auth).
+  const flow = url.searchParams.get('flow')
 
   if (code) {
     const supabase = createRouteHandlerClient({ cookies })
@@ -50,6 +54,12 @@ export async function GET(request: Request) {
 
     // Exchange failed (expired code, already used, etc.)
     console.error('[auth/callback] exchangeCodeForSession error:', error)
+    // A signup confirmation is already recorded by GoTrue's /verify before it
+    // redirects here; a failed exchange (link opened in a different browser
+    // from the one that signed up, so no PKCE verifier) only means no session.
+    if (flow === 'signup') {
+      return NextResponse.redirect(new URL('/auth/login?confirmed=1', request.url))
+    }
     return NextResponse.redirect(
       new URL(`/auth/reset-password?error=link_expired`, request.url),
     )

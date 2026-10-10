@@ -36,10 +36,43 @@ export async function signUp(
   const { data, error } = await supabase.auth.signUp({
     email,
     password,
-    options: { data: { full_name: fullName, role }, ...captchaOptions(captchaToken) },
+    options: {
+      data: { full_name: fullName, role },
+      emailRedirectTo: confirmationRedirect(role === 'supplier' ? '/supplier' : '/account'),
+      ...captchaOptions(captchaToken),
+    },
   })
   if (error) throw error
   return data
+}
+
+// Where the "Confirm your email" link lands. Without this GoTrue falls back
+// to the project's Site URL, so a wrong Site URL in the Supabase dashboard
+// sent every new account to a dead page after confirming. /api/auth/callback
+// exchanges the code and forwards to `next`; flow=signup tells it the email
+// is already confirmed even if the exchange fails (other device / browser),
+// so it sends the person to sign in rather than to the password-reset page.
+// The origin must be listed under Authentication → URL Configuration →
+// Redirect URLs, or GoTrue ignores it and uses the Site URL anyway.
+export function confirmationRedirect(next: string): string {
+  const params = new URLSearchParams({ next, flow: 'signup' })
+  return `${window.location.origin}/api/auth/callback?${params}`
+}
+
+// Sign-in refuses an unconfirmed account with this; the UI offers a resend.
+export function isEmailNotConfirmed(err: unknown): boolean {
+  if (!err || typeof err !== 'object') return false
+  const { code, message } = err as { code?: string; message?: string }
+  return code === 'email_not_confirmed' || /email not confirmed/i.test(message ?? '')
+}
+
+export async function resendConfirmation(email: string, next: string, captchaToken?: string) {
+  const { error } = await supabase.auth.resend({
+    type: 'signup',
+    email,
+    options: { emailRedirectTo: confirmationRedirect(next), ...captchaOptions(captchaToken) },
+  })
+  if (error) throw error
 }
 
 export async function signOut() {

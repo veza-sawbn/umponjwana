@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { signUp, supabase } from '@/lib/auth'
+import { signUp, resendConfirmation, supabase } from '@/lib/auth'
 import { trackEvent, AnalyticsEvent } from '@/lib/analytics'
 import Turnstile, {
   captchaBlocked,
@@ -30,6 +30,10 @@ export default function RegisterPage() {
   const [authError, setAuthError] = useState<string | null>(null)
   const [captchaToken, setCaptchaToken] = useState('')
   const turnstile = useRef<TurnstileHandle>(null)
+  // Set once signup succeeds without a session: email confirmation is on, so
+  // the account can't be used until the link in the email is clicked.
+  const [pending, setPending] = useState<{ email: string; next: string } | null>(null)
+  const [resendState, setResendState] = useState<'idle' | 'sending' | 'sent'>('idle')
   const { register, handleSubmit, watch, formState: { errors, isSubmitting } } = useForm<Form>({
     resolver: zodResolver(schema),
     defaultValues: { role: 'visitor', marketingConsent: false },
@@ -40,7 +44,7 @@ export default function RegisterPage() {
   const onSubmit = async (data: Form) => {
     setAuthError(null)
     try {
-      await signUp(data.email, data.password, data.fullName, data.role, captchaToken)
+      const result = await signUp(data.email, data.password, data.fullName, data.role, captchaToken)
       // Consent + funnel tracking never block account creation on failure —
       // both are awaited (not fire-and-forget) purely so the hard navigation
       // right after doesn't tear the page down mid-request and silently
@@ -54,13 +58,37 @@ export default function RegisterPage() {
         if (error) console.error('[register] consent record failed:', error)
       }
       await trackEvent(AnalyticsEvent.ACCOUNT_CREATED, { role: data.role })
+      const next = data.role === 'supplier' ? '/supplier' : '/account'
+      if (!result.session) {
+        // No session means the project requires email confirmation. Sending
+        // the person to /account here only bounced them to sign-in, where
+        // they were met with a bare "Email not confirmed" and no way forward.
+        turnstile.current?.reset()
+        setPending({ email: data.email, next })
+        return
+      }
       // Hard navigation so middleware sees the fresh session cookie.
-      window.location.assign(data.role === 'supplier' ? '/supplier' : '/account')
+      window.location.assign(next)
     } catch (err: unknown) {
       setAuthError(err instanceof Error ? err.message : 'Registration failed')
       // Single-use token, already spent. "That email is already registered" is
       // the common landing here, and the retry after it must not fail for a
       // second, unrelated reason.
+      turnstile.current?.reset()
+    }
+  }
+
+  const onResend = async () => {
+    if (!pending) return
+    setAuthError(null)
+    setResendState('sending')
+    try {
+      await resendConfirmation(pending.email, pending.next, captchaToken)
+      setResendState('sent')
+    } catch (err: unknown) {
+      setAuthError(err instanceof Error ? err.message : 'Could not resend the email')
+      setResendState('idle')
+    } finally {
       turnstile.current?.reset()
     }
   }
@@ -85,6 +113,46 @@ export default function RegisterPage() {
           <Link href="/" className="lg:hidden font-display italic text-xl text-forest block mb-10">
             Visit Drakensberg
           </Link>
+          {pending ? (
+            <>
+              <p className="font-sans text-xs tracking-[0.2em] uppercase text-forest/40 mb-2">Almost there</p>
+              <h1 className="font-display text-4xl text-forest mb-6">Check your email</h1>
+              <p className="font-sans text-sm text-forest/70 leading-relaxed mb-6">
+                We&apos;ve sent a confirmation link to <span className="text-forest font-medium break-all">{pending.email}</span>.
+                Open it to activate your account. It can take a minute or two — check your spam or promotions folder if you don&apos;t see it.
+              </p>
+
+              {authError && (
+                <div className="mb-6 px-4 py-3 bg-red-50 border border-red-200 font-sans text-sm text-red-700">
+                  {authError}
+                </div>
+              )}
+              {resendState === 'sent' && (
+                <div className="mb-6 px-4 py-3 bg-green-50 border border-green-200 font-sans text-sm text-green-800">
+                  Sent again. Use the newest email — earlier links stop working.
+                </div>
+              )}
+
+              <Turnstile
+                ref={turnstile}
+                action="resend"
+                onToken={setCaptchaToken}
+                onError={code => setAuthError(turnstileErrorMessage(code))}
+                className="flex justify-center mb-4"
+              />
+              <button type="button" onClick={onResend}
+                disabled={resendState === 'sending' || captchaBlocked(captchaToken)}
+                className="w-full border border-forest text-forest py-3.5 font-sans text-sm hover:bg-forest hover:text-white transition-colors disabled:opacity-50">
+                {resendState === 'sending' ? 'Sending…' : 'Resend confirmation email'}
+              </button>
+
+              <p className="font-sans text-sm text-forest/50 text-center mt-8">
+                Already confirmed?{' '}
+                <Link href="/auth/login" className="text-forest hover:text-gold transition-colors font-medium">Sign in</Link>
+              </p>
+            </>
+          ) : (
+          <>
           <p className="font-sans text-xs tracking-[0.2em] uppercase text-forest/40 mb-2">Get started</p>
           <h1 className="font-display text-4xl text-forest mb-8">Create account</h1>
 
@@ -163,6 +231,8 @@ export default function RegisterPage() {
             Already have an account?{' '}
             <Link href="/auth/login" className="text-forest hover:text-gold transition-colors font-medium">Sign in</Link>
           </p>
+          </>
+          )}
         </div>
       </div>
     </div>

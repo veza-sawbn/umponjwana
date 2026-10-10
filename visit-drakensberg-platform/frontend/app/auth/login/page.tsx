@@ -1,12 +1,12 @@
 'use client'
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import AuthPhoto from '@/components/auth/AuthPhoto'
 import { useRouter } from 'next/navigation'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { signIn, supabase } from '@/lib/auth'
+import { signIn, isEmailNotConfirmed, resendConfirmation, supabase } from '@/lib/auth'
 import { trackEvent, AnalyticsEvent } from '@/lib/analytics'
 import { safeRedirectPath } from '@/lib/safe-redirect'
 import Turnstile, {
@@ -26,12 +26,38 @@ export default function LoginPage() {
   const [authError, setAuthError] = useState<string | null>(null)
   const [captchaToken, setCaptchaToken] = useState('')
   const turnstile = useRef<TurnstileHandle>(null)
+  // The address sign-in was refused for as unconfirmed — offers a resend.
+  const [unconfirmedEmail, setUnconfirmedEmail] = useState<string | null>(null)
+  const [resendState, setResendState] = useState<'idle' | 'sending' | 'sent'>('idle')
+  // ?confirmed=1 — /api/auth/callback after a confirmation link that couldn't
+  // also sign the person in (opened in a different browser).
+  const [justConfirmed, setJustConfirmed] = useState(false)
+  useEffect(() => {
+    setJustConfirmed(new URLSearchParams(window.location.search).get('confirmed') === '1')
+  }, [])
   const { register, handleSubmit, formState: { errors, isSubmitting } } = useForm<Form>({
     resolver: zodResolver(schema),
   })
 
+  const onResend = async () => {
+    if (!unconfirmedEmail) return
+    setAuthError(null)
+    setResendState('sending')
+    try {
+      await resendConfirmation(unconfirmedEmail, '/account', captchaToken)
+      setResendState('sent')
+    } catch (err: unknown) {
+      setAuthError(err instanceof Error ? err.message : 'Could not resend the email')
+      setResendState('idle')
+    } finally {
+      turnstile.current?.reset()
+    }
+  }
+
   const onSubmit = async (data: Form) => {
     setAuthError(null)
+    setUnconfirmedEmail(null)
+    setResendState('idle')
     try {
       const result = await signIn(data.email, data.password, captchaToken)
       let role = result?.user?.app_metadata?.role ?? result?.user?.user_metadata?.role
@@ -77,7 +103,12 @@ export default function LoginPage() {
       // cookie and bypasses any prefetched redirect cached by the router.
       window.location.assign(targetPath)
     } catch (err: unknown) {
-      setAuthError(err instanceof Error ? err.message : 'Sign in failed')
+      if (isEmailNotConfirmed(err)) {
+        setUnconfirmedEmail(data.email)
+        setAuthError('Please confirm your email address first. We sent you a link when you created your account.')
+      } else {
+        setAuthError(err instanceof Error ? err.message : 'Sign in failed')
+      }
       // The token was spent on the attempt that just failed — a second submit
       // with the same one is refused by Supabase for a reason that has nothing
       // to do with the password, so hand the visitor a fresh challenge.
@@ -108,9 +139,28 @@ export default function LoginPage() {
           <p className="font-sans text-xs tracking-[0.2em] uppercase text-forest/40 mb-2">Welcome back</p>
           <h1 className="font-display text-4xl text-forest mb-8">Sign in</h1>
 
+          {justConfirmed && !authError && (
+            <div className="mb-6 px-4 py-3 bg-green-50 border border-green-200 font-sans text-sm text-green-800">
+              Your email is confirmed. Sign in to continue.
+            </div>
+          )}
+
           {authError && (
             <div className="mb-6 px-4 py-3 bg-red-50 border border-red-200 font-sans text-sm text-red-700">
               {authError}
+              {unconfirmedEmail && resendState !== 'sent' && (
+                <button type="button" onClick={onResend}
+                  disabled={resendState === 'sending' || captchaBlocked(captchaToken)}
+                  className="block mt-2 underline font-medium disabled:opacity-50">
+                  {resendState === 'sending' ? 'Sending…' : `Resend the link to ${unconfirmedEmail}`}
+                </button>
+              )}
+            </div>
+          )}
+
+          {resendState === 'sent' && (
+            <div className="mb-6 px-4 py-3 bg-green-50 border border-green-200 font-sans text-sm text-green-800">
+              Sent. Check your inbox (and spam folder) for the newest email and open the link in it.
             </div>
           )}
 
