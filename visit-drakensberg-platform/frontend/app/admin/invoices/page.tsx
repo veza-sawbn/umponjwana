@@ -6,9 +6,14 @@ import toast from 'react-hot-toast'
 import { Search, RefreshCw, Plus, Printer, Trash2, X, FileText, Send, Pencil, Wallet, Save, Link2, Check, Eye, EyeOff, ShieldOff, RotateCw, KeyRound, Ban, RotateCcw } from 'lucide-react'
 import {
   getInvoices, getFinanceSettings, sendInvoice, invoiceShareUrl, invoiceViewedLabel,
-  revokeInvoiceLink, reissueInvoiceLink, voidInvoice, reissueInvoice,
+  revokeInvoiceLink, reissueInvoiceLink, voidInvoice, reissueInvoice, setInvoicePaymentSchedule,
   type Invoice, type InvoiceWithOrder,
 } from '@/lib/invoices'
+import {
+  amountDueNow, draftFromSchedule, parseSchedule, scheduleFromDraft, scheduleSummary, validateSchedule,
+  type ScheduleDraft,
+} from '@/lib/payment-schedule'
+import PaymentScheduleEditor from '@/components/admin/PaymentScheduleEditor'
 import { createOrder, updateOrder, getOrderLines, type OrderLineInput, type OrderLine } from '@/lib/orders'
 import {
   getInvoiceDrafts, saveInvoiceDraft, deleteInvoiceDraft,
@@ -261,6 +266,19 @@ function ViewedBadge({ invoice, className = '' }: { invoice: Invoice; className?
   )
 }
 
+/** Under the status badge: what the customer owes next on a deposit or split invoice. */
+function ScheduleNote({ invoice, className = '' }: { invoice: Invoice; className?: string }) {
+  const schedule = parseSchedule(invoice.payment_schedule)
+  if (!schedule || invoice.status === 'void' || Number(invoice.balance) <= 0) return null
+  const next = amountDueNow(schedule, Number(invoice.total), Number(invoice.amount_paid))
+  if (!next.label) return null
+  return (
+    <p className={`font-sans text-[11px] text-gray-500 whitespace-nowrap ${className}`} title={scheduleSummary(schedule)}>
+      {next.label}: {formatMoney(next.amount, invoice.currency)}{next.dueDate ? ` by ${fmt(next.dueDate)}` : ''}
+    </p>
+  )
+}
+
 /** Create / edit / draft form. `editing` switches it to updating an issued invoice. */
 function InvoiceModal({ customers, suppliers, draft, editing, onClose, onDone }: {
   customers: Person[]
@@ -297,6 +315,8 @@ function InvoiceModal({ customers, suppliers, draft, editing, onClose, onDone }:
   const [rates, setRates] = useState({ serviceFeeRate: 0.12, vatRate: 0.15, currency: 'ZAR' })
   const [feeOverride, setFeeOverride] = useState(draft?.fee_override ?? '')
   const [taxOverride, setTaxOverride] = useState(draft?.tax_override ?? '')
+  const [scheduleDraft, setScheduleDraft] = useState<ScheduleDraft>(
+    () => draftFromSchedule(draft ? draft.payment_schedule : editing?.invoice.payment_schedule))
   const [busy, setBusy] = useState('')
 
   useEffect(() => { getFinanceSettings().then(setRates) }, [])
@@ -305,6 +325,7 @@ function InvoiceModal({ customers, suppliers, draft, editing, onClose, onDone }:
   const serviceFee = feeOverride !== '' ? (parseFloat(feeOverride) || 0) : Math.round(subtotal * rates.serviceFeeRate)
   const tax = taxOverride !== '' ? (parseFloat(taxOverride) || 0) : Math.round((subtotal + serviceFee) * rates.vatRate)
   const total = subtotal + serviceFee + tax
+  const schedule = scheduleFromDraft(scheduleDraft, total)
 
   function setLine(i: number, patch: Partial<DraftLine>) {
     setLines(ls => ls.map((l, idx) => idx === i ? { ...l, ...patch } : l))
@@ -352,6 +373,7 @@ function InvoiceModal({ customers, suppliers, draft, editing, onClose, onDone }:
         fee_override: feeOverride,
         tax_override: taxOverride,
         notes: '',
+        payment_schedule: schedule,
       }, draft?.id)
       toast.success('Draft saved.')
       onDone(); onClose()
@@ -372,6 +394,8 @@ function InvoiceModal({ customers, suppliers, draft, editing, onClose, onDone }:
       }
     }
     if (validLines.length === 0) { toast.error('Add at least one line with a title and price.'); return }
+    const scheduleError = validateSchedule(schedule, total)
+    if (scheduleError) { toast.error(scheduleError); return }
 
     setBusy('submit')
     try {
@@ -400,6 +424,15 @@ function InvoiceModal({ customers, suppliers, draft, editing, onClose, onDone }:
           orderLines,
           { invoiceLines },
         )
+        // Only touch the terms when there are, or were, any — so a plain
+        // invoice still saves on a database without the schedules migration.
+        if (schedule || editing.invoice.payment_schedule) {
+          try { await setInvoicePaymentSchedule(editing.invoice.id, schedule) }
+          catch (e) {
+            toast.error(`Invoice ${res.invoiceNumber} updated, but its payment terms were not: ${e instanceof Error ? e.message : 'unknown error'}`, { duration: 8000 })
+            onDone(); onClose(); return
+          }
+        }
         toast.success(`Invoice ${res.invoiceNumber} updated.`)
       } else {
         const res = await createOrder(
@@ -418,6 +451,15 @@ function InvoiceModal({ customers, suppliers, draft, editing, onClose, onDone }:
           orderLines,
           { invoiceLines, userId: isGuest ? undefined : customer!.id },
         )
+        if (schedule) {
+          try { await setInvoicePaymentSchedule(res.invoiceId, schedule) }
+          catch (e) {
+            // The invoice exists either way; say so, and how to finish the job.
+            toast.error(`Invoice ${res.invoiceNumber} created, but its payment terms were not saved (${e instanceof Error ? e.message : 'unknown error'}). Set them from Payments.`, { duration: 10000 })
+            if (draft) await deleteInvoiceDraft(draft.id).catch(() => {})
+            onDone(); onClose(); return
+          }
+        }
         toast.success(`Invoice ${res.invoiceNumber} created.`)
         if (draft) await deleteInvoiceDraft(draft.id).catch(() => {})
       }
@@ -552,6 +594,10 @@ function InvoiceModal({ customers, suppliers, draft, editing, onClose, onDone }:
             Leave fee/VAT blank to use the configured rates. Any value entered, including 0, is applied exactly.
           </p>
         </div>
+
+        <div className="mt-4">
+          <PaymentScheduleEditor value={scheduleDraft} onChange={setScheduleDraft} total={total} currency={rates.currency} />
+        </div>
         </div>
 
         <div
@@ -561,6 +607,9 @@ function InvoiceModal({ customers, suppliers, draft, editing, onClose, onDone }:
           <div className="sm:text-right">
             <p className="font-sans text-xs text-gray-500">Subtotal {formatMoney(subtotal)} · Fee {formatMoney(serviceFee)} · VAT {formatMoney(tax)}</p>
             <p className="font-display italic text-xl sm:text-2xl text-[#2d6a4f]">Total {formatMoney(total)}</p>
+            {schedule && !validateSchedule(schedule, total) && (
+              <p className="font-sans text-xs text-gray-500">{scheduleSummary(schedule)} · first payment {formatMoney(amountDueNow(schedule, total, 0).amount)}</p>
+            )}
           </div>
           <div className="flex gap-2">
             {!editing && (
@@ -593,6 +642,9 @@ function PaymentsModal({ invoice, onClose, onDone }: {
   const [method, setMethod] = useState<string>('eft')
   const [reference, setReference] = useState('')
   const [busy, setBusy] = useState(false)
+  const [scheduleDraft, setScheduleDraft] = useState<ScheduleDraft>(() => draftFromSchedule(invoice.payment_schedule))
+  const [savedSchedule, setSavedSchedule] = useState(() => parseSchedule(invoice.payment_schedule))
+  const [savingTerms, setSavingTerms] = useState(false)
 
   async function load() {
     setLoading(true)
@@ -604,6 +656,24 @@ function PaymentsModal({ invoice, onClose, onDone }: {
   const paid = payments.filter(p => p.direction === 'in').reduce((s, p) => s + Number(p.amount), 0)
   const refunded = payments.filter(p => p.direction === 'out').reduce((s, p) => s + Number(p.amount), 0)
   const outstanding = Number(invoice.total) - paid + refunded
+  const total = Number(invoice.total)
+  const editedSchedule = scheduleFromDraft(scheduleDraft, total)
+  const termsChanged = JSON.stringify(editedSchedule) !== JSON.stringify(savedSchedule)
+  const dueNow = amountDueNow(savedSchedule, total, paid - refunded)
+
+  async function saveTerms() {
+    const problem = validateSchedule(editedSchedule, total)
+    if (problem) { toast.error(problem); return }
+    setSavingTerms(true)
+    try {
+      await setInvoicePaymentSchedule(invoice.id, editedSchedule)
+      setSavedSchedule(editedSchedule)
+      toast.success(editedSchedule ? 'Payment terms saved. The customer\'s invoice now shows them.' : 'Back to pay in full.')
+      onDone()
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Could not save the payment terms')
+    } finally { setSavingTerms(false) }
+  }
 
   async function submit() {
     const value = parseFloat(amount)
@@ -649,8 +719,44 @@ function PaymentsModal({ invoice, onClose, onDone }: {
           ))}
         </div>
 
+        {invoice.status !== 'void' && (
+          <div className="mb-6">
+            <PaymentScheduleEditor
+              value={scheduleDraft}
+              onChange={setScheduleDraft}
+              total={total}
+              currency={invoice.currency}
+              amountPaid={paid - refunded}
+            />
+            {termsChanged && (
+              <div className="flex gap-2 mt-2">
+                <button onClick={saveTerms} disabled={savingTerms}
+                  className={`px-5 py-2.5 font-sans text-sm transition-colors ${savingTerms ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : 'bg-[#2d6a4f] text-white hover:bg-[#245741]'}`}>
+                  {savingTerms ? 'Saving…' : 'Save payment terms'}
+                </button>
+                <button onClick={() => setScheduleDraft(draftFromSchedule(savedSchedule))} disabled={savingTerms}
+                  className="px-5 py-2.5 border border-gray-200 font-sans text-sm text-gray-500">
+                  Discard
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+
         <div className="border border-gray-200 p-3 sm:p-4 mb-6">
           <p className="font-sans text-[10px] tracking-[0.12em] uppercase text-gray-400 mb-3">Record payment / refund / credit</p>
+          {savedSchedule && dueNow.label && dueNow.amount > 0 && (
+            <button
+              onClick={() => {
+                setAmount(String(dueNow.amount))
+                if (savedSchedule.kind === 'deposit' && dueNow.label === savedSchedule.instalments[0].label && paid - refunded <= 0) setType('deposit')
+                else setType(dueNow.amount >= outstanding ? 'payment' : 'installment')
+              }}
+              className="mb-3 inline-flex items-center gap-1.5 font-sans text-xs text-[#2d6a4f] hover:underline"
+            >
+              Fill in next due: {dueNow.label} · {formatMoney(dueNow.amount, invoice.currency)}
+            </button>
+          )}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-2 sm:gap-3">
             <input value={amount} onChange={e => setAmount(e.target.value)} placeholder="Amount" inputMode="decimal"
               className="border border-gray-200 px-3 py-2.5 md:py-2 font-sans text-base sm:text-sm text-right focus:outline-none" />
@@ -1033,7 +1139,10 @@ export default function AdminInvoicesPage() {
                   <p className="font-mono text-xs text-gray-400 mt-1">{i.invoice_number} · Issued {fmt(i.issued_at)}</p>
                   <ViewedBadge invoice={i} className="mt-1" />
                 </div>
-                <span className={`font-sans text-[10px] tracking-[0.1em] uppercase px-2.5 py-1 shrink-0 ${STATUS_BADGE[i.status] ?? STATUS_BADGE.unpaid}`}>{i.status}</span>
+                <div className="shrink-0 text-right">
+                  <span className={`font-sans text-[10px] tracking-[0.1em] uppercase px-2.5 py-1 ${STATUS_BADGE[i.status] ?? STATUS_BADGE.unpaid}`}>{i.status}</span>
+                  <ScheduleNote invoice={i} className="mt-1.5" />
+                </div>
               </div>
 
               <div className="flex items-end justify-between gap-3 mt-3">
@@ -1119,6 +1228,7 @@ export default function AdminInvoicesPage() {
                   <td className="px-5 py-4 font-sans text-sm text-gray-600">{formatMoney(Number(i.balance), i.currency)}</td>
                   <td className="px-5 py-4">
                     <span className={`font-sans text-[10px] tracking-[0.1em] uppercase px-2.5 py-1 ${STATUS_BADGE[i.status] ?? STATUS_BADGE.unpaid}`}>{i.status}</span>
+                    <ScheduleNote invoice={i} className="mt-1.5" />
                   </td>
                   <td className="px-5 py-4 whitespace-nowrap"><ViewedBadge invoice={i} /></td>
                   <td className="px-5 py-4">

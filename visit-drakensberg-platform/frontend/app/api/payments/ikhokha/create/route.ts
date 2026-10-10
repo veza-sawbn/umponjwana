@@ -6,6 +6,7 @@ import { createPaymentLink, isIkhokhaConfigured } from '@/lib/ikhokha'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 import { maxTip, tippableTotal } from '@/lib/tips'
 import type { InvoiceLine } from '@/lib/invoices'
+import { amountDueNow, parseSchedule } from '@/lib/payment-schedule'
 import { rateLimit, rateLimitHeaders, callerKey } from '@/lib/rate-limit'
 
 export const dynamic = 'force-dynamic'
@@ -34,7 +35,9 @@ function isMissingTipColumn(error: { code?: string; message?: string } | null): 
 // returned paylinkUrl; the actual "mark as paid" happens later, in the
 // webhook route, once iKhokha confirms the payment really went through.
 export async function POST(req: Request) {
-  let body: { invoiceId?: string; bookingId?: string; tip?: unknown; shareToken?: unknown }
+  // `pay`: 'instalment' charges the deposit / split instalment due now on an
+  // invoice with payment terms; anything else (or no terms) the full balance.
+  let body: { invoiceId?: string; bookingId?: string; tip?: unknown; shareToken?: unknown; pay?: unknown }
   try {
     body = await req.json()
   } catch {
@@ -77,6 +80,7 @@ export async function POST(req: Request) {
     id: string; order_id: string; invoice_number: string; balance: unknown
     currency: string; status: string; lines: InvoiceLine[] | null
     user_id: string | null; share_revoked_at?: string | null
+    total?: unknown; amount_paid?: unknown; payment_schedule?: unknown
   } | null = null
   if (!user && linkRef) {
     const { data } = await supabaseAdmin().rpc('vd_invoice_payable', { p_ref: linkRef })
@@ -133,7 +137,21 @@ export async function POST(req: Request) {
     }
   }
 
-  const chargeAmount = Math.round((balance + tip) * 100) / 100
+  // The instalment is worked out here from the stored terms, never taken from
+  // the page. Without terms, or once only the last instalment is left, it is
+  // simply the balance.
+  let base = balance
+  let instalmentLabel: string | null = null
+  if (body.pay === 'instalment') {
+    const schedule = parseSchedule(invoice.payment_schedule)
+    const due = amountDueNow(schedule, Number(invoice.total ?? balance), Number(invoice.amount_paid ?? 0))
+    if (due.label && due.amount > 0 && due.amount < balance) {
+      base = due.amount
+      instalmentLabel = due.label
+    }
+  }
+
+  const chargeAmount = Math.round((base + tip) * 100) / 100
 
   const origin = process.env.NEXT_PUBLIC_SITE_URL || new URL(req.url).origin
   const externalTransactionID = `${invoice.id}-${Date.now()}`
@@ -157,9 +175,7 @@ export async function POST(req: Request) {
     link = await createPaymentLink({
       amount: chargeAmount,
       currency: invoice.currency,
-      description: tip > 0
-        ? `Invoice ${invoice.invoice_number} + gratuity, Visit Drakensberg`
-        : `Invoice ${invoice.invoice_number}, Visit Drakensberg`,
+      description: `Invoice ${invoice.invoice_number}${instalmentLabel ? ` (${instalmentLabel})` : ''}${tip > 0 ? ' + gratuity' : ''}, Visit Drakensberg`,
       paymentReference: invoice.invoice_number,
       externalTransactionID,
       requesterUrl: origin,

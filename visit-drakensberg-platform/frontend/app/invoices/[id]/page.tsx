@@ -14,6 +14,7 @@ import { supabase } from '@/lib/auth'
 import { copyToClipboard } from '@/lib/clipboard'
 import { formatMoney } from '@/lib/allocation'
 import { DEFAULT_TIP_PRESETS, maxTip, tipForPercent, tippableTotal } from '@/lib/tips'
+import { amountDueNow, parseSchedule, resolveSchedule } from '@/lib/payment-schedule'
 import Logo from '@/components/Logo'
 
 type BusinessDetails = typeof SITE_CONTENT_DEFAULTS.business_details
@@ -90,7 +91,7 @@ function PrintableInvoiceInner() {
   const [business, setBusiness] = useState<BusinessDetails>(SITE_CONTENT_DEFAULTS.business_details)
   const [loading, setLoading] = useState(true)
   const [signedIn, setSignedIn] = useState<boolean | null>(null)
-  const [paying, setPaying] = useState(false)
+  const [paying, setPaying] = useState<'instalment' | 'balance' | null>(null)
   const [payError, setPayError] = useState('')
   const [tipping, setTipping] = useState({ enabled: false, presets: DEFAULT_TIP_PRESETS })
   // null = no tip yet, a number = that percentage, 'custom' = the guest's own amount
@@ -169,10 +170,20 @@ function PrintableInvoiceInner() {
   const tipTooLarge = tip > tipCeiling
   const payable = !!invoice && Number(invoice.balance) > 0 && invoice.status !== 'void'
 
-  async function payNow() {
+  // Deposit / split terms set by staff. The customer is asked for the
+  // instalment due now, and can always settle the whole balance instead.
+  const schedule = useMemo(() => parseSchedule(invoice?.payment_schedule), [invoice])
+  const instalments = useMemo(
+    () => schedule && invoice ? resolveSchedule(schedule, Number(invoice.total), Number(invoice.amount_paid)) : [],
+    [schedule, invoice])
+  const dueNow = invoice ? amountDueNow(schedule, Number(invoice.total), Number(invoice.amount_paid)) : null
+  // Only a real choice when the instalment is less than everything owed.
+  const instalmentDue = !!dueNow?.label && dueNow.amount > 0 && dueNow.amount < Number(invoice?.balance ?? 0)
+
+  async function payNow(part: 'instalment' | 'balance' = 'balance') {
     if (!invoice) return
     if (tipTooLarge) return
-    setPaying(true)
+    setPaying(part)
     setPayError('')
     try {
       const res = await fetch('/api/payments/ikhokha/create', {
@@ -180,14 +191,14 @@ function PrintableInvoiceInner() {
         headers: { 'Content-Type': 'application/json' },
         // The token goes with it: a customer who opened the invoice from a
         // link has no session for the API to authorise them by.
-        body: JSON.stringify({ invoiceId: invoice.id, tip, shareToken: shareToken || undefined }),
+        body: JSON.stringify({ invoiceId: invoice.id, tip, shareToken: shareToken || undefined, pay: part }),
       })
       const json = await res.json()
       if (!res.ok || !json.paylinkUrl) throw new Error(json.error || 'Could not start payment')
       window.location.href = json.paylinkUrl
     } catch (e) {
       setPayError(e instanceof Error ? e.message : 'Could not start payment')
-      setPaying(false)
+      setPaying(null)
     }
   }
 
@@ -353,8 +364,11 @@ function PrintableInvoiceInner() {
               </p>
             ) : tip > 0 && (
               <p className="mt-3 font-sans text-sm text-gray-600">
-                Balance {formatMoney(Number(invoice.balance), invoice.currency)} + tip {formatMoney(tip, invoice.currency)} ={' '}
-                <span className="font-medium text-[#000000]">{formatMoney(Number(invoice.balance) + tip, invoice.currency)}</span>
+                {instalmentDue && dueNow
+                  ? <>{dueNow.label} {formatMoney(dueNow.amount, invoice.currency)} + tip {formatMoney(tip, invoice.currency)} ={' '}
+                      <span className="font-medium text-[#000000]">{formatMoney(dueNow.amount + tip, invoice.currency)}</span></>
+                  : <>Balance {formatMoney(Number(invoice.balance), invoice.currency)} + tip {formatMoney(tip, invoice.currency)} ={' '}
+                      <span className="font-medium text-[#000000]">{formatMoney(Number(invoice.balance) + tip, invoice.currency)}</span></>}
               </p>
             )}
             <p className="mt-2 font-sans text-[11px] text-gray-400">
@@ -376,13 +390,25 @@ function PrintableInvoiceInner() {
                 className="inline-flex items-center gap-2 border border-gray-200 bg-white text-gray-600 px-4 py-2.5 font-sans text-sm hover:border-[#2d6a4f] hover:text-[#2d6a4f] transition-colors"
               />
             )}
+            {payable && instalmentDue && dueNow && (
+              <button
+                onClick={() => payNow('balance')}
+                disabled={!!paying || tipTooLarge}
+                className="inline-flex items-center gap-2 border border-gray-200 bg-white text-gray-600 px-4 py-2.5 font-sans text-sm hover:border-[#2d6a4f] hover:text-[#2d6a4f] transition-colors disabled:opacity-60"
+              >
+                {paying === 'balance' ? 'Redirecting…' : `Pay full balance — ${formatMoney(Number(invoice.balance) + tip, invoice.currency)}`}
+              </button>
+            )}
             {payable && (
               <button
-                onClick={payNow}
-                disabled={paying || tipTooLarge}
+                onClick={() => payNow(instalmentDue ? 'instalment' : 'balance')}
+                disabled={!!paying || tipTooLarge}
                 className="inline-flex items-center gap-2 bg-[#C9A96E] text-[#2d2d2d] px-5 py-2.5 font-sans text-sm font-medium hover:bg-[#b8935e] transition-colors disabled:opacity-60"
               >
-                <CreditCard size={14} /> {paying ? 'Redirecting…' : `Pay Now — ${formatMoney(Number(invoice.balance) + tip, invoice.currency)}`}
+                <CreditCard size={14} /> {paying === (instalmentDue ? 'instalment' : 'balance') ? 'Redirecting…'
+                  : instalmentDue && dueNow
+                    ? `Pay ${dueNow.label} — ${formatMoney(dueNow.amount + tip, invoice.currency)}`
+                    : `Pay Now — ${formatMoney(Number(invoice.balance) + tip, invoice.currency)}`}
               </button>
             )}
             <a
@@ -488,6 +514,32 @@ function PrintableInvoiceInner() {
               <div className="flex justify-between font-medium text-base text-gray-800 border-t-2 border-gray-800 pt-2"><span>Balance Due</span><span>{formatMoney(Number(invoice.balance), invoice.currency)}</span></div>
             </div>
           </div>
+
+          {/* Payment schedule — deposit / split terms set when the invoice was raised. */}
+          {schedule && invoice.status !== 'void' && instalments.length > 0 && (
+            <div className="mt-10 print:mt-6 pt-6 print:pt-4 border-t border-gray-200 print:break-inside-avoid">
+              <p className="font-sans text-[10px] tracking-[0.14em] uppercase text-gray-400 mb-2">
+                {schedule.kind === 'deposit' ? 'Deposit & balance' : 'Payment schedule'}
+              </p>
+              <table className="w-full font-sans text-xs">
+                <tbody className="divide-y divide-gray-100">
+                  {instalments.map((inst, i) => (
+                    <tr key={i}>
+                      <td className="py-1.5 print:py-0.5 text-gray-700">{inst.label}</td>
+                      <td className="py-1.5 print:py-0.5 text-gray-500">{inst.dueDate ? `Due ${fmt(inst.dueDate)}` : 'Due on receipt'}</td>
+                      <td className="py-1.5 print:py-0.5 text-right text-gray-800 whitespace-nowrap">{formatMoney(inst.amount, invoice.currency)}</td>
+                      <td className={`py-1.5 print:py-0.5 pl-3 text-right whitespace-nowrap ${
+                        inst.status === 'paid' ? 'text-[#2d6a4f]' : inst.status === 'upcoming' ? 'text-gray-400' : 'text-[#8B6914]'}`}>
+                        {inst.status === 'paid' ? 'Paid'
+                          : inst.status === 'part-paid' ? `${formatMoney(inst.outstanding, invoice.currency)} to pay`
+                          : inst.status === 'due' ? 'Due now' : 'Upcoming'}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
 
           {/* Receipts */}
           {receipts.length > 0 && (
