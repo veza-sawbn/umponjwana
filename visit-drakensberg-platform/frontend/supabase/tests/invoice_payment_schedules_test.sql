@@ -67,6 +67,14 @@ begin
     'at least two', 'a one-payment split is refused');
   perform vdtest.raises(
     format('select vd_set_invoice_payment_schedule(%L, %L::jsonb)', v_invoice,
+      '{"kind":"split","instalments":[{"label":"A"},{"label":"B","amount":0}]}'),
+    'needs an amount', 'an earlier instalment with no amount is refused');
+  perform vdtest.raises(
+    format('select vd_set_invoice_payment_schedule(%L, %L::jsonb)', v_invoice,
+      '{"kind":"split","instalments":[{"label":"A","amount":"500"},{"label":"B","amount":0}]}'),
+    'needs an amount', 'an amount given as text is refused');
+  perform vdtest.raises(
+    format('select vd_set_invoice_payment_schedule(%L, %L::jsonb)', v_invoice,
       '{"kind":"split","instalments":[{"label":"A","amount":-5},{"label":"B","amount":0}]}'),
     'greater than zero', 'a negative instalment is refused');
   perform vdtest.raises(

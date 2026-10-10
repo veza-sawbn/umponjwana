@@ -82,7 +82,9 @@ begin
 
     -- The last instalment is the remainder; its amount is not checked.
     if v_i < v_n - 1 then
-      if jsonb_typeof(v_item->'amount') <> 'number' then return 'each instalment needs an amount'; end if;
+      -- coalesce: a missing key gives SQL NULL, which would slip past every
+      -- comparison below and leave v_running NULL — and the schedule "valid".
+      if coalesce(jsonb_typeof(v_item->'amount'), '') <> 'number' then return 'each instalment needs an amount'; end if;
       v_amount := (v_item->>'amount')::numeric;
       if v_amount <= 0 then return 'instalment amounts must be greater than zero'; end if;
       v_running := v_running + round(v_amount, 2);
