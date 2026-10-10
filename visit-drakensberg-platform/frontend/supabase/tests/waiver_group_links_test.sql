@@ -1,7 +1,8 @@
 -- ============================================================================
 -- Shareable group waiver links
 --
--- See supabase/migrations/20261010_waiver_group_links.sql. A link is handed
+-- See supabase/migrations/20261010_waiver_group_links.sql and
+-- 20261010_waiver_group_links_review.sql. A link is handed
 -- out publicly, so these check that it can only ever add signatures to its
 -- own trip, honours close / expiry / cap, and leaks nothing to anon.
 -- ============================================================================
@@ -12,12 +13,16 @@ do $$
 declare
   v_a        uuid;
   v_b        uuid;
+  v_viewer   uuid;
+  v_manager  uuid;
   v_template uuid;
 begin
   raise notice 'waiver group links';
 
   v_a := vdtest.make_user('wl-alpha@example.test', 'supplier', null, true);
   v_b := vdtest.make_user('wl-beta@example.test',  'supplier', null, true);
+  v_viewer  := vdtest.make_user('wl-ops-viewer@example.test',  'visitor', 'operations');
+  v_manager := vdtest.make_user('wl-ops-manager@example.test', 'visitor', 'operations');
 
   perform vdtest.act_as_nobody();
   insert into vd_waiver_templates (supplier_id, title, clauses)
@@ -32,8 +37,16 @@ begin
   insert into vd_waiver_links (token, template_id, supplier_id, activity_name, expires_at)
   values ('link-expired', v_template, v_a, 'Past trip', now() - interval '1 day');
 
+  -- Two ops employees managing supplier A: one may only look at customers,
+  -- the other may manage them.
+  insert into vd_ops_assignments (employee_id, supplier_id, permissions, is_active) values
+    (v_viewer,  v_a, array['view_customers'], true),
+    (v_manager, v_a, array['view_customers', 'manage_customers'], true);
+
   perform set_config('test.a', v_a::text, false);
   perform set_config('test.b', v_b::text, false);
+  perform set_config('test.viewer', v_viewer::text, false);
+  perform set_config('test.manager', v_manager::text, false);
 end $$;
 
 -- ── The public path, as the real anon database role ─────────────────────────
@@ -74,7 +87,8 @@ begin
     'expired', 'an expired link refuses signatures');
 
   perform vdtest.allows(
-    $q$select vd_waiver_link_submit('link-open', 'Ann@Example.test', '{}', '{"c1":true}', 'Ann Hiker')$q$,
+    $q$select vd_waiver_link_submit('link-open', 'Ann@Example.test', '{}',
+         '{"c1":true,"c2":false,"not-a-clause":"padding padding padding"}', 'Ann Hiker')$q$,
     'the first participant signs');
   perform vdtest.allows(
     $q$select vd_waiver_link_submit('link-open', '', '{}', '{"c1":true}', 'Ben Hiker', null, 'Ann Hiker')$q$,
@@ -117,6 +131,11 @@ begin
       where r.participant_name = 'Ben Hiker'),
     'Ann Hiker', 'the guardian countersignature is kept');
   perform vdtest.eq(
+    (select acknowledged from vd_waiver_submissions s join vd_waiver_requests r on r.id = s.request_id
+      where r.participant_name = 'Ann Hiker'),
+    '{"c1": true}'::jsonb,
+    'only the template''s own ticked clauses are stored, not the caller''s object');
+  perform vdtest.eq(
     (select signature_count from vd_waiver_link_details where id = v_link), 2,
     'the link details view counts signatures');
   perform vdtest.eq(
@@ -144,6 +163,26 @@ begin
   perform vdtest.eq(
     (select count(*)::int from vd_waiver_request_details where link_id is not null), 2,
     'and the signatures they produced, tagged with their link');
+
+  -- A view-only ops employee can see links but not delete one. DELETE checks
+  -- only USING, so without the restrictive policy this went through.
+  perform vdtest.act_as(current_setting('test.viewer')::uuid);
+  perform vdtest.eq((select count(*)::int from vd_waiver_links), 3,
+    'a view_customers ops employee sees the managed supplier''s links');
+  delete from vd_waiver_links where token = 'link-closed';
+  perform vdtest.act_as(current_setting('test.a')::uuid);
+  perform vdtest.eq((select count(*)::int from vd_waiver_links where token = 'link-closed'), 1,
+    'but cannot delete one');
+
+  perform vdtest.act_as(current_setting('test.manager')::uuid);
+  delete from vd_waiver_links where token = 'link-closed';
+  perform vdtest.act_as(current_setting('test.a')::uuid);
+  perform vdtest.eq((select count(*)::int from vd_waiver_links where token = 'link-closed'), 0,
+    'a manage_customers ops employee can delete an unsigned link');
+
+  delete from vd_waiver_links where token = 'link-expired';
+  perform vdtest.eq((select count(*)::int from vd_waiver_links where token = 'link-expired'), 0,
+    'and so can the supplier who owns it');
 end $$;
 
 reset role;

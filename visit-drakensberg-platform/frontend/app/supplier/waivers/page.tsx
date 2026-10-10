@@ -15,7 +15,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import toast from 'react-hot-toast'
 import {
-  FileSignature, Plus, Send, Copy, Check, Eye, RefreshCw, Search, Ban, Link2, QrCode,
+  FileSignature, Plus, Send, Copy, Check, X, Eye, RefreshCw, Search, Ban, Link2, QrCode,
 } from 'lucide-react'
 import {
   getMyWaiverTemplates, getMyWaiverRequests, getMyWaiverLinks, deleteWaiverTemplate,
@@ -74,6 +74,8 @@ export default function WaiversPage() {
   const [links, setLinks] = useState<WaiverLinkDetails[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
+  // Set from the Group links tab: narrows Sent to one link's signatures.
+  const [linkFilter, setLinkFilter] = useState<WaiverLinkDetails | null>(null)
   const [sending, setSending] = useState(false)
   const [viewing, setViewing] = useState<WaiverRequestDetails | null>(null)
   const [linkModal, setLinkModal] = useState<
@@ -95,14 +97,15 @@ export default function WaiversPage() {
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase()
-    if (!q) return requests
-    return requests.filter(r =>
+    const scoped = linkFilter ? requests.filter(r => r.link_id === linkFilter.id) : requests
+    if (!q) return scoped
+    return scoped.filter(r =>
       r.participant_name?.toLowerCase().includes(q) ||
       r.participant_email?.toLowerCase().includes(q) ||
       r.activity_name?.toLowerCase().includes(q) ||
       r.booking_reference?.toLowerCase().includes(q),
     )
-  }, [requests, search])
+  }, [requests, search, linkFilter])
 
   const counts = useMemo(() => ({
     pending: requests.filter(r => r.status === 'pending').length,
@@ -220,14 +223,30 @@ export default function WaiversPage() {
         <p className="font-sans text-sm text-black/30">Loading…</p>
       ) : tab === 'sent' ? (
         <>
-          <div className="relative max-w-sm mb-4">
-            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-black/20" />
-            <input
-              value={search}
-              onChange={e => setSearch(e.target.value)}
-              placeholder="Search participant, activity or reference…"
-              className="w-full font-sans text-sm border border-black/10 rounded-lg pl-9 pr-3 py-2 outline-none focus:border-[#C9A96E]/50 bg-white"
-            />
+          <div className="flex items-center gap-3 flex-wrap mb-4">
+            <div className="relative max-w-sm w-full">
+              <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-black/20" />
+              <input
+                value={search}
+                onChange={e => setSearch(e.target.value)}
+                placeholder="Search participant, activity or reference…"
+                className="w-full font-sans text-sm border border-black/10 rounded-lg pl-9 pr-3 py-2 outline-none focus:border-[#C9A96E]/50 bg-white"
+              />
+            </div>
+            {linkFilter && (
+              <span className="inline-flex items-center gap-1.5 font-sans text-xs text-[#9a7b45] bg-[#C9A96E]/10 border border-[#C9A96E]/30 rounded-full pl-3 pr-1.5 py-1">
+                <Link2 size={11} />
+                Group link: {linkFilter.activity_name || 'untitled'}
+                {linkFilter.service_date && ` · ${fmt(linkFilter.service_date)}`}
+                <button
+                  onClick={() => setLinkFilter(null)}
+                  className="p-0.5 rounded-full hover:bg-[#C9A96E]/20"
+                  aria-label="Show all waivers"
+                >
+                  <X size={11} />
+                </button>
+              </span>
+            )}
           </div>
 
           {filtered.length === 0 ? (
@@ -235,7 +254,9 @@ export default function WaiversPage() {
               <p className="font-sans text-sm text-black/30">
                 {requests.length === 0
                   ? 'No waivers sent yet. Create a form, then send it to your participants.'
-                  : 'No waivers match your search.'}
+                  : linkFilter && !search.trim()
+                    ? 'Nobody has signed through this link yet.'
+                    : 'No waivers match your search.'}
               </p>
             </div>
           ) : (
@@ -343,7 +364,7 @@ export default function WaiversPage() {
                       <td className="px-5 py-4 font-sans text-xs text-black/40">{l.template_title}</td>
                       <td className="px-5 py-4">
                         <button
-                          onClick={() => { setSearch(l.activity_name); setTab('sent') }}
+                          onClick={() => { setLinkFilter(l); setSearch(''); setTab('sent') }}
                           className="font-sans text-sm text-black/70 hover:text-[#2d6a4f] hover:underline"
                           title="See who has signed"
                         >
