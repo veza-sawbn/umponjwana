@@ -25,9 +25,13 @@ const OPERATIONS_ROUTES = ['/operations']
 // prefix already covers /supplier-terms and /supplier-code-of-conduct; the
 // commission step also links out to /privacy. None of these expose the
 // browse-and-book site the toggle is hiding.
+//
+// /unsubscribe and /subscribed are exempt because an opt-out link in an email
+// that bounces to a maintenance page is a consent-law problem, not an
+// inconvenience: it must work whenever the email can be read.
 const MAINTENANCE_EXEMPT_ROUTES = [
   '/admin', '/supplier', '/operations', '/auth', '/maintenance', '/invoices', '/quotes',
-  '/list-with-us', '/privacy',
+  '/list-with-us', '/privacy', '/unsubscribe', '/subscribed',
 ]
 
 export async function middleware(req: NextRequest) {

@@ -1,7 +1,7 @@
 'use client'
 import { useState } from 'react'
 import toast from 'react-hot-toast'
-import { supabase } from '@/lib/auth'
+import { requestNewsletterOptIn } from '@/lib/newsletter-client'
 import { trackEvent, AnalyticsEvent } from '@/lib/analytics'
 
 interface NewsletterSignupProps {
@@ -21,10 +21,9 @@ interface NewsletterSignupProps {
 }
 
 /**
- * Mailing-list signup form. Writes the address to `vd_newsletter_subscribers`
- * (insert-only for the public) and records explicit marketing consent through
- * `vd_set_consent`, exactly like the homepage newsletter block — see
- * supabase/migrations/20260824_customer_intelligence_foundation.sql.
+ * Mailing-list signup form (double opt-in). Submitting emails the address a
+ * confirmation link; consent is recorded only once that link is confirmed —
+ * see app/api/marketing/subscribe and supabase/migrations/20261007_marketing_send_pipeline.sql.
  */
 export default function NewsletterSignup({
   source,
@@ -32,7 +31,7 @@ export default function NewsletterSignup({
   label,
   buttonLabel = 'Subscribe',
   placeholder = 'Your email address',
-  successMessage = 'You’re on the list. See you in the next dispatch.',
+  successMessage = 'Almost there — check your inbox and confirm your email to join the list.',
   tone = 'light',
   className = '',
 }: NewsletterSignupProps) {
@@ -56,19 +55,15 @@ export default function NewsletterSignup({
     }
     setSubscribing(true)
     try {
-      const { error } = await supabase.from('vd_newsletter_subscribers').insert({ email: address })
-      // 23505 = already subscribed; treat as success.
-      if (error && error.code !== '23505') throw error
-      // Consent + funnel event are best-effort: neither blocks the
-      // confirmation the visitor sees.
-      supabase.rpc('vd_set_consent', {
-        p_email: address, p_consent_type: 'marketing_email', p_granted: true, p_source: source,
-      }).then(({ error: consentError }) => { if (consentError) console.error('[newsletter] consent record failed:', consentError) })
+      const result = await requestNewsletterOptIn(address, source)
+      if (!result.ok) throw new Error(result.error)
+      // The funnel event is best-effort. Consent itself is recorded only when
+      // the visitor confirms from the email we just sent (double opt-in).
       trackEvent(AnalyticsEvent.NEWSLETTER_SIGNUP, { source })
       toast.success(successMessage)
       setEmail('')
-    } catch {
-      toast.error('Subscription failed. Please try again later.')
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Subscription failed. Please try again later.')
     } finally {
       setSubscribing(false)
     }

@@ -3,14 +3,15 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { Plus, Send, FileText, AlertTriangle } from 'lucide-react'
-import { getEmailCampaigns, type EmailCampaign } from '@/lib/email-campaigns-admin'
+import { getEmailCampaigns, getSendReadiness, type EmailCampaign, type SendReadiness } from '@/lib/email-campaigns-admin'
 
 const STATUS_LABEL: Record<EmailCampaign['status'], string> = {
-  draft: 'Draft', scheduled: 'Scheduled', dry_run_sent: 'Dry Run Sent', sent: 'Sent', paused: 'Paused', cancelled: 'Cancelled',
+  draft: 'Draft', scheduled: 'Scheduled', sending: 'Sending', dry_run_sent: 'Dry Run Sent', sent: 'Sent', paused: 'Paused', cancelled: 'Cancelled',
 }
 const STATUS_STYLE: Record<EmailCampaign['status'], string> = {
   draft: 'bg-gray-100 text-gray-500',
   scheduled: 'bg-blue-50 text-blue-600',
+  sending: 'bg-blue-50 text-blue-600',
   dry_run_sent: 'bg-[#C9A96E]/15 text-[#8B6914]',
   sent: 'bg-[#2d6a4f]/10 text-[#2d6a4f]',
   paused: 'bg-gray-100 text-gray-500',
@@ -27,8 +28,10 @@ function fmtDate(d: string | null) {
 export default function EmailCampaignsPage() {
   const [campaigns, setCampaigns] = useState<EmailCampaign[]>([])
   const [loading, setLoading] = useState(true)
+  const [readiness, setReadiness] = useState<SendReadiness | null | undefined>(undefined)
 
   useEffect(() => { getEmailCampaigns().then(c => { setCampaigns(c); setLoading(false) }) }, [])
+  useEffect(() => { getSendReadiness().then(setReadiness) }, [])
 
   return (
     <div className="p-4 sm:p-6 lg:p-8">
@@ -48,14 +51,18 @@ export default function EmailCampaignsPage() {
         </div>
       </div>
 
-      <div className="mb-6 bg-white border border-gray-200 p-4 flex items-start gap-3">
-        <AlertTriangle size={16} className="text-[#C9A96E] shrink-0 mt-0.5" />
-        <p className="font-sans text-xs text-gray-500 leading-relaxed">
-          Sending is currently a <strong>dry run</strong> — the real, consented audience is resolved and recorded, but no
-          email actually leaves the platform. Real delivery needs a marketing email provider wired in first (the existing
-          transactional mailbox isn&apos;t suited to bulk sends).
-        </p>
-      </div>
+      {readiness !== undefined && (
+        <div className="mb-6 bg-white border border-gray-200 p-4 flex items-start gap-3">
+          <AlertTriangle size={16} className={`${readiness?.ready ? 'text-[#2d6a4f]' : 'text-[#C9A96E]'} shrink-0 mt-0.5`} />
+          <p className="font-sans text-xs text-gray-500 leading-relaxed">
+            {readiness?.ready ? (
+              <>Real sending is <strong>on</strong> — campaigns go out through Brevo from {readiness.sender}, capped at {readiness.dailyCap.toLocaleString()} emails per day while the sender warms up. Only consented, unsuppressed addresses are mailed.</>
+            ) : (
+              <>Real sending is <strong>not enabled yet</strong>{readiness?.missing?.length ? <> — missing: <code>{readiness.missing.join(', ')}</code></> : null}. Until it is, &ldquo;Dry run&rdquo; resolves and records the audience without delivering anything. See docs/email/BREVO_SETUP.md.</>
+            )}
+          </p>
+        </div>
+      )}
 
       {loading ? (
         <p className="font-sans text-sm text-gray-400 py-12 text-center">Loading campaigns…</p>

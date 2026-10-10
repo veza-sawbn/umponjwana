@@ -8,6 +8,7 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { signUp, supabase } from '@/lib/auth'
 import { trackEvent, AnalyticsEvent } from '@/lib/analytics'
+import { requestNewsletterOptIn } from '@/lib/newsletter-client'
 import Turnstile, {
   captchaBlocked,
   turnstileErrorMessage,
@@ -45,13 +46,24 @@ export default function RegisterPage() {
       // both are awaited (not fire-and-forget) purely so the hard navigation
       // right after doesn't tear the page down mid-request and silently
       // drop them; a failed write here still doesn't stop signup.
-      // vd_set_consent() writes an audit-trail row (§22); account_created
-      // feeds the Prospect -> Customer journey (§3, §21).
+      // account_created feeds the Prospect -> Customer journey (§3, §21).
+      //
+      // Marketing consent: with a live session the customer opts THEMSELVES in
+      // (vd_set_consent only ever acts on the caller's own account). With no
+      // session yet — email-confirmation signups — an anonymous caller may not
+      // assert consent for an address, so we fall back to the double-opt-in
+      // email instead. Either way nothing is subscribed on an unproven address.
       if (data.marketingConsent) {
-        const { error } = await supabase.rpc('vd_set_consent', {
-          p_email: data.email, p_consent_type: 'marketing_email', p_granted: true, p_source: 'registration',
-        })
-        if (error) console.error('[register] consent record failed:', error)
+        const { data: { session } } = await supabase.auth.getSession()
+        if (session) {
+          const { error } = await supabase.rpc('vd_set_consent', {
+            p_email: data.email, p_consent_type: 'marketing_email', p_granted: true, p_source: 'registration',
+          })
+          if (error) console.error('[register] consent record failed:', error)
+        } else {
+          const result = await requestNewsletterOptIn(data.email, 'registration')
+          if (!result.ok) console.error('[register] opt-in request failed:', result.error)
+        }
       }
       await trackEvent(AnalyticsEvent.ACCOUNT_CREATED, { role: data.role })
       // Hard navigation so middleware sees the fresh session cookie.

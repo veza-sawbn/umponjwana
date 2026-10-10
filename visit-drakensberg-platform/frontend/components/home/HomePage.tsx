@@ -4,7 +4,7 @@ import Link from 'next/link'
 import SafeImage from '@/components/ui/SafeImage'
 import toast from 'react-hot-toast'
 import { ArrowRight, ChevronDown, X } from 'lucide-react'
-import { supabase } from '@/lib/auth'
+import { requestNewsletterOptIn } from '@/lib/newsletter-client'
 import { publicSupabase } from '@/lib/supabase-public'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Swiper, SwiperSlide } from 'swiper/react'
@@ -387,19 +387,15 @@ export default function HomePage({ initialContent, initialRegions }: { initialCo
     }
     setSubscribing(true)
     try {
-      const { error } = await supabase.from('vd_newsletter_subscribers').insert({ email })
-      // 23505 = already subscribed; treat as success.
-      if (error && error.code !== '23505') throw error
-      // Record explicit marketing consent (§22) and the funnel event (§3) —
-      // best-effort, never blocks the subscribe confirmation the visitor sees.
-      supabase.rpc('vd_set_consent', {
-        p_email: email, p_consent_type: 'marketing_email', p_granted: true, p_source: 'newsletter_footer',
-      }).then(({ error: consentError }) => { if (consentError) console.error('[newsletter] consent record failed:', consentError) })
+      // Double opt-in: this only emails a confirmation link. Consent is
+      // recorded when the visitor confirms it (app/api/marketing/confirm).
+      const result = await requestNewsletterOptIn(email, 'newsletter_footer')
+      if (!result.ok) throw new Error(result.error)
       trackEvent(AnalyticsEvent.NEWSLETTER_SIGNUP, { source: 'home_footer' })
-      toast.success('You’re on the list. See you in the next dispatch.')
+      toast.success('Almost there — check your inbox and confirm your email to join the list.')
       setNewsletterEmail('')
-    } catch {
-      toast.error('Subscription failed. Please try again later.')
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Subscription failed. Please try again later.')
     } finally {
       setSubscribing(false)
     }
