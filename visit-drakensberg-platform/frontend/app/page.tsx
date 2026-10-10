@@ -23,6 +23,7 @@ export default async function Page() {
     home_cards: content.home_cards,
     home_sections: content.home_sections,
     home_layout: content.home_layout,
+    seasonal_picks: content.seasonal_picks,
     footer: content.footer,
   }
   return (

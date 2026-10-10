@@ -1,6 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { supabase } from './auth'
 import { CENTER_POSITION_CSS } from './image-position'
+import type { Season } from './seasons'
 
 // Per-section presentation overrides applied by the visual editor.
 export type SectionStyle = {
@@ -117,6 +118,28 @@ export const SITE_CONTENT_DEFAULTS = {
     journeys_eyebrow: 'Curated journeys', journeys_heading: 'Multi-day packages',
     newsletter_eyebrow: 'Stay informed', newsletter_heading: 'Berg dispatches',
     newsletter_body: 'Seasonal trail conditions, new accommodation and stories from the escarpment, delivered monthly.',
+  },
+  // The homepage "Recommended this season" band (components/home/
+  // RecommendedThisSeason.tsx), edited at Admin → Website. Listing refs are
+  // `trail:<id>` / `activity:<id>` strings — see lib/seasonal-picks.ts.
+  seasonal_picks: {
+    enabled: true,
+    // 'auto' follows the calendar (Southern Hemisphere); a season name pins it.
+    season_mode: 'auto' as 'auto' | Season,
+    // Blank eyebrow → "<Season> · <months>"; blank blurb → the season's own.
+    eyebrow: '',
+    heading: 'Recommended this season',
+    blurbs: { summer: '', autumn: '', winter: '', spring: '' } as Record<Season, string>,
+    max_cards: 8,
+    // Fill the remaining slots with published listings tagged for the season.
+    auto_fill: true,
+    include_trails: true,
+    include_activities: true,
+    // Hand-picked listings per season, shown first and in this order.
+    pinned: { summer: [], autumn: [], winter: [], spring: [] } as Record<Season, string[]>,
+    // Listings never shown in this band, whatever their tags.
+    excluded: [] as string[],
+    show_region_links: true,
   },
   stays_page: {
     eyebrow: 'Where to sleep',

@@ -7,13 +7,16 @@ import { getAllSiteContent, setSiteContent, SITE_CONTENT_DEFAULTS } from '@/lib/
 import { adminMediaSource } from '@/lib/admin-supabase'
 import { MediaPicker, MediaGalleryPicker } from '@/components/media/MediaPicker'
 import { ImagePositionPicker } from '@/components/media/ImagePositionPicker'
+import SeasonalPicksEditor from '@/components/admin/SeasonalPicksEditor'
+import { normalizePicks } from '@/lib/seasonal-picks'
 import { imagePositionToCss, isCenterPosition, CENTER_POSITION_CSS } from '@/lib/image-position'
 
-type Section = 'hero' | 'featured' | 'promos' | 'footer' | 'nav' | 'about'
+type Section = 'hero' | 'featured' | 'seasonal' | 'promos' | 'footer' | 'nav' | 'about'
 
 const SECTIONS: { id: Section; label: string; desc: string }[] = [
   { id: 'hero', label: 'Hero Banner', desc: 'Homepage headline, background image/video, CTA' },
   { id: 'featured', label: 'Homepage Featured', desc: 'Featured listings section config' },
+  { id: 'seasonal', label: 'Recommended This Season', desc: 'Season, copy, hand-picked and hidden listings' },
   { id: 'promos', label: 'Promotions & Offers', desc: 'Promotional banner and deals section' },
   { id: 'footer', label: 'Footer Content', desc: 'Tagline, copyright, social links, contact' },
   { id: 'nav', label: 'Navigation & Menu Images', desc: 'Nav items + super menu photos' },
@@ -129,6 +132,7 @@ export default function AdminWebsitePage() {
   // Section states — initialised from defaults, overwritten when Supabase loads
   const [hero, setHero] = useState(SITE_CONTENT_DEFAULTS.hero)
   const [featured, setFeatured] = useState(SITE_CONTENT_DEFAULTS.homepage_featured)
+  const [seasonal, setSeasonal] = useState(SITE_CONTENT_DEFAULTS.seasonal_picks)
   const [promos, setPromos] = useState(SITE_CONTENT_DEFAULTS.promotions)
   const [footer, setFooter] = useState(SITE_CONTENT_DEFAULTS.footer)
   const [about, setAbout] = useState(SITE_CONTENT_DEFAULTS.about)
@@ -140,6 +144,7 @@ export default function AdminWebsitePage() {
     getAllSiteContent().then(content => {
       setHero(content.hero)
       setFeatured(content.homepage_featured)
+      setSeasonal(normalizePicks(content.seasonal_picks))
       setPromos(content.promotions)
       setFooter(content.footer)
       setAbout(content.about)
@@ -153,6 +158,7 @@ export default function AdminWebsitePage() {
     const saves: Promise<void>[] = []
     if (activeSection === 'hero') saves.push(setSiteContent('hero', hero))
     if (activeSection === 'featured') saves.push(setSiteContent('homepage_featured', featured))
+    if (activeSection === 'seasonal') saves.push(setSiteContent('seasonal_picks', seasonal))
     if (activeSection === 'promos') saves.push(setSiteContent('promotions', promos))
     if (activeSection === 'footer') saves.push(setSiteContent('footer', footer))
     if (activeSection === 'about') saves.push(setSiteContent('about', about))
@@ -336,6 +342,11 @@ export default function AdminWebsitePage() {
                   </div>
                 </Field>
               </div>
+            )}
+
+            {/* ── Recommended This Season ── */}
+            {activeSection === 'seasonal' && (
+              <SeasonalPicksEditor value={seasonal} onChange={setSeasonal} />
             )}
 
             {/* ── Promotions ── */}

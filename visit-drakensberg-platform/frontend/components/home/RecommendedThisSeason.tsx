@@ -7,71 +7,59 @@ import { getTrailSummaries, type Trail } from '@/lib/trails'
 import { getActivities, type Activity } from '@/lib/activities'
 import { regionsMatch } from '@/lib/regions'
 import { DESTINATION_GRAPH_NAV } from '@/lib/destination-ia'
-import { SEASON_META, type Season } from '@/lib/seasons'
+import { SEASON_META } from '@/lib/seasons'
+import { useSiteSection } from '@/lib/use-site-section'
+import { activeSeason, normalizePicks, seasonCopy, selectSeasonalItems } from '@/lib/seasonal-picks'
 import { toSeasonCard, type SeasonCard } from '@/lib/season-cards'
-import type { SeasonalItem } from '@/lib/modules'
 import SeasonListingCard from '@/components/modules/SeasonListingCard'
 import TopicListingCarousel from '@/components/modules/TopicListingCarousel'
 import { homeContainer, homeTone, homeType } from '@/components/home/home-style'
 
 /* ─── Recommended this season ───────────────────────────────────────────────
-   Published trails and active activities that their admin/supplier tagged
-   for the current season (the same `seasons` facet behind the
-   /regions/[slug]/[season] pages), rendered with that page's own card.
-   Renders nothing until loaded, and nothing at all when no published listing
-   is tagged for this season — no placeholders, prices or counts are invented. */
-
-const MAX_CARDS = 8
-
-/** Southern Hemisphere seasons, matching SEASON_META's month ranges. */
-function seasonFor(date: Date): Season {
-  const m = date.getMonth() // 0 = Jan
-  if (m === 11 || m <= 1) return 'summer'
-  if (m <= 4) return 'autumn'
-  if (m <= 7) return 'winter'
-  return 'spring'
-}
+   Hand-picked and season-tagged trails and activities (the same `seasons`
+   facet behind the /regions/[slug]/[season] pages), rendered with that
+   page's own card. What shows — season, copy, pinned/excluded listings,
+   card count — is controlled from Admin → Website (`seasonal_picks`; the
+   selection itself lives in lib/seasonal-picks.ts).
+   Renders nothing until loaded, and nothing at all when the admin has
+   switched it off or nothing qualifies — no placeholders, prices or counts
+   are invented. */
 
 // Region pages from the primary nav — the season pages hang off these.
 const REGION_LINKS = (DESTINATION_GRAPH_NAV.find(n => n.href === '/regions')?.children ?? [])
   .filter(c => c.type === 'entity' && c.status === 'live' && c.href.startsWith('/regions/'))
 
-type Loaded = { season: Season; items: SeasonalItem[] }
+type Loaded = { trails: Trail[]; activities: Activity[]; now: Date }
 
 export default function RecommendedThisSeason() {
   const headingId = useId()
-  const [data, setData] = useState<Loaded | null>(null)
+  const config = normalizePicks(useSiteSection('seasonal_picks'))
+  const [loaded, setLoaded] = useState<Loaded | null>(null)
 
   useEffect(() => {
     let cancelled = false
-    // Season is resolved on the client so server and client render agree
-    // (nothing renders until this runs).
-    const season = seasonFor(new Date())
     // publicSupabase (session-less) — public catalogue only; see lib/supabase-public.ts.
     Promise.all([
       getTrailSummaries(publicSupabase).catch(() => [] as Trail[]),
       getActivities(publicSupabase).catch(() => [] as Activity[]),
     ]).then(([trails, activities]) => {
-      if (cancelled) return
-      const t = trails.filter(x => x.status === 'published' && (x.seasons ?? []).includes(season))
-      const a = activities.filter(x => x.status === 'active' && (x.seasons ?? []).includes(season))
-      // Interleave so one kind doesn't crowd out the other.
-      const items: SeasonalItem[] = []
-      for (let i = 0; i < Math.max(t.length, a.length); i++) {
-        if (t[i]) items.push({ kind: 'trail', item: t[i] })
-        if (a[i]) items.push({ kind: 'activity', item: a[i] })
-      }
-      setData({ season, items })
+      // The date is taken on the client so server and client render agree
+      // (nothing renders until this runs).
+      if (!cancelled) setLoaded({ trails, activities, now: new Date() })
     })
     return () => { cancelled = true }
   }, [])
 
-  if (!data || data.items.length === 0) return null
+  if (!loaded || !config.enabled) return null
+  const season = activeSeason(config, loaded.now)
+  const data = { season, items: selectSeasonalItems(config, season, loaded.trails, loaded.activities) }
+  if (data.items.length === 0) return null
 
+  const copy = seasonCopy(config, data.season)
   const meta = SEASON_META[data.season]
   // toSeasonCard() substitutes a stock photo when a listing has none; here a
   // listing without its own photo shows the card's plain background instead.
-  const cards: SeasonCard[] = data.items.slice(0, MAX_CARDS).map(entry => {
+  const cards: SeasonCard[] = data.items.map(entry => {
     const card = toSeasonCard(entry)
     const ownImage = entry.kind === 'trail' ? entry.item.image : entry.item.photos?.[0]
     return ownImage ? card : { ...card, image: '' }
@@ -86,10 +74,10 @@ export default function RecommendedThisSeason() {
       <div className={homeContainer}>
         <div className="mb-7 lg:mb-9 max-w-3xl">
           <p className={`font-sans text-xs tracking-[0.2em] uppercase ${homeTone.light.eyebrow} mb-3`}>
-            {meta.label} · {meta.range}
+            {copy.eyebrow}
           </p>
-          <h2 id={headingId} className={`${homeType.heading} ${homeTone.light.heading}`}>Recommended this season</h2>
-          <p className={`font-sans text-base ${homeTone.light.subheading} mt-4 max-w-xl leading-relaxed`}>{meta.blurb}</p>
+          <h2 id={headingId} className={`${homeType.heading} ${homeTone.light.heading}`}>{copy.heading}</h2>
+          <p className={`font-sans text-base ${homeTone.light.subheading} mt-4 max-w-xl leading-relaxed`}>{copy.blurb}</p>
         </div>
 
         {/* Desktop/tablet: static grid */}
@@ -102,7 +90,7 @@ export default function RecommendedThisSeason() {
           <TopicListingCarousel cards={cards} variant="home" />
         </div>
 
-        {regionLinks.length > 0 && (
+        {config.show_region_links && regionLinks.length > 0 && (
           <div className="flex flex-wrap gap-x-6 gap-y-3 mt-8">
             {regionLinks.map(r => (
               <Link
