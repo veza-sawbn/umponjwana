@@ -340,6 +340,16 @@ export async function getWaiverSubmission(requestId: string): Promise<WaiverSubm
   return (data as WaiverSubmission) ?? null
 }
 
+/**
+ * The operator's display name for a printed waiver. Best effort: it returns
+ * null when the caller can't read that profile, and the print omits the name.
+ */
+export async function getWaiverOperatorName(supplierId: string): Promise<string | null> {
+  const { data } = await supabase
+    .from('profiles').select('full_name').eq('id', supplierId).maybeSingle()
+  return (data?.full_name as string | undefined) || null
+}
+
 /** The link a participant receives. */
 export function waiverUrl(token: string, origin?: string): string {
   const base = origin ?? (typeof window !== 'undefined' ? window.location.origin : '')

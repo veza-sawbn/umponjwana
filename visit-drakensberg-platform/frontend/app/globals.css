@@ -324,3 +324,21 @@ body {
   outline: 1px dashed #2d6a4f;
   outline-offset: 6px;
 }
+
+/* ─── Printed waivers ─────────────────────────────────────────────────────────
+   WaiverSubmissionPanel portals WaiverPrintDocument into <body> and adds
+   `printing-waiver` to <body> while it is open. On screen the document is
+   hidden; in print it is the only thing on the page. */
+.waiver-print-root { display: none; }
+
+@media print {
+  body.printing-waiver > *:not(.waiver-print-root) { display: none !important; }
+  body.printing-waiver .waiver-print-root {
+    display: block;
+    max-width: 180mm;
+    margin: 0 auto;
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+  }
+}
+
