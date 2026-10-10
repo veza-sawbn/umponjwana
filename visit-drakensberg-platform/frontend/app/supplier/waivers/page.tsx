@@ -3,23 +3,27 @@
 /**
  * /supplier/waivers — waiver forms and the signatures they've collected.
  *
- * Two tabs: the forms the supplier has written, and every waiver sent to a
- * participant with its current status. Signed waivers open read-only — they
- * are legal records and the database has no update path for them.
+ * Three tabs: every waiver sent to a participant with its current status,
+ * the shareable group links (one per trip, signed by anyone holding it), and
+ * the forms the supplier has written. Signatures collected through a group
+ * link appear under Sent alongside emailed ones. Signed waivers open
+ * read-only — they are legal records and the database has no update path
+ * for them.
  */
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import toast from 'react-hot-toast'
 import {
-  FileSignature, Plus, Send, Copy, Check, X, Eye, RefreshCw, Search, Ban,
+  FileSignature, Plus, Send, Copy, Check, X, Eye, RefreshCw, Search, Ban, Link2, QrCode,
 } from 'lucide-react'
 import {
-  getMyWaiverTemplates, getMyWaiverRequests, deleteWaiverTemplate,
-  voidWaiverRequest, waiverUrl,
-  type WaiverTemplate, type WaiverRequestDetails,
+  getMyWaiverTemplates, getMyWaiverRequests, getMyWaiverLinks, deleteWaiverTemplate,
+  voidWaiverRequest, setWaiverLinkActive, waiverUrl,
+  type WaiverTemplate, type WaiverRequestDetails, type WaiverLinkDetails,
 } from '@/lib/waivers'
 import SendWaiverModal from '@/components/waivers/SendWaiverModal'
+import WaiverLinkModal from '@/components/waivers/WaiverLinkModal'
 import WaiverSubmissionPanel from '@/components/waivers/WaiverSubmissionPanel'
 
 const STATUS_CHIP: Record<string, string> = {
@@ -32,6 +36,14 @@ const STATUS_CHIP: Record<string, string> = {
 function fmt(d: string | null) {
   if (!d) return '—'
   return new Date(d).toLocaleDateString('en-ZA', { day: 'numeric', month: 'short', year: 'numeric' })
+}
+
+/** Open, closed by the supplier, expired, or full — in that order of precedence. */
+function linkState(l: WaiverLinkDetails): { label: string; chip: string } {
+  if (!l.is_active) return { label: 'closed', chip: 'bg-gray-100 text-gray-500' }
+  if (l.expires_at && new Date(l.expires_at) < new Date()) return { label: 'expired', chip: 'bg-gray-100 text-gray-500' }
+  if (l.max_signatures !== null && l.signature_count >= l.max_signatures) return { label: 'full', chip: 'bg-sky-50 text-sky-700' }
+  return { label: 'open', chip: 'bg-emerald-50 text-emerald-700' }
 }
 
 function CopyLink({ token }: { token: string }) {
@@ -56,19 +68,28 @@ function CopyLink({ token }: { token: string }) {
 }
 
 export default function WaiversPage() {
-  const [tab, setTab] = useState<'sent' | 'forms'>('sent')
+  const [tab, setTab] = useState<'sent' | 'links' | 'forms'>('sent')
   const [templates, setTemplates] = useState<WaiverTemplate[]>([])
   const [requests, setRequests] = useState<WaiverRequestDetails[]>([])
+  const [links, setLinks] = useState<WaiverLinkDetails[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
+  // Set from the Group links tab: narrows Sent to one link's signatures.
+  const [linkFilter, setLinkFilter] = useState<WaiverLinkDetails | null>(null)
   const [sending, setSending] = useState(false)
   const [viewing, setViewing] = useState<WaiverRequestDetails | null>(null)
+  const [linkModal, setLinkModal] = useState<
+    | { mode: 'create' }
+    | { mode: 'share'; link: { token: string; activityName: string } }
+    | null
+  >(null)
 
   const load = useCallback(async () => {
     setLoading(true)
-    const [t, r] = await Promise.all([getMyWaiverTemplates(), getMyWaiverRequests()])
+    const [t, r, l] = await Promise.all([getMyWaiverTemplates(), getMyWaiverRequests(), getMyWaiverLinks()])
     setTemplates(t)
     setRequests(r)
+    setLinks(l)
     setLoading(false)
   }, [])
 
@@ -76,19 +97,39 @@ export default function WaiversPage() {
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase()
-    if (!q) return requests
-    return requests.filter(r =>
+    const scoped = linkFilter ? requests.filter(r => r.link_id === linkFilter.id) : requests
+    if (!q) return scoped
+    return scoped.filter(r =>
       r.participant_name?.toLowerCase().includes(q) ||
       r.participant_email?.toLowerCase().includes(q) ||
       r.activity_name?.toLowerCase().includes(q) ||
       r.booking_reference?.toLowerCase().includes(q),
     )
-  }, [requests, search])
+  }, [requests, search, linkFilter])
 
   const counts = useMemo(() => ({
     pending: requests.filter(r => r.status === 'pending').length,
     signed: requests.filter(r => r.status === 'signed').length,
   }), [requests])
+
+  async function toggleLink(l: WaiverLinkDetails) {
+    if (l.is_active && !confirm(`Close the group link for ${l.activity_name || 'this trip'}? Nobody else will be able to sign with it. Waivers already signed are kept.`)) return
+    try {
+      await setWaiverLinkActive(l.id, !l.is_active)
+      toast.success(l.is_active ? 'Link closed.' : 'Link reopened.')
+      load()
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Could not update this link.')
+    }
+  }
+
+  function openLinkModal() {
+    if (templates.filter(t => t.is_active).length === 0) {
+      toast.error('Create a waiver form first.')
+      return
+    }
+    setLinkModal({ mode: 'create' })
+  }
 
   async function removeTemplate(t: WaiverTemplate) {
     if (!confirm(`Delete "${t.title}"?`)) return
@@ -137,6 +178,12 @@ export default function WaiversPage() {
             <Plus size={14} /> New form
           </Link>
           <button
+            onClick={openLinkModal}
+            className="inline-flex items-center gap-2 border border-[#C9A96E] text-[#9a7b45] px-4 py-2 rounded-lg font-sans text-sm hover:bg-[#C9A96E]/10 transition-colors"
+          >
+            <Link2 size={14} /> Group link
+          </button>
+          <button
             onClick={() => {
               if (templates.filter(t => t.is_active).length === 0) {
                 toast.error('Create a waiver form first.')
@@ -153,7 +200,11 @@ export default function WaiversPage() {
 
       {/* Tabs */}
       <div className="flex gap-1 border-b border-black/8 mb-5">
-        {([['sent', `Sent (${requests.length})`], ['forms', `Forms (${templates.length})`]] as const).map(([key, label]) => (
+        {([
+          ['sent', `Sent (${requests.length})`],
+          ['links', `Group links (${links.length})`],
+          ['forms', `Forms (${templates.length})`],
+        ] as const).map(([key, label]) => (
           <button
             key={key}
             onClick={() => setTab(key)}
@@ -172,14 +223,30 @@ export default function WaiversPage() {
         <p className="font-sans text-sm text-black/30">Loading…</p>
       ) : tab === 'sent' ? (
         <>
-          <div className="relative max-w-sm mb-4">
-            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-black/20" />
-            <input
-              value={search}
-              onChange={e => setSearch(e.target.value)}
-              placeholder="Search participant, activity or reference…"
-              className="w-full font-sans text-sm border border-black/10 rounded-lg pl-9 pr-3 py-2 outline-none focus:border-[#C9A96E]/50 bg-white"
-            />
+          <div className="flex items-center gap-3 flex-wrap mb-4">
+            <div className="relative max-w-sm w-full">
+              <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-black/20" />
+              <input
+                value={search}
+                onChange={e => setSearch(e.target.value)}
+                placeholder="Search participant, activity or reference…"
+                className="w-full font-sans text-sm border border-black/10 rounded-lg pl-9 pr-3 py-2 outline-none focus:border-[#C9A96E]/50 bg-white"
+              />
+            </div>
+            {linkFilter && (
+              <span className="inline-flex items-center gap-1.5 font-sans text-xs text-[#9a7b45] bg-[#C9A96E]/10 border border-[#C9A96E]/30 rounded-full pl-3 pr-1.5 py-1">
+                <Link2 size={11} />
+                Group link: {linkFilter.activity_name || 'untitled'}
+                {linkFilter.service_date && ` · ${fmt(linkFilter.service_date)}`}
+                <button
+                  onClick={() => setLinkFilter(null)}
+                  className="p-0.5 rounded-full hover:bg-[#C9A96E]/20"
+                  aria-label="Show all waivers"
+                >
+                  <X size={11} />
+                </button>
+              </span>
+            )}
           </div>
 
           {filtered.length === 0 ? (
@@ -187,7 +254,9 @@ export default function WaiversPage() {
               <p className="font-sans text-sm text-black/30">
                 {requests.length === 0
                   ? 'No waivers sent yet. Create a form, then send it to your participants.'
-                  : 'No waivers match your search.'}
+                  : linkFilter && !search.trim()
+                    ? 'Nobody has signed through this link yet.'
+                    : 'No waivers match your search.'}
               </p>
             </div>
           ) : (
@@ -208,6 +277,11 @@ export default function WaiversPage() {
                       <td className="px-5 py-4">
                         <p className="font-sans text-sm text-black/80">{r.participant_name || '—'}</p>
                         <p className="font-sans text-[11px] text-black/35 mt-0.5">{r.participant_email}</p>
+                        {r.link_id && (
+                          <p className="font-sans text-[10px] text-[#9a7b45] mt-0.5 inline-flex items-center gap-1">
+                            <Link2 size={10} /> via group link
+                          </p>
+                        )}
                       </td>
                       <td className="px-5 py-4 font-sans text-sm text-black/60">{r.activity_name || '—'}</td>
                       <td className="px-5 py-4 font-sans text-xs text-black/40">{fmt(r.service_date)}</td>
@@ -249,6 +323,92 @@ export default function WaiversPage() {
             </div>
           )}
         </>
+      ) : tab === 'links' ? (
+        links.length === 0 ? (
+          <div className="bg-white border border-black/8 rounded-xl p-8 text-center">
+            <p className="font-sans text-sm text-black/30 mb-3 max-w-md mx-auto">
+              A group link lets everyone on a trip sign their own waiver from one link or QR code,
+              without you having to email each of them.
+            </p>
+            <button
+              onClick={openLinkModal}
+              className="inline-flex items-center gap-2 bg-[#C9A96E] text-white px-4 py-2 rounded-lg font-sans text-sm hover:bg-[#b8965d] transition-colors"
+            >
+              <Link2 size={14} /> Create a group link
+            </button>
+          </div>
+        ) : (
+          <div className="bg-white border border-black/8 rounded-xl overflow-x-auto">
+            <table className="w-full min-w-[760px]">
+              <thead>
+                <tr className="border-b border-black/5">
+                  {['Activity', 'Date', 'Form', 'Signed', 'Status', ''].map(h => (
+                    <th key={h} className="text-left px-5 py-3 font-sans text-[10px] tracking-[0.12em] uppercase text-black/30">
+                      {h}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-black/5">
+                {links.map(l => {
+                  const st = linkState(l)
+                  return (
+                    <tr key={l.id} className="hover:bg-black/[0.015]">
+                      <td className="px-5 py-4">
+                        <p className="font-sans text-sm text-black/80">{l.activity_name || '—'}</p>
+                        {l.booking_reference && (
+                          <p className="font-sans text-[11px] text-black/35 mt-0.5">{l.booking_reference}</p>
+                        )}
+                      </td>
+                      <td className="px-5 py-4 font-sans text-xs text-black/40">{fmt(l.service_date)}</td>
+                      <td className="px-5 py-4 font-sans text-xs text-black/40">{l.template_title}</td>
+                      <td className="px-5 py-4">
+                        <button
+                          onClick={() => { setLinkFilter(l); setSearch(''); setTab('sent') }}
+                          className="font-sans text-sm text-black/70 hover:text-[#2d6a4f] hover:underline"
+                          title="See who has signed"
+                        >
+                          {l.signature_count}{l.max_signatures !== null && ` / ${l.max_signatures}`}
+                        </button>
+                      </td>
+                      <td className="px-5 py-4">
+                        <span className={`font-sans text-[10px] tracking-[0.1em] uppercase px-2 py-0.5 rounded ${st.chip}`}>
+                          {st.label}
+                        </span>
+                        {l.expires_at && (
+                          <p className="font-sans text-[10px] text-black/30 mt-1">until {fmt(l.expires_at)}</p>
+                        )}
+                      </td>
+                      <td className="px-5 py-4">
+                        <div className="flex items-center gap-3 justify-end">
+                          {l.is_active && (
+                            <>
+                              <CopyLink token={l.token} />
+                              <button
+                                onClick={() => setLinkModal({ mode: 'share', link: { token: l.token, activityName: l.activity_name } })}
+                                className="inline-flex items-center gap-1 font-sans text-xs text-black/40 hover:text-[#C9A96E] transition-colors"
+                              >
+                                <QrCode size={12} /> Share
+                              </button>
+                            </>
+                          )}
+                          <button
+                            onClick={() => toggleLink(l)}
+                            className={`inline-flex items-center gap-1 font-sans text-xs transition-colors ${
+                              l.is_active ? 'text-black/30 hover:text-red-500' : 'text-[#2d6a4f] hover:underline'
+                            }`}
+                          >
+                            {l.is_active ? <><Ban size={12} /> Close</> : 'Reopen'}
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+        )
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
           {templates.length === 0 ? (
@@ -279,6 +439,8 @@ export default function WaiversPage() {
               <p className="font-sans text-[11px] text-black/30 mt-3">
                 {t.clauses.length} clause{t.clauses.length !== 1 ? 's' : ''} ·{' '}
                 {requests.filter(r => r.template_id === t.id).length} sent
+                {links.some(l => l.template_id === t.id) &&
+                  ` · ${links.filter(l => l.template_id === t.id).length} group link${links.filter(l => l.template_id === t.id).length !== 1 ? 's' : ''}`}
               </p>
               <div className="flex items-center gap-3 mt-4 pt-3 border-t border-black/5">
                 <Link
@@ -304,6 +466,14 @@ export default function WaiversPage() {
           templates={templates.filter(t => t.is_active)}
           onClose={() => setSending(false)}
           onSent={() => { setSending(false); load() }}
+        />
+      )}
+      {linkModal && (
+        <WaiverLinkModal
+          templates={templates.filter(t => t.is_active)}
+          link={linkModal.mode === 'share' ? linkModal.link : undefined}
+          onClose={() => setLinkModal(null)}
+          onCreated={() => { load(); setTab('links') }}
         />
       )}
       {viewing && (

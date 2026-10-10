@@ -7,6 +7,11 @@
  * and it reaches the database exclusively through vd_waiver_open /
  * vd_waiver_submit, which validate it server-side on every call.
  *
+ * The token is either a participant's personal link or a supplier's shared
+ * group link for a whole trip. A group link asks for the participant's own
+ * details, signs through vd_waiver_link_submit, and can be signed again by
+ * the next person on the same device.
+ *
  * Designed mobile-first — most participants open this on a phone, often
  * outdoors, sometimes on a poor connection.
  */
@@ -14,9 +19,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useParams } from 'next/navigation'
 import Link from 'next/link'
-import { CheckCircle, AlertCircle, Loader2, Eraser } from 'lucide-react'
+import { CheckCircle, AlertCircle, Loader2, Eraser, UserPlus } from 'lucide-react'
 import {
-  openWaiver, submitWaiver, WAIVER_FIELD_LABELS,
+  openWaiver, submitWaiver, submitSharedWaiver, WAIVER_FIELD_LABELS,
   type OpenWaiver,
 } from '@/lib/waivers'
 
@@ -28,7 +33,11 @@ const REASON_COPY: Record<string, { title: string; body: string }> = {
   expired:        { title: 'This link has expired', body: 'Your operator can send you a fresh link to sign.' },
   already_signed: { title: 'Already signed', body: 'This waiver has been completed. There\'s nothing more you need to do.' },
   void:           { title: 'This waiver was withdrawn', body: 'Your operator withdrew this form. Contact them if you think that\'s a mistake.' },
+  closed:         { title: 'This link is closed', body: 'Your operator is no longer collecting waivers through this link. Contact them if you still need to sign.' },
+  full:           { title: 'Everyone has signed', body: 'This link has reached the number of signatures your operator expected. If you still need to sign, ask them for another link.' },
 }
+
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
 /** Age in whole years, or null when the date can't be read. */
 function ageFrom(dob: string): number | null {
@@ -143,11 +152,15 @@ export default function WaiverSigningPage() {
   const [answers, setAnswers] = useState<Record<string, string>>({})
   const [acknowledged, setAcknowledged] = useState<Record<string, boolean>>({})
   const [signedName, setSignedName] = useState('')
+  const [email, setEmail] = useState('')
   const [guardianName, setGuardianName] = useState('')
   const [signature, setSignature] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
   const [done, setDone] = useState(false)
   const [error, setError] = useState('')
+  // Bumped to remount the signature pad when a group link is signed again.
+  const [formKey, setFormKey] = useState(0)
+  const [signedCount, setSignedCount] = useState(0)
 
   useEffect(() => {
     openWaiver(token).then(s => {
@@ -166,6 +179,10 @@ export default function WaiverSigningPage() {
   async function handleSubmit() {
     if (!state?.ok) return
     if (!signedName.trim()) { setError('Please type your full name to sign.'); return }
+    if (state.shared && email.trim() && !EMAIL_RE.test(email.trim())) {
+      setError('Please enter a valid email address, or leave it blank.')
+      return
+    }
 
     const missing = state.template.clauses.find(
       c => c.required && !acknowledged[c.id],
@@ -180,14 +197,20 @@ export default function WaiverSigningPage() {
     setError('')
     setSubmitting(true)
     try {
-      await submitWaiver({
+      const signed = {
         token,
         answers,
         acknowledged,
         signedName: signedName.trim(),
         signature,
         guardianName: needsGuardian() ? guardianName.trim() : null,
-      })
+      }
+      if (state.shared) {
+        await submitSharedWaiver({ ...signed, participantEmail: email.trim() })
+      } else {
+        await submitWaiver(signed)
+      }
+      setSignedCount(n => n + 1)
       setDone(true)
       window.scrollTo({ top: 0, behavior: 'smooth' })
     } catch (e) {
@@ -205,7 +228,22 @@ export default function WaiverSigningPage() {
     )
   }
 
+  /** Group links only: clear the form so the next person can sign. */
+  function signAnother() {
+    setAnswers({})
+    setAcknowledged({})
+    setSignedName('')
+    setEmail('')
+    setGuardianName('')
+    setSignature(null)
+    setError('')
+    setFormKey(k => k + 1)
+    setDone(false)
+    window.scrollTo({ top: 0 })
+  }
+
   if (done) {
+    const shared = Boolean(state?.ok && state.shared)
     return (
       <div className="min-h-screen bg-[#F7F5F2] flex items-center justify-center px-6 py-16">
         <div className="max-w-md text-center">
@@ -215,8 +253,19 @@ export default function WaiverSigningPage() {
           <h1 className="font-display italic text-3xl text-black mb-3">Waiver signed</h1>
           <p className="font-sans text-sm text-black/50 leading-relaxed mb-8">
             Thank you. Your operator has received your signed waiver, so there is nothing
-            further you need to do. Keep an eye on your inbox for trip details.
+            further you need to do.
+            {shared
+              ? signedCount > 1 && ` ${signedCount} waivers have been signed on this device.`
+              : ' Keep an eye on your inbox for trip details.'}
           </p>
+          {shared && (
+            <button
+              onClick={signAnother}
+              className="w-full mb-3 inline-flex items-center justify-center gap-2 bg-[#C9A96E] text-black px-6 py-3 font-sans text-sm font-medium rounded-lg hover:bg-[#b8965d] transition-colors"
+            >
+              <UserPlus size={15} /> Sign for another person
+            </button>
+          )}
           <Link
             href="/"
             className="inline-block bg-[#2d6a4f] text-white px-6 py-3 font-sans text-sm rounded-lg hover:bg-[#235a3f] transition-colors"
@@ -276,6 +325,14 @@ export default function WaiverSigningPage() {
         <section className="bg-white border border-black/8 rounded-xl p-5 space-y-4">
           <h2 className="font-display italic text-lg text-black/90">Your details</h2>
 
+          {state.shared && (
+            <p className="font-sans text-xs text-black/40 leading-relaxed -mt-1">
+              Everyone on this trip signs their own waiver with this link.
+              {template.fields.dateOfBirth &&
+                ' If you\'re signing for a child, enter the child\'s details and countersign below.'}
+            </p>
+          )}
+
           <div>
             <label className={lbl}>Full name</label>
             <input
@@ -285,6 +342,20 @@ export default function WaiverSigningPage() {
               className={inp}
             />
           </div>
+
+          {state.shared && (
+            <div>
+              <label className={lbl}>Email <span className="normal-case tracking-normal text-black/25">optional</span></label>
+              <input
+                type="email"
+                value={email}
+                onChange={e => setEmail(e.target.value)}
+                placeholder="you@example.com"
+                className={inp}
+              />
+              <p className="font-sans text-xs text-black/30 mt-1">So your operator can reach you about the trip.</p>
+            </div>
+          )}
 
           {WAIVER_FIELD_LABELS.filter(f => template.fields[f.key]).map(f => (
             <div key={f.key}>
@@ -334,7 +405,7 @@ export default function WaiverSigningPage() {
         {/* Signature */}
         <section className="bg-white border border-black/8 rounded-xl p-5 space-y-4">
           <h2 className="font-display italic text-lg text-black/90">Signature</h2>
-          <SignaturePad onChange={setSignature} />
+          <SignaturePad key={formKey} onChange={setSignature} />
 
           {needsGuardian() && (
             <div className="border border-amber-200 bg-amber-50 rounded-lg p-4">
