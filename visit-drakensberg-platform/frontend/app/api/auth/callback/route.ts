@@ -65,6 +65,11 @@ export async function GET(request: Request) {
     )
   }
 
-  // No code present — send to login
-  return NextResponse.redirect(new URL('/auth/login', request.url))
+  // No code present. GoTrue lands here without one when the link itself was
+  // refused (expired, already used) and reports why as ?error_code=; pass it
+  // on so sign-in can say so instead of failing silently.
+  const login = new URL('/auth/login', request.url)
+  const errorCode = url.searchParams.get('error_code')
+  if (errorCode) login.searchParams.set('link_error', errorCode)
+  return NextResponse.redirect(login)
 }

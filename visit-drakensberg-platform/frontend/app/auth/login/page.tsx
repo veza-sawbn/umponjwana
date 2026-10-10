@@ -33,7 +33,19 @@ export default function LoginPage() {
   // also sign the person in (opened in a different browser).
   const [justConfirmed, setJustConfirmed] = useState(false)
   useEffect(() => {
-    setJustConfirmed(new URLSearchParams(window.location.search).get('confirmed') === '1')
+    const query = new URLSearchParams(window.location.search)
+    setJustConfirmed(query.get('confirmed') === '1')
+    // A refused email link: ?link_error= from /api/auth/callback, or GoTrue's
+    // own #error_code= when it redirected straight here.
+    const hash = new URLSearchParams(window.location.hash.slice(1))
+    const linkError = query.get('link_error') ?? hash.get('error_code')
+    if (linkError) {
+      setAuthError(
+        linkError === 'otp_expired'
+          ? 'That confirmation link has expired or was already used. Sign in below — if your email still needs confirming, you can get a fresh link.'
+          : 'That email link didn\'t work. Sign in below — if your email still needs confirming, you can get a fresh link.',
+      )
+    }
   }, [])
   const { register, handleSubmit, formState: { errors, isSubmitting } } = useForm<Form>({
     resolver: zodResolver(schema),
