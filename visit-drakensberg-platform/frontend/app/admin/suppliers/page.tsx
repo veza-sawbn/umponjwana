@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import {
   Search, RefreshCw, Building2, Check, X, AlertCircle, Mail,
-  ChevronRight, ExternalLink, Save, ArrowUpRight, Download,
+  ChevronRight, ExternalLink, Save, ArrowUpRight, Download, Trash2,
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { supabase } from '@/lib/auth'
@@ -430,6 +430,133 @@ function SupplierDetailPanel({
   )
 }
 
+// ─── Bulk Delete Confirmation ──────────────────────────────────────────────────
+
+type DeleteResult = { id: string; name: string; deleted: boolean; reason?: string }
+
+function BulkDeleteDialog({
+  suppliers,
+  onClose,
+  onDone,
+}: {
+  suppliers: SupplierRow[]
+  onClose: () => void
+  onDone: (deletedIds: string[]) => void
+}) {
+  const [typed, setTyped] = useState('')
+  const [deleting, setDeleting] = useState(false)
+  const [failures, setFailures] = useState<DeleteResult[] | null>(null)
+
+  async function run() {
+    setDeleting(true)
+    try {
+      const res = await fetch('/api/admin/suppliers/delete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ids: suppliers.map(s => s.id) }),
+      })
+      const json = await res.json()
+      if (!res.ok) throw new Error(json.error || 'Could not delete suppliers.')
+      const results: DeleteResult[] = json.results ?? []
+      const deletedIds = results.filter(r => r.deleted).map(r => r.id)
+      const failed = results.filter(r => !r.deleted)
+      if (deletedIds.length > 0) {
+        toast.success(`Deleted ${deletedIds.length} supplier${deletedIds.length === 1 ? '' : 's'}.`)
+      }
+      onDone(deletedIds)
+      if (failed.length > 0) setFailures(failed)
+      else onClose()
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Could not delete suppliers.')
+    } finally {
+      setDeleting(false)
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+      <div className="w-full max-w-md bg-white shadow-xl">
+        <div className="px-6 py-5 border-b border-gray-100 flex items-start justify-between gap-4">
+          <div>
+            <p className="font-sans text-[10px] tracking-[0.14em] uppercase text-red-500 mb-0.5">Permanent</p>
+            <h2 className="font-display italic text-2xl">
+              {failures ? 'Some were not deleted' : `Delete ${suppliers.length} supplier${suppliers.length === 1 ? '' : 's'}`}
+            </h2>
+          </div>
+          <button onClick={onClose} disabled={deleting} className="text-gray-400 hover:text-gray-700 shrink-0 mt-0.5">
+            <X size={18} />
+          </button>
+        </div>
+
+        {failures ? (
+          <div className="px-6 py-5 space-y-3">
+            <ul className="max-h-64 overflow-y-auto divide-y divide-gray-100 border border-gray-100">
+              {failures.map(f => (
+                <li key={f.id} className="px-3 py-2">
+                  <p className="font-sans text-sm truncate">{f.name}</p>
+                  <p className="font-sans text-[11px] text-red-600">{f.reason}</p>
+                </li>
+              ))}
+            </ul>
+            <button
+              onClick={onClose}
+              className="w-full py-2.5 font-sans text-sm border border-gray-200 text-gray-600 hover:border-gray-400 transition-colors"
+            >
+              Close
+            </button>
+          </div>
+        ) : (
+          <div className="px-6 py-5 space-y-4">
+            <p className="font-sans text-sm text-gray-600 leading-relaxed">
+              This removes the accounts and everything they own from the platform and the database: login,
+              profile, listings, rooms, departures, uploaded images, waivers, contacts and documents.
+              It cannot be undone.
+            </p>
+            <ul className="max-h-40 overflow-y-auto divide-y divide-gray-100 border border-gray-100">
+              {suppliers.map(s => (
+                <li key={s.id} className="px-3 py-2 flex items-center justify-between gap-3">
+                  <span className="font-sans text-sm truncate">{s.businessName}</span>
+                  <span className="font-sans text-[11px] text-gray-400 truncate max-w-[45%]">{s.email}</span>
+                </li>
+              ))}
+            </ul>
+            <p className="font-sans text-[11px] text-gray-400 leading-relaxed">
+              Suppliers with bookings on record are skipped so guests don&rsquo;t lose their bookings. Suspend those instead.
+            </p>
+            <div>
+              <label className="block font-sans text-[10px] tracking-[0.12em] uppercase text-gray-400 mb-1.5">
+                Type DELETE to confirm
+              </label>
+              <input
+                value={typed}
+                onChange={e => setTyped(e.target.value)}
+                autoFocus
+                className="w-full border border-gray-200 px-3 py-2.5 font-sans text-sm focus:outline-none focus:border-red-400 transition-colors"
+              />
+            </div>
+            <div className="flex gap-3">
+              <button
+                onClick={onClose}
+                disabled={deleting}
+                className="flex-1 py-2.5 font-sans text-sm border border-gray-200 text-gray-600 hover:border-gray-400 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={run}
+                disabled={typed !== 'DELETE' || deleting}
+                className="flex-1 flex items-center justify-center gap-2 py-2.5 font-sans text-sm bg-red-600 text-white hover:bg-red-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+              >
+                <Trash2 size={13} /> {deleting ? 'Deleting…' : 'Delete permanently'}
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
 // ─── Main Page ──────────────────────────────────────────────────────────────────
 
 export default function AdminSuppliersPage() {
@@ -438,6 +565,8 @@ export default function AdminSuppliersPage() {
   const [filter, setFilter] = useState<'all' | 'pending' | 'approved' | 'hidden' | 'vd_managed'>('all')
   const [loading, setLoading] = useState(true)
   const [selected, setSelected] = useState<SupplierRow | null>(null)
+  const [checked, setChecked] = useState<Set<string>>(new Set())
+  const [confirmingDelete, setConfirmingDelete] = useState(false)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -525,6 +654,24 @@ export default function AdminSuppliersPage() {
     vd_managed: suppliers.filter(s => s.isVdManaged).length,
   }
 
+  // Ticks only count while the row is in view, so switching tabs or searching
+  // can never leave a hidden supplier queued for deletion.
+  const checkedRows = filtered.filter(s => checked.has(s.id))
+  const allChecked = filtered.length > 0 && checkedRows.length === filtered.length
+
+  function toggle(id: string) {
+    setChecked(prev => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+
+  function toggleAll() {
+    setChecked(allChecked ? new Set() : new Set(filtered.map(s => s.id)))
+  }
+
   const tabs: { key: typeof filter; label: string }[] = [
     { key: 'all', label: 'All' },
     { key: 'pending', label: 'Pending approval' },
@@ -578,11 +725,43 @@ export default function AdminSuppliersPage() {
         />
       </div>
 
+      {/* Bulk actions */}
+      {checkedRows.length > 0 && (
+        <div className="bg-red-50 border border-red-200 px-4 py-3 mb-4 flex items-center justify-between gap-3 flex-wrap">
+          <p className="font-sans text-sm text-red-700">
+            {checkedRows.length} supplier{checkedRows.length === 1 ? '' : 's'} selected
+          </p>
+          <div className="flex gap-2">
+            <button
+              onClick={() => setChecked(new Set())}
+              className="px-3 py-2 font-sans text-xs border border-gray-300 bg-white text-gray-600 hover:border-gray-400 transition-colors"
+            >
+              Clear
+            </button>
+            <button
+              onClick={() => setConfirmingDelete(true)}
+              className="inline-flex items-center gap-1.5 px-3 py-2 font-sans text-xs bg-red-600 text-white hover:bg-red-700 transition-colors"
+            >
+              <Trash2 size={12} /> Delete permanently
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Table */}
       <div className="bg-white border border-gray-200 overflow-x-auto">
         <table className="w-full min-w-[720px]">
           <thead>
             <tr className="border-b border-gray-100">
+              <th className="pl-5 py-3 w-8">
+                <input
+                  type="checkbox"
+                  checked={allChecked}
+                  onChange={toggleAll}
+                  aria-label="Select all suppliers shown"
+                  className="accent-[#2d6a4f]"
+                />
+              </th>
               {['Business', 'Email / Alias', 'Type', 'Status', 'Joined', ''].map(h => (
                 <th key={h} className="text-left px-5 py-3 font-sans text-[10px] tracking-[0.12em] uppercase text-gray-400">{h}</th>
               ))}
@@ -590,13 +769,22 @@ export default function AdminSuppliersPage() {
           </thead>
           <tbody className="divide-y divide-gray-100">
             {loading && (
-              <tr><td colSpan={6} className="px-5 py-12 text-center font-sans text-sm text-gray-400">Loading…</td></tr>
+              <tr><td colSpan={7} className="px-5 py-12 text-center font-sans text-sm text-gray-400">Loading…</td></tr>
             )}
             {!loading && filtered.length === 0 && (
-              <tr><td colSpan={6} className="px-5 py-12 text-center font-sans text-sm text-gray-400">No suppliers found.</td></tr>
+              <tr><td colSpan={7} className="px-5 py-12 text-center font-sans text-sm text-gray-400">No suppliers found.</td></tr>
             )}
             {filtered.map(s => (
-              <tr key={s.id} className="hover:bg-[#F7F5F2] transition-colors">
+              <tr key={s.id} className={`hover:bg-[#F7F5F2] transition-colors ${checked.has(s.id) ? 'bg-red-50/40' : ''}`}>
+                <td className="pl-5 py-4 w-8">
+                  <input
+                    type="checkbox"
+                    checked={checked.has(s.id)}
+                    onChange={() => toggle(s.id)}
+                    aria-label={`Select ${s.businessName}`}
+                    className="accent-[#2d6a4f]"
+                  />
+                </td>
                 <td className="px-5 py-4">
                   <div className="flex items-center gap-2.5">
                     <div className="w-8 h-8 bg-[#2d6a4f]/10 flex items-center justify-center font-display italic text-[#2d6a4f] text-sm shrink-0">
@@ -641,6 +829,21 @@ export default function AdminSuppliersPage() {
           supplier={selected}
           onClose={() => setSelected(null)}
           onSaved={() => { setSelected(null); load() }}
+        />
+      )}
+
+      {confirmingDelete && (
+        <BulkDeleteDialog
+          suppliers={checkedRows}
+          onClose={() => setConfirmingDelete(false)}
+          onDone={deletedIds => {
+            setChecked(prev => {
+              const next = new Set(prev)
+              deletedIds.forEach(id => next.delete(id))
+              return next
+            })
+            load()
+          }}
         />
       )}
     </div>
