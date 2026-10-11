@@ -54,7 +54,10 @@ const pillCls = (active: boolean) =>
 
 export default function StaysPage() {
   const [sortBy, setSortBy] = useState('Recommended')
-  const [maxPrice, setMaxPrice] = useState(5000)
+  // null = no price cap. This used to default to a fixed R5,000 ceiling, which
+  // silently hid every stay whose cheapest room costs more than that — with no
+  // filter visibly applied. The slider now tops out at the dearest stay.
+  const [maxPrice, setMaxPrice] = useState<number | null>(null)
   const [amenities, setAmenities] = useState<string[]>([])
   const [showFilters, setShowFilters] = useState(false)
   const [liveProperties, setLiveProperties] = useState<StayCard[]>([])
@@ -97,11 +100,12 @@ export default function StaysPage() {
   const toggleAmenity = (a: string) =>
     setAmenities((prev) => prev.includes(a) ? prev.filter((x) => x !== a) : [...prev, a])
 
-  const hasActiveFilters = Boolean(typeFilter || regionFilter || amenities.length || maxPrice < 5000)
+  const priceCeiling = Math.max(5000, Math.ceil(Math.max(0, ...liveProperties.map(s => s.price || 0)) / 500) * 500)
+  const hasActiveFilters = Boolean(typeFilter || regionFilter || amenities.length || maxPrice != null)
 
   const filtered = liveProperties
     .filter((s) =>
-      (!s.price || s.price <= maxPrice) &&
+      (maxPrice == null || !s.price || s.price <= maxPrice) &&
       (!amenities.length || amenities.every((a) => s.amenities.includes(a))) &&
       (!regionFilter || regionsMatch(s.location, regionFilter)) &&
       (!typeFilter || s.category === typeFilter)
@@ -193,10 +197,10 @@ export default function StaysPage() {
               <div>
                 <p className="font-sans text-xs tracking-[0.15em] uppercase text-forest/40 mb-3">Max price / night</p>
                 <div className="flex items-center justify-between font-sans text-sm text-forest mb-2">
-                  <span>{formatMoney(0)}</span><span className="font-medium">{formatMoney(maxPrice)}</span>
+                  <span>{formatMoney(0)}</span><span className="font-medium">{maxPrice == null ? 'Any' : formatMoney(maxPrice)}</span>
                 </div>
-                <input type="range" min={0} max={5000} step={100} value={maxPrice}
-                  onChange={(e) => setMaxPrice(Number(e.target.value))}
+                <input type="range" min={0} max={priceCeiling} step={100} value={maxPrice ?? priceCeiling}
+                  onChange={(e) => { const v = Number(e.target.value); setMaxPrice(v >= priceCeiling ? null : v) }}
                   className="w-full accent-forest" />
               </div>
               <div>
@@ -212,7 +216,7 @@ export default function StaysPage() {
                 </div>
               </div>
               <div className="sm:col-span-2 lg:col-span-2 flex items-end">
-                <button onClick={() => { setAmenities([]); setMaxPrice(5000); setTypeFilter(''); setRegionFilter('') }}
+                <button onClick={() => { setAmenities([]); setMaxPrice(null); setTypeFilter(''); setRegionFilter('') }}
                   className="font-sans text-xs text-forest/40 hover:text-forest transition-colors inline-flex items-center gap-1">
                   <X className="w-3 h-3" /> Clear filters
                 </button>

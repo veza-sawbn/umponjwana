@@ -62,5 +62,8 @@ export async function POST(req: Request) {
   if (slug && slug !== id) revalidatePath(`/stays/${slug}`)
   revalidatePath(`/stays/${id}`)
   revalidatePath('/stays')
+  // Region pages list their active stays and are ISR-cached for an hour, so a
+  // property going live (or being edited/unpublished) must bust them too.
+  revalidatePath('/regions/[slug]', 'page')
   return NextResponse.json({ revalidated: true })
 }

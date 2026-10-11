@@ -227,7 +227,10 @@ export async function updateEntity(
     .eq('kind', kind)
     .eq('id', id)
     .maybeSingle()
-  if (!data) return
+  // Neither of these may pass silently: RLS turns a write the caller isn't
+  // allowed to make into "0 rows", not an error, and the UI would report a
+  // save (e.g. a status change to active) that never happened.
+  if (!data) throw new Error('This item could not be found, or you do not have access to it.')
   const merged = { ...(data.value as object), ...patch, id } as Record<string, unknown>
   const update: Record<string, unknown> = {
     value: merged,
@@ -236,12 +239,16 @@ export async function updateEntity(
   if (typeof merged.status === 'string') {
     update.status = merged.status
   }
-  const { error } = await supabase
+  const { data: updated, error } = await supabase
     .from('vd_entities')
     .update(update)
     .eq('kind', kind)
     .eq('id', id)
+    .select('id')
   if (error) throw error
+  if (!updated || updated.length === 0) {
+    throw new Error('Changes were not saved — you do not have permission to edit this item.')
+  }
 }
 
 export async function deleteEntity(kind: string, id: string): Promise<void> {
