@@ -187,6 +187,15 @@ export async function sendCampaign(id: string): Promise<{ sent: number; total: n
   }
 }
 
+/** Closes out a send that was cut off and left the campaign in 'sending'
+ *  (migrations/20261012_campaign_send_recovery.sql). Marks it sent — never
+ *  back to draft, since some recipients were very likely emailed. Returns
+ *  how many are recorded as sent. */
+export async function releaseStuckCampaign(id: string): Promise<{ sent: number | null; error: string | null }> {
+  const { data, error } = await supabase.rpc('vd_campaign_release_stuck', { p_campaign_id: id })
+  return { sent: typeof data === 'number' ? data : null, error: error?.message ?? null }
+}
+
 // ── Audience ─────────────────────────────────────────────────────────────
 
 export async function getAudienceSegmentOptions(): Promise<SegmentCount[]> {

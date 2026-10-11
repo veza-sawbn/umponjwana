@@ -47,7 +47,7 @@ export async function sendBrevoBatch(o: {
   messages: BrevoMessage[]
   campaignId: string
   unsubscribeUrl: string
-}): Promise<{ sent: number; error: string | null }> {
+}): Promise<{ sent: number; error: string | null; uncertain?: boolean }> {
   if (!brevoConfigured()) return { sent: 0, error: 'Brevo not configured (BREVO_API_KEY, BREVO_SENDER_EMAIL)' }
   if (o.messages.length === 0) return { sent: 0, error: null }
   if (o.messages.length > 1000) return { sent: 0, error: 'Brevo batch larger than 1000 messages' }
@@ -95,7 +95,10 @@ export async function sendBrevoBatch(o: {
     }
     return { sent: o.messages.length, error: null }
   } catch (e) {
-    return { sent: 0, error: e instanceof Error ? e.message : 'Brevo request failed' }
+    // No HTTP response at all — a dropped connection or timeout. Brevo may
+    // well have accepted the batch before the reply was lost, so the caller
+    // must not treat these people as unsent and offer a retry.
+    return { sent: 0, uncertain: true, error: e instanceof Error ? e.message : 'Brevo request failed' }
   }
 }
 

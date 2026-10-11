@@ -7,7 +7,7 @@ import { ArrowLeft, Loader2, Send, Pause, Play, XCircle, Eye, AlertTriangle, Use
 import {
   getEmailCampaign, getEmailTemplate, getAudienceSegmentOptions, getConsentedAudienceCount,
   getConsentedRecipientCount, getCampaignContacts,
-  dryRunSendCampaign, sendCampaign, setCampaignStatus, type EmailCampaign, type EmailTemplate, type CampaignContact,
+  dryRunSendCampaign, sendCampaign, releaseStuckCampaign, setCampaignStatus, type EmailCampaign, type EmailTemplate, type CampaignContact,
 } from '@/lib/email-campaigns-admin'
 import type { SegmentCount } from '@/lib/customers-admin'
 import PersonalisedPreview from '@/components/admin/campaigns/PersonalisedPreview'
@@ -89,6 +89,14 @@ export default function EmailCampaignDetailPage() {
     await load()
   }
 
+  async function handleRelease() {
+    if (!campaign) return
+    setError(''); setNotice('')
+    const { error: err } = await releaseStuckCampaign(campaign.id)
+    if (err) { setError(err); return }
+    await load()
+  }
+
   async function handleStatus(status: 'paused' | 'cancelled' | 'draft') {
     if (!campaign) return
     const { error: err } = await setCampaignStatus(campaign.id, status)
@@ -107,9 +115,13 @@ export default function EmailCampaignDetailPage() {
   const segmentName = campaign.audienceMode === 'manual'
     ? `${campaign.recipientUserIds.length.toLocaleString()} hand-picked contact${campaign.recipientUserIds.length === 1 ? '' : 's'}`
     : segments.find(s => s.id === campaign.audienceSegmentId)?.name ?? 'All marketing-consented customers'
-  const sendable = ['draft', 'scheduled'].includes(campaign.status) && !!campaign.templateId
+  // dry_run_sent stays sendable: a dry run emails nobody, and "check the
+  // audience, then send" is the order an admin should work in.
+  const sendable = ['draft', 'scheduled', 'dry_run_sent'].includes(campaign.status) && !!campaign.templateId
     && (campaign.audienceMode !== 'manual' || campaign.recipientUserIds.length > 0)
   const mergeEntries = Object.entries(campaign.mergeValues)
+  // The send function's limit is 5 minutes; past 10 it has certainly stopped.
+  const stuck = campaign.status === 'sending' && Date.now() - new Date(campaign.updatedAt).getTime() > 10 * 60 * 1000
 
   return (
     <div className="p-4 sm:p-6 lg:p-8">
@@ -148,9 +160,25 @@ export default function EmailCampaignDetailPage() {
               <p className="font-sans text-xs text-red-500 mb-4 break-words">Last send problem: {campaign.sendError}</p>
             )}
 
-            {campaign.status === 'sending' ? (
+            {campaign.status === 'dry_run_sent' && campaign.sentAt && (
+              <p className="font-sans text-sm text-gray-700 mb-4">
+                Dry run completed {fmtDateTime(campaign.sentAt)}: <strong>{campaign.audienceCountSnapshot?.toLocaleString() ?? 0}</strong> recipients resolved, nobody emailed.
+              </p>
+            )}
+
+            {stuck ? (
+              <div className="space-y-3">
+                <p className="font-sans text-sm text-gray-700">
+                  This send stopped before it finished (started {fmtDateTime(campaign.updatedAt)}). Some recipients were probably
+                  emailed. Releasing it marks the campaign as sent with the recorded count — it won&apos;t send again.
+                </p>
+                <button onClick={handleRelease} className="inline-flex items-center gap-2 border border-gray-200 px-5 py-2.5 font-sans text-sm text-gray-600 hover:border-[#2d6a4f] hover:text-[#2d6a4f] transition-colors">
+                  Release Interrupted Send
+                </button>
+              </div>
+            ) : campaign.status === 'sending' ? (
               <p className="font-sans text-sm text-gray-700 inline-flex items-center gap-2"><Loader2 size={14} className="animate-spin" /> Sending through Brevo…</p>
-            ) : campaign.sentAt ? (
+            ) : campaign.status === 'sent' && campaign.sentAt ? (
               <div className="space-y-2">
                 <p className="font-sans text-sm text-gray-700">
                   {campaign.dryRun ? 'Dry run completed' : 'Sent through Brevo'} {fmtDateTime(campaign.sentAt)}
@@ -180,9 +208,9 @@ export default function EmailCampaignDetailPage() {
                   <button onClick={() => setConfirmSend('real')} className="inline-flex items-center gap-2 bg-[#2d6a4f] text-white px-5 py-2.5 font-sans text-sm hover:bg-[#245a41] transition-colors">
                     <Send size={14} /> Send Now
                   </button>
-                  <button onClick={() => setConfirmSend('dry')} className="inline-flex items-center gap-2 border border-gray-200 px-5 py-2.5 font-sans text-sm text-gray-600 hover:border-[#2d6a4f] hover:text-[#2d6a4f] transition-colors">
+                  {campaign.status !== 'dry_run_sent' && <button onClick={() => setConfirmSend('dry')} className="inline-flex items-center gap-2 border border-gray-200 px-5 py-2.5 font-sans text-sm text-gray-600 hover:border-[#2d6a4f] hover:text-[#2d6a4f] transition-colors">
                     Dry Run
-                  </button>
+                  </button>}
                 </div>
               )
             ) : (

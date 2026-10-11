@@ -103,6 +103,12 @@ describe('sendBrevoBatch', () => {
     expect(body.headers['List-Unsubscribe']).toBe('<https://x.test/unsubscribe>')
   })
 
+  it('flags a lost connection as possibly sent, not as a clean failure', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('socket hang up')))
+    const r = await sendBrevoBatch({ messages: [{ email: 'a@b.test', subject: 's', html: 'h' }], campaignId: 'c', unsubscribeUrl: 'u' })
+    expect(r).toEqual({ sent: 0, uncertain: true, error: 'socket hang up' })
+  })
+
   it('surfaces Brevo error messages', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(
       new Response(JSON.stringify({ code: 'unauthorized', message: 'Key not found' }), { status: 401 }),

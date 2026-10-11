@@ -55,9 +55,21 @@ export async function POST(req: Request, { params }: { params: { id: string } })
     heroImageAlt: template.hero_image_alt ?? '',
   }
 
+  // Reporting rows go in after every accepted batch, not once at the end: if
+  // the function is cut off mid-send they are the only record of who got the
+  // email, and vd_campaign_release_stuck() counts them. Service role only (no
+  // client insert policy on vd_email_events); best-effort either way.
+  const admin = supabaseAdmin()
+  async function recordSent(batch: CampaignRecipientRow[], unconfirmed: boolean) {
+    const { error } = await admin.from('vd_email_events').insert(batch.map(r => ({
+      campaign_id: params.id, user_id: r.user_id, email: r.email, event_type: 'sent',
+      metadata: unconfirmed ? { provider: 'brevo', unconfirmed: true } : { provider: 'brevo' },
+    })))
+    if (error) console.error('[campaign-send] event log failed:', error)
+  }
+
   let sent = 0
   const errors: string[] = []
-  const sentEmails: { email: string; userId: string }[] = []
   try {
     for (let i = 0; i < recipients.length; i += BREVO_BATCH_SIZE) {
       const batch = recipients.slice(i, i + BREVO_BATCH_SIZE)
@@ -66,12 +78,21 @@ export async function POST(req: Request, { params }: { params: { id: string } })
         postalAddress: process.env.EMAIL_POSTAL_ADDRESS,
       }))
       const result = await sendBrevoBatch({ messages, campaignId: params.id, unsubscribeUrl: `${origin}/unsubscribe` })
+      const range = `recipients ${i + 1}–${i + batch.length}`
+      if (result.uncertain) {
+        // Counted as sent so the campaign can't fall back to draft and be
+        // retried into a double send; the error says to check Brevo.
+        errors.push(`${range}: no reply from Brevo (${result.error}) — may have been sent, check Brevo's logs`)
+        sent += batch.length
+        await recordSent(batch, true)
+        continue
+      }
       if (result.error) {
-        errors.push(`recipients ${i + 1}–${i + batch.length}: ${result.error}`)
+        errors.push(`${range}: ${result.error}`)
         continue
       }
       sent += result.sent
-      for (const r of batch) sentEmails.push({ email: r.email, userId: r.user_id })
+      await recordSent(batch, false)
     }
   } catch (e) {
     errors.push(e instanceof Error ? e.message : 'send failed')
@@ -80,27 +101,13 @@ export async function POST(req: Request, { params }: { params: { id: string } })
   const errorText = errors.length ? errors.join('; ').slice(0, 2000)
     : recipients.length === 0 ? 'no consented recipients' : null
 
-  // Always release the claim, whatever happened above — a campaign left in
-  // 'sending' can't be sent or edited again.
+  // Releases the claim. If the function dies before getting here the
+  // campaign stays 'sending' until an admin releases it from the campaign
+  // page (vd_campaign_release_stuck, migrations/20261012_campaign_send_recovery.sql).
   const { error: finishError } = await supabase.rpc('vd_campaign_finish_send', {
     p_campaign_id: params.id, p_sent_count: sent, p_error: errorText,
   })
   if (finishError) console.error('[campaign-send] finish failed:', finishError)
-
-  // Reporting rows are best-effort and service-role only (no client insert
-  // policy on vd_email_events). The send already happened either way.
-  if (sentEmails.length) {
-    const admin = supabaseAdmin()
-    for (let i = 0; i < sentEmails.length; i += 1000) {
-      const { error } = await admin.from('vd_email_events').insert(
-        sentEmails.slice(i, i + 1000).map(s => ({
-          campaign_id: params.id, user_id: s.userId, email: s.email, event_type: 'sent',
-          metadata: { provider: 'brevo' },
-        })),
-      )
-      if (error) { console.error('[campaign-send] event log failed:', error); break }
-    }
-  }
 
   if (sent === 0) {
     return NextResponse.json({ sent: 0, total: recipients.length, error: errorText }, { status: recipients.length ? 502 : 400 })
