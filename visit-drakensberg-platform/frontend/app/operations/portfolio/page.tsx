@@ -99,7 +99,7 @@ export default function PortfolioPage() {
                   </p>
                   <p className="font-sans text-sm text-gray-900">
                     {canSeeContract
-                      ? (s.commission_rate != null ? `${s.commission_rate}%` : '—')
+                      ? (s.commission_rate != null ? `${Math.round(Number(s.commission_rate) * 100 * 100) / 100}%` : '—')
                       : <span className="text-gray-300">Not visible</span>}
                   </p>
                 </div>

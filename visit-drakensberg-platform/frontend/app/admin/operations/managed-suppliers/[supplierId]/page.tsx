@@ -118,6 +118,21 @@ function fmtDate(d: string | null | undefined) {
   return new Date(d).toLocaleDateString('en-ZA', { day: 'numeric', month: 'short', year: 'numeric' })
 }
 
+// commission_rate and platform_fee_rate are stored as fractions (0.15 = 15%);
+// the DB enforces 0 <= rate < 1. The form works in percent, so convert at the
+// edges. management_fee has no such constraint and is stored as entered.
+function fractionToPctInput(rate: number | null | undefined): string {
+  if (rate == null) return ''
+  return String(Math.round(Number(rate) * 100 * 10000) / 10000)
+}
+
+function pctInputToFraction(pct: string): number | null {
+  if (!pct.trim()) return null
+  const n = parseFloat(pct)
+  if (!Number.isFinite(n)) return null
+  return Math.round((n / 100) * 1e6) / 1e6
+}
+
 // ─── Commercial Terms Panel (admin only) ───────────────────────────────────────
 
 function CommercialTermsPanel({
@@ -135,9 +150,9 @@ function CommercialTermsPanel({
   const [model, setModel]             = useState<ManagementModel>(terms?.management_model ?? 'supplier_managed')
   const [status, setStatus]           = useState<ManagementStatus>(terms?.management_status ?? 'active')
   const [agreementType, setAgreementType] = useState<AgreementType | ''>(terms?.agreement_type ?? '')
-  const [commission, setCommission]   = useState(terms?.commission_rate?.toString() ?? '')
+  const [commission, setCommission]   = useState(fractionToPctInput(terms?.commission_rate))
   const [mgmtFee, setMgmtFee]         = useState(terms?.management_fee?.toString() ?? '')
-  const [platformFee, setPlatformFee] = useState(terms?.platform_fee_rate?.toString() ?? '')
+  const [platformFee, setPlatformFee] = useState(fractionToPctInput(terms?.platform_fee_rate))
   const [settlement, setSettlement]   = useState(terms?.settlement_frequency ?? 'monthly')
   const [effectiveDate, setEffectiveDate] = useState(terms?.agreement_effective_date ?? '')
   const [expiryDate, setExpiryDate]   = useState(terms?.agreement_expiry_date ?? '')
@@ -148,9 +163,9 @@ function CommercialTermsPanel({
     setModel(terms?.management_model ?? 'supplier_managed')
     setStatus(terms?.management_status ?? 'active')
     setAgreementType(terms?.agreement_type ?? '')
-    setCommission(terms?.commission_rate?.toString() ?? '')
+    setCommission(fractionToPctInput(terms?.commission_rate))
     setMgmtFee(terms?.management_fee?.toString() ?? '')
-    setPlatformFee(terms?.platform_fee_rate?.toString() ?? '')
+    setPlatformFee(fractionToPctInput(terms?.platform_fee_rate))
     setSettlement(terms?.settlement_frequency ?? 'monthly')
     setEffectiveDate(terms?.agreement_effective_date ?? '')
     setExpiryDate(terms?.agreement_expiry_date ?? '')
@@ -160,15 +175,22 @@ function CommercialTermsPanel({
   }
 
   async function save() {
+    const commissionRate = pctInputToFraction(commission)
+    const platformFeeRate = pctInputToFraction(platformFee)
+    if ((commissionRate != null && (commissionRate < 0 || commissionRate >= 1)) ||
+        (platformFeeRate != null && (platformFeeRate < 0 || platformFeeRate >= 1))) {
+      toast.error('Commission and platform fee must be at least 0% and below 100%')
+      return
+    }
     setSaving(true)
     try {
       await upsertSupplierTerms(supplierId, {
         management_model: model,
         management_status: status,
         agreement_type: agreementType || null,
-        commission_rate: commission ? parseFloat(commission) : null,
+        commission_rate: commissionRate,
         management_fee: mgmtFee ? parseFloat(mgmtFee) : null,
-        platform_fee_rate: platformFee ? parseFloat(platformFee) : null,
+        platform_fee_rate: platformFeeRate,
         settlement_frequency: settlement,
         agreement_effective_date: effectiveDate || null,
         agreement_expiry_date: expiryDate || null,
@@ -287,7 +309,7 @@ function CommercialTermsPanel({
               <input type="number" min="0" max="100" step="0.1" value={commission} onChange={e => setCommission(e.target.value)} placeholder="e.g. 15" className={inputCls} />
             ) : (
               <p className="font-sans text-sm text-gray-700">
-                {terms?.commission_rate != null ? `${terms.commission_rate}%` : <span className="text-gray-400">—</span>}
+                {terms?.commission_rate != null ? `${fractionToPctInput(terms.commission_rate)}%` : <span className="text-gray-400">—</span>}
               </p>
             )}
           </div>
@@ -307,7 +329,7 @@ function CommercialTermsPanel({
               <input type="number" min="0" max="100" step="0.1" value={platformFee} onChange={e => setPlatformFee(e.target.value)} placeholder="e.g. 2.5" className={inputCls} />
             ) : (
               <p className="font-sans text-sm text-gray-700">
-                {terms?.platform_fee_rate != null ? `${terms.platform_fee_rate}%` : <span className="text-gray-400">—</span>}
+                {terms?.platform_fee_rate != null ? `${fractionToPctInput(terms.platform_fee_rate)}%` : <span className="text-gray-400">—</span>}
               </p>
             )}
           </div>
