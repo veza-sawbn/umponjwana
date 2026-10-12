@@ -1,7 +1,10 @@
 'use client'
 
+import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { MapPin, Star, Mountain, Zap, Calendar } from 'lucide-react'
+import { getTrails, type Trail } from '@/lib/trails'
+import { getActivities, type Activity } from '@/lib/activities'
 
 interface SmartRecommendation {
   title: string
@@ -12,29 +15,6 @@ interface SmartRecommendation {
   image: string
   href: string
   distance?: string
-}
-
-const REGION_DATA: Record<string, SmartRecommendation[]> = {
-  'Northern Berg': [
-    { title: 'Cathedral Peak Summit', type: 'Trail', location: 'Cathedral Peak', rating: 4.7, price: null, image: 'https://images.unsplash.com/photo-1486870591958-9b9d0d1dda99?w=400&q=80', href: '/hikes/cathedral-peak', distance: '~12km' },
-    { title: 'Tugela Falls Circuit', type: 'Trail', location: 'Royal Natal National Park', rating: 4.9, price: null, image: 'https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?w=400&q=80', href: '/hikes/tugela-falls', distance: '~14km' },
-    { title: 'Berg Photography Tour', type: 'Activity', location: 'Northern Berg', rating: 4.8, price: 950, image: 'https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=400&q=80', href: '/activities/a1' },
-    { title: 'Guided Rock Climbing', type: 'Activity', location: 'Amphitheatre', rating: 4.9, price: 750, image: 'https://images.unsplash.com/photo-1504280390367-361c6d9f38f4?w=400&q=80', href: '/activities/a1' },
-    { title: 'Drakensberg Boys Choir', type: 'Event', location: 'Drakensberg Boys Choir School', image: 'https://images.unsplash.com/photo-1441974231531-c6227db76b6e?w=400&q=80', href: '/events/boys-choir' },
-  ],
-  'Central Berg': [
-    { title: "Giant's Castle via Meander", type: 'Trail', location: "Giant's Castle", rating: 4.6, price: null, image: 'https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=400&q=80', href: '/hikes/giants-castle', distance: '~18km' },
-    { title: 'Fairy Glen Waterfall Walk', type: 'Trail', location: 'Central Berg', rating: 4.6, price: null, image: 'https://images.unsplash.com/photo-1441974231531-c6227db76b6e?w=400&q=80', href: '/hikes/fairy-glen', distance: '~7km' },
-    { title: 'San Rock Art Full-Day Tour', type: 'Experience', location: "Giant's Castle", rating: 4.9, price: 620, image: 'https://images.unsplash.com/photo-1501854140801-50d01698950b?w=400&q=80', href: '/activities/a2' },
-    { title: 'Bearded Vulture Hide', type: 'Experience', location: "Giant's Castle", rating: 4.8, price: 480, image: 'https://images.unsplash.com/photo-1441974231531-c6227db76b6e?w=400&q=80', href: '/activities/a3' },
-    { title: 'Midlands Meander Art Route', type: 'Event', location: 'Midlands', image: 'https://images.unsplash.com/photo-1504280390367-361c6d9f38f4?w=400&q=80', href: '/events/midlands-meander' },
-  ],
-  'Southern Berg': [
-    { title: 'Sani Pass to Lesotho', type: 'Trail', location: 'Sani Pass', rating: 4.9, price: null, image: 'https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?w=400&q=80', href: '/hikes/sani-pass', distance: '~8km' },
-    { title: "Bushman's Nek Loop", type: 'Trail', location: 'Southern Berg', rating: 4.5, price: null, image: 'https://images.unsplash.com/photo-1486870591958-9b9d0d1dda99?w=400&q=80', href: '/hikes/bushmans-nek', distance: '~10km' },
-    { title: 'Sani Pass 4WD Tour', type: 'Activity', location: 'Sani Pass', rating: 4.8, price: 850, image: 'https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=400&q=80', href: '/activities/sani-4wd' },
-    { title: 'Zulu Cultural Village', type: 'Experience', location: 'Southern Foothills', rating: 4.7, price: 350, image: 'https://images.unsplash.com/photo-1501854140801-50d01698950b?w=400&q=80', href: '/activities/zulu-village' },
-  ],
 }
 
 const TYPE_ICON: Record<string, React.ReactNode> = {
@@ -51,13 +31,88 @@ const TYPE_COLOR: Record<string, string> = {
   Event: 'text-blue-400',
 }
 
+const FALLBACK_IMAGE = 'https://images.unsplash.com/photo-1486870591958-9b9d0d1dda99?w=400&q=80'
+
+// Normalise region names so "Northern Berg" matches "Royal Natal National Park" etc.
+function trailMatchesRegion(trail: Trail, region: string): boolean {
+  const r = region.toLowerCase()
+  const tr = (trail.region || '').toLowerCase()
+  if (tr.includes(r) || r.includes(tr)) return true
+  if (r.includes('northern') && (tr.includes('northern') || tr.includes('royal natal') || tr.includes('cathedral'))) return true
+  if (r.includes('central') && (tr.includes('central') || tr.includes("giant") || tr.includes('champagne'))) return true
+  if (r.includes('southern') && (tr.includes('southern') || tr.includes('sani') || tr.includes('bushman'))) return true
+  return false
+}
+
+function activityMatchesRegion(activity: Activity, region: string): boolean {
+  const r = region.toLowerCase()
+  const mp = (activity.meetingPoint || '').toLowerCase()
+  const cat = (activity.category || '').toLowerCase()
+  return mp.includes(r.split(' ')[0]) || r.includes(mp.split(' ')[0])
+}
+
 interface Props {
   region: string
   excludeListingId?: string
 }
 
 export default function SmartRecommendations({ region, excludeListingId }: Props) {
-  const recommendations = (REGION_DATA[region] || REGION_DATA['Central Berg']).slice(0, 4)
+  const [recommendations, setRecommendations] = useState<SmartRecommendation[]>([])
+
+  useEffect(() => {
+    let cancelled = false
+    async function load() {
+      const [trails, activities] = await Promise.all([getTrails(), getActivities()])
+
+      const trailItems: SmartRecommendation[] = trails
+        .filter(t => t.status === 'published' && trailMatchesRegion(t, region))
+        .slice(0, 3)
+        .map(t => ({
+          title: t.name,
+          type: 'Trail' as const,
+          location: t.region,
+          image: t.image || FALLBACK_IMAGE,
+          href: `/hikes/${t.id}`,
+          distance: t.distance,
+        }))
+
+      const activityItems: SmartRecommendation[] = activities
+        .filter(a => a.status === 'active' && a.id !== excludeListingId && activityMatchesRegion(a, region))
+        .slice(0, 2)
+        .map(a => ({
+          title: a.name,
+          type: 'Activity' as const,
+          location: a.meetingPoint || region,
+          price: a.pricePerPerson,
+          image: FALLBACK_IMAGE,
+          href: `/activities/${a.id}`,
+        }))
+
+      const combined = [...trailItems, ...activityItems].slice(0, 4)
+
+      // If no region-specific results, show published trails as fallback
+      if (!cancelled) {
+        if (combined.length === 0) {
+          const fallback: SmartRecommendation[] = trails
+            .filter(t => t.status === 'published')
+            .slice(0, 4)
+            .map(t => ({
+              title: t.name,
+              type: 'Trail' as const,
+              location: t.region,
+              image: t.image || FALLBACK_IMAGE,
+              href: `/hikes/${t.id}`,
+              distance: t.distance,
+            }))
+          setRecommendations(fallback)
+        } else {
+          setRecommendations(combined)
+        }
+      }
+    }
+    load()
+    return () => { cancelled = true }
+  }, [region, excludeListingId])
 
   if (recommendations.length === 0) return null
 
