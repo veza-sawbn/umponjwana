@@ -82,6 +82,12 @@ export type InvoiceCustomerOrder = {
   order_number: string
   customer_name: string
   customer_email: string
+  /** Company billing details — absent before 20261014_order_customer_details.sql. */
+  customer_is_company?: boolean
+  customer_company?: string
+  customer_vat_number?: string
+  customer_registration_number?: string
+  customer_address?: string
   trip_name: string
   travel_start: string | null
   travel_end: string | null

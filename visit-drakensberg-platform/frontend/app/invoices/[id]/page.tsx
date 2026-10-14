@@ -456,9 +456,19 @@ function PrintableInvoiceInner() {
           {/* Bill to / trip */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 sm:gap-8 py-8 print:py-5 border-b border-gray-200">
             <div>
-              <p className="font-sans text-[10px] tracking-[0.14em] uppercase text-gray-400 mb-2">Customer Info</p>
-              <p className="font-sans text-sm font-medium text-gray-800">{order?.customer_name || '—'}</p>
+              <p className="font-sans text-[10px] tracking-[0.14em] uppercase text-gray-400 mb-2">{order?.customer_is_company ? 'Bill To' : 'Customer Info'}</p>
+              {order?.customer_is_company && order.customer_company ? (
+                <>
+                  <p className="font-sans text-sm font-medium text-gray-800">{order.customer_company}</p>
+                  {order.customer_vat_number && <p className="font-sans text-xs text-gray-500 mt-0.5">VAT: {order.customer_vat_number}</p>}
+                  {order.customer_registration_number && <p className="font-sans text-xs text-gray-500 mt-0.5">Reg. no: {order.customer_registration_number}</p>}
+                  <p className="font-sans text-xs text-gray-500 mt-0.5">Attn: {order.customer_name}</p>
+                </>
+              ) : (
+                <p className="font-sans text-sm font-medium text-gray-800">{order?.customer_name || '—'}</p>
+              )}
               <p className="font-sans text-xs text-gray-500 mt-0.5">{order?.customer_email}</p>
+              {order?.customer_address && <p className="font-sans text-xs text-gray-500 mt-0.5 whitespace-pre-line">{order.customer_address}</p>}
             </div>
             <div className="text-left sm:text-right">
               <p className="font-sans text-[10px] tracking-[0.14em] uppercase text-gray-400 mb-2">Trip</p>

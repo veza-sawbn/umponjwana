@@ -159,9 +159,19 @@ function InvoiceDocument({ invoice, order, receipts, business, siteUrl }: Invoic
 
         {/* Customer info */}
         <View style={styles.customerBlock}>
-          <Text style={styles.label}>Customer Info:</Text>
-          <Text style={styles.customerName}>{order?.customer_name || '—'}</Text>
+          <Text style={styles.label}>{order?.customer_is_company ? 'Bill To:' : 'Customer Info:'}</Text>
+          {order?.customer_is_company && order.customer_company ? (
+            <>
+              <Text style={styles.customerName}>{order.customer_company}</Text>
+              {!!order.customer_vat_number && <Text style={styles.customerLine}>VAT: {order.customer_vat_number}</Text>}
+              {!!order.customer_registration_number && <Text style={styles.customerLine}>Reg. no: {order.customer_registration_number}</Text>}
+              <Text style={styles.customerLine}>Attn: {order.customer_name}</Text>
+            </>
+          ) : (
+            <Text style={styles.customerName}>{order?.customer_name || '—'}</Text>
+          )}
           {!!order?.customer_email && <Text style={styles.customerLine}>{order.customer_email}</Text>}
+          {!!order?.customer_address && <Text style={styles.customerLine}>{order.customer_address}</Text>}
           <Text style={styles.tripLine}>
             {order?.trip_name ? `${order.trip_name} · ` : ''}Order {order?.order_number}
             {order?.travel_start

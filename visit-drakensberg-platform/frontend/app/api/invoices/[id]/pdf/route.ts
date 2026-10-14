@@ -48,7 +48,7 @@ async function loadAuthed(id: string): Promise<Shared | null> {
 
   const [{ data: order }, { data: receipts }] = await Promise.all([
     supabase.from('vd_orders')
-      .select('order_number, customer_name, customer_email, trip_name, travel_start, travel_end, currency')
+      .select('*')
       .eq('id', invoice.order_id).maybeSingle(),
     supabase.from('vd_receipts').select('*').eq('order_id', invoice.order_id).order('created_at', { ascending: false }),
   ])
