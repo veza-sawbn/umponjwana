@@ -40,15 +40,20 @@ export type OrderBilling = {
 }
 
 /**
- * The company rows a receipt shows for a company customer — who the money
- * came from (or, on a refund, went to), then VAT and registration numbers
- * when they are on file. Empty for an individual, so a personal receipt
- * reads exactly as before.
+ * The company rows a customer email shows for a company customer, then VAT
+ * and registration numbers when they are on file. The first row names the
+ * company's role in that email: who the invoice is billed to, who a payment
+ * was received from, or who a refund went to. Empty for an individual, so
+ * their emails read exactly as before.
  */
-export function companyBillingRows(order: OrderBilling, opts: { refund?: boolean } = {}): [string, string][] {
+export function companyBillingRows(
+  order: OrderBilling,
+  opts: { refund?: boolean; invoice?: boolean } = {},
+): [string, string][] {
   const company = (order.customer_company ?? '').trim()
   if (!order.customer_is_company || !company) return []
-  const rows: [string, string][] = [[opts.refund ? 'Refunded to' : 'Received from', company]]
+  const label = opts.invoice ? 'Billed to' : opts.refund ? 'Refunded to' : 'Received from'
+  const rows: [string, string][] = [[label, company]]
   const vat = (order.customer_vat_number ?? '').trim()
   const reg = (order.customer_registration_number ?? '').trim()
   if (vat) rows.push(['VAT number', vat])

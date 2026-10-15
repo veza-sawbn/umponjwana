@@ -41,6 +41,10 @@ describe('companyBillingRows', () => {
       ['Registration number', '2019/123456/07'],
     ])
   })
+  it('names the company as the one billed on an invoice', () => {
+    expect(companyBillingRows({ customer_is_company: true, customer_company: 'Acme', customer_vat_number: '4840254876' }, { invoice: true }))
+      .toEqual([['Billed to', 'Acme'], ['VAT number', '4840254876']])
+  })
   it('names the company as the recipient on a refund', () => {
     expect(companyBillingRows({ customer_is_company: true, customer_company: 'Acme', customer_vat_number: '4840254876' }, { refund: true }))
       .toEqual([['Refunded to', 'Acme'], ['VAT number', '4840254876']])
