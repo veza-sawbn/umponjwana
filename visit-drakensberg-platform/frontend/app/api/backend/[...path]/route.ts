@@ -3,6 +3,10 @@ import { cookies } from 'next/headers'
 import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs'
 import { rateLimit, rateLimitHeaders, callerKey } from '@/lib/rate-limit'
 
+// Never serve a database read from Next's fetch cache — see
+// tests/route-fetch-cache.test.ts for why force-dynamic alone isn't enough.
+export const fetchCache = 'force-no-store'
+
 // Proxy /api/backend/* requests to the legacy FastAPI backend, bypassing
 // browser CORS. Usage: fetch('/api/backend/api/v1/listings').
 //

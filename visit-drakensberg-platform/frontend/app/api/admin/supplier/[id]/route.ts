@@ -4,6 +4,9 @@ import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 
 export const dynamic = 'force-dynamic'
+// Never serve a database read from Next's fetch cache — see
+// tests/route-fetch-cache.test.ts for why force-dynamic alone isn't enough.
+export const fetchCache = 'force-no-store'
 
 /** Assert caller is a platform admin, return 403 response if not. */
 async function requireAdmin(supabase: ReturnType<typeof createRouteHandlerClient>) {
