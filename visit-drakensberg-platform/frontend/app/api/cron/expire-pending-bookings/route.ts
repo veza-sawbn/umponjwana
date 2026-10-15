@@ -3,6 +3,9 @@ import { supabaseAdmin } from '@/lib/supabase-admin'
 import { bearerMatches } from '@/lib/secret-compare'
 
 export const dynamic = 'force-dynamic'
+// Never serve a database read from Next's fetch cache — see
+// tests/route-fetch-cache.test.ts for why force-dynamic alone isn't enough.
+export const fetchCache = 'force-no-store'
 
 // Sweeps abandoned 'pending' bookings (customer never completed iKhokha
 // payment) so they stop holding room/departure-seat inventory forever — see

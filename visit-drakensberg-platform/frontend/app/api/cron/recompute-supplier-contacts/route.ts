@@ -3,6 +3,9 @@ import { supabaseAdmin } from '@/lib/supabase-admin'
 import { bearerMatches } from '@/lib/secret-compare'
 
 export const dynamic = 'force-dynamic'
+// Never serve a database read from Next's fetch cache — see
+// tests/route-fetch-cache.test.ts for why force-dynamic alone isn't enough.
+export const fetchCache = 'force-no-store'
 
 // Recomputes every supplier's contact list from live vd_order_lines/
 // vd_orders history — see vd_recompute_supplier_contacts() in

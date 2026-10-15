@@ -5,6 +5,9 @@ import { EMAIL_STARTERS } from '@/lib/email-starters'
 import { getSiteOrigin } from '@/lib/origin'
 
 export const dynamic = 'force-dynamic'
+// Never serve a database read from Next's fetch cache — see
+// tests/route-fetch-cache.test.ts for why force-dynamic alone isn't enough.
+export const fetchCache = 'force-no-store'
 
 // Serves the campaign builder's starting points. lib/email-starters.ts builds
 // them from lib/email-layout.ts's blocks, both of which are SERVER ONLY, so

@@ -7,6 +7,9 @@ import type { Invoice, InvoiceCustomerOrder, Receipt } from '@/lib/invoices'
 import { rateLimit, rateLimitHeaders, callerKey } from '@/lib/rate-limit'
 
 export const dynamic = 'force-dynamic'
+// Never serve a database read from Next's fetch cache — see
+// tests/route-fetch-cache.test.ts for why force-dynamic alone isn't enough.
+export const fetchCache = 'force-no-store'
 
 // Serves the invoice as an actual generated PDF — @react-pdf/renderer lays
 // it out itself, so there's no browser print pipeline in the way: no site

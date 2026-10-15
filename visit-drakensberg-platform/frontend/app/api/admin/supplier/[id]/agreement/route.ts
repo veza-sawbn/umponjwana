@@ -6,6 +6,9 @@ import { renderAgreementPdf } from '@/lib/agreement-pdf'
 import { loadAgreementRecord, agreementFileName, isAgreementDocument } from '@/lib/agreement-record'
 
 export const dynamic = 'force-dynamic'
+// Never serve a database read from Next's fetch cache — see
+// tests/route-fetch-cache.test.ts for why force-dynamic alone isn't enough.
+export const fetchCache = 'force-no-store'
 
 /**
  * GET /api/admin/supplier/[id]/agreement?document=supplier_terms

@@ -4,6 +4,9 @@ import { bearerMatches } from '@/lib/secret-compare'
 import { alertEvent, logEvent, EVENTS } from '@/lib/observability'
 
 export const dynamic = 'force-dynamic'
+// Never serve a database read from Next's fetch cache — see
+// tests/route-fetch-cache.test.ts for why force-dynamic alone isn't enough.
+export const fetchCache = 'force-no-store'
 
 /**
  * GET /api/cron/audit-digest

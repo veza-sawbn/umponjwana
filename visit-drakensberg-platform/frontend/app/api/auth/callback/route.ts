@@ -4,6 +4,9 @@ import { NextResponse } from 'next/server'
 import { safeRedirectPath } from '@/lib/safe-redirect'
 
 export const dynamic = 'force-dynamic'
+// Never serve a database read from Next's fetch cache — see
+// tests/route-fetch-cache.test.ts for why force-dynamic alone isn't enough.
+export const fetchCache = 'force-no-store'
 
 /**
  * GET /api/auth/callback
