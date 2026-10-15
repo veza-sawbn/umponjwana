@@ -51,6 +51,13 @@ export type MasterOrder = {
   booking_id: string | null
   customer_name: string
   customer_email: string
+  /** The customer columns below arrive with 20261014_order_customer_details.sql. */
+  customer_phone?: string
+  customer_is_company?: boolean
+  customer_company?: string
+  customer_vat_number?: string
+  customer_registration_number?: string
+  customer_address?: string
   trip_name: string
   destination: string
   trip_status: string
@@ -459,6 +466,42 @@ export async function updateOrderStatus(
     .update({ ...patch, updated_at: new Date().toISOString() })
     .eq('id', id)
   if (error) throw error
+}
+
+export type OrderCustomerDetails = {
+  name: string
+  email: string
+  phone: string
+  isCompany: boolean
+  company: string
+  vatNumber: string
+  registrationNumber: string
+  address: string
+}
+
+/** The order's customer, as the edit form holds it. */
+export function orderCustomerDetails(order: MasterOrder): OrderCustomerDetails {
+  return {
+    name: order.customer_name ?? '',
+    email: order.customer_email ?? '',
+    phone: order.customer_phone || String((order.value as { customerPhone?: unknown } | null)?.customerPhone ?? ''),
+    isCompany: !!order.customer_is_company,
+    company: order.customer_company ?? '',
+    vatNumber: order.customer_vat_number ?? '',
+    registrationNumber: order.customer_registration_number ?? '',
+    address: order.customer_address ?? '',
+  }
+}
+
+/**
+ * Staff: correct the customer on an order — name, contact details, and the
+ * company billing details (VAT and registration number) a company needs on
+ * its tax invoice. Validated and audited server-side; the invoice and its
+ * emails pick the new details up from the order.
+ */
+export async function updateOrderCustomer(orderId: string, details: OrderCustomerDetails): Promise<void> {
+  const { error } = await supabase.rpc('vd_update_order_customer', { p_order_id: orderId, p_details: details })
+  if (error) throw new Error(error.message || 'Could not save the customer details')
 }
 
 /** Admin: recompute a line's supplier/platform allocation server-side. */

@@ -17,6 +17,7 @@ import { getLedgerEntries, type LedgerEntry } from '@/lib/ledger'
 import { formatMoney } from '@/lib/allocation'
 import { supabase } from '@/lib/auth'
 import { getOrderNextStep, nextStepBadgeClass, type NextStep } from '@/lib/next-step'
+import OrderCustomerCard from '@/components/admin/OrderCustomerCard'
 
 const STATUS_BADGE: Record<string, string> = {
   paid: 'bg-[#2d6a4f]/10 text-[#2d6a4f]',
@@ -143,6 +144,8 @@ function OrderDetail({ order, onChanged }: { order: MasterOrder; onChanged: () =
           <p className="font-sans text-xs mt-0.5 opacity-80">{nextStep.detail}</p>
         </div>
       </div>
+
+      <OrderCustomerCard order={order} onSaved={onChanged} />
 
       {/* Status controls */}
       <div className="flex flex-wrap gap-3 mb-4">
@@ -379,7 +382,7 @@ export default function AdminOrdersPage() {
   useEffect(() => { load() }, [])
 
   const filtered = useMemo(() => orders.filter(o => {
-    const hay = `${o.order_number} ${o.customer_name} ${o.customer_email} ${o.trip_name}`.toLowerCase()
+    const hay = `${o.order_number} ${o.customer_name} ${o.customer_email} ${o.customer_company ?? ''} ${o.customer_vat_number ?? ''} ${o.trip_name}`.toLowerCase()
     const matchSearch = hay.includes(search.toLowerCase())
     const matchFilter = filter === 'all'
       || (filter === 'outstanding' && Number(o.outstanding_balance) > 0 && o.booking_status !== 'cancelled')
@@ -426,7 +429,7 @@ export default function AdminOrdersPage() {
       <div className="flex flex-col sm:flex-row sm:flex-wrap gap-3 mb-6">
         <div className="flex items-center gap-2 border border-gray-200 bg-white px-3 py-2.5 sm:py-2 flex-1 sm:min-w-[220px]">
           <Search size={14} className="text-gray-400 shrink-0" />
-          <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search order number, customer, trip…" className="flex-1 min-w-0 font-sans text-base sm:text-sm focus:outline-none" />
+          <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search order number, customer, company, trip…" className="flex-1 min-w-0 font-sans text-base sm:text-sm focus:outline-none" />
         </div>
         <div className="-mx-4 px-4 sm:mx-0 sm:px-0 overflow-x-auto">
           <div className="flex w-max border border-gray-200 bg-white">
@@ -448,7 +451,7 @@ export default function AdminOrdersPage() {
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
                   <p className="font-mono text-xs text-gray-500">{o.order_number}</p>
-                  <p className="font-sans text-sm font-medium truncate mt-0.5">{o.customer_name || '—'}</p>
+                  <p className="font-sans text-sm font-medium truncate mt-0.5">{o.customer_is_company && o.customer_company ? o.customer_company : o.customer_name || '—'}</p>
                   <p className="font-sans text-xs text-gray-400 truncate">{o.trip_name}</p>
                 </div>
                 {expanded === o.id ? <ChevronUp size={16} className="text-gray-400 shrink-0" /> : <ChevronDown size={16} className="text-gray-400 shrink-0" />}
@@ -485,8 +488,8 @@ export default function AdminOrdersPage() {
                   <tr className="hover:bg-[#F7F5F2] transition-colors cursor-pointer" onClick={() => setExpanded(expanded === o.id ? null : o.id)}>
                     <td className="px-5 py-4 font-mono text-xs text-gray-500">{o.order_number}</td>
                     <td className="px-5 py-4">
-                      <p className="font-sans text-sm font-medium">{o.customer_name || '—'}</p>
-                      <p className="font-sans text-xs text-gray-400">{o.customer_email}</p>
+                      <p className="font-sans text-sm font-medium">{o.customer_is_company && o.customer_company ? o.customer_company : o.customer_name || '—'}</p>
+                      <p className="font-sans text-xs text-gray-400">{o.customer_is_company && o.customer_company ? `${o.customer_name} · ` : ''}{o.customer_email}</p>
                     </td>
                     <td className="px-5 py-4 font-sans text-xs text-gray-500 max-w-[220px] truncate">{o.trip_name}</td>
                     <td className="px-5 py-4 font-sans text-xs text-gray-500">{fmt(o.travel_start)}{o.travel_end && o.travel_end !== o.travel_start ? ` — ${fmt(o.travel_end)}` : ''}</td>
