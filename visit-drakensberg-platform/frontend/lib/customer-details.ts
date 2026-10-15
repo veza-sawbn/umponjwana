@@ -30,3 +30,27 @@ export function validateCustomerDetails(d: OrderCustomerDetails): string | null 
   }
   return null
 }
+
+/** The billing columns an order carries (see 20261014_order_customer_details.sql). */
+export type OrderBilling = {
+  customer_is_company?: boolean | null
+  customer_company?: string | null
+  customer_vat_number?: string | null
+  customer_registration_number?: string | null
+}
+
+/**
+ * The "who paid" rows a receipt shows for a company customer — company name,
+ * then VAT and registration numbers when they are on file. Empty for an
+ * individual, so a personal receipt reads exactly as before.
+ */
+export function companyBillingRows(order: OrderBilling): [string, string][] {
+  const company = (order.customer_company ?? '').trim()
+  if (!order.customer_is_company || !company) return []
+  const rows: [string, string][] = [['Received from', company]]
+  const vat = (order.customer_vat_number ?? '').trim()
+  const reg = (order.customer_registration_number ?? '').trim()
+  if (vat) rows.push(['VAT number', vat])
+  if (reg) rows.push(['Registration number', reg])
+  return rows
+}
