@@ -3,6 +3,8 @@ import { getEffectiveSupplierId } from './effective-supplier'
 import type { SavedBooking } from './bookings'
 import { getPropertyById } from './properties'
 import { sendReceiptEmail } from './order-payments'
+import type { OrderCustomerDetails } from './customer-details'
+export { validateCustomerDetails, type OrderCustomerDetails } from './customer-details'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Master Orders — the single source of truth for a trip's finances.
@@ -468,16 +470,6 @@ export async function updateOrderStatus(
   if (error) throw error
 }
 
-export type OrderCustomerDetails = {
-  name: string
-  email: string
-  phone: string
-  isCompany: boolean
-  company: string
-  vatNumber: string
-  registrationNumber: string
-  address: string
-}
 
 /** The order's customer, as the edit form holds it. */
 export function orderCustomerDetails(order: MasterOrder): OrderCustomerDetails {
