@@ -46,7 +46,7 @@ function receiptHtml(o: {
    *  boarding passes) — links to the buyer's QR ticket wallet alongside the
    *  invoice. */
   ticketsUrl?: string
-  /** Company billing rows (Received from / VAT / Registration); empty for an individual. */
+  /** Company billing rows (Received from or Refunded to / VAT / Registration); empty for an individual. */
   billingRows?: [string, string][]
 }) {
   return emailShell({
@@ -150,7 +150,7 @@ export async function sendOrderReceipt(
         balance: Number(order.outstanding_balance),
         invoiceUrl,
         ticketsUrl,
-        billingRows: companyBillingRows(order),
+        billingRows: companyBillingRows(order, { refund: isRefund }),
         origin: input.origin,
       }),
     })
