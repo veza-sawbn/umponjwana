@@ -4,7 +4,7 @@ import { useState } from 'react'
 import toast from 'react-hot-toast'
 import { Building2, Pencil, User, X } from 'lucide-react'
 import {
-  orderCustomerDetails, updateOrderCustomer,
+  orderCustomerDetails, updateOrderCustomer, validateCustomerDetails,
   type MasterOrder, type OrderCustomerDetails,
 } from '@/lib/orders'
 
@@ -36,9 +36,8 @@ export default function OrderCustomerCard({ order, onSaved }: { order: MasterOrd
   function open() { setForm(orderCustomerDetails(order)); setEditing(true) }
 
   async function save() {
-    if (!form.name.trim()) { toast.error('Enter the customer name.'); return }
-    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(form.email.trim())) { toast.error('Enter a valid email address.'); return }
-    if (form.isCompany && !form.company.trim()) { toast.error('Enter the company name.'); return }
+    const problem = validateCustomerDetails(form)
+    if (problem) { toast.error(problem); return }
     setBusy(true)
     try {
       await updateOrderCustomer(order.id, form)

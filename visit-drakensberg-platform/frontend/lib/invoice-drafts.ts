@@ -20,6 +20,14 @@ export type DraftLine = {
   supplierId: string   // '' = platform-owned
 }
 
+export type DraftBilling = {
+  isCompany: boolean
+  company: string
+  vatNumber: string
+  registrationNumber: string
+  address: string
+}
+
 export type InvoiceDraft = {
   id: string
   created_by: string | null
@@ -36,6 +44,11 @@ export type InvoiceDraft = {
   fee_override: string
   tax_override: string
   notes: string
+  /**
+   * Company billing details to put on the order when the draft is issued.
+   * Absent before 20261015_invoice_draft_billing.sql.
+   */
+  customer_billing?: DraftBilling | null
   /** Deposit / split terms to apply when the draft is issued. Null = pay in full. */
   payment_schedule?: PaymentSchedule | null
   created_at: string

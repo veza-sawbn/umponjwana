@@ -479,6 +479,23 @@ export type OrderCustomerDetails = {
   address: string
 }
 
+/**
+ * The checks vd_update_order_customer makes, run in the browser first so
+ * staff see the problem before anything is saved. Returns a message, or null.
+ */
+export function validateCustomerDetails(d: OrderCustomerDetails): string | null {
+  if (!d.name.trim()) return 'Enter the customer name.'
+  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(d.email.trim())) return 'Enter a valid customer email.'
+  if (d.isCompany) {
+    if (!d.company.trim()) return 'Enter the company name.'
+    const vat = d.vatNumber.replace(/\s+/g, '')
+    // An all-digit VAT number is South African: ten digits starting with 4.
+    // Anything with letters is foreign and is taken as typed.
+    if (/^\d+$/.test(vat) && !/^4\d{9}$/.test(vat)) return 'A South African VAT number is 10 digits starting with 4.'
+  }
+  return null
+}
+
 /** The order's customer, as the edit form holds it. */
 export function orderCustomerDetails(order: MasterOrder): OrderCustomerDetails {
   return {

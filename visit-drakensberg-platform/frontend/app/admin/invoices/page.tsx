@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import toast from 'react-hot-toast'
-import { Search, RefreshCw, Plus, Printer, Trash2, X, FileText, Send, Pencil, Wallet, Save, Link2, Check, Eye, EyeOff, ShieldOff, RotateCw, KeyRound, Ban, RotateCcw } from 'lucide-react'
+import { Search, RefreshCw, Plus, Printer, Trash2, X, FileText, Send, Pencil, Wallet, Save, Link2, Check, Eye, EyeOff, ShieldOff, RotateCw, KeyRound, Ban, RotateCcw, Building2 } from 'lucide-react'
 import {
   getInvoices, getFinanceSettings, sendInvoice, invoiceShareUrl, invoiceViewedLabel,
   revokeInvoiceLink, reissueInvoiceLink, voidInvoice, reissueInvoice, setInvoicePaymentSchedule,
@@ -14,10 +14,13 @@ import {
   type ScheduleDraft,
 } from '@/lib/payment-schedule'
 import PaymentScheduleEditor from '@/components/admin/PaymentScheduleEditor'
-import { createOrder, updateOrder, getOrderLines, type OrderLineInput, type OrderLine } from '@/lib/orders'
+import {
+  createOrder, updateOrder, getOrderLines, updateOrderCustomer, validateCustomerDetails,
+  type OrderLineInput, type OrderLine, type OrderCustomerDetails,
+} from '@/lib/orders'
 import {
   getInvoiceDrafts, saveInvoiceDraft, deleteInvoiceDraft,
-  type InvoiceDraft, type DraftLine,
+  type InvoiceDraft, type DraftLine, type DraftBilling,
 } from '@/lib/invoice-drafts'
 import {
   recordOrderPayment, getOrderPayments, type OrderPayment,
@@ -294,6 +297,13 @@ function InvoiceModal({ customers, suppliers, draft, editing, onClose, onDone }:
   const [guestName, setGuestName] = useState(draft?.customer_name ?? editing?.lines[0]?.customer_name ?? '')
   const [guestEmail, setGuestEmail] = useState(draft?.customer_email ?? '')
   const [guestPhone, setGuestPhone] = useState(draft?.customer_phone ?? '')
+  const [billing, setBilling] = useState<DraftBilling>(() => ({
+    isCompany: false, company: '', vatNumber: '', registrationNumber: '', address: '',
+    ...(draft?.customer_billing ?? {}),
+  }))
+  const setBill = (patch: Partial<DraftBilling>) => setBilling(b => ({ ...b, ...patch }))
+  // Only worth a round trip when there is something beyond name and email.
+  const hasBilling = billing.isCompany || !!billing.address.trim()
   const [tripName, setTripName] = useState(draft?.trip_name ?? '')
   const [travelStart, setTravelStart] = useState(draft?.travel_start ?? '')
   const [travelEnd, setTravelEnd] = useState(draft?.travel_end ?? '')
@@ -374,6 +384,7 @@ function InvoiceModal({ customers, suppliers, draft, editing, onClose, onDone }:
         tax_override: taxOverride,
         notes: '',
         payment_schedule: schedule,
+        customer_billing: hasBilling ? billing : null,
       }, draft?.id)
       toast.success('Draft saved.')
       onDone(); onClose()
@@ -394,6 +405,21 @@ function InvoiceModal({ customers, suppliers, draft, editing, onClose, onDone }:
       }
     }
     if (validLines.length === 0) { toast.error('Add at least one line with a title and price.'); return }
+    // The details vd_update_order_customer will write once the order exists.
+    const customerDetails: OrderCustomerDetails | null = editing || !hasBilling ? null : {
+      name: isGuest ? guestName.trim() : (customer?.full_name || customer?.email || ''),
+      email: isGuest ? guestEmail.trim() : (customer?.email || ''),
+      phone: isGuest ? guestPhone.trim() : '',
+      isCompany: billing.isCompany,
+      company: billing.company.trim(),
+      vatNumber: billing.vatNumber.trim(),
+      registrationNumber: billing.registrationNumber.trim(),
+      address: billing.address.trim(),
+    }
+    if (customerDetails) {
+      const problem = validateCustomerDetails(customerDetails)
+      if (problem) { toast.error(problem); return }
+    }
     const scheduleError = validateSchedule(schedule, total)
     if (scheduleError) { toast.error(scheduleError); return }
 
@@ -451,6 +477,14 @@ function InvoiceModal({ customers, suppliers, draft, editing, onClose, onDone }:
           orderLines,
           { invoiceLines, userId: isGuest ? undefined : customer!.id },
         )
+        // Company billing goes on the order the invoice reads from. The order
+        // exists either way, so a failure here is reported, not rolled back.
+        if (customerDetails) {
+          try { await updateOrderCustomer(res.orderId, customerDetails) }
+          catch (e) {
+            toast.error(`Invoice ${res.invoiceNumber} created, but the company details were not saved (${e instanceof Error ? e.message : 'unknown error'}). Add them from Orders.`, { duration: 10000 })
+          }
+        }
         if (schedule) {
           try { await setInvoicePaymentSchedule(res.invoiceId, schedule) }
           catch (e) {
@@ -530,6 +564,44 @@ function InvoiceModal({ customers, suppliers, draft, editing, onClose, onDone }:
                 <label className="block font-sans text-[10px] tracking-[0.12em] uppercase text-gray-400 mb-1.5">Customer Phone (optional)</label>
                 <input type="tel" value={guestPhone} onChange={e => setGuestPhone(e.target.value)} placeholder="+27 82 000 0000" className="w-full border border-gray-200 px-3 py-2.5 font-sans text-base sm:text-sm focus:outline-none" />
               </div>
+            </div>
+          )}
+          {!editing && (
+            <div className="md:col-span-2 border border-gray-200 p-3">
+              <label className="inline-flex items-center gap-2 font-sans text-sm text-gray-700 cursor-pointer">
+                <input type="checkbox" checked={billing.isCompany} onChange={e => setBill({ isCompany: e.target.checked })}
+                  className="accent-[#2d6a4f] w-4 h-4" />
+                <Building2 size={14} className="text-gray-400" /> Bill to a company
+              </label>
+              {billing.isCompany && (
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mt-3">
+                  <div className="md:col-span-3">
+                    <label className="block font-sans text-[10px] tracking-[0.12em] uppercase text-gray-400 mb-1.5">Company Name</label>
+                    <input value={billing.company} onChange={e => setBill({ company: e.target.value })} maxLength={200}
+                      placeholder="e.g. Acme Tours (Pty) Ltd" className="w-full border border-gray-200 px-3 py-2.5 font-sans text-base sm:text-sm focus:outline-none" />
+                  </div>
+                  <div>
+                    <label className="block font-sans text-[10px] tracking-[0.12em] uppercase text-gray-400 mb-1.5">VAT Number</label>
+                    <input value={billing.vatNumber} onChange={e => setBill({ vatNumber: e.target.value })} maxLength={30}
+                      placeholder="4xxxxxxxxx" className="w-full border border-gray-200 px-3 py-2.5 font-sans text-base sm:text-sm focus:outline-none" />
+                  </div>
+                  <div>
+                    <label className="block font-sans text-[10px] tracking-[0.12em] uppercase text-gray-400 mb-1.5">Company Registration Number</label>
+                    <input value={billing.registrationNumber} onChange={e => setBill({ registrationNumber: e.target.value })} maxLength={40}
+                      placeholder="2019/123456/07" className="w-full border border-gray-200 px-3 py-2.5 font-sans text-base sm:text-sm focus:outline-none" />
+                  </div>
+                </div>
+              )}
+              <div className="mt-3">
+                <label className="block font-sans text-[10px] tracking-[0.12em] uppercase text-gray-400 mb-1.5">Billing Address (optional)</label>
+                <textarea value={billing.address} onChange={e => setBill({ address: e.target.value })} rows={2} maxLength={500}
+                  placeholder="Street, town, postal code" className="w-full border border-gray-200 px-3 py-2 font-sans text-base sm:text-sm resize-none focus:outline-none" />
+              </div>
+              <p className="font-sans text-[10px] text-gray-400 mt-1.5">
+                {billing.isCompany
+                  ? `The invoice is addressed to the company, with ${customerMode === 'guest' ? 'the name above' : 'the selected customer'} as the contact person.`
+                  : 'Printed under the customer on the tax invoice.'}
+              </p>
             </div>
           )}
           <div>
