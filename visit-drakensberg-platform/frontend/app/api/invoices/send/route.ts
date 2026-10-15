@@ -5,6 +5,7 @@ import { sendMail } from '@/lib/mailer'
 import { formatMoney as money } from '@/lib/allocation'
 import { emailShell, ctaButton, detailTable, esc, finePrint } from '@/lib/email-layout'
 import { amountDueNow, parseSchedule, scheduleSummary } from '@/lib/payment-schedule'
+import { companyBillingRows } from '@/lib/customer-details'
 
 export const dynamic = 'force-dynamic'
 
@@ -34,6 +35,8 @@ function invoiceHtml(o: {
   origin: string
   /** Deposit / split terms, when the invoice has them. */
   terms?: { summary: string; label: string; amount: number; dueDate: string | null } | null
+  /** Company billing rows (Billed to / VAT / Registration); empty for an individual. */
+  billingRows?: [string, string][]
 }) {
   const settled = o.balance <= 0
   const trip = o.tripName ? ` for ${esc(o.tripName)}` : ''
@@ -60,6 +63,7 @@ function invoiceHtml(o: {
             : `Here is invoice <strong>${esc(o.invoiceNumber)}</strong>${trip}, with <strong>${esc(money(o.balance, o.currency))}</strong> still outstanding.`}
       </p>
       ${detailTable([
+        ...(o.billingRows ?? []),
         ['Invoice', o.invoiceNumber],
         ['Order', o.orderNumber],
         ['Trip', o.tripName || '—'],
@@ -138,6 +142,7 @@ export async function POST(req: Request) {
       invoiceUrl,
       origin,
       terms,
+      billingRows: companyBillingRows(order, { invoice: true }),
     }),
   })
 
