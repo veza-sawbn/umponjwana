@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { validateCustomerDetails, type OrderCustomerDetails } from '@/lib/orders'
+import { validateCustomerDetails, type OrderCustomerDetails } from '@/lib/customer-details'
 
 const base: OrderCustomerDetails = {
   name: 'Chrissie Loock', email: 'loockc@telkom.co.za', phone: '',
