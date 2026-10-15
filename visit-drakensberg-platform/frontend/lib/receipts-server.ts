@@ -2,6 +2,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import { sendMail } from './mailer'
 import { formatMoney as money } from './allocation'
 import { emailShell, ctaButton, detailTable, esc, finePrint } from './email-layout'
+import { companyBillingRows } from './customer-details'
 
 // SERVER ONLY — the receipt builder, extracted from app/api/receipts/send so
 // callers that already have a database client can use it WITHOUT an HTTP hop.
@@ -45,6 +46,8 @@ function receiptHtml(o: {
    *  boarding passes) — links to the buyer's QR ticket wallet alongside the
    *  invoice. */
   ticketsUrl?: string
+  /** Company billing rows (Received from or Refunded to / VAT / Registration); empty for an individual. */
+  billingRows?: [string, string][]
 }) {
   return emailShell({
     origin: o.origin,
@@ -61,6 +64,7 @@ function receiptHtml(o: {
           : `Thank you — we have received your payment of <strong>${esc(money(o.amount, o.currency))}</strong>.`}
       </p>
       ${detailTable([
+        ...(o.billingRows ?? []),
         ['Receipt', o.receiptNumber],
         ['Invoice', o.invoiceNumber],
         ['Order', o.orderNumber],
@@ -146,6 +150,7 @@ export async function sendOrderReceipt(
         balance: Number(order.outstanding_balance),
         invoiceUrl,
         ticketsUrl,
+        billingRows: companyBillingRows(order, { refund: isRefund }),
         origin: input.origin,
       }),
     })

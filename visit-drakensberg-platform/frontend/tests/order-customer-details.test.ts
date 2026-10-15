@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { validateCustomerDetails, type OrderCustomerDetails } from '@/lib/customer-details'
+import { companyBillingRows, validateCustomerDetails, type OrderCustomerDetails } from '@/lib/customer-details'
 
 const base: OrderCustomerDetails = {
   name: 'Chrissie Loock', email: 'loockc@telkom.co.za', phone: '',
@@ -27,5 +27,30 @@ describe('validateCustomerDetails', () => {
   })
   it('ignores company fields for an individual', () => {
     expect(validateCustomerDetails({ ...base, isCompany: false, company: '', vatNumber: '123' })).toBeNull()
+  })
+})
+
+describe('companyBillingRows', () => {
+  it('lists the company and its numbers for a company customer', () => {
+    expect(companyBillingRows({
+      customer_is_company: true, customer_company: 'Acme Tours (Pty) Ltd',
+      customer_vat_number: '4840254876', customer_registration_number: '2019/123456/07',
+    })).toEqual([
+      ['Received from', 'Acme Tours (Pty) Ltd'],
+      ['VAT number', '4840254876'],
+      ['Registration number', '2019/123456/07'],
+    ])
+  })
+  it('names the company as the recipient on a refund', () => {
+    expect(companyBillingRows({ customer_is_company: true, customer_company: 'Acme', customer_vat_number: '4840254876' }, { refund: true }))
+      .toEqual([['Refunded to', 'Acme'], ['VAT number', '4840254876']])
+  })
+  it('leaves out numbers that are not on file', () => {
+    expect(companyBillingRows({ customer_is_company: true, customer_company: 'Acme', customer_vat_number: '', customer_registration_number: null }))
+      .toEqual([['Received from', 'Acme']])
+  })
+  it('adds nothing for an individual, or an order from before the billing columns', () => {
+    expect(companyBillingRows({ customer_is_company: false, customer_company: 'Old Co' })).toEqual([])
+    expect(companyBillingRows({})).toEqual([])
   })
 })
