@@ -160,7 +160,7 @@ export default function DayTourDetail({ tour, bookable, stages: allStages }: { t
       {bookable && (
         <div className="lg:hidden fixed bottom-0 inset-x-0 z-30 bg-white border-t border-black/10 px-4 py-3 flex items-center justify-between gap-3 shadow-[0_-8px_24px_rgba(0,0,0,0.06)]">
           <div className="font-sans text-xs text-black/55 min-w-0">
-            <span className="font-display italic text-xl text-[#2d6a4f]">{formatMoney(tour.pricePerPerson)}</span> per seat
+            <span className="whitespace-nowrap"><span className="font-display italic text-xl text-[#2d6a4f]">{formatMoney(tour.pricePerPerson)}</span> per seat</span>
             {next && <span className="block truncate">Next: {new Date(`${next.date}T00:00:00`).toLocaleDateString('en-ZA', { weekday: 'short', day: 'numeric', month: 'short' })} · {next.time}</span>}
           </div>
           <a href="#book" className="bg-[#2d6a4f] text-white font-sans text-sm px-5 py-2.5 whitespace-nowrap">Book seats</a>

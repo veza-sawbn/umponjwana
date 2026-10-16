@@ -485,8 +485,8 @@ function TourCard({ tour, hotel, reduce, highlightStage, stages }: { tour: Activ
           )}
         </div>
 
-        <div className="mt-auto pt-6 flex items-end justify-between gap-4">
-          <p className="font-sans text-xs text-black/45">
+        <div className="mt-auto pt-6 flex flex-wrap items-end justify-between gap-x-4 gap-y-3">
+          <p className="font-sans text-xs text-black/45 whitespace-nowrap">
             From <span className="font-display italic text-2xl text-[#2d6a4f]">{formatMoney(tour.pricePerPerson)}</span> per seat
           </p>
           <div className="flex items-center gap-2 shrink-0">
