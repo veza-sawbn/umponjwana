@@ -814,7 +814,12 @@ export default function ListWithUsPage() {
                 ref={grantTurnstile}
                 action="listing-upload-grant"
                 onToken={onGrantToken}
-                onError={() => setGrantState('failed')}
+                onError={code => {
+                  // Keep Cloudflare's code: "refresh and try again" is the wrong
+                  // advice for a sitekey/hostname mismatch, which never recovers.
+                  setGrantState('failed')
+                  setGrantError(turnstileErrorMessage(code))
+                }}
               />
               {grantState === 'ready' && (
                 <p className="font-sans text-xs text-[#2d6a4f]">
@@ -824,7 +829,15 @@ export default function ListWithUsPage() {
               {grantState === 'failed' && (
                 <p className="font-sans text-xs text-red-500">
                   {grantError || TURNSTILE_FAILED_MESSAGE}{' '}
-                  You can still submit your application without attachments.
+                  You can still submit your application without attachments.{' '}
+                  <button type="button" className="underline"
+                    onClick={() => {
+                      setGrantState('idle')
+                      setGrantError('')
+                      grantTurnstile.current?.reset()
+                    }}>
+                    Try again
+                  </button>
                 </p>
               )}
             </div>
