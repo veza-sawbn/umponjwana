@@ -3,10 +3,10 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { Loader2, Save, Users, Plus, Trash2, Copy, Check } from 'lucide-react'
+import { Loader2, Save, Users, Plus, Trash2, Copy, Check, ShieldCheck } from 'lucide-react'
 import {
   saveEmailCampaign, getEmailTemplates, getAudienceSegmentOptions, getConsentedAudienceCount,
-  getCampaignContacts, type EmailCampaign, type EmailTemplate, type CampaignContact,
+  getCampaignContacts, recordMarketingConsent, type EmailCampaign, type EmailTemplate, type CampaignContact,
 } from '@/lib/email-campaigns-admin'
 import type { SegmentCount } from '@/lib/customers-admin'
 import { CONTACT_MERGE_TAGS, campaignFieldKeyError, toCampaignFieldKey, usedMergeTags } from '@/lib/email-merge-tags'
@@ -53,7 +53,11 @@ export default function EmailCampaignForm({ campaign }: { campaign: EmailCampaig
   const [scheduledAt, setScheduledAt] = useState(campaign?.scheduledAt ? toLocalDateTimeInputValue(campaign.scheduledAt) : '')
   const [notes, setNotes] = useState(campaign?.notes ?? '')
   const [audienceMode, setAudienceMode] = useState<EmailCampaign['audienceMode']>(campaign?.audienceMode ?? 'segment')
-  const [recipientIds, setRecipientIds] = useState<string[]>(campaign?.recipientUserIds ?? [])
+  // Picks are lower-cased email addresses. A campaign saved before picks went
+  // by address still has account ids; they're mapped to addresses once the
+  // contact list loads (and saved as addresses from then on).
+  const [recipientEmails, setRecipientEmails] = useState<string[]>(campaign?.recipientEmails ?? [])
+  const [attested, setAttested] = useState(false)
   const [fieldRows, setFieldRows] = useState<FieldRow[]>(
     Object.entries(campaign?.mergeValues ?? {}).map(([key, value]) => ({ key, value: String(value ?? '') })),
   )
@@ -69,8 +73,23 @@ export default function EmailCampaignForm({ campaign }: { campaign: EmailCampaig
 
   useEffect(() => {
     Promise.all([getEmailTemplates(), getAudienceSegmentOptions()]).then(([t, s]) => { setTemplates(t); setSegments(s) })
-    getCampaignContacts().then(c => { setContacts(c); setContactsLoading(false) })
+    getCampaignContacts().then(c => {
+      setContacts(c)
+      const legacy = new Set(campaign?.recipientUserIds ?? [])
+      if (legacy.size) {
+        const mapped = c.filter(x => x.userId && legacy.has(x.userId)).map(x => x.id)
+        setRecipientEmails(prev => Array.from(new Set([...prev, ...mapped])))
+      }
+      setContactsLoading(false)
+    })
   }, [])
+
+  function addTypedContacts(added: CampaignContact[]) {
+    setContacts(prev => {
+      const have = new Set(prev.map(c => c.id))
+      return [...prev, ...added.filter(c => !have.has(c.id))]
+    })
+  }
 
   useEffect(() => {
     if (audienceMode !== 'segment') return
@@ -90,12 +109,14 @@ export default function EmailCampaignForm({ campaign }: { campaign: EmailCampaig
 
   const contactsById = useMemo(() => new Map(contacts.map(c => [c.id, c])), [contacts])
   const selectedContacts = useMemo(
-    () => recipientIds.map(id => contactsById.get(id)).filter((c): c is CampaignContact => !!c),
-    [recipientIds, contactsById],
+    () => recipientEmails.map(id => contactsById.get(id)).filter((c): c is CampaignContact => !!c && c.consent !== 'opted_out'),
+    [recipientEmails, contactsById],
   )
+  const needsConfirmation = useMemo(() => selectedContacts.filter(c => c.consent === 'unknown'), [selectedContacts])
   const previewRecipients = useMemo(() => {
     if (audienceMode === 'manual') return selectedContacts
-    const pool = audienceSegmentId ? contacts.filter(c => c.segmentIds.includes(audienceSegmentId)) : contacts
+    const consenting = contacts.filter(c => c.kind === 'customer' && c.consent === 'opted_in')
+    const pool = audienceSegmentId ? consenting.filter(c => c.segmentIds.includes(audienceSegmentId)) : consenting
     return pool.slice(0, SEGMENT_PREVIEW_SAMPLE)
   }, [audienceMode, selectedContacts, contacts, audienceSegmentId])
 
@@ -123,11 +144,16 @@ export default function EmailCampaignForm({ campaign }: { campaign: EmailCampaig
     setTimeout(() => setCopiedTag(k => k === key ? '' : k), 1200)
   }
 
-  const locked = campaign ? !['draft', 'scheduled'].includes(campaign.status) : false
+  // A dry run emails nobody, so a dry-run campaign can still be changed.
+  const locked = campaign ? !['draft', 'scheduled', 'dry_run_sent'].includes(campaign.status) : false
 
   async function handleSave() {
     if (!name.trim()) { setError('Name is required.'); return }
-    if (audienceMode === 'manual' && recipientIds.length === 0) { setError('Select at least one contact, or switch the audience to a segment.'); return }
+    if (audienceMode === 'manual' && selectedContacts.length === 0) { setError('Select at least one contact, or switch the audience to a segment.'); return }
+    if (audienceMode === 'manual' && needsConfirmation.length > 0 && !attested) {
+      setError(`Confirm that the ${needsConfirmation.length} contact${needsConfirmation.length === 1 ? '' : 's'} without consent on record agreed to receive marketing email, or remove them.`)
+      return
+    }
     const keys = fieldRows.map(r => r.key.trim()).filter(Boolean)
     for (const k of keys) {
       const keyErr = campaignFieldKeyError(k)
@@ -135,10 +161,15 @@ export default function EmailCampaignForm({ campaign }: { campaign: EmailCampaig
     }
     if (new Set(keys).size !== keys.length) { setError('Each campaign detail needs a different name.'); return }
     setSaving(true); setError('')
+    if (audienceMode === 'manual' && needsConfirmation.length > 0) {
+      // Written to the consent log in the admin's name; an opt-out is never overridden.
+      const { error: consentErr } = await recordMarketingConsent(needsConfirmation.map(c => c.email))
+      if (consentErr) { setSaving(false); setError(`Couldn't record consent: ${consentErr}`); return }
+    }
     const { id, error: err } = await saveEmailCampaign(campaign?.id ?? null, {
       name, campaignType, templateId: templateId || null, audienceSegmentId: audienceSegmentId || null,
       scheduledAt: scheduledAt ? new Date(scheduledAt).toISOString() : null, notes,
-      audienceMode, recipientUserIds: recipientIds, mergeValues,
+      audienceMode, recipientUserIds: [], recipientEmails: selectedContacts.map(c => c.email), mergeValues,
     })
     setSaving(false)
     if (err) { setError(err); return }
@@ -146,7 +177,7 @@ export default function EmailCampaignForm({ campaign }: { campaign: EmailCampaig
     router.refresh()
   }
 
-  const consentedSelected = selectedContacts.length
+  const optedInSelected = selectedContacts.length - needsConfirmation.length
 
   return (
     <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 lg:gap-8">
@@ -219,12 +250,25 @@ export default function EmailCampaignForm({ campaign }: { campaign: EmailCampaig
           <div className="border border-gray-200 h-40 flex items-center justify-center"><Loader2 size={18} className="animate-spin text-gray-300" /></div>
         ) : (
           <>
-            <ContactPicker contacts={contacts} segments={segments} selected={recipientIds} onChange={setRecipientIds} disabled={locked} />
+            <ContactPicker contacts={contacts} segments={segments} selected={recipientEmails} onChange={setRecipientEmails}
+              onAddTyped={addTypedContacts} disabled={locked} />
             <p className="font-sans text-xs text-gray-500 mt-2 inline-flex items-center gap-1.5">
               <Users size={12} className="text-gray-400" />
-              {consentedSelected.toLocaleString()} consented recipient{consentedSelected === 1 ? '' : 's'} selected.
-              Only customers who have opted in to marketing are listed.
+              {selectedContacts.length.toLocaleString()} recipient{selectedContacts.length === 1 ? '' : 's'} selected
+              {needsConfirmation.length > 0 && ` · ${optedInSelected.toLocaleString()} opted in, ${needsConfirmation.length.toLocaleString()} with no consent on record`}
             </p>
+            {needsConfirmation.length > 0 && !locked && (
+              <label className="mt-3 flex items-start gap-2.5 bg-[#C9A96E]/15 px-3 py-3 cursor-pointer">
+                <input type="checkbox" checked={attested} onChange={e => setAttested(e.target.checked)} className="mt-0.5" />
+                <span className="font-sans text-xs text-[#5c4a12] leading-relaxed">
+                  <ShieldCheck size={12} className="inline -mt-0.5 mr-1" />
+                  I confirm the <strong>{needsConfirmation.length.toLocaleString()}</strong> selected contact{needsConfirmation.length === 1 ? '' : 's'} with
+                  no consent on record agreed to receive marketing email from Visit Drakensberg (for example when they
+                  signed up on Wix), and that we can show it if asked. Saving records this in the consent log under
+                  your name. Anyone who has opted out stays opted out.
+                </span>
+              </label>
+            )}
           </>
         )}
       </div>

@@ -14,7 +14,8 @@ import type { BrevoMessage } from './brevo'
 
 /** One row of vd_campaign_begin_send(). */
 export type CampaignRecipientRow = {
-  user_id: string
+  /** Null for an address-book contact or typed address with no account. */
+  user_id: string | null
   email: string
   full_name: string | null
   country: string | null
@@ -37,7 +38,7 @@ export type CampaignTemplateContent = {
 
 export function rowToMergeContact(r: CampaignRecipientRow): MergeContact {
   return {
-    id: r.user_id,
+    id: r.user_id ?? r.email,
     fullName: r.full_name?.trim() || r.email,
     email: r.email,
     country: r.country,

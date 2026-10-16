@@ -1,5 +1,5 @@
 import { supabase } from './auth'
-import { fetchAllRows, getCustomerDirectory, getSegmentCounts, type SegmentCount } from './customers-admin'
+import { fetchAllRows, getSegmentCounts, type SegmentCount } from './customers-admin'
 import type { MergeContact } from './email-merge-tags'
 
 /* ────────────────────────────────────────────────────────────────────────────
@@ -36,6 +36,9 @@ export type EmailCampaign = {
    *  See migrations/20261001_campaign_manual_recipients.sql. */
   audienceMode: 'segment' | 'manual'
   recipientUserIds: string[]
+  /** Hand-picked recipients by email — accounts or not (migrations/20261016_campaign_any_contact.sql).
+   *  Both lists count; new campaigns save picks here. */
+  recipientEmails: string[]
   /** Campaign-level merge fields ({{offer}}, {{promo_code}}…), see lib/email-merge-tags.ts. */
   mergeValues: Record<string, string>
   status: 'draft' | 'scheduled' | 'dry_run_sent' | 'sending' | 'sent' | 'paused' | 'cancelled'
@@ -67,6 +70,7 @@ function rowToCampaign(r: any): EmailCampaign {
     // before 20261001 landed has none of these keys.
     audienceMode: r.audience_mode === 'manual' ? 'manual' : 'segment',
     recipientUserIds: r.recipient_user_ids ?? [],
+    recipientEmails: r.recipient_emails ?? [],
     mergeValues: r.merge_values && typeof r.merge_values === 'object' ? r.merge_values : {},
     status: r.status, scheduledAt: r.scheduled_at,
     sentAt: r.sent_at, dryRun: r.dry_run, audienceCountSnapshot: r.audience_count_snapshot,
@@ -135,7 +139,7 @@ export async function saveEmailCampaign(
   patch: {
     name: string; campaignType: EmailCampaign['campaignType']; templateId: string | null
     audienceSegmentId: string | null; scheduledAt: string | null; notes: string
-    audienceMode: EmailCampaign['audienceMode']; recipientUserIds: string[]
+    audienceMode: EmailCampaign['audienceMode']; recipientUserIds: string[]; recipientEmails: string[]
     mergeValues: Record<string, string>
   },
 ): Promise<{ id: string | null; error: string | null }> {
@@ -145,6 +149,9 @@ export async function saveEmailCampaign(
     audience_segment_id: patch.audienceMode === 'segment' ? patch.audienceSegmentId : null,
     audience_mode: patch.audienceMode,
     recipient_user_ids: patch.audienceMode === 'manual' ? Array.from(new Set(patch.recipientUserIds)) : [],
+    recipient_emails: patch.audienceMode === 'manual'
+      ? Array.from(new Set(patch.recipientEmails.map(e => e.trim().toLowerCase()).filter(Boolean)))
+      : [],
     merge_values: patch.mergeValues,
     scheduled_at: patch.scheduledAt,
     status: patch.scheduledAt ? 'scheduled' : 'draft', notes: patch.notes, updated_at: new Date().toISOString(),
@@ -212,65 +219,102 @@ export async function getConsentedAudienceCount(segmentId: string | null): Promi
   return typeof data === 'number' ? data : 0
 }
 
-/** Consented count for a hand-picked list — vd_count_consented_recipients,
- *  the same function vd_campaign_dry_run_send uses for a manual campaign, so
- *  the builder's number and the send's number can't disagree. */
-export async function getConsentedRecipientCount(userIds: string[]): Promise<number> {
-  if (userIds.length === 0) return 0
-  const { data, error } = await supabase.rpc('vd_count_consented_recipients', { p_user_ids: userIds })
+/** How many people a saved campaign would reach right now — the same
+ *  resolution the real send and the dry run use (vd_campaign_recipients). */
+export async function getCampaignRecipientCount(campaignId: string): Promise<number> {
+  const { data, error } = await supabase.rpc('vd_campaign_recipient_count', { p_campaign_id: campaignId })
   if (error) { console.error('[email-campaigns-admin] recipient count failed:', error); return 0 }
   return typeof data === 'number' ? data : 0
 }
 
-/** One pickable recipient: everything the merge tags read, plus what the
- *  picker filters on. */
+export type ContactConsent = 'opted_in' | 'unknown' | 'opted_out'
+
+/** One pickable recipient. `id` is the lower-cased email address: the same
+ *  person can be a customer and sit in a supplier address book, and the
+ *  address is what both have in common. */
 export type CampaignContact = MergeContact & {
   segmentIds: string[]
+  /** The website account behind this address, if any. */
+  userId: string | null
+  /** 'customer' has a website account; 'address_book' is a supplier contact (e.g. imported from Wix). */
+  kind: 'customer' | 'address_book' | 'typed'
+  /** Supplier names whose address book holds this address. */
+  addressBooks: string[]
+  consent: ContactConsent
 }
 
-/** Every marketing-consented customer, with the profile fields the merge
- *  tags fill and their segment memberships. Only consented customers are
- *  returned — a promotional campaign has no business offering anyone else
- *  as a pick (and the send re-checks consent regardless). */
-export async function getCampaignContacts(): Promise<CampaignContact[]> {
-  const [directory, crm, members] = await Promise.all([
-    getCustomerDirectory(),
-    fetchAllRows(
-      (from, to) => supabase.from('vd_customer_profiles')
-        .select('user_id, province_or_city, interests, favourite_destinations, favourite_activities')
-        .eq('marketing_consent', true).range(from, to),
-      'vd_customer_profiles',
-    ),
-    fetchAllRows(
-      (from, to) => supabase.from('vd_customer_segment_members').select('user_id, segment_id').range(from, to),
-      'vd_customer_segment_members',
-    ),
-  ])
-  const crmByUser = new Map(crm.map((c: any) => [c.user_id, c]))
-  const segmentsByUser = new Map<string, string[]>()
-  for (const m of members as { user_id: string; segment_id: string }[]) {
-    const list = segmentsByUser.get(m.user_id) ?? []
-    list.push(m.segment_id)
-    segmentsByUser.set(m.user_id, list)
+function rowToContact(r: any): CampaignContact {
+  const email = String(r.email ?? '').toLowerCase()
+  return {
+    id: email,
+    fullName: (r.full_name ?? '').trim() || email,
+    email,
+    country: r.country ?? null,
+    city: r.city ?? null,
+    lifecycleStage: r.lifecycle_stage ?? 'visitor',
+    interests: r.interests ?? [],
+    favouriteDestinations: r.favourite_destinations ?? [],
+    favouriteActivities: r.favourite_activities ?? [],
+    tripCount: r.trip_count ?? 0,
+    upcomingTravel: r.upcoming_travel ?? null,
+    segmentIds: r.segment_ids ?? [],
+    userId: r.user_id ?? null,
+    kind: r.kind === 'customer' ? 'customer' : 'address_book',
+    addressBooks: r.address_books ?? [],
+    consent: r.consent === 'opted_in' || r.consent === 'opted_out' ? r.consent : 'unknown',
   }
-  return directory
-    .filter(c => c.marketingConsent && c.email)
-    .map(c => {
-      const extra: any = crmByUser.get(c.id)
-      return {
-        id: c.id,
-        fullName: c.fullName,
-        email: c.email,
-        country: c.country,
-        city: extra?.province_or_city ?? null,
-        lifecycleStage: c.lifecycleStage,
-        interests: extra?.interests ?? [],
-        favouriteDestinations: extra?.favourite_destinations ?? [],
-        favouriteActivities: extra?.favourite_activities ?? [],
-        tripCount: c.tripCount,
-        upcomingTravel: c.upcomingTravel,
-        segmentIds: segmentsByUser.get(c.id) ?? [],
-      }
+}
+
+/** Every customer and every supplier address-book contact, one per email
+ *  address, with their marketing consent status (vd_campaign_contacts).
+ *  Opted-out people are included so the picker can show them as such. */
+export async function getCampaignContacts(): Promise<CampaignContact[]> {
+  const rows = await fetchAllRows(
+    (from, to) => supabase.rpc('vd_campaign_contacts').range(from, to),
+    'vd_campaign_contacts',
+  )
+  return (rows as any[]).map(rowToContact)
+}
+
+/** A contact for an address typed into the builder that isn't in the list. */
+export function typedContact(email: string, consent: ContactConsent): CampaignContact {
+  const e = email.trim().toLowerCase()
+  return {
+    id: e, fullName: e, email: e, country: null, city: null, lifecycleStage: 'visitor',
+    interests: [], favouriteDestinations: [], favouriteActivities: [], tripCount: 0, upcomingTravel: null,
+    segmentIds: [], userId: null, kind: 'typed', addressBooks: [], consent,
+  }
+}
+
+/** Consent status for typed-in addresses. Staff addresses come back flagged
+ *  so the builder can refuse them. */
+export async function getConsentStatus(emails: string[]): Promise<{ email: string; consent: ContactConsent; isStaff: boolean }[]> {
+  if (emails.length === 0) return []
+  const { data, error } = await supabase.rpc('vd_marketing_consent_status', { p_emails: emails })
+  if (error) { console.error('[email-campaigns-admin] consent status failed:', error); return [] }
+  return ((data ?? []) as any[]).map(r => ({
+    email: String(r.email), consent: r.consent === 'opted_in' || r.consent === 'opted_out' ? r.consent : 'unknown',
+    isStaff: !!r.is_staff,
+  }))
+}
+
+/** Records the admin's confirmation that these people opted in elsewhere
+ *  (e.g. on Wix). Never overrides an opt-out. Returns how many were recorded. */
+export async function recordMarketingConsent(emails: string[]): Promise<{ recorded: number; error: string | null }> {
+  const { data, error } = await supabase.rpc('vd_admin_record_marketing_consent', { p_emails: emails, p_source: 'admin_attested' })
+  return { recorded: typeof data === 'number' ? data : 0, error: error?.message ?? null }
+}
+
+/** Sends the campaign, marked [Test], to a few typed addresses. Doesn't change
+ *  the campaign or need consent: it's for checking the email before sending. */
+export async function sendTestEmail(campaignId: string, emails: string[]): Promise<{ sent: number; error: string | null }> {
+  try {
+    const res = await fetch(`/api/admin/campaigns/${encodeURIComponent(campaignId)}/test`, {
+      method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ emails }),
     })
-    .sort((a, b) => a.fullName.localeCompare(b.fullName))
+    const body = await res.json().catch(() => ({}))
+    return { sent: Number(body.sent) || 0, error: body.error ?? (res.ok ? null : `test send failed (${res.status})`) }
+  } catch (e) {
+    return { sent: 0, error: e instanceof Error ? e.message : 'test send failed' }
+  }
 }

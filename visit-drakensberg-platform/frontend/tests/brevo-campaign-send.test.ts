@@ -54,6 +54,16 @@ describe('renderCampaignEmail', () => {
     expect(m.subject.startsWith('Hi there,')).toBe(true)
   })
 
+  it('renders a contact with no account (e.g. a Wix import) by their address-book name', () => {
+    const m = renderCampaignEmail({
+      origin: 'https://example.test', template, campaignFields: {},
+      recipient: { ...recipient, user_id: null, email: 'wix@example.test', full_name: 'Wix Person', city: null, favourite_destinations: [] },
+    })
+    expect(m.email).toBe('wix@example.test')
+    expect(m.subject.startsWith('Hi Wix,')).toBe(true)
+    expect(m.html).toContain('See you at the berg, Wix.')
+  })
+
   it('encodes the address in the unsubscribe link', () => {
     expect(unsubscribeUrlFor('https://x.test', 'a+b@c.test')).toBe('https://x.test/unsubscribe?email=a%2Bb%40c.test')
   })

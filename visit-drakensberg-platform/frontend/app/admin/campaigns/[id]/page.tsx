@@ -3,10 +3,10 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useParams } from 'next/navigation'
 import Link from 'next/link'
-import { ArrowLeft, Loader2, Send, Pause, Play, XCircle, Eye, AlertTriangle, Users, FileText } from 'lucide-react'
+import { ArrowLeft, Loader2, Send, Pause, Play, XCircle, Eye, AlertTriangle, Users, FileText, FlaskConical } from 'lucide-react'
 import {
-  getEmailCampaign, getEmailTemplate, getAudienceSegmentOptions, getConsentedAudienceCount,
-  getConsentedRecipientCount, getCampaignContacts,
+  getEmailCampaign, getEmailTemplate, getAudienceSegmentOptions,
+  getCampaignRecipientCount, getCampaignContacts, sendTestEmail,
   dryRunSendCampaign, sendCampaign, releaseStuckCampaign, setCampaignStatus, type EmailCampaign, type EmailTemplate, type CampaignContact,
 } from '@/lib/email-campaigns-admin'
 import type { SegmentCount } from '@/lib/customers-admin'
@@ -43,6 +43,9 @@ export default function EmailCampaignDetailPage() {
   const [confirmSend, setConfirmSend] = useState<null | 'real' | 'dry'>(null)
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
+  const [testEmails, setTestEmails] = useState('')
+  const [testing, setTesting] = useState(false)
+  const [testResult, setTestResult] = useState<{ ok: boolean; text: string } | null>(null)
 
   async function load() {
     setLoading(true)
@@ -54,7 +57,8 @@ export default function EmailCampaignDetailPage() {
       const [t, segs, count, people] = await Promise.all([
         c.templateId ? getEmailTemplate(c.templateId) : Promise.resolve(null),
         getAudienceSegmentOptions(),
-        c.audienceMode === 'manual' ? getConsentedRecipientCount(c.recipientUserIds) : getConsentedAudienceCount(c.audienceSegmentId),
+        // The same resolution the send uses, so this is the number that will go out.
+        getCampaignRecipientCount(c.id),
         getCampaignContacts(),
       ])
       setTemplate(t); setSegments(segs); setLiveAudienceCount(count); setContacts(people)
@@ -67,10 +71,12 @@ export default function EmailCampaignDetailPage() {
   const previewRecipients = useMemo(() => {
     if (!campaign) return []
     if (campaign.audienceMode === 'manual') {
-      const picked = new Set(campaign.recipientUserIds)
-      return contacts.filter(c => picked.has(c.id))
+      const picked = new Set(campaign.recipientEmails)
+      const pickedIds = new Set(campaign.recipientUserIds)
+      return contacts.filter(c => c.consent !== 'opted_out' && (picked.has(c.id) || (c.userId !== null && pickedIds.has(c.userId))))
     }
-    const pool = campaign.audienceSegmentId ? contacts.filter(c => c.segmentIds.includes(campaign.audienceSegmentId!)) : contacts
+    const consenting = contacts.filter(c => c.kind === 'customer' && c.consent === 'opted_in')
+    const pool = campaign.audienceSegmentId ? consenting.filter(c => c.segmentIds.includes(campaign.audienceSegmentId!)) : consenting
     return pool.slice(0, 25)
   }, [campaign, contacts])
 
@@ -87,6 +93,15 @@ export default function EmailCampaignDetailPage() {
     }
     setSending(false); setConfirmSend(null)
     await load()
+  }
+
+  async function handleTestSend() {
+    if (!campaign) return
+    const emails = testEmails.split(/[\s,;]+/).map(e => e.trim()).filter(Boolean)
+    setTesting(true); setTestResult(null)
+    const { sent, error: err } = await sendTestEmail(campaign.id, emails)
+    setTesting(false)
+    setTestResult(err ? { ok: false, text: err } : { ok: true, text: `Test sent to ${sent} address${sent === 1 ? '' : 'es'}. Check the inbox (and spam folder).` })
   }
 
   async function handleRelease() {
@@ -112,13 +127,14 @@ export default function EmailCampaignDetailPage() {
     </div>
   )
 
+  const pickedCount = campaign.recipientEmails.length + campaign.recipientUserIds.length
   const segmentName = campaign.audienceMode === 'manual'
-    ? `${campaign.recipientUserIds.length.toLocaleString()} hand-picked contact${campaign.recipientUserIds.length === 1 ? '' : 's'}`
+    ? `${pickedCount.toLocaleString()} hand-picked contact${pickedCount === 1 ? '' : 's'}`
     : segments.find(s => s.id === campaign.audienceSegmentId)?.name ?? 'All marketing-consented customers'
   // dry_run_sent stays sendable: a dry run emails nobody, and "check the
   // audience, then send" is the order an admin should work in.
   const sendable = ['draft', 'scheduled', 'dry_run_sent'].includes(campaign.status) && !!campaign.templateId
-    && (campaign.audienceMode !== 'manual' || campaign.recipientUserIds.length > 0)
+    && (campaign.audienceMode !== 'manual' || pickedCount > 0)
   const mergeEntries = Object.entries(campaign.mergeValues)
   // The send function's limit is 5 minutes; past 10 it has certainly stopped.
   const stuck = campaign.status === 'sending' && Date.now() - new Date(campaign.updatedAt).getTime() > 10 * 60 * 1000
@@ -135,7 +151,7 @@ export default function EmailCampaignDetailPage() {
           </div>
           <p className="font-sans text-sm text-gray-400 mt-1">{campaign.campaignType} campaign</p>
         </div>
-        {['draft', 'scheduled'].includes(campaign.status) && (
+        {['draft', 'scheduled', 'dry_run_sent'].includes(campaign.status) && (
           <Link href={`/admin/campaigns/${campaign.id}/edit`} className="font-sans text-sm text-[#2d6a4f] hover:underline shrink-0">Edit</Link>
         )}
       </div>
@@ -216,11 +232,34 @@ export default function EmailCampaignDetailPage() {
             ) : (
               <p className="font-sans text-sm text-gray-400">
                 {!campaign.templateId ? 'Add a template before sending.'
-                  : campaign.audienceMode === 'manual' && campaign.recipientUserIds.length === 0 ? 'Pick at least one contact before sending.'
+                  : campaign.audienceMode === 'manual' && pickedCount === 0 ? 'Pick at least one contact before sending.'
                   : `This campaign is ${STATUS_LABEL[campaign.status].toLowerCase()} and can't be sent.`}
               </p>
             )}
           </div>
+
+          {/* Test send */}
+          {campaign.templateId && campaign.status !== 'cancelled' && (
+            <div className="bg-white border border-gray-200 p-6">
+              <h2 className="font-display italic text-lg text-[#000000] mb-1 inline-flex items-center gap-2"><FlaskConical size={16} className="text-gray-400" /> Send a test</h2>
+              <p className="font-sans text-xs text-gray-500 mb-4">
+                Sends this email, marked [Test], to up to 5 addresses so you can check it in a real inbox. Personal
+                tags use sample values. Nothing on the campaign changes and nothing counts as sent.
+              </p>
+              <div className="flex flex-col sm:flex-row gap-2">
+                <input value={testEmails} onChange={e => setTestEmails(e.target.value)} placeholder="you@example.com, colleague@example.com"
+                  aria-label="Test email addresses"
+                  className="flex-1 bg-white border border-gray-200 px-3 py-2 font-sans text-sm text-[#000000] placeholder:text-gray-300 focus:outline-none focus:border-[#2d6a4f] transition-colors" />
+                <button onClick={handleTestSend} disabled={testing || !testEmails.trim()}
+                  className="inline-flex items-center justify-center gap-2 border border-gray-200 px-5 py-2 font-sans text-sm text-gray-600 hover:border-[#2d6a4f] hover:text-[#2d6a4f] transition-colors disabled:opacity-50">
+                  {testing ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />} {testing ? 'Sending…' : 'Send Test'}
+                </button>
+              </div>
+              {testResult && (
+                <p className={`font-sans text-xs mt-3 ${testResult.ok ? 'text-[#2d6a4f]' : 'text-red-500'}`}>{testResult.text}</p>
+              )}
+            </div>
+          )}
 
           {/* Template */}
           <div className="bg-white border border-gray-200 p-6">
