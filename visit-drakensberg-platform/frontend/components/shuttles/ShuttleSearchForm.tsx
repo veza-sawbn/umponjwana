@@ -1,5 +1,6 @@
 'use client'
 
+import { useState } from 'react'
 import { ArrowRight, ArrowLeftRight, Calendar, Clock, MapPin, Search, Users } from 'lucide-react'
 import { GoogleAddressField, type GooglePlaceSelection } from '@/components/maps/GoogleAddressField'
 
@@ -30,8 +31,12 @@ export type ShuttleSearchValue = {
 const field = 'w-full border border-gray-200 bg-white px-3 py-2.5 font-sans text-sm [@media(pointer:coarse)]:text-base text-forest focus:outline-none focus:border-forest transition-colors'
 const legend = 'flex font-sans text-[10px] tracking-[0.14em] uppercase text-forest/40 mb-1.5 flex items-center gap-1.5'
 
+// The visitor's own calendar date, not UTC's: toISOString() still reports
+// yesterday for the first two hours of every South African day, which let a
+// past date through as the earliest pickable one.
 function todayIso() {
-  return new Date().toISOString().slice(0, 10)
+  const d = new Date()
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 }
 
 /**
@@ -44,6 +49,13 @@ function todayIso() {
  * own text is made transparent and our placeholder is drawn over it, which
  * gives every browser the same readable prompt; once a value is chosen the
  * native text takes over again.
+ *
+ * The prompt only stands in while the field is idle. Once it has focus the
+ * native editor is shown as-is, because on desktop the visitor types into its
+ * mm/dd/yyyy segments and the value stays empty until all of them are filled:
+ * hiding the text then left every keystroke invisible under the prompt. A
+ * half-typed entry (badInput) keeps the native text visible after blur too.
+ * Clicking anywhere on the field opens the picker, not only on its icon.
  */
 function WhenField({
   label,
@@ -62,7 +74,9 @@ function WhenField({
   placeholder: string
   onChange: (value: string) => void
 }) {
-  const empty = !value
+  const [focused, setFocused] = useState(false)
+  const [partial, setPartial] = useState(false)
+  const showPrompt = !value && !focused && !partial
   return (
     <label className="block min-w-0">
       <span className={legend}><Icon size={11} className="text-gold" /> {label}</span>
@@ -71,10 +85,18 @@ function WhenField({
           type={type}
           min={min}
           value={value}
-          onChange={e => onChange(e.target.value)}
-          className={`${field} ${empty ? 'text-transparent' : ''}`}
+          onChange={e => { setPartial(e.target.validity.badInput); onChange(e.target.value) }}
+          onFocus={() => setFocused(true)}
+          onBlur={e => { setFocused(false); setPartial(e.target.validity.badInput) }}
+          onClick={e => {
+            // showPicker() is missing on older browsers and throws if the
+            // picker cannot open (e.g. it is already open); the native
+            // behaviour still applies in either case.
+            try { e.currentTarget.showPicker?.() } catch { /* ignore */ }
+          }}
+          className={`${field} cursor-pointer ${showPrompt ? 'text-transparent' : ''}`}
         />
-        {empty && (
+        {showPrompt && (
           <span
             aria-hidden="true"
             className="pointer-events-none absolute inset-y-0 left-3 right-9 flex items-center font-sans text-sm [@media(pointer:coarse)]:text-base text-forest/35"
@@ -101,9 +123,19 @@ export function ShuttleSearchForm({
   const isReturn = value.tripType === 'return'
   // Enough to quote: a route and an outbound date. A return leg additionally
   // needs its own date, so the visitor cannot search half a journey.
+  // A date carried in from elsewhere (a stay's check-in, a ?date= link) can
+  // already be in the past, and the return can't come before the outbound.
+  const today = todayIso()
   const canSearch = Boolean(
-    value.pickup.address && value.destination.address && value.date && (!isReturn || value.returnDate),
+    value.pickup.address && value.destination.address && value.date && value.date >= today &&
+    (!isReturn || (value.returnDate && value.returnDate >= value.date)),
   )
+
+  // Moving the outbound past the return would leave an impossible trip, so
+  // the return follows it forward.
+  function setOutboundDate(date: string) {
+    onChange(value.returnDate && date && value.returnDate < date ? { date, returnDate: date } : { date })
+  }
 
   function swapEnds() {
     onChange({ pickup: value.destination, destination: value.pickup })
@@ -188,10 +220,10 @@ export function ShuttleSearchForm({
             label={isReturn ? 'Outbound' : 'Date'}
             icon={Calendar}
             type="date"
-            min={todayIso()}
+            min={today}
             value={value.date}
             placeholder="Select a date"
-            onChange={date => onChange({ date })}
+            onChange={setOutboundDate}
           />
           <WhenField
             label="Pickup time"
@@ -208,7 +240,7 @@ export function ShuttleSearchForm({
                 label="Return"
                 icon={Calendar}
                 type="date"
-                min={value.date || todayIso()}
+                min={value.date || today}
                 value={value.returnDate}
                 placeholder="Select a date"
                 onChange={returnDate => onChange({ returnDate })}
