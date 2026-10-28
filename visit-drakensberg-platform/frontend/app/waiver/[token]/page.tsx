@@ -297,7 +297,8 @@ export default function WaiverSigningPage() {
   return (
     <div className="min-h-screen bg-[#F7F5F2]">
       {/* Header */}
-      <header className="bg-[#2d6a4f] text-white px-5 py-8 sm:px-8 sm:py-10">
+      {/* pt clears the site Navbar, which is fixed at h-16 over this page. */}
+      <header className="bg-[#2d6a4f] text-white px-5 pt-24 pb-8 sm:px-8 sm:pt-28 sm:pb-10">
         <div className="max-w-2xl mx-auto">
           <p className="font-sans text-[10px] tracking-[0.2em] uppercase text-[#C9A96E] mb-2">
             {supplierName || 'Visit Drakensberg'}
@@ -373,7 +374,11 @@ export default function WaiverSigningPage() {
                   type={f.key === 'dateOfBirth' ? 'date' : f.key === 'phone' ? 'tel' : 'text'}
                   value={answers[f.key] ?? ''}
                   onChange={e => setAnswers(a => ({ ...a, [f.key]: e.target.value }))}
-                  className={inp}
+                  // iOS Safari gives date inputs an intrinsic width wider than
+                  // a phone card and an empty one a taller box; pin both.
+                  className={f.key === 'dateOfBirth'
+                    ? `${inp} appearance-none min-w-0 max-w-full h-[42px] [&::-webkit-date-and-time-value]:text-left`
+                    : inp}
                 />
               )}
               <p className="font-sans text-xs text-black/30 mt-1">{f.hint}</p>
