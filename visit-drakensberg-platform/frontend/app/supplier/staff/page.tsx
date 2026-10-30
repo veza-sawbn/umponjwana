@@ -2,7 +2,7 @@
 import { useState, useEffect } from 'react'
 import toast from 'react-hot-toast'
 import Link from 'next/link'
-import { Users, CalendarDays, Bell, CheckCircle, Clock, Send } from 'lucide-react'
+import { Users, CalendarDays, Bell, CheckCircle, Clock, Send, ChevronDown } from 'lucide-react'
 import { supabase } from '@/lib/auth'
 import { effectiveSupplierId } from '@/lib/effective-supplier'
 import { getMyDepartures, updateDeparture, type Departure } from '@/lib/departures'
@@ -10,6 +10,7 @@ import {
   getSupplierEntities, updateSupplierEntity, type SupplierEntity,
 } from '@/lib/supplier-entities'
 import { GUIDE_TYPE_LABEL, guideTypeOf, type GuideType } from '@/lib/operators'
+import { splitUpcomingPast } from '@/lib/upcoming'
 
 interface BlockedRange { id: string; from: string; to: string; reason: string }
 type Guide = SupplierEntity & { name: string; status: string; guideType?: GuideType; blocked?: BlockedRange[] }
@@ -40,23 +41,22 @@ function initialsOf(name: string) {
 export default function StaffPage() {
   const [guides, setGuides] = useState<Guide[]>([])
   const [departures, setDepartures] = useState<Dep[]>([])
+  const [showPast, setShowPast] = useState(false)
   const [loading, setLoading] = useState(true)
   const [blockForms, setBlockForms] = useState<Record<string, { from: string; to: string; reason: string }>>({})
 
   useEffect(() => {
     supabase.auth.getUser().then(async ({ data: { user } }) => {
       if (!user) { setLoading(false); return }
-      const today = new Date().toISOString().slice(0, 10)
       const [roster, deps] = await Promise.all([
         getSupplierEntities<Guide>(GUIDE_ENTITY, effectiveSupplierId(user.id)),
+        // Already scoped to this supplier (or the managed supplier for
+        // operations staff), exactly as the Departures page reads it, so
+        // the two screens list the same departures.
         getMyDepartures(),
       ])
       setGuides(roster)
-      setDepartures(
-        (deps as Dep[])
-          .filter(d => d.supplierId === user.id && d.date >= today)
-          .sort((a, b) => a.date.localeCompare(b.date))
-      )
+      setDepartures(deps as Dep[])
       setLoading(false)
     })
   }, [])
@@ -103,16 +103,74 @@ export default function StaffPage() {
     }
   }
 
+  const { upcoming, past } = splitUpcomingPast(departures)
+
   async function markAllNotified() {
-    const pending = departures.filter(d => !d.guideNotified)
+    const pending = upcoming.filter(d => !d.guideNotified)
     if (pending.length === 0) return
     try {
       await Promise.all(pending.map(d => updateDeparture(d.id, { guideNotified: true })))
-      setDepartures(ds => ds.map(d => ({ ...d, guideNotified: true })))
+      const ids = new Set(pending.map(d => d.id))
+      setDepartures(ds => ds.map(d => (ids.has(d.id) ? { ...d, guideNotified: true } : d)))
       toast.success(`Marked ${pending.length} departure${pending.length !== 1 ? 's' : ''} as notified.`)
     } catch {
       toast.error('Could not update all departures.')
     }
+  }
+
+  // Past departures keep their notified status for the record but have
+  // nothing left to brief, so they get no "Mark notified" action.
+  function departureTable(list: Dep[], isPast: boolean) {
+    return (
+      <div className="bg-white rounded-xl border border-black/8 overflow-hidden">
+        <div className="overflow-x-auto">
+        <table className="w-full">
+          <thead>
+            <tr className="border-b border-black/6">
+              {['Tour', 'Date', 'Guide', 'Status', ''].map((h, i) => (
+                <th key={i} className="px-4 py-3 text-left font-sans text-xs font-semibold text-black/40 uppercase tracking-wider">{h}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {!loading && list.length === 0 && (
+              <tr><td colSpan={5} className="px-4 py-10 text-center font-sans text-sm text-black/30">No upcoming departures. Schedule one under Departures.</td></tr>
+            )}
+            {list.map((d, i) => (
+              <tr key={d.id} className={i < list.length - 1 ? 'border-b border-black/5' : ''}>
+                <td className="px-4 py-3 font-sans text-sm text-black/80 max-w-[160px]">
+                  <span className="line-clamp-2">{d.tour}</span>
+                </td>
+                <td className="px-4 py-3 font-sans text-sm text-black/60 whitespace-nowrap">{d.date}</td>
+                <td className="px-4 py-3 font-sans text-sm text-black/60 whitespace-nowrap">{d.guide || 'Unassigned'}</td>
+                <td className="px-4 py-3">
+                  {d.guideNotified ? (
+                    <span className="flex items-center gap-1 font-sans text-xs bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full whitespace-nowrap">
+                      <CheckCircle size={10} /> Guide notified
+                    </span>
+                  ) : (
+                    <span className="flex items-center gap-1 font-sans text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full whitespace-nowrap">
+                      <Clock size={10} /> Pending
+                    </span>
+                  )}
+                </td>
+                <td className="px-4 py-3">
+                  {!isPast && !d.guideNotified && (
+                    <button
+                      onClick={() => markNotified(d.id)}
+                      className="font-sans text-xs text-[#C9A96E] hover:underline whitespace-nowrap"
+                    >
+                      Mark notified
+                    </button>
+                  )}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -192,54 +250,7 @@ export default function StaffPage() {
             <h2 className="font-sans text-sm font-semibold text-black/60 uppercase tracking-wider">Upcoming Departures</h2>
           </div>
 
-          <div className="bg-white rounded-xl border border-black/8 overflow-hidden">
-            <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead>
-                <tr className="border-b border-black/6">
-                  {['Tour', 'Date', 'Guide', 'Status', ''].map((h, i) => (
-                    <th key={i} className="px-4 py-3 text-left font-sans text-xs font-semibold text-black/40 uppercase tracking-wider">{h}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {!loading && departures.length === 0 && (
-                  <tr><td colSpan={5} className="px-4 py-10 text-center font-sans text-sm text-black/30">No upcoming departures. Schedule one under Departures.</td></tr>
-                )}
-                {departures.map((d, i) => (
-                  <tr key={d.id} className={i < departures.length - 1 ? 'border-b border-black/5' : ''}>
-                    <td className="px-4 py-3 font-sans text-sm text-black/80 max-w-[160px]">
-                      <span className="line-clamp-2">{d.tour}</span>
-                    </td>
-                    <td className="px-4 py-3 font-sans text-sm text-black/60 whitespace-nowrap">{d.date}</td>
-                    <td className="px-4 py-3 font-sans text-sm text-black/60 whitespace-nowrap">{d.guide || 'Unassigned'}</td>
-                    <td className="px-4 py-3">
-                      {d.guideNotified ? (
-                        <span className="flex items-center gap-1 font-sans text-xs bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full whitespace-nowrap">
-                          <CheckCircle size={10} /> Guide notified
-                        </span>
-                      ) : (
-                        <span className="flex items-center gap-1 font-sans text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full whitespace-nowrap">
-                          <Clock size={10} /> Pending
-                        </span>
-                      )}
-                    </td>
-                    <td className="px-4 py-3">
-                      {!d.guideNotified && (
-                        <button
-                          onClick={() => markNotified(d.id)}
-                          className="font-sans text-xs text-[#C9A96E] hover:underline whitespace-nowrap"
-                        >
-                          Mark notified
-                        </button>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-            </div>
-          </div>
+          {departureTable(upcoming, false)}
 
           <div className="bg-white rounded-xl border border-black/8 p-5 space-y-3">
             <div className="flex items-center gap-2">
@@ -252,12 +263,27 @@ export default function StaffPage() {
             </p>
             <button
               onClick={markAllNotified}
-              disabled={departures.every(d => d.guideNotified)}
+              disabled={upcoming.every(d => d.guideNotified)}
               className="flex items-center gap-2 bg-[#C9A96E] text-white font-sans text-sm px-4 py-2 rounded-lg hover:bg-[#b8965d] transition-colors disabled:opacity-40"
             >
               <CheckCircle size={14} /> Mark all as notified
             </button>
           </div>
+
+          {past.length > 0 && (
+            <div className="space-y-3">
+              <button
+                onClick={() => setShowPast(v => !v)}
+                aria-expanded={showPast}
+                className="flex items-center gap-2 font-sans text-sm font-semibold text-black/40 uppercase tracking-wider hover:text-black/60"
+              >
+                <CalendarDays size={15} className="text-black/30" />
+                Past departures <span className="font-normal normal-case tracking-normal">({past.length})</span>
+                <ChevronDown size={14} className={`transition-transform ${showPast ? 'rotate-180' : ''}`} />
+              </button>
+              {showPast && departureTable(past, true)}
+            </div>
+          )}
         </div>
       </div>
     </div>

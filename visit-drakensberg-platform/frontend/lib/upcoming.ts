@@ -34,3 +34,18 @@ export function isEventUpcoming(
 ): boolean {
   return isOnOrAfterToday(e.ends_at || e.starts_at, today)
 }
+
+/** Splits dated rows (departures) into upcoming — soonest first — and past —
+ *  most recent first — by the same rule as isOnOrAfterToday, so every screen
+ *  that groups departures agrees on which side of today a date falls. */
+export function splitUpcomingPast<T extends { date: string }>(
+  rows: T[],
+  today: string = todayISO(),
+): { upcoming: T[]; past: T[] } {
+  const upcoming: T[] = []
+  const past: T[] = []
+  for (const r of rows) (isOnOrAfterToday(r.date, today) ? upcoming : past).push(r)
+  upcoming.sort((a, b) => a.date.localeCompare(b.date))
+  past.sort((a, b) => b.date.localeCompare(a.date))
+  return { upcoming, past }
+}

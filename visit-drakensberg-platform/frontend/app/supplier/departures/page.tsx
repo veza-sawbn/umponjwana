@@ -10,6 +10,7 @@ import { GUIDE_TYPE_LABEL, guideTypeOf, type GuideType } from '@/lib/operators'
 import { getMyTours, type Tour, type PricingTier } from '@/lib/tours'
 import { getTrails, type Trail } from '@/lib/trails'
 import { formatMoney } from '@/lib/allocation'
+import { splitUpcomingPast } from '@/lib/upcoming'
 import {
   getMyDepartures, addDeparture, updateDeparture, deleteDeparture, newDeparturePackageId,
   type Departure,
@@ -434,6 +435,60 @@ function DeparturesInner() {
     return `${formatMoney(Math.min(...prices))}–${Math.max(...prices).toLocaleString()} · ${packages.length} rates`
   }
 
+  // Upcoming and past split by the same rule as the Staff page's reminders,
+  // so the two screens list the same departures.
+  const { upcoming, past } = splitUpcomingPast(filtered)
+
+  function renderTable(list: Departure[], emptyText: string) {
+    return (
+      <div className="bg-white rounded-xl border border-black/8 overflow-hidden">
+        <div className="overflow-x-auto">
+        <table className="w-full">
+          <thead>
+            <tr className="border-b border-black/6">
+              {['Tour', 'Date', 'Guide', 'Seats', 'Rates', 'Status', ''].map(h => (
+                <th key={h} className="px-4 py-3 text-left font-sans text-xs font-semibold text-black/40 uppercase tracking-wider">{h}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {list.length === 0 && (
+              <tr><td colSpan={7} className="px-4 py-10 text-center font-sans text-sm text-black/30">{emptyText}</td></tr>
+            )}
+            {list.map((r, i) => (
+              <tr key={r.id} className={i < list.length - 1 ? 'border-b border-black/5' : ''}>
+                <td className="px-4 py-3 font-sans text-sm text-black/80">{r.tour}</td>
+                <td className="px-4 py-3 font-sans text-sm text-black/60">{r.date}</td>
+                <td className="px-4 py-3 font-sans text-sm text-black/60">{r.guide || '—'}</td>
+                <td className="px-4 py-3 font-sans text-sm text-black/60">
+                  <span className="flex items-center gap-1"><Users size={12} /> {r.bookedSeats}/{r.maxSeats}</span>
+                </td>
+                <td className="px-4 py-3 font-sans text-sm text-black/60 whitespace-nowrap">{rateSummary(r)}</td>
+                <td className="px-4 py-3">
+                  <span className={`font-sans text-xs px-2 py-0.5 rounded-full capitalize ${STATUS[r.status]}`}>{r.status}</span>
+                </td>
+                <td className="px-4 py-3">
+                  <div className="flex items-center gap-3">
+                    <button onClick={() => setManagingGuests(r)} className="text-black/30 hover:text-[#C9A96E]" title="Add or view guests">
+                      <UserPlus size={14} />
+                    </button>
+                    <button onClick={() => setConfiguring(r)} className="text-black/30 hover:text-[#C9A96E]" title="Configure rates & inclusions">
+                      <Settings2 size={14} />
+                    </button>
+                    <button onClick={() => handleDelete(r.id)} className="text-red-400 hover:text-red-600">
+                      <Trash2 size={14} />
+                    </button>
+                  </div>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="p-8 space-y-6">
       <div className="flex items-center justify-between">
@@ -527,51 +582,17 @@ function DeparturesInner() {
         </div>
       )}
 
-      <div className="bg-white rounded-xl border border-black/8 overflow-hidden">
-        <div className="overflow-x-auto">
-        <table className="w-full">
-          <thead>
-            <tr className="border-b border-black/6">
-              {['Tour', 'Date', 'Guide', 'Seats', 'Rates', 'Status', ''].map(h => (
-                <th key={h} className="px-4 py-3 text-left font-sans text-xs font-semibold text-black/40 uppercase tracking-wider">{h}</th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {filtered.length === 0 && (
-              <tr><td colSpan={7} className="px-4 py-10 text-center font-sans text-sm text-black/30">No departures scheduled</td></tr>
-            )}
-            {filtered.map((r, i) => (
-              <tr key={r.id} className={i < filtered.length - 1 ? 'border-b border-black/5' : ''}>
-                <td className="px-4 py-3 font-sans text-sm text-black/80">{r.tour}</td>
-                <td className="px-4 py-3 font-sans text-sm text-black/60">{r.date}</td>
-                <td className="px-4 py-3 font-sans text-sm text-black/60">{r.guide || '—'}</td>
-                <td className="px-4 py-3 font-sans text-sm text-black/60">
-                  <span className="flex items-center gap-1"><Users size={12} /> {r.bookedSeats}/{r.maxSeats}</span>
-                </td>
-                <td className="px-4 py-3 font-sans text-sm text-black/60 whitespace-nowrap">{rateSummary(r)}</td>
-                <td className="px-4 py-3">
-                  <span className={`font-sans text-xs px-2 py-0.5 rounded-full capitalize ${STATUS[r.status]}`}>{r.status}</span>
-                </td>
-                <td className="px-4 py-3">
-                  <div className="flex items-center gap-3">
-                    <button onClick={() => setManagingGuests(r)} className="text-black/30 hover:text-[#C9A96E]" title="Add or view guests">
-                      <UserPlus size={14} />
-                    </button>
-                    <button onClick={() => setConfiguring(r)} className="text-black/30 hover:text-[#C9A96E]" title="Configure rates & inclusions">
-                      <Settings2 size={14} />
-                    </button>
-                    <button onClick={() => handleDelete(r.id)} className="text-red-400 hover:text-red-600">
-                      <Trash2 size={14} />
-                    </button>
-                  </div>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-        </div>
-      </div>
+      <section className="space-y-3">
+        <h2 className="font-sans text-sm font-semibold text-black/60 uppercase tracking-wider">Upcoming departures</h2>
+        {renderTable(upcoming, filtered.length === 0 ? 'No departures scheduled' : 'No upcoming departures')}
+      </section>
+
+      {past.length > 0 && (
+        <section className="space-y-3">
+          <h2 className="font-sans text-sm font-semibold text-black/40 uppercase tracking-wider">Past departures <span className="font-normal normal-case tracking-normal">({past.length})</span></h2>
+          {renderTable(past, '')}
+        </section>
+      )}
 
       {configuring && (
         <ConfigureModal

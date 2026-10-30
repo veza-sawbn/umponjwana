@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { todayISO, isOnOrAfterToday, isEventUpcoming } from '@/lib/upcoming'
+import { todayISO, isOnOrAfterToday, isEventUpcoming, splitUpcomingPast } from '@/lib/upcoming'
 
 describe('todayISO', () => {
   it('uses South African time, not UTC', () => {
@@ -31,5 +31,18 @@ describe('isEventUpcoming', () => {
   it('falls back to the start date, staying up until that day is over', () => {
     expect(isEventUpcoming({ starts_at: '2026-09-30T08:00', ends_at: '' }, today)).toBe(true)
     expect(isEventUpcoming({ starts_at: '2026-09-29T20:00' }, today)).toBe(false)
+  })
+})
+
+describe('splitUpcomingPast', () => {
+  const today = '2026-10-30'
+  it('puts today and later in upcoming, soonest first, and the rest in past, latest first', () => {
+    const rows = ['2026-12-31', '2026-09-24', '2026-10-30', '2026-11-05', '2026-10-24', '2026-09-27'].map(date => ({ date }))
+    const { upcoming, past } = splitUpcomingPast(rows, today)
+    expect(upcoming.map(r => r.date)).toEqual(['2026-10-30', '2026-11-05', '2026-12-31'])
+    expect(past.map(r => r.date)).toEqual(['2026-10-24', '2026-09-27', '2026-09-24'])
+  })
+  it('treats an undated row as past', () => {
+    expect(splitUpcomingPast([{ date: '' }], today).past).toHaveLength(1)
   })
 })
