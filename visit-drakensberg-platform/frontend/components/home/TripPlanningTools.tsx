@@ -51,11 +51,13 @@ function withQuery(path: string, params: Record<string, string>) {
 
 type Option = { value: string; label: string }
 
+// Sized to common form guidance: ~64px fields on mobile, ~76px on desktop,
+// and 16px control text everywhere (smaller makes iOS Safari zoom on focus).
 const fieldBox =
-  'relative flex flex-col justify-center lg:justify-start border border-white/15 px-5 py-4 lg:pt-[31px] lg:pb-0 lg:h-[138px] transition-colors focus-within:border-gold'
-const fieldLabel = 'block font-sans text-[11px] lg:text-[15px] tracking-[0.12em] uppercase text-white/50'
+  'relative flex flex-col justify-center min-w-0 min-h-[64px] lg:min-h-[76px] border border-white/15 px-4 py-3 lg:px-5 lg:py-3.5 transition-colors focus-within:border-gold'
+const fieldLabel = 'block font-sans text-[11px] lg:text-xs font-medium tracking-[0.12em] uppercase text-white/60'
 const fieldControl =
-  'w-full bg-transparent border-0 p-0 font-sans text-base lg:text-[20px] text-white focus:outline-none mt-2 lg:mt-[26px]'
+  'block w-full min-h-[24px] bg-transparent border-0 p-0 font-sans text-base leading-6 text-white focus:outline-none mt-1.5'
 
 function SelectField({
   id, label, value, onChange, options, placeholder, required,
@@ -82,7 +84,7 @@ function SelectField({
           {placeholder !== undefined && <option value="" className="text-black">{placeholder}</option>}
           {options.map(o => <option key={o.value} value={o.value} className="text-black">{o.label}</option>)}
         </select>
-        <ChevronDown aria-hidden="true" className="pointer-events-none absolute right-0 bottom-1 w-4 h-4 text-white" />
+        <ChevronDown aria-hidden="true" className="pointer-events-none absolute right-0 top-1/2 -translate-y-1/2 w-4 h-4 text-white/80" />
       </div>
     </div>
   )
@@ -98,7 +100,7 @@ function DateField({ id, label, value, onChange }: { id: string; label: string; 
         value={value}
         min={todayIso()}
         onChange={e => onChange(e.target.value)}
-        className={`${fieldControl} [color-scheme:dark]`}
+        className={`${fieldControl} appearance-none [color-scheme:dark]`}
       />
     </div>
   )
@@ -108,14 +110,14 @@ function SubmitButton({ children }: { children: React.ReactNode }) {
   return (
     <button
       type="submit"
-      className="mt-5 lg:mt-[27px] w-full sm:w-auto h-14 lg:h-[78px] px-10 bg-gold hover:bg-brown-600 text-forest font-sans font-semibold text-lg lg:text-[24px] transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
+      className="mt-5 lg:mt-6 w-full sm:w-auto h-12 lg:h-14 px-8 lg:px-10 bg-gold hover:bg-brown-600 text-forest font-sans font-semibold text-base transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
     >
       {children}
     </button>
   )
 }
 
-const fieldGrid = 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 lg:gap-5'
+const fieldGrid = 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 lg:gap-4'
 const regionOptions: Option[] = REGION_NAMES.map(r => ({ value: r, label: r }))
 
 /* ── Row forms ── */
@@ -273,7 +275,7 @@ function PackagesForm({ idBase }: { idBase: string }) {
         <SubmitButton>Browse packages</SubmitButton>
         <Link
           href="/plan"
-          className="mt-5 lg:mt-[27px] inline-flex items-center gap-2 font-sans text-base lg:text-lg text-gold hover:text-white transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
+          className="mt-5 lg:mt-6 inline-flex items-center gap-2 font-sans text-base text-gold hover:text-white transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
         >
           Build your own itinerary <ArrowRight className="w-4 h-4" aria-hidden="true" />
         </Link>
@@ -333,10 +335,10 @@ export default function TripPlanningTools() {
                   aria-controls={panelId}
                   onClick={() => setOpenId(isOpen ? null : row.id)}
                   onKeyDown={e => onHeaderKeyDown(e, index)}
-                  className="group w-full flex items-center h-[72px] lg:h-[100px] pl-4 pr-4 lg:pl-8 lg:pr-11 text-left focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-gold"
+                  className="group w-full flex items-center min-h-[60px] lg:min-h-[80px] py-3 px-4 lg:pl-8 lg:pr-8 text-left focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-gold"
                 >
-                  <Icon aria-hidden="true" strokeWidth={1.5} className="w-5 h-5 lg:w-[22px] lg:h-[22px] shrink-0 text-gold" />
-                  <span className="ml-4 lg:ml-[50px] flex-1 min-w-0 font-sans font-semibold text-lg lg:text-[25px] text-white">
+                  <Icon aria-hidden="true" strokeWidth={1.5} className="w-5 h-5 shrink-0 text-gold" />
+                  <span className="ml-4 lg:ml-6 flex-1 min-w-0 font-sans font-semibold text-lg lg:text-[22px] text-white">
                     {row.title}
                   </span>
                   <ChevronDown
@@ -345,7 +347,7 @@ export default function TripPlanningTools() {
                   />
                 </button>
               </h3>
-              <div id={panelId} role="region" aria-labelledby={headerId} hidden={!isOpen} className="px-4 lg:px-8 pt-1 lg:pt-3 pb-6 lg:pb-10">
+              <div id={panelId} role="region" aria-labelledby={headerId} hidden={!isOpen} className="px-4 lg:px-8 pt-1 pb-6 lg:pb-8">
                 {isOpen && <row.Form idBase={`${baseId}-${row.id}`} />}
               </div>
             </div>
