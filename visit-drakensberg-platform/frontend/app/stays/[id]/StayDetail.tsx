@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import Image from 'next/image'
 import Footer from '@/components/layout/Footer'
-import { MapPin, Star, Users, Wifi, Flame, Utensils, Car, ArrowLeft, Calendar, Waves, TreePine, ShieldCheck, BedDouble } from 'lucide-react'
+import { MapPin, Star, Users, Wifi, Flame, Utensils, Car, ArrowLeft, Calendar, Waves, TreePine, ShieldCheck, BedDouble, Wine, Sparkles, Dumbbell, Shirt, PawPrint, Accessibility, ParkingCircle } from 'lucide-react'
 import SmartRecommendations from '@/components/booking/SmartRecommendations'
 import HeroCarousel from '@/components/media/HeroCarousel'
 import RoomDetailModal, { type RoomDetail } from '@/components/listings/RoomDetailModal'
@@ -21,9 +21,19 @@ import ReadMoreText from '@/components/ui/ReadMoreText'
 
 const AMENITY_ICONS: Record<string, React.ComponentType<any>> = {
   'Wi-Fi': Wifi, 'Swimming Pool': Waves, 'Braai Facilities': Flame, 'Restaurant': Utensils,
-  'Bar': Utensils, 'Spa': ShieldCheck, 'Gym': ShieldCheck, 'Laundry': ShieldCheck,
-  'Airport Transfers': Car, 'Hiking Trails Access': TreePine, 'Pet-Friendly': TreePine,
-  'Wheelchair Access': ShieldCheck,
+  'Bar': Wine, 'Spa': Sparkles, 'Gym': Dumbbell, 'Laundry': Shirt,
+  'Airport Transfers': Car, 'Hiking Trails Access': TreePine, 'Pet-Friendly': PawPrint,
+  'Wheelchair Access': Accessibility, 'Parking': ParkingCircle,
+}
+
+// Tile spans for the desktop collage (4 cols x 2 rows), keyed by how many
+// photos it shows, so every cell is filled whatever the supplier uploaded.
+const COLLAGE_SPANS: Record<number, string[]> = {
+  1: ['col-span-4 row-span-2'],
+  2: ['col-span-2 row-span-2', 'col-span-2 row-span-2'],
+  3: ['col-span-2 row-span-2', 'col-span-2', 'col-span-2'],
+  4: ['col-span-2 row-span-2', 'col-span-2', '', ''],
+  5: ['col-span-2 row-span-2', '', '', '', ''],
 }
 
 function propToStay(prop: Property, rooms: Room[]) {
@@ -97,6 +107,9 @@ export default function StayDetail({ property, rooms: roomsData, id }: { propert
     image: stay.images[0],
     rating: stay.rating || undefined,
   }
+
+  const collage = stay.images.slice(0, 5)
+  const collageSpans = COLLAGE_SPANS[collage.length]
 
   const [heroSlide, setHeroSlide] = useState(0)
   const [selectedRoom, setSelectedRoom] = useState<any>(null)
@@ -193,7 +206,7 @@ export default function StayDetail({ property, rooms: roomsData, id }: { propert
       {/* Hero header — sm and up (mobile uses the photo hero above instead). */}
       <section className={`${stay.hero} text-white py-20 px-6 lg:px-12 mt-16 hidden sm:block`}>
         <div className="max-w-[1440px] mx-auto">
-          <Link href="/stays" className="inline-flex items-center gap-2 text-white/60 hover:text-white text-sm mb-8 transition-colors">
+          <Link href="/stays" className="flex w-fit items-center gap-2 text-white/60 hover:text-white text-sm mb-8 transition-colors">
             <ArrowLeft size={16} /> All Stays
           </Link>
           <span className="inline-block font-sans text-[10px] tracking-[0.14em] uppercase bg-[#C9A96E]/20 text-[#C9A96E] px-3 py-1.5 mb-4">{stay.category}</span>
@@ -212,20 +225,20 @@ export default function StayDetail({ property, rooms: roomsData, id }: { propert
         </div>
       </section>
 
-      {/* Desktop/tablet 4-up photo collage. */}
-      <div className="hidden sm:grid grid-cols-4 grid-rows-2 h-[52vh] min-h-[340px] gap-px">
-        <div className="relative col-span-2 row-span-2 overflow-hidden">
-          <Image src={stay.images[0]} alt={stay.title} fill priority sizes="50vw" className="object-cover" />
-        </div>
-        {[1, 2, 3].map(i => (
-          <div key={i} className="relative overflow-hidden bg-[#2d6a4f]/10">
-            {stay.images[i] ? (
-              <Image src={stay.images[i]} alt="" fill loading="lazy" sizes="25vw" className="object-cover" />
-            ) : (
-              <div className="w-full h-full flex items-center justify-center">
-                <span className="font-sans text-xs text-gray-400">Photo {i + 1}</span>
-              </div>
-            )}
+      {/* Desktop/tablet photo collage — the layout follows the number of
+          photos so a listing never shows an empty or placeholder tile. */}
+      <div className="hidden sm:grid grid-cols-4 grid-rows-2 h-[52vh] min-h-[340px] gap-px bg-white">
+        {collage.map((src, i) => (
+          <div key={src + i} className={`relative overflow-hidden ${collageSpans[i]}`}>
+            <Image
+              src={src}
+              alt={i === 0 ? stay.title : ''}
+              fill
+              priority={i === 0}
+              loading={i === 0 ? undefined : 'lazy'}
+              sizes={collageSpans[i].includes('col-span-4') ? '100vw' : collageSpans[i].includes('col-span-2') ? '50vw' : '25vw'}
+              className="object-cover"
+            />
           </div>
         ))}
       </div>
@@ -233,13 +246,16 @@ export default function StayDetail({ property, rooms: roomsData, id }: { propert
       {/* Highlights strip */}
       {stay.highlights?.length > 0 && (
         <div className="bg-white border-b border-gray-200">
-          <div className="max-w-[1440px] mx-auto px-6 lg:px-12 py-5 flex flex-wrap gap-6">
-            {stay.highlights.map((h: string) => (
-              <div key={h} className="flex items-center gap-2">
-                <ShieldCheck size={14} className="text-[#C9A96E] shrink-0" />
-                <span className="font-sans text-sm text-gray-700">{h}</span>
-              </div>
-            ))}
+          <div className="max-w-[1440px] mx-auto px-6 lg:px-12 py-5 flex flex-wrap gap-x-8 gap-y-3">
+            {stay.highlights.map((h: string) => {
+              const Icon = AMENITY_ICONS[h] ?? ShieldCheck
+              return (
+                <div key={h} className="flex items-center gap-2">
+                  <Icon size={15} className="text-[#C9A96E] shrink-0" />
+                  <span className="font-sans text-sm text-gray-700">{h}</span>
+                </div>
+              )
+            })}
           </div>
         </div>
       )}
