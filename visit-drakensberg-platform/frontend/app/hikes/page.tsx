@@ -9,7 +9,7 @@ import { regionsMatch } from '@/lib/regions'
 import { getReserves, type Reserve } from '@/lib/reserves'
 import { getUpcomingExperiences, type TrekkingExperience } from '@/lib/experiences'
 import { publicSupabase } from '@/lib/supabase-public'
-import TrailCardsCarousel from '@/components/trails/TrailCardsCarousel'
+import TrailCardsGrid from '@/components/trails/TrailCardsGrid'
 import HikesRegionExplorer from '@/components/trails/HikesRegionExplorer'
 import { FeaturedExperiencesCarousel, CarouselNav, trekkingExperienceToFeatured } from '@/components/home/FeaturedExperiences'
 import HikesHero from '@/components/trails/HikesHero'
@@ -18,6 +18,24 @@ import { ROUTE_TYPES } from '@/lib/gpx'
 const DIFF_COLOR: Record<string, string> = { Easy: '#4A7251', Moderate: '#C9A96E', Strenuous: '#c0392b', Extreme: '#7f1d1d' }
 const DIFF_OPTS = ['All', 'Easy', 'Moderate', 'Strenuous', 'Extreme']
 const TYPE_OPTS = ['All', ...ROUTE_TYPES]
+
+const DIFF_RANK: Record<string, number> = { Easy: 0, Moderate: 1, Strenuous: 2, Extreme: 3 }
+
+// 'recommended' keeps the order trails come back in (the curated admin order).
+const SORT_OPTS = [
+  { value: 'recommended', label: 'Recommended' },
+  { value: 'distance_asc', label: 'Shortest first' },
+  { value: 'distance_desc', label: 'Longest first' },
+  { value: 'elevation_asc', label: 'Least climbing' },
+  { value: 'elevation_desc', label: 'Most climbing' },
+  { value: 'difficulty_asc', label: 'Easiest first' },
+  { value: 'difficulty_desc', label: 'Hardest first' },
+  { value: 'name', label: 'Name (A–Z)' },
+] as const
+type SortValue = typeof SORT_OPTS[number]['value']
+
+// One grid page = three full rows at desktop width.
+const PAGE_SIZE = 9
 
 const CATEGORY_TABS: { value: 'All' | TrailCategory; label: string }[] = [
   { value: 'All', label: 'All Hikes' },
@@ -29,6 +47,26 @@ const CATEGORY_TABS: { value: 'All' | TrailCategory; label: string }[] = [
 function parseKm(distance: string): number {
   const m = distance.match(/[\d.]+/)
   return m ? parseFloat(m[0]) : 0
+}
+
+// "+2119m" / "+1,200m total" → 2119 / 1200
+function parseElevation(elevation: string | undefined): number {
+  const m = (elevation || '').replace(/,/g, '').match(/[\d.]+/)
+  return m ? parseFloat(m[0]) : 0
+}
+
+function sortTrails(trails: Trail[], sort: SortValue): Trail[] {
+  if (sort === 'recommended') return trails
+  const by: Record<Exclude<SortValue, 'recommended'>, (a: Trail, b: Trail) => number> = {
+    distance_asc: (a, b) => parseKm(a.distance) - parseKm(b.distance),
+    distance_desc: (a, b) => parseKm(b.distance) - parseKm(a.distance),
+    elevation_asc: (a, b) => parseElevation(a.elevation) - parseElevation(b.elevation),
+    elevation_desc: (a, b) => parseElevation(b.elevation) - parseElevation(a.elevation),
+    difficulty_asc: (a, b) => (DIFF_RANK[a.difficulty] ?? 0) - (DIFF_RANK[b.difficulty] ?? 0),
+    difficulty_desc: (a, b) => (DIFF_RANK[b.difficulty] ?? 0) - (DIFF_RANK[a.difficulty] ?? 0),
+    name: (a, b) => a.name.localeCompare(b.name),
+  }
+  return [...trails].sort(by[sort])
 }
 
 export default function HikesPage() {
@@ -49,6 +87,8 @@ export default function HikesPage() {
   // behind a toggle by default — the category tabs above already narrow most
   // browsing, so a minimalist first view doesn't need every control exposed.
   const [filtersOpen, setFiltersOpen] = useState(false)
+  const [sort, setSort] = useState<SortValue>('recommended')
+  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE)
   const [experienceSwiper, setExperienceSwiper] = useState<SwiperInstance | null>(null)
 
   useEffect(() => {
@@ -56,7 +96,7 @@ export default function HikesPage() {
     // are supplier content, and a signed-in admin or ops session would
     // otherwise read past the public RLS gate and list suspended suppliers'
     // departures here. See lib/supabase-public.ts.
-    // TrailCardsCarousel (ExploreCard) and HikesHero both draw a route-artwork
+    // TrailCardsGrid (ExploreCard) and HikesHero both draw a route-artwork
     // silhouette per trail, so this needs analytics.routeArtworkSvg — but
     // not the rest of `analytics`/`gpx` behind it. See getTrailsWithArtwork().
     getTrailsWithArtwork(publicSupabase).then(all => setTrails(all.filter(t => t.status === 'published')))
@@ -79,6 +119,8 @@ export default function HikesPage() {
     if (validDifficulty) setDiff(difficultyParam)
     if (validRouteType) setRouteType(routeTypeParam)
     if (validDifficulty || validRouteType) setFiltersOpen(true)
+    const sortParam = params.get('sort')
+    if (SORT_OPTS.some(o => o.value === sortParam)) setSort(sortParam as SortValue)
     const reserveParam = params.get('nature-reserves')
     if (reserveParam) {
       setReserveId(reserveParam)
@@ -101,6 +143,12 @@ export default function HikesPage() {
     (!reserveId || t.reserveId === reserveId) &&
     parseKm(t.distance) <= maxDist
   )
+
+  // Any change to what's listed starts the grid back at its first page.
+  useEffect(() => { setVisibleCount(PAGE_SIZE) }, [category, specialityType, diff, region, routeType, reserveId, maxDist, sort])
+
+  const sorted = sortTrails(filtered, sort)
+  const visible = sorted.slice(0, visibleCount)
 
   // Marketplace departures on the trails that pass the active filters,
   // soonest first, as the same cards as the homepage reel — each opens
@@ -186,8 +234,18 @@ export default function HikesPage() {
             <ChevronDown size={13} className={`transition-transform ${filtersOpen ? 'rotate-180' : ''}`} />
           </button>
           <p className="font-sans text-sm text-forest/50">
-            <span className="text-forest font-medium">{filtered.length}</span> trails
+            <span className="text-forest font-medium">{filtered.length}</span> {filtered.length === 1 ? 'trail' : 'trails'}
           </p>
+          <label className="ml-auto inline-flex items-center gap-2 font-sans text-xs text-forest/40">
+            Sort by
+            <select
+              value={sort}
+              onChange={(e) => setSort(e.target.value as SortValue)}
+              className="font-sans text-xs border border-black/15 bg-white px-3 py-2 text-forest/70 focus:outline-none hover:border-forest transition-colors"
+            >
+              {SORT_OPTS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+            </select>
+          </label>
         </div>
 
         {filtersOpen && (
@@ -234,8 +292,21 @@ export default function HikesPage() {
                 No trails match your filters
               </div>
             ) : (
-              <div className="mb-10">
-                <TrailCardsCarousel trails={filtered} difficultyColor={DIFF_COLOR} />
+              <div className="mb-12">
+                <TrailCardsGrid trails={visible} difficultyColor={DIFF_COLOR} />
+                {sorted.length > visible.length && (
+                  <div className="mt-10 flex flex-col items-center gap-3">
+                    <p className="font-sans text-xs text-forest/40">
+                      Showing {visible.length} of {sorted.length} trails
+                    </p>
+                    <button
+                      onClick={() => setVisibleCount(c => c + PAGE_SIZE)}
+                      className="font-sans text-xs tracking-[0.15em] uppercase px-8 py-3 border border-forest text-forest hover:bg-forest hover:text-white transition-colors"
+                    >
+                      Show more trails
+                    </button>
+                  </div>
+                )}
               </div>
             )}
 
