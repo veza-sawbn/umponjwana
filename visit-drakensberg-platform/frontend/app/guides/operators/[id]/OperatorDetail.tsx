@@ -6,17 +6,16 @@ import Image from 'next/image'
 import Footer from '@/components/layout/Footer'
 import {
   ArrowLeft, Building2, MapPin, Award, Globe, Shield, Siren,
-  Backpack, UserCircle, Calendar, CheckCircle,
+  Backpack, CheckCircle,
 } from 'lucide-react'
 import { getGuidesByOperator, type OperatorProfile, type GuideProfile } from '@/lib/operators'
 import GuideTeamCarousel from '@/components/guides/GuideTeamCarousel'
+import HikeCalendar from '@/components/guides/HikeCalendar'
 import { getUpcomingExperiences, type TrekkingExperience } from '@/lib/experiences'
 import { publicSupabase } from '@/lib/supabase-public'
 import { formatMoney } from '@/lib/allocation'
 
-function formatDate(iso: string) {
-  return new Date(iso).toLocaleDateString('en-ZA', { day: 'numeric', month: 'short', year: 'numeric' })
-}
+const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://visitdrakensberg.com'
 
 /**
  * Client island rendered inside the server shell (page.tsx), which already
@@ -24,20 +23,28 @@ function formatDate(iso: string) {
  * the id doesn't exist. The guide roster (needs the operator object as
  * input) and upcoming departures (time-sensitive) are fetched here. See
  * docs/destination-graph/PHASE_B.md.
+ *
+ * The page leads with the operator's hike calendar (components/guides/
+ * HikeCalendar.tsx) — the place visitors view, save and book departures —
+ * with the company profile below it.
  */
 export default function OperatorDetail({ operator }: { operator: OperatorProfile }) {
   const [guides, setGuides] = useState<GuideProfile[]>([])
   const [departures, setDepartures] = useState<TrekkingExperience[]>([])
+  const [departuresLoaded, setDeparturesLoaded] = useState(false)
 
   useEffect(() => {
     // publicSupabase (session-less) — matches the server shell's own read, so
     // a signed-in admin or ops session sees the same page a visitor does
     // rather than one including suspended suppliers. See lib/supabase-public.ts.
     getGuidesByOperator(operator, publicSupabase).then(setGuides)
-    getUpcomingExperiences(publicSupabase).then(exps =>
-      setDepartures(operator.supplierId ? exps.filter(e => e.operatorId === operator.supplierId) : [])
-    )
+    getUpcomingExperiences(publicSupabase)
+      .then(exps => setDepartures(operator.supplierId ? exps.filter(e => e.operatorId === operator.supplierId) : []))
+      .finally(() => setDeparturesLoaded(true))
   }, [operator])
+
+  const trailCount = new Set(departures.map(d => d.trailId).filter(Boolean)).size
+  const fromPrice = departures.length > 0 ? Math.min(...departures.map(d => d.pricePerPerson)) : null
 
   return (
     <div className="min-h-screen bg-[#F7F5F2]">
@@ -68,8 +75,31 @@ export default function OperatorDetail({ operator }: { operator: OperatorProfile
               </div>
             </div>
           </div>
+
+          <div className="mt-12 pt-8 border-t border-white/15 flex items-end justify-between gap-8 flex-wrap">
+            <dl className="flex gap-10 flex-wrap">
+              <HeroStat label="Upcoming departures" value={departuresLoaded ? String(departures.length) : '–'} />
+              <HeroStat label="Trails" value={departuresLoaded ? String(trailCount) : '–'} />
+              {fromPrice !== null && <HeroStat label="From" value={formatMoney(fromPrice)} />}
+            </dl>
+            <a href="#calendar" className="bg-[#C9A96E] text-[#2d2d2d] px-6 py-3 font-sans text-sm font-medium hover:bg-[#b8935e] transition-colors">
+              View hike calendar ↓
+            </a>
+          </div>
         </div>
       </section>
+
+      <div className="max-w-[1440px] mx-auto px-6 lg:px-12 pt-16">
+        {departuresLoaded ? (
+          <HikeCalendar operatorName={operator.companyName} experiences={departures} siteUrl={SITE_URL} />
+        ) : (
+          <div className="space-y-4" aria-busy="true" aria-label="Loading hike calendar">
+            <div className="h-12 w-72 bg-gray-200 animate-pulse" />
+            <div className="h-40 bg-gray-200 animate-pulse" />
+            <div className="h-20 bg-gray-200 animate-pulse" />
+          </div>
+        )}
+      </div>
 
       <main className="max-w-[1440px] mx-auto px-6 lg:px-12 py-16">
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-12">
@@ -91,32 +121,6 @@ export default function OperatorDetail({ operator }: { operator: OperatorProfile
                 <GuideTeamCarousel guides={guides} />
               )}
             </div>
-
-            {/* Upcoming departures */}
-            {departures.length > 0 && (
-              <div>
-                <h2 className="font-display italic text-2xl text-[#000000] mb-4">Upcoming Departures</h2>
-                <div className="space-y-3">
-                  {departures.slice(0, 6).map(e => (
-                    <Link key={e.id} href={`/experiences/${e.id}`} className="block bg-white border border-gray-200 p-4 hover:border-[#2d6a4f] transition-colors">
-                      <div className="flex items-center justify-between gap-4 flex-wrap">
-                        <div>
-                          <p className="font-display italic text-lg">{e.title}</p>
-                          <p className="font-sans text-xs text-gray-500 flex items-center gap-2 flex-wrap">
-                            <Calendar size={11} className="text-[#C9A96E]" /> {formatDate(e.departureDate)} · {e.durationDays} day{e.durationDays !== 1 ? 's' : ''}
-                            {e.leadGuide && <span className="flex items-center gap-1"><UserCircle size={11} /> {e.leadGuide}</span>}
-                          </p>
-                        </div>
-                        <div className="text-right shrink-0">
-                          <p className="font-display italic text-lg text-[#2d6a4f]">{formatMoney(e.pricePerPerson)}</p>
-                          <p className="font-sans text-[10px] text-gray-400">{e.spacesAvailable === 0 ? 'Fully booked' : `${e.spacesAvailable} spaces left`}</p>
-                        </div>
-                      </div>
-                    </Link>
-                  ))}
-                </div>
-              </div>
-            )}
 
             {/* Reviews */}
             <div>
@@ -169,6 +173,15 @@ export default function OperatorDetail({ operator }: { operator: OperatorProfile
       </main>
 
       <Footer />
+    </div>
+  )
+}
+
+function HeroStat({ label, value }: { label: string; value: string }) {
+  return (
+    <div>
+      <dt className="font-sans text-[10px] tracking-[0.15em] uppercase text-white/50 mb-1">{label}</dt>
+      <dd className="font-display italic text-3xl">{value}</dd>
     </div>
   )
 }
