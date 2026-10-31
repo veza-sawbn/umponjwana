@@ -30,6 +30,8 @@ import { formatMoney } from '@/lib/allocation'
 import { copyToClipboard } from '@/lib/clipboard'
 import { useQuickParam } from '@/lib/admin-quick-param'
 import { supabase } from '@/lib/auth'
+import { getContacts, contactLabel, type Contact } from '@/lib/contacts'
+import ContactPicker, { ContactAvatar } from '@/components/admin/contacts/ContactPicker'
 
 // Invoice module: list every customer invoice and raise new ones manually
 // (phone/walk-in/custom bookings). A manual invoice creates a full Master
@@ -283,16 +285,34 @@ function ScheduleNote({ invoice, className = '' }: { invoice: Invoice; className
 }
 
 /** Create / edit / draft form. `editing` switches it to updating an issued invoice. */
-function InvoiceModal({ customers, suppliers, draft, editing, onClose, onDone }: {
-  customers: Person[]
+/**
+ * Registered accounts as contacts — what the picker shows when the contact
+ * book (vd_contacts, 20261031_platform_contacts.sql) isn't there yet.
+ */
+function contactsFromProfiles(people: Person[]): Contact[] {
+  return people.filter(p => p.email).map(p => ({
+    id: p.id, name: p.full_name ?? '', email: p.email, phone: '', userId: p.id,
+    isCompany: false, company: '', vatNumber: '', registrationNumber: '', address: '',
+    sources: ['account'], invoiceCount: 0, lastInvoicedAt: null, createdAt: '',
+  }))
+}
+
+function InvoiceModal({ contacts, contactsLoading, suppliers, draft, editing, onClose, onDone }: {
+  contacts: Contact[]
+  contactsLoading: boolean
   suppliers: Person[]
   draft?: InvoiceDraft
   editing?: { invoice: Invoice; lines: OrderLine[] }
   onClose: () => void
   onDone: () => void
 }) {
-  const [customerMode, setCustomerMode] = useState<'registered' | 'guest'>(
-    draft ? (draft.guest ? 'guest' : 'registered') : editing ? 'guest' : 'registered')
+  // Who the invoice is for. Picking a contact fills the fields below, which
+  // stay editable (a Wix contact may have no email yet); "Add New Contact"
+  // starts them blank. Either way the customer lands in the contact book
+  // automatically once the invoice is issued (vd_contacts_on_invoice).
+  const [contactId, setContactId] = useState<string | null>(null)
+  const [enteringNew, setEnteringNew] = useState(!!draft && !draft.user_id && !!(draft.customer_name || draft.customer_email))
+  // The registered account the order belongs to, when the contact has one.
   const [customerId, setCustomerId] = useState(draft?.user_id ?? '')
   const [guestName, setGuestName] = useState(draft?.customer_name ?? editing?.lines[0]?.customer_name ?? '')
   const [guestEmail, setGuestEmail] = useState(draft?.customer_email ?? '')
@@ -304,6 +324,45 @@ function InvoiceModal({ customers, suppliers, draft, editing, onClose, onDone }:
   const setBill = (patch: Partial<DraftBilling>) => setBilling(b => ({ ...b, ...patch }))
   // Only worth a round trip when there is something beyond name and email.
   const hasBilling = billing.isCompany || !!billing.address.trim()
+  const selectedContact = contacts.find(c => c.id === contactId) ?? null
+
+  // A draft remembers the customer, not the contact: find them in the book
+  // once it has loaded.
+  useEffect(() => {
+    if (!draft || contactId || contacts.length === 0) return
+    const email = draft.customer_email.trim().toLowerCase()
+    const match = contacts.find(c => (draft.user_id && c.userId === draft.user_id) || (email && c.email === email))
+    if (match) { setContactId(match.id); setEnteringNew(false) }
+  }, [contacts, draft, contactId])
+
+  function chooseContact(c: Contact) {
+    setContactId(c.id)
+    setEnteringNew(false)
+    setCustomerId(c.userId ?? '')
+    setGuestName(c.name || c.company || '')
+    setGuestEmail(c.email ?? '')
+    setGuestPhone(c.phone)
+    // Bring the contact's billing details along, without wiping anything
+    // already typed for this invoice.
+    if (c.isCompany || c.company || c.address) {
+      setBilling(b => ({
+        isCompany: b.isCompany || c.isCompany,
+        company: b.company || c.company,
+        vatNumber: b.vatNumber || c.vatNumber,
+        registrationNumber: b.registrationNumber || c.registrationNumber,
+        address: b.address || c.address,
+      }))
+    }
+  }
+
+  function startNewContact() {
+    setContactId(null)
+    setEnteringNew(true)
+    setCustomerId('')
+    setGuestName(''); setGuestEmail(''); setGuestPhone('')
+  }
+
+  const showCustomerFields = enteringNew || !!selectedContact || !!guestName || !!guestEmail
   const [tripName, setTripName] = useState(draft?.trip_name ?? '')
   const [travelStart, setTravelStart] = useState(draft?.travel_start ?? '')
   const [travelEnd, setTravelEnd] = useState(draft?.travel_end ?? '')
@@ -367,14 +426,12 @@ function InvoiceModal({ customers, suppliers, draft, editing, onClose, onDone }:
     }
     setBusy('draft')
     try {
-      const customer = customers.find(c => c.id === customerId)
-      const isGuest = customerMode === 'guest'
       await saveInvoiceDraft({
-        user_id: isGuest ? null : (customerId || null),
-        guest: isGuest,
-        customer_name: isGuest ? guestName.trim() : (customer?.full_name || customer?.email || ''),
-        customer_email: isGuest ? guestEmail.trim() : (customer?.email || ''),
-        customer_phone: isGuest ? guestPhone.trim() : '',
+        user_id: customerId || null,
+        guest: !customerId,
+        customer_name: guestName.trim(),
+        customer_email: guestEmail.trim(),
+        customer_phone: guestPhone.trim(),
         trip_name: tripName.trim(),
         travel_start: travelStart || null,
         travel_end: travelEnd || null,
@@ -394,22 +451,23 @@ function InvoiceModal({ customers, suppliers, draft, editing, onClose, onDone }:
   }
 
   async function submit() {
-    const customer = customers.find(c => c.id === customerId)
-    const isGuest = customerMode === 'guest'
+    const isGuest = !customerId
     if (!editing) {
-      if (isGuest) {
-        if (!guestName.trim()) { toast.error('Enter the customer name.'); return }
-        if (!guestEmail.trim() || !guestEmail.includes('@')) { toast.error('Enter a valid customer email.'); return }
-      } else if (!customer) {
-        toast.error('Select a customer.'); return
+      if (!showCustomerFields) { toast.error('Select a contact, or add a new one.'); return }
+      if (!guestName.trim()) { toast.error('Enter the customer name.'); return }
+      if (!guestEmail.trim() || !guestEmail.includes('@')) {
+        toast.error(selectedContact && !selectedContact.email
+          ? 'This contact has no email address yet. Add one to send the invoice.'
+          : 'Enter a valid customer email.')
+        return
       }
     }
     if (validLines.length === 0) { toast.error('Add at least one line with a title and price.'); return }
     // The details vd_update_order_customer will write once the order exists.
     const customerDetails: OrderCustomerDetails | null = editing || !hasBilling ? null : {
-      name: isGuest ? guestName.trim() : (customer?.full_name || customer?.email || ''),
-      email: isGuest ? guestEmail.trim() : (customer?.email || ''),
-      phone: isGuest ? guestPhone.trim() : '',
+      name: guestName.trim(),
+      email: guestEmail.trim(),
+      phone: guestPhone.trim(),
       isCompany: billing.isCompany,
       company: billing.company.trim(),
       vatNumber: billing.vatNumber.trim(),
@@ -464,18 +522,18 @@ function InvoiceModal({ customers, suppliers, draft, editing, onClose, onDone }:
         const res = await createOrder(
           {
             guest: isGuest || undefined,
-            customerName: isGuest ? guestName.trim() : (customer!.full_name || customer!.email || ''),
-            customerEmail: isGuest ? guestEmail.trim() : (customer!.email || ''),
+            customerName: guestName.trim(),
+            customerEmail: guestEmail.trim(),
             tripName: tripName.trim() || 'Manual invoice',
             travelStart: travelStart || undefined,
             travelEnd: travelEnd || undefined,
             subtotal, serviceFee, taxAmount: tax, total,
             serviceFeeOverride: feeOverride,
             taxOverride: taxOverride,
-            value: isGuest ? { manual: true, customerPhone: guestPhone.trim() } : { manual: true },
+            value: guestPhone.trim() ? { manual: true, customerPhone: guestPhone.trim() } : { manual: true },
           },
           orderLines,
-          { invoiceLines, userId: isGuest ? undefined : customer!.id },
+          { invoiceLines, userId: isGuest ? undefined : customerId },
         )
         // Company billing goes on the order the invoice reads from. The order
         // exists either way, so a failure here is reported, not rolled back.
@@ -524,17 +582,6 @@ function InvoiceModal({ customers, suppliers, draft, editing, onClose, onDone }:
         </div>
 
         <div className="px-4 sm:px-6 py-4 sm:py-5">
-        {!editing && (
-          <div className="grid grid-cols-2 sm:flex sm:w-fit border border-gray-200 bg-white overflow-hidden mb-4">
-            {([['registered', 'Registered customer'], ['guest', 'Guest / manual details']] as const).map(([id, label]) => (
-              <button key={id} onClick={() => setCustomerMode(id)}
-                className={`px-4 py-2.5 font-sans text-xs transition-colors border-r border-gray-100 last:border-0 ${customerMode === id ? 'bg-[#2d6a4f] text-white' : 'text-gray-500 hover:bg-[#F7F5F2]'}`}>
-                {label}
-              </button>
-            ))}
-          </div>
-        )}
-
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-5">
           {editing ? (
             <div className="md:col-span-2 bg-[#F7F5F2] border border-gray-200 px-4 py-3">
@@ -542,28 +589,43 @@ function InvoiceModal({ customers, suppliers, draft, editing, onClose, onDone }:
               <p className="font-sans text-sm text-gray-700">{editing.lines[0]?.customer_name || '—'}</p>
               <p className="font-sans text-xs text-gray-400 mt-0.5">Customer details are changed on the order, not here.</p>
             </div>
-          ) : customerMode === 'registered' ? (
-            <div>
-              <label className="block font-sans text-[10px] tracking-[0.12em] uppercase text-gray-400 mb-1.5">Customer (registered account)</label>
-              <select value={customerId} onChange={e => setCustomerId(e.target.value)} className="w-full border border-gray-200 bg-white px-3 py-2.5 font-sans text-base sm:text-sm focus:outline-none">
-                <option value="">Select a customer…</option>
-                {customers.map(c => <option key={c.id} value={c.id}>{c.full_name || c.email} {c.email ? `(${c.email})` : ''}</option>)}
-              </select>
-            </div>
           ) : (
-            <div className="md:col-span-2 grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div>
-                <label className="block font-sans text-[10px] tracking-[0.12em] uppercase text-gray-400 mb-1.5">Customer Name</label>
-                <input value={guestName} onChange={e => setGuestName(e.target.value)} placeholder="Full name" className="w-full border border-gray-200 px-3 py-2.5 font-sans text-base sm:text-sm focus:outline-none" />
-              </div>
-              <div>
-                <label className="block font-sans text-[10px] tracking-[0.12em] uppercase text-gray-400 mb-1.5">Customer Email</label>
-                <input type="email" value={guestEmail} onChange={e => setGuestEmail(e.target.value)} placeholder="name@example.com" className="w-full border border-gray-200 px-3 py-2.5 font-sans text-base sm:text-sm focus:outline-none" />
-              </div>
-              <div>
-                <label className="block font-sans text-[10px] tracking-[0.12em] uppercase text-gray-400 mb-1.5">Customer Phone (optional)</label>
-                <input type="tel" value={guestPhone} onChange={e => setGuestPhone(e.target.value)} placeholder="+27 82 000 0000" className="w-full border border-gray-200 px-3 py-2.5 font-sans text-base sm:text-sm focus:outline-none" />
-              </div>
+            <div className="md:col-span-2">
+              <label className="block font-sans text-[10px] tracking-[0.12em] uppercase text-gray-400 mb-1.5">Customer</label>
+              <ContactPicker contacts={contacts} loading={contactsLoading} selected={selectedContact}
+                onSelect={chooseContact} onAddNew={startNewContact} />
+              {showCustomerFields && (
+                <div className="mt-3 border border-gray-200 bg-[#F7F5F2] p-3">
+                  <div className="flex items-center gap-2 mb-3">
+                    {selectedContact ? <ContactAvatar contact={selectedContact} size={22} /> : null}
+                    <p className="font-sans text-xs text-gray-500 flex-1 min-w-0">
+                      {selectedContact
+                        ? <>Invoicing <strong className="text-gray-700">{contactLabel(selectedContact)}</strong>{customerId ? ' (registered account)' : ''}. Changes here apply to this invoice and update the contact.</>
+                        : enteringNew
+                          ? 'New contact. Saved to your contacts automatically when the invoice is issued.'
+                          : 'Customer details for this invoice.'}
+                    </p>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                    <div>
+                      <label className="block font-sans text-[10px] tracking-[0.12em] uppercase text-gray-400 mb-1.5">Customer Name</label>
+                      <input value={guestName} onChange={e => setGuestName(e.target.value)} placeholder="Full name" className="w-full border border-gray-200 bg-white px-3 py-2.5 font-sans text-base sm:text-sm focus:outline-none" />
+                    </div>
+                    <div>
+                      <label className="block font-sans text-[10px] tracking-[0.12em] uppercase text-gray-400 mb-1.5">Customer Email</label>
+                      <input type="email" value={guestEmail} onChange={e => setGuestEmail(e.target.value)} placeholder="name@example.com"
+                        className={`w-full border bg-white px-3 py-2.5 font-sans text-base sm:text-sm focus:outline-none ${selectedContact && !guestEmail.trim() ? 'border-[#C9A96E]' : 'border-gray-200'}`} />
+                      {selectedContact && !guestEmail.trim() && (
+                        <p className="font-sans text-[10px] text-[#8B6914] mt-1">No email on this contact. Add one to send the invoice.</p>
+                      )}
+                    </div>
+                    <div>
+                      <label className="block font-sans text-[10px] tracking-[0.12em] uppercase text-gray-400 mb-1.5">Customer Phone (optional)</label>
+                      <input type="tel" value={guestPhone} onChange={e => setGuestPhone(e.target.value)} placeholder="+27 82 000 0000" className="w-full border border-gray-200 bg-white px-3 py-2.5 font-sans text-base sm:text-sm focus:outline-none" />
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           )}
           {!editing && (
@@ -599,7 +661,7 @@ function InvoiceModal({ customers, suppliers, draft, editing, onClose, onDone }:
               </div>
               <p className="font-sans text-[10px] text-gray-400 mt-1.5">
                 {billing.isCompany
-                  ? `The invoice is addressed to the company, with ${customerMode === 'guest' ? 'the name above' : 'the selected customer'} as the contact person.`
+                  ? 'The invoice is addressed to the company, with the customer above as the contact person.'
                   : 'Printed under the customer on the tax invoice.'}
               </p>
             </div>
@@ -1002,6 +1064,9 @@ export default function AdminInvoicesPage() {
   const [invoices, setInvoices] = useState<InvoiceWithOrder[]>([])
   const [drafts, setDrafts] = useState<InvoiceDraft[]>([])
   const [people, setPeople] = useState<Person[]>([])
+  // null = the contact book isn't available (migration not applied yet).
+  const [contactBook, setContactBook] = useState<Contact[] | null>(null)
+  const [contactsLoading, setContactsLoading] = useState(true)
   const [search, setSearch] = useState('')
   const [filter, setFilter] = useState('all')
   const [loading, setLoading] = useState(true)
@@ -1029,6 +1094,12 @@ export default function AdminInvoicesPage() {
     ])
     setInvoices(inv); setDrafts(drf); setPeople(prof)
     setLoading(false)
+    // Separately, so a large book never holds up the invoice list. Reloaded
+    // after every save: issuing an invoice adds its customer to the book.
+    getContacts()
+      .then(setContactBook)
+      .catch(() => setContactBook(null))
+      .finally(() => setContactsLoading(false))
   }
   useEffect(() => { load() }, [])
 
@@ -1075,7 +1146,9 @@ export default function AdminInvoicesPage() {
     }
   }
 
-  const customers = useMemo(() => people.filter(p => p.role !== 'supplier'), [people])
+  const contacts = useMemo(
+    () => contactBook ?? contactsFromProfiles(people.filter(p => p.role === 'visitor')),
+    [contactBook, people])
   const suppliers = useMemo(() => people.filter(p => p.role === 'supplier'), [people])
 
   const filtered = useMemo(() => invoices.filter(i => {
@@ -1367,7 +1440,8 @@ export default function AdminInvoicesPage() {
 
       {(showNew || editingDraft || editingInvoice) && (
         <InvoiceModal
-          customers={customers}
+          contacts={contacts}
+          contactsLoading={contactsLoading}
           suppliers={suppliers}
           draft={editingDraft}
           editing={editingInvoice}
