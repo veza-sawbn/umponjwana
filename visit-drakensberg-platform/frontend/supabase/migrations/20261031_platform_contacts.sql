@@ -213,12 +213,24 @@ create trigger vd_contacts_on_invoice after insert on vd_invoices
 -- the company details the New Invoice form saves straight after creating).
 create or replace function public.vd_contacts_on_order_customer()
 returns trigger language plpgsql security definer set search_path = public as $$
-declare v_id uuid;
+declare
+  v_id  uuid;
+  v_old uuid;
 begin
   begin
     if exists (select 1 from vd_invoices where order_id = new.id) then
       v_id := vd_contact_merge(vd_contact_from_order(new), 'invoice', true);
       if v_id is not null then perform vd_contact_refresh_stats(v_id); end if;
+      -- The contact the order used to point at (a corrected email) loses
+      -- this invoice: recount it too.
+      for v_old in
+        select id from vd_contacts
+         where id is distinct from v_id
+           and nullif(lower(btrim(old.customer_email)), '') is not null
+           and email = lower(btrim(old.customer_email))
+      loop
+        perform vd_contact_refresh_stats(v_old);
+      end loop;
     end if;
   exception when others then
     raise warning 'vd_contacts_on_order_customer(%): %', new.id, sqlerrm;

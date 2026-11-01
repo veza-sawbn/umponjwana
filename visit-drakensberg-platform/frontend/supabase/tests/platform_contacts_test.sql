@@ -42,6 +42,10 @@ begin
   perform vdtest.ok(found, 'a corrected invoiced customer is filed under their email, lower-cased');
   perform vdtest.eq(v_c.name, 'Walk In', 'with their name');
   perform vdtest.eq(v_c.invoice_count, 1, 'and one invoiced order');
+  -- The fixture's default customer was filed first; the correction moved the
+  -- invoice away from it, so it must be recounted.
+  select * into v_c from vd_contacts where email = 'traveller@example.test';
+  perform vdtest.eq(v_c.invoice_count, 0, 'the contact the order used to point at loses the invoice');
 
   -- A fresh invoice for a brand-new guest, the way vd_create_order writes it.
   v_order2 := 'vdo-' || gen_random_uuid();

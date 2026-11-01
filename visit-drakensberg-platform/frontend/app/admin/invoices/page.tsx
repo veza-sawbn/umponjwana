@@ -342,17 +342,17 @@ function InvoiceModal({ contacts, contactsLoading, suppliers, draft, editing, on
     setGuestName(c.name || c.company || '')
     setGuestEmail(c.email ?? '')
     setGuestPhone(c.phone)
-    // Bring the contact's billing details along, without wiping anything
-    // already typed for this invoice.
-    if (c.isCompany || c.company || c.address) {
-      setBilling(b => ({
-        isCompany: b.isCompany || c.isCompany,
-        company: b.company || c.company,
-        vatNumber: b.vatNumber || c.vatNumber,
-        registrationNumber: b.registrationNumber || c.registrationNumber,
-        address: b.address || c.address,
-      }))
-    }
+    // Billing belongs to the customer: switching contacts replaces it with
+    // the new contact's details (blank if it has none), so one company's
+    // name, VAT number or address can never carry over onto another
+    // customer's invoice.
+    setBilling({
+      isCompany: c.isCompany,
+      company: c.company,
+      vatNumber: c.vatNumber,
+      registrationNumber: c.registrationNumber,
+      address: c.address,
+    })
   }
 
   function startNewContact() {
@@ -360,6 +360,7 @@ function InvoiceModal({ contacts, contactsLoading, suppliers, draft, editing, on
     setEnteringNew(true)
     setCustomerId('')
     setGuestName(''); setGuestEmail(''); setGuestPhone('')
+    setBilling({ isCompany: false, company: '', vatNumber: '', registrationNumber: '', address: '' })
   }
 
   const showCustomerFields = enteringNew || !!selectedContact || !!guestName || !!guestEmail
