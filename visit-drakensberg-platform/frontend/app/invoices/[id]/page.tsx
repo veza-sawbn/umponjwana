@@ -13,6 +13,7 @@ import { getSiteContent, SITE_CONTENT_DEFAULTS } from '@/lib/site-content'
 import { supabase } from '@/lib/auth'
 import { copyToClipboard } from '@/lib/clipboard'
 import { formatMoney } from '@/lib/allocation'
+import { docLineGross, invoiceGrossItems, invoiceSavings } from '@/lib/line-discount'
 import { DEFAULT_TIP_PRESETS, maxTip, tipForPercent, tippableTotal } from '@/lib/tips'
 import { amountDueNow, parseSchedule, resolveSchedule } from '@/lib/payment-schedule'
 import Logo from '@/components/Logo'
@@ -158,6 +159,7 @@ function PrintableInvoiceInner() {
   // The guided portion of the invoice — a tip is a percentage of what the
   // guides did, not of the chalet, the permits or the VAT.
   const tippable = useMemo(() => tippableTotal(invoice?.lines), [invoice])
+  const savings = useMemo(() => invoiceSavings(invoice?.lines), [invoice])
   const tipCeiling = maxTip(tippable)
   const tip = useMemo(() => {
     if (tipChoice === null) return 0
@@ -498,10 +500,20 @@ function PrintableInvoiceInner() {
                     {l.description && (
                       <p className="font-sans text-[12px] text-gray-600 mt-0.5 whitespace-pre-wrap">{l.description}</p>
                     )}
+                    {Number(l.discount) > 0 && (
+                      <p className="font-sans text-[12px] text-[#2d6a4f] mt-0.5">
+                        {l.discountLabel || 'Discount'}: −{formatMoney(Number(l.discount), invoice.currency)}
+                      </p>
+                    )}
                   </td>
                   <td className="py-3 print:py-1.5 text-right font-sans text-sm text-gray-600 whitespace-nowrap">{Number(l.quantity)} {l.unitLabel}{Number(l.quantity) !== 1 ? 's' : ''}</td>
                   <td className="py-3 print:py-1.5 text-right font-sans text-sm text-gray-600 whitespace-nowrap">{formatMoney(Number(l.unitPrice), invoice.currency)}</td>
-                  <td className="py-3 print:py-1.5 text-right font-sans text-sm text-gray-800 whitespace-nowrap">{formatMoney(Number(l.total), invoice.currency)}</td>
+                  <td className="py-3 print:py-1.5 text-right font-sans text-sm text-gray-800 whitespace-nowrap">
+                    {Number(l.discount) > 0 && (
+                      <span className="block text-[12px] text-gray-400 line-through">{formatMoney(docLineGross(l), invoice.currency)}</span>
+                    )}
+                    {Number(l.discount) > 0 && Number(l.total) === 0 ? 'Included' : formatMoney(Number(l.total), invoice.currency)}
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -511,6 +523,12 @@ function PrintableInvoiceInner() {
           {/* Totals */}
           <div className="flex justify-end print:break-inside-avoid">
             <div className="w-full sm:w-72 space-y-2 print:space-y-1 font-sans text-sm">
+              {savings > 0 && (
+                <>
+                  <div className="flex justify-between text-gray-600"><span>Items</span><span>{formatMoney(invoiceGrossItems(invoice.lines), invoice.currency)}</span></div>
+                  <div className="flex justify-between text-[#2d6a4f]"><span>Package savings</span><span>−{formatMoney(savings, invoice.currency)}</span></div>
+                </>
+              )}
               <div className="flex justify-between text-gray-600"><span>Subtotal</span><span>{formatMoney(Number(invoice.subtotal), invoice.currency)}</span></div>
               {Number(invoice.discount) > 0 && (
                 <div className="flex justify-between text-gray-600"><span>Discount</span><span>−{formatMoney(Number(invoice.discount), invoice.currency)}</span></div>
@@ -522,6 +540,11 @@ function PrintableInvoiceInner() {
               </div>
               <div className="flex justify-between text-[#2d6a4f]"><span>Amount paid</span><span>{formatMoney(Number(invoice.amount_paid), invoice.currency)}</span></div>
               <div className="flex justify-between font-medium text-base text-gray-800 border-t-2 border-gray-800 pt-2"><span>Balance Due</span><span>{formatMoney(Number(invoice.balance), invoice.currency)}</span></div>
+              {savings > 0 && (
+                <p className="mt-3 bg-[#2d6a4f]/10 text-[#2d6a4f] px-3 py-2 text-center text-sm print:bg-transparent print:border print:border-[#2d6a4f]">
+                  You save {formatMoney(savings, invoice.currency)} by booking this as a package
+                </p>
+              )}
             </div>
           </div>
 

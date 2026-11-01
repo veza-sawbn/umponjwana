@@ -18,6 +18,11 @@ export type DraftLine = {
   unitLabel: string
   unitPrice: string
   supplierId: string   // '' = platform-owned
+  /** Optional per-line discount; absent on drafts saved before it existed. */
+  discountType?: 'amount' | 'percent'
+  discountValue?: string
+  discountReason?: string
+  discountFundedBy?: 'supplier' | 'platform'
 }
 
 export type DraftBilling = {

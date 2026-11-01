@@ -6,6 +6,7 @@ import { RefreshCw, Wallet, Clock, CheckCircle, FileText, Printer } from 'lucide
 import { getMyOrderLines, setLineFulfilment, type OrderLine } from '@/lib/orders'
 import { getMySettlements, buildStatements, type Settlement, type SupplierStatement } from '@/lib/settlements'
 import { formatMoney } from '@/lib/allocation'
+import { supplierBilledAmount } from '@/lib/line-discount'
 
 // Supplier earnings portal. Row-level security guarantees a supplier only
 // ever receives their own order lines and settlements — no other suppliers,
@@ -188,7 +189,7 @@ export default function SupplierEarningsPage() {
                     </td>
                     <td className="px-4 py-3.5 font-sans text-xs text-gray-500">{l.share_customer_name ? l.customer_name || '—' : '—'}</td>
                     <td className="px-4 py-3.5 font-sans text-xs text-gray-500">{fmt(l.service_date)}{l.end_date ? ` → ${fmt(l.end_date)}` : ''}</td>
-                    <td className="px-4 py-3.5 font-sans text-sm">{formatMoney(Number(l.gross_amount) - Number(l.discount_amount), l.currency)}</td>
+                    <td className="px-4 py-3.5 font-sans text-sm">{formatMoney(supplierBilledAmount(l), l.currency)}</td>
                     <td className="px-4 py-3.5 font-sans text-sm text-gray-500">−{formatMoney(Number(l.commission_amount) + Number(l.platform_fee), l.currency)}</td>
                     <td className="px-4 py-3.5 font-display italic text-[#2d6a4f]">{formatMoney(Number(l.supplier_share), l.currency)}</td>
                     <td className="px-4 py-3.5 font-sans text-xs capitalize text-gray-500">{l.payment_status}</td>

@@ -9,6 +9,7 @@ import {
   type Settlement, type SupplierBalance,
 } from '@/lib/settlements'
 import { formatMoney } from '@/lib/allocation'
+import { supplierBilledAmount } from '@/lib/line-discount'
 
 const STATUS_BADGE: Record<string, string> = {
   pending: 'bg-[#C9A96E]/15 text-[#8B6914]',
@@ -100,7 +101,7 @@ function CreateSettlementModal({ balance, onClose, onCreated }: {
                   <td className="px-3 py-2 font-mono text-xs text-gray-400">{l.order_number}</td>
                   <td className="px-3 py-2 font-sans text-sm text-gray-700">{l.title}</td>
                   <td className="px-3 py-2 font-sans text-xs text-gray-500">{fmt(l.service_date)}</td>
-                  <td className="px-3 py-2 font-sans text-sm">{formatMoney(Number(l.gross_amount) - Number(l.discount_amount))}</td>
+                  <td className="px-3 py-2 font-sans text-sm">{formatMoney(supplierBilledAmount(l))}</td>
                   <td className="px-3 py-2 font-sans text-sm text-gray-500">{formatMoney(Number(l.commission_amount))}</td>
                   <td className="px-3 py-2 font-sans text-sm text-[#2d6a4f]">{formatMoney(Number(l.supplier_share))}</td>
                 </tr>
