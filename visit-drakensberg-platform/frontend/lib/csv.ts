@@ -72,8 +72,10 @@ function firstNonEmpty(row: string[], indexes: number[]): string {
  *  Name/Last Name split is joined into one name; repeated "Email N"/
  *  "Phone N" columns (Wix-style) all feed the same field, preferring the
  *  lowest-numbered one that's actually filled in for a given row. Rows with
- *  neither a name nor an email are dropped — nothing useful to import. */
-export function parseContactsCsv(text: string): CsvContactRow[] {
+ *  neither a name nor an email are dropped — nothing useful to import —
+ *  unless `keepPhoneOnly` is set: Wix lists many contacts under nothing but
+ *  a phone number, and the platform contact book keeps those. */
+export function parseContactsCsv(text: string, opts?: { keepPhoneOnly?: boolean }): CsvContactRow[] {
   const table = parseCsv(text)
   if (table.length === 0) return []
 
@@ -104,7 +106,7 @@ export function parseContactsCsv(text: string): CsvContactRow[] {
         phone: firstNonEmpty(r, phoneIdx),
       }
     })
-    .filter(r => r.name || r.email)
+    .filter(r => r.name || r.email || (opts?.keepPhoneOnly && r.phone))
 }
 
 /* ────────────────────────────────────────────────────────────────────────────

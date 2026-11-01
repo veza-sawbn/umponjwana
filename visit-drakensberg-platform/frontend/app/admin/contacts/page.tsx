@@ -1,12 +1,17 @@
 'use client'
 
 import { useState } from 'react'
-import { BookUser, Building2 } from 'lucide-react'
+import { BookUser, Building2, Users } from 'lucide-react'
 import DirectoryContactsPanel from '@/components/admin/contacts/DirectoryContactsPanel'
 import SupplierContactsPanel from '@/components/admin/contacts/SupplierContactsPanel'
+import CustomerContactsPanel from '@/components/admin/contacts/CustomerContactsPanel'
 
-// Two contact books live here, and they are deliberately separate:
+// Three contact books live here, and they are deliberately separate:
 //
+//   Customers   the platform's own customer book (vd_contacts): the Wix
+//               import, registered accounts, and everyone an invoice has
+//               been generated for (added automatically). The New Invoice
+//               form picks from this list.
 //   Directory   the platform's own outreach list — establishments compiled
 //               from the regional tourism directories that we want to
 //               recruit. No account, no supplier, no booking behind them;
@@ -17,15 +22,16 @@ import SupplierContactsPanel from '@/components/admin/contacts/SupplierContactsP
 //               (vd_supplier_contacts). Cross-supplier view — a supplier
 //               session only ever sees its own rows.
 //
-// Registered customers are a third book again, over on /admin/customers.
+// Registered customers' CRM profiles are over on /admin/customers.
 
 const TABS = [
+  { id: 'customers', label: 'Customers', icon: Users },
   { id: 'directory', label: 'Directory', icon: Building2 },
   { id: 'suppliers', label: 'Supplier Address Books', icon: BookUser },
 ] as const
 
 export default function AdminContactsPage() {
-  const [tab, setTab] = useState<(typeof TABS)[number]['id']>('directory')
+  const [tab, setTab] = useState<(typeof TABS)[number]['id']>('customers')
 
   return (
     <div className="p-4 sm:p-6 lg:p-8">
@@ -49,7 +55,8 @@ export default function AdminContactsPage() {
         })}
       </div>
 
-      {tab === 'directory' ? <DirectoryContactsPanel /> : <SupplierContactsPanel />}
+      {tab === 'customers' ? <CustomerContactsPanel />
+        : tab === 'directory' ? <DirectoryContactsPanel /> : <SupplierContactsPanel />}
     </div>
   )
 }
