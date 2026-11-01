@@ -106,6 +106,16 @@ begin
   select sum(debit), sum(credit) into v_debit, v_credit from vd_ledger_entries where order_id = v_order;
   perform vdtest.eq(v_debit, v_credit, 'balanced');
 
+  -- ── Cancelling reverses everything, the platform discount included ───────
+  perform vdtest.act_as(v_admin);
+  perform vd_cancel_order(v_order);
+  perform vdtest.act_as_nobody();
+  for v_n in select coalesce(sum(debit - credit), 0) from vd_ledger_entries where order_id = v_order
+              group by account_code having coalesce(sum(debit - credit), 0) <> 0 loop
+    raise exception 'FAILED: an account still carries % after cancelling', v_n;
+  end loop;
+  perform vdtest.ok(true, 'after cancelling, every account on the order nets to zero (5100 and 4000 included)');
+
   -- ── Guards ────────────────────────────────────────────────────────────────
   perform vdtest.act_as(v_admin);
   perform vdtest.raises(format('select vd_create_order(%L::jsonb, %L::jsonb)',

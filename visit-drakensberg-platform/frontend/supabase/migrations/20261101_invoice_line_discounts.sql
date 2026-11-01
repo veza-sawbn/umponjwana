@@ -673,3 +673,85 @@ begin
 end;
 $$;
 grant execute on function public.vd_update_line_allocation(text, numeric, numeric, numeric) to authenticated;
+
+-- ────────────────────────────────────────────────────────────────────────────
+-- Cancelling an order reverses its platform-funded discounts too. Same as
+-- 20260804_guest_orders_repair.sql apart from the 5100 credit (and the 4000
+-- reversal that offsets it), so a cancelled package leaves neither a
+-- discount expense nor the matching revenue behind.
+-- ────────────────────────────────────────────────────────────────────────────
+create or replace function public.vd_cancel_order(p_order_id text)
+returns void language plpgsql security definer set search_path = public as $$
+declare
+  v_order vd_orders%rowtype;
+  v_journal uuid := gen_random_uuid();
+  v_sum_supplier numeric; v_sum_commission numeric; v_platform numeric;
+  v_platform_discount numeric;
+begin
+  select * into v_order from vd_orders where id = p_order_id for update;
+  if not found then return; end if;
+  if auth.uid() is not null and v_order.user_id is distinct from auth.uid() and not is_finance() then
+    raise exception 'not allowed';
+  end if;
+  if v_order.booking_status = 'cancelled' then return; end if;
+
+  select coalesce(sum(supplier_share), 0), coalesce(sum(commission_amount), 0),
+         coalesce(sum(discount_amount) filter (where discount_funded_by = 'platform' and supplier_id is not null), 0)
+    into v_sum_supplier, v_sum_commission, v_platform_discount
+    from vd_order_lines
+   where order_id = p_order_id and settlement_status in ('unsettled', 'allocated');
+
+  v_platform := v_order.total_value - v_sum_supplier - v_sum_commission - v_order.service_fee - v_order.tax_amount
+                + v_platform_discount;
+  insert into vd_ledger_entries (journal_id, account_code, order_id, debit, credit, memo) values
+    (v_journal, '1100', p_order_id, 0, v_order.total_value, 'Order ' || v_order.order_number || ' cancelled');
+  if v_platform_discount <> 0 then
+    insert into vd_ledger_entries (journal_id, account_code, order_id, debit, credit, memo)
+    values (v_journal, '5100', p_order_id, 0, v_platform_discount, 'Order ' || v_order.order_number || ' cancelled — package discounts reversed');
+  end if;
+  if v_sum_supplier <> 0 then
+    insert into vd_ledger_entries (journal_id, account_code, order_id, debit, credit, memo)
+    values (v_journal, '2000', p_order_id, v_sum_supplier, 0, 'Order ' || v_order.order_number || ' cancelled');
+  end if;
+  if v_sum_commission <> 0 then
+    insert into vd_ledger_entries (journal_id, account_code, order_id, debit, credit, memo)
+    values (v_journal, '4100', p_order_id, v_sum_commission, 0, 'Order ' || v_order.order_number || ' cancelled');
+  end if;
+  if v_order.service_fee <> 0 then
+    insert into vd_ledger_entries (journal_id, account_code, order_id, debit, credit, memo)
+    values (v_journal, '4200', p_order_id, v_order.service_fee, 0, 'Order ' || v_order.order_number || ' cancelled');
+  end if;
+  if v_order.tax_amount <> 0 then
+    insert into vd_ledger_entries (journal_id, account_code, order_id, debit, credit, memo)
+    values (v_journal, '2200', p_order_id, v_order.tax_amount, 0, 'Order ' || v_order.order_number || ' cancelled');
+  end if;
+  if v_platform <> 0 then
+    insert into vd_ledger_entries (journal_id, account_code, order_id, debit, credit, memo)
+    values (v_journal, '4000', p_order_id, greatest(v_platform, 0), greatest(-v_platform, 0),
+            'Order ' || v_order.order_number || ' cancelled');
+  end if;
+
+  if v_order.amount_paid > 0 then
+    v_journal := gen_random_uuid();
+    insert into vd_ledger_entries (journal_id, account_code, order_id, debit, credit, memo) values
+      (v_journal, '1100', p_order_id, v_order.amount_paid, 0, 'Order ' || v_order.order_number || ' — reinstate receivable for refund'),
+      (v_journal, '2100', p_order_id, 0, v_order.amount_paid, 'Order ' || v_order.order_number || ' — refund liability');
+  end if;
+
+  update vd_orders set
+    booking_status = 'cancelled', trip_status = 'cancelled',
+    financial_status = case when amount_paid > 0 then 'open' else 'closed' end,
+    refund_balance = amount_paid,
+    outstanding_balance = 0,
+    updated_at = now()
+  where id = p_order_id;
+
+  update vd_order_lines set fulfilment_status = 'cancelled', updated_at = now()
+  where order_id = p_order_id and settlement_status in ('unsettled', 'allocated');
+
+  update vd_invoices set status = 'void', updated_at = now() where order_id = p_order_id;
+
+  perform vd_audit('order.cancelled', 'order', p_order_id,
+    jsonb_build_object('refundBalance', v_order.amount_paid));
+end;
+$$;
