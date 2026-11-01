@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import toast from 'react-hot-toast'
-import { Search, RefreshCw, Plus, Printer, Trash2, X, FileText, Send, Pencil, Wallet, Save, Link2, Check, Eye, EyeOff, ShieldOff, RotateCw, KeyRound, Ban, RotateCcw, Building2 } from 'lucide-react'
+import { Search, RefreshCw, Plus, Printer, Trash2, X, FileText, Send, Pencil, Wallet, Save, Link2, Check, Eye, EyeOff, ShieldOff, RotateCw, KeyRound, Ban, RotateCcw, Building2, Tag } from 'lucide-react'
 import {
   getInvoices, getFinanceSettings, sendInvoice, invoiceShareUrl, invoiceViewedLabel,
   revokeInvoiceLink, reissueInvoiceLink, voidInvoice, reissueInvoice, setInvoicePaymentSchedule,
@@ -27,6 +27,7 @@ import {
   PAYMENT_TYPES, PAYMENT_METHODS,
 } from '@/lib/order-payments'
 import { formatMoney } from '@/lib/allocation'
+import { lineDiscountAmount, discountProblem, isWrittenOff, DEFAULT_DISCOUNT_REASON } from '@/lib/line-discount'
 import { copyToClipboard } from '@/lib/clipboard'
 import { useQuickParam } from '@/lib/admin-quick-param'
 import { supabase } from '@/lib/auth'
@@ -55,6 +56,99 @@ const CATEGORIES = ['accommodation', 'activity', 'tour', 'hike', 'event', 'shutt
 type Person = { id: string; full_name: string | null; email: string | null; role: string }
 
 const emptyLine = (): DraftLine => ({ title: '', description: '', category: 'extra', quantity: '1', unitLabel: 'unit', unitPrice: '', supplierId: '' })
+
+/** A line's price before any discount. */
+function lineGross(l: DraftLine): number {
+  return (parseFloat(l.unitPrice) || 0) * (parseFloat(l.quantity) || 0)
+}
+/** The rand discount the line carries (0 when it has none). */
+function lineDiscount(l: DraftLine): number {
+  return l.discountType ? lineDiscountAmount(lineGross(l), l.discountType, l.discountValue) : 0
+}
+
+const possessive = (name: string) => /s$/i.test(name) ? `${name}'` : `${name}'s`
+
+/**
+ * Per-line discount / write-off. For a bundled package: add the included
+ * item as its own line (so its booking still reaches its supplier), then
+ * write it off here; the customer's invoice shows the full price, the
+ * discount and the reason.
+ */
+function LineDiscountEditor({ line, supplierName, onChange }: {
+  line: DraftLine
+  supplierName: string | null
+  onChange: (patch: Partial<DraftLine>) => void
+}) {
+  const gross = lineGross(line)
+  const discount = lineDiscount(line)
+  const problem = discountProblem(gross, line.discountType, line.discountValue)
+  const net = gross - discount
+
+  if (!line.discountType) {
+    return (
+      <button type="button" onClick={() => onChange({ discountType: 'amount', discountValue: '', discountReason: '' })}
+        className="mt-2 inline-flex items-center gap-1.5 font-sans text-xs text-[#2d6a4f] hover:underline">
+        <Tag size={12} /> Discount or write off this item
+      </button>
+    )
+  }
+
+  const seg = (active: boolean) => `px-3 py-2 font-sans text-xs transition-colors ${active ? 'bg-[#2d6a4f] text-white' : 'text-gray-500 hover:bg-[#F7F5F2]'}`
+  return (
+    <div className="mt-2 border border-[#C9A96E]/40 bg-[#C9A96E]/5 p-2.5 space-y-2.5">
+      <div className="flex items-center justify-between gap-2">
+        <p className="inline-flex items-center gap-1.5 font-sans text-[10px] tracking-[0.12em] uppercase text-[#8B6914]"><Tag size={11} /> Discount</p>
+        <button type="button" aria-label="Remove discount"
+          onClick={() => onChange({ discountType: undefined, discountValue: undefined, discountReason: undefined, discountFundedBy: undefined })}
+          className="text-gray-400 hover:text-red-400"><X size={14} /></button>
+      </div>
+
+      <div className="flex flex-wrap items-center gap-2">
+        <div className="inline-flex border border-gray-200 bg-white overflow-hidden">
+          <button type="button" onClick={() => onChange({ discountType: 'amount' })} className={seg(line.discountType === 'amount')}>R</button>
+          <button type="button" onClick={() => onChange({ discountType: 'percent' })} className={seg(line.discountType === 'percent')}>%</button>
+        </div>
+        <input value={line.discountValue ?? ''} onChange={e => onChange({ discountValue: e.target.value })} inputMode="decimal"
+          placeholder={line.discountType === 'percent' ? '0–100' : 'Amount'}
+          className={`w-28 border bg-white px-2 py-2 font-sans text-base sm:text-sm text-right focus:outline-none ${problem ? 'border-red-300' : 'border-gray-200'}`} />
+        <button type="button"
+          onClick={() => onChange({ discountType: 'percent', discountValue: '100', discountReason: line.discountReason || DEFAULT_DISCOUNT_REASON })}
+          className="px-3 py-2 border border-gray-200 bg-white font-sans text-xs text-gray-600 hover:border-[#2d6a4f] hover:text-[#2d6a4f]">
+          Write off in full (included)
+        </button>
+        <span className="font-sans text-xs text-gray-500">
+          {problem ? <span className="text-red-500">{problem}</span>
+            : <>Customer pays <strong className="text-gray-800">{formatMoney(net)}</strong>{discount > 0 && <> of <span className="line-through">{formatMoney(gross)}</span></>}</>}
+        </span>
+      </div>
+
+      <input value={line.discountReason ?? ''} onChange={e => onChange({ discountReason: e.target.value })} maxLength={200}
+        placeholder="Shown to the customer, e.g. Included in the Northern Mini Traverse package"
+        className="w-full border border-gray-200 bg-white px-3 py-2 font-sans text-base sm:text-xs focus:outline-none" />
+
+      {supplierName && (
+        <div>
+          <p className="font-sans text-[10px] tracking-[0.12em] uppercase text-gray-400 mb-1">Who covers the discount?</p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            {([
+              ['platform', 'Visit Drakensberg', `${supplierName} is still paid on the full ${formatMoney(gross)}; the discount comes out of our margin.`],
+              ['supplier', supplierName, `${possessive(supplierName)} payout is worked out on ${formatMoney(net)}${isWrittenOff(gross, discount) ? ', so they are paid nothing for it' : ''}.`],
+            ] as const).map(([id, label, help]) => (
+              <button type="button" key={id} onClick={() => onChange({ discountFundedBy: id })}
+                className={`text-left border px-3 py-2 transition-colors ${line.discountFundedBy === id ? 'border-[#2d6a4f] bg-white' : 'border-gray-200 bg-white/60 hover:border-gray-300'}`}>
+                <span className="flex items-center gap-2 font-sans text-xs text-gray-800">
+                  <span className={`w-3 h-3 rounded-full border ${line.discountFundedBy === id ? 'border-[#2d6a4f] bg-[#2d6a4f]' : 'border-gray-300'}`} />
+                  {label}
+                </span>
+                <span className="block font-sans text-[11px] text-gray-500 mt-0.5 leading-snug">{help}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
 
 function fmt(d?: string | null) {
   return d ? new Date(d).toLocaleDateString('en-ZA', { day: 'numeric', month: 'short', year: 'numeric' }) : '—'
@@ -378,6 +472,12 @@ function InvoiceModal({ contacts, contactsLoading, suppliers, draft, editing, on
         unitLabel: l.unit_label,
         unitPrice: String(l.unit_price),
         supplierId: l.supplier_id ?? '',
+        ...(Number(l.discount_amount) > 0 ? {
+          discountType: 'amount' as const,
+          discountValue: String(Number(l.discount_amount)),
+          discountReason: l.discount_reason ?? '',
+          discountFundedBy: l.discount_funded_by ?? 'supplier',
+        } : {}),
       }))
     }
     return [emptyLine()]
@@ -391,7 +491,9 @@ function InvoiceModal({ contacts, contactsLoading, suppliers, draft, editing, on
 
   useEffect(() => { getFinanceSettings().then(setRates) }, [])
 
-  const subtotal = lines.reduce((s, l) => s + (parseFloat(l.unitPrice) || 0) * (parseFloat(l.quantity) || 0), 0)
+  const itemsGross = lines.reduce((s, l) => s + lineGross(l), 0)
+  const savings = lines.reduce((s, l) => s + lineDiscount(l), 0)
+  const subtotal = itemsGross - savings
   const serviceFee = feeOverride !== '' ? (parseFloat(feeOverride) || 0) : Math.round(subtotal * rates.serviceFeeRate)
   const tax = taxOverride !== '' ? (parseFloat(taxOverride) || 0) : Math.round((subtotal + serviceFee) * rates.vatRate)
   const total = subtotal + serviceFee + tax
@@ -418,6 +520,11 @@ function InvoiceModal({ contacts, contactsLoading, suppliers, draft, editing, on
       unitLabel: l.unitLabel || 'unit',
       unitPrice: parseFloat(l.unitPrice) || 0,
       grossAmount: (parseFloat(l.unitPrice) || 0) * (parseFloat(l.quantity) || 1),
+      ...(lineDiscount(l) > 0 ? {
+        discountAmount: lineDiscount(l),
+        discountFundedBy: l.supplierId ? (l.discountFundedBy ?? 'supplier') : 'platform',
+        discountReason: (l.discountReason ?? '').trim() || DEFAULT_DISCOUNT_REASON,
+      } : {}),
     }))
   }
 
@@ -464,6 +571,13 @@ function InvoiceModal({ contacts, contactsLoading, suppliers, draft, editing, on
       }
     }
     if (validLines.length === 0) { toast.error('Add at least one line with a title and price.'); return }
+    for (const l of validLines) {
+      const problem = discountProblem(lineGross(l), l.discountType, l.discountValue)
+      if (problem) { toast.error(`Discount on "${l.title.trim()}": ${problem.toLowerCase()}.`); return }
+      if (lineDiscount(l) > 0 && l.supplierId && !l.discountFundedBy) {
+        toast.error(`Choose who covers the discount on "${l.title.trim()}".`); return
+      }
+    }
     // The details vd_update_order_customer will write once the order exists.
     const customerDetails: OrderCustomerDetails | null = editing || !hasBilling ? null : {
       name: guestName.trim(),
@@ -493,7 +607,12 @@ function InvoiceModal({ contacts, contactsLoading, suppliers, draft, editing, on
         quantity: l.quantity,
         unitLabel: l.unitLabel ?? 'unit',
         unitPrice: l.unitPrice,
-        total: l.grossAmount ?? l.unitPrice * l.quantity,
+        total: (l.grossAmount ?? l.unitPrice * l.quantity) - (l.discountAmount ?? 0),
+        ...(l.discountAmount ? {
+          grossTotal: l.grossAmount ?? l.unitPrice * l.quantity,
+          discount: l.discountAmount,
+          discountLabel: l.discountReason ?? '',
+        } : {}),
       }))
 
       if (editing) {
@@ -707,6 +826,8 @@ function InvoiceModal({ contacts, contactsLoading, suppliers, draft, editing, on
                 placeholder="Description, appears beneath the title on the customer's invoice (optional)"
                 className="mt-2 w-full border border-gray-200 px-3 py-2 font-sans text-sm md:text-xs resize-none focus:outline-none"
               />
+              <LineDiscountEditor line={l} onChange={patch => setLine(i, patch)}
+                supplierName={l.supplierId ? (suppliers.find(s => s.id === l.supplierId)?.full_name || 'The supplier') : null} />
             </div>
           ))}
         </div>
@@ -740,6 +861,11 @@ function InvoiceModal({ contacts, contactsLoading, suppliers, draft, editing, on
           style={{ paddingBottom: 'calc(0.75rem + env(safe-area-inset-bottom))' }}
         >
           <div className="sm:text-right">
+            {savings > 0 && (
+              <p className="font-sans text-xs text-gray-500">
+                Items {formatMoney(itemsGross)} · <span className="text-[#2d6a4f]">Package savings −{formatMoney(savings)}</span>
+              </p>
+            )}
             <p className="font-sans text-xs text-gray-500">Subtotal {formatMoney(subtotal)} · Fee {formatMoney(serviceFee)} · VAT {formatMoney(tax)}</p>
             <p className="font-display italic text-xl sm:text-2xl text-[#2d6a4f]">Total {formatMoney(total)}</p>
             {schedule && !validateSchedule(schedule, total) && (

@@ -7,6 +7,7 @@ import { LogoMark, BUSINESS_DETAILS_DEFAULTS } from './pdf-letterhead'
 export { BUSINESS_DETAILS_DEFAULTS }
 import { formatMoney } from './allocation'
 import { parseSchedule, resolveSchedule } from './payment-schedule'
+import { docLineGross, invoiceGrossItems, invoiceSavings } from './line-discount'
 // Type-only: pulls in no runtime code, so this stays safe to import from a
 // server route — lib/invoices.ts constructs a browser-oriented Supabase
 // client (lib/auth.ts) as a module-level side effect, which has no business
@@ -84,6 +85,9 @@ const styles = StyleSheet.create({
   lineTitle: { fontFamily: 'Helvetica-Bold', fontSize: 9.5, color: INK },
   lineDesc: { fontSize: 8.5, color: MUTED, marginTop: 3, lineHeight: 1.5 },
   cellText: { fontSize: 9, color: INK },
+  lineSaving: { fontSize: 8.5, color: GREEN, marginTop: 3 },
+  struck: { fontSize: 8, color: FAINT, textDecoration: 'line-through', textAlign: 'right' },
+  savingsBanner: { marginTop: 10, paddingVertical: 6, paddingHorizontal: 8, backgroundColor: '#E6F1EC', color: GREEN, fontSize: 9, textAlign: 'center' },
 
   // Totals
   totalsWrap: { flexDirection: 'row', justifyContent: 'flex-end', marginTop: 18 },
@@ -125,6 +129,7 @@ function InvoiceDocument({ invoice, order, receipts, business, siteUrl }: Invoic
   const addressLine = [business.address_line1, business.address_line2, business.city, business.country]
     .filter(Boolean).join(', ') || 'KwaZulu-Natal, South Africa'
   const hasDiscount = Number(invoice.discount) > 0
+  const savings = invoiceSavings(invoice.lines)
   const hasEft = Number(invoice.balance) > 0 && !!business.bank_account_number
   const st = statusStyle(invoice.status)
   const website = siteUrl ? siteUrl.replace(/^https?:\/\//, '') : ''
@@ -193,10 +198,18 @@ function InvoiceDocument({ invoice, order, receipts, business, siteUrl }: Invoic
               <View style={styles.colService}>
                 <Text style={styles.lineTitle}>{l.title}</Text>
                 {!!l.description && <Text style={styles.lineDesc}>{l.description}</Text>}
+                {Number(l.discount) > 0 && (
+                  <Text style={styles.lineSaving}>{l.discountLabel || 'Discount'}: -{formatMoney(Number(l.discount), invoice.currency)}</Text>
+                )}
               </View>
               <Text style={[styles.cellText, styles.colQty]}>{Number(l.quantity)}</Text>
               <Text style={[styles.cellText, styles.colPrice]}>{formatMoney(Number(l.unitPrice), invoice.currency)}</Text>
-              <Text style={[styles.cellText, styles.colTotal]}>{formatMoney(Number(l.total), invoice.currency)}</Text>
+              <View style={styles.colTotal}>
+                {Number(l.discount) > 0 && <Text style={styles.struck}>{formatMoney(docLineGross(l), invoice.currency)}</Text>}
+                <Text style={[styles.cellText, { textAlign: 'right' }]}>
+                  {Number(l.discount) > 0 && Number(l.total) === 0 ? 'Included' : formatMoney(Number(l.total), invoice.currency)}
+                </Text>
+              </View>
             </View>
           ))}
         </View>
@@ -205,6 +218,18 @@ function InvoiceDocument({ invoice, order, receipts, business, siteUrl }: Invoic
         <View style={styles.totalsWrap} wrap={false}>
           <View style={styles.totalsBox}>
             <Text style={styles.heading}>Summary</Text>
+            {savings > 0 && (
+              <>
+                <View style={styles.totalsRow}>
+                  <Text style={styles.totalsMuted}>Items</Text>
+                  <Text style={styles.totalsMuted}>{formatMoney(invoiceGrossItems(invoice.lines), invoice.currency)}</Text>
+                </View>
+                <View style={styles.totalsRow}>
+                  <Text style={[styles.totalsMuted, { color: GREEN }]}>Package savings</Text>
+                  <Text style={[styles.totalsMuted, { color: GREEN }]}>-{formatMoney(savings, invoice.currency)}</Text>
+                </View>
+              </>
+            )}
             <View style={styles.totalsRow}>
               <Text style={styles.totalsMuted}>Subtotal</Text>
               <Text style={styles.totalsMuted}>{formatMoney(Number(invoice.subtotal), invoice.currency)}</Text>
@@ -235,6 +260,9 @@ function InvoiceDocument({ invoice, order, receipts, business, siteUrl }: Invoic
               <Text style={styles.totalsDueLabel}>Balance Due</Text>
               <Text style={styles.totalsDueValue}>{formatMoney(Number(invoice.balance), invoice.currency)}</Text>
             </View>
+            {savings > 0 && (
+              <Text style={styles.savingsBanner}>You save {formatMoney(savings, invoice.currency)} by booking this as a package</Text>
+            )}
           </View>
         </View>
 

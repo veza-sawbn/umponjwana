@@ -34,7 +34,12 @@ export type OrderLineInput = {
   unitLabel?: string
   unitPrice: number
   grossAmount?: number
+  /** Staff only — vd_create_order refuses a discount from anyone else. */
   discountAmount?: number
+  /** Who carries the discount: the supplier's payout ('supplier', default) or Visit Drakensberg ('platform'). */
+  discountFundedBy?: 'supplier' | 'platform'
+  /** Shown to the customer beside the discount, e.g. "Included in package". */
+  discountReason?: string
   commissionRate?: number   // suggestion only — supplier terms win server-side
   shareCustomerName?: boolean
   // Opt-in: vd_create_order re-prices this line from its canonical
@@ -103,6 +108,9 @@ export type OrderLine = {
   unit_price: number
   gross_amount: number
   discount_amount: number
+  /** Arrive with 20261101_invoice_line_discounts.sql. */
+  discount_funded_by?: 'supplier' | 'platform'
+  discount_reason?: string
   tax_amount: number
   commission_rate: number
   commission_amount: number
@@ -176,11 +184,27 @@ export type CreateOrderResult = {
 }
 
 /** Create a Master Order (+ lines, invoice, ledger and optional payment) atomically. */
+/** A line as it is printed on the customer's invoice document. */
+export type InvoiceDocLine = {
+  title: string
+  description?: string
+  category?: string
+  quantity: number
+  unitLabel?: string
+  unitPrice: number
+  /** What the customer pays for the line. */
+  total: number
+  /** Before any discount. */
+  grossTotal?: number
+  discount?: number
+  discountLabel?: string
+}
+
 export async function createOrder(
   order: CreateOrderInput,
   lines: OrderLineInput[],
   opts?: {
-    invoiceLines?: Array<{ title: string; category?: string; quantity: number; unitLabel?: string; unitPrice: number; total: number }>
+    invoiceLines?: InvoiceDocLine[]
     payment?: { amount: number; type?: string; method?: string; reference?: string }
     userId?: string
   },
@@ -213,7 +237,7 @@ export async function updateOrder(
     'customerName' | 'customerEmail' | 'tripName' | 'currency' | 'travelStart' | 'travelEnd'
     | 'serviceFeeOverride' | 'taxOverride'>>,
   lines: OrderLineInput[],
-  opts?: { invoiceLines?: Array<{ title: string; description?: string; category?: string; quantity: number; unitLabel?: string; unitPrice: number; total: number }> },
+  opts?: { invoiceLines?: InvoiceDocLine[] },
 ): Promise<CreateOrderResult> {
   const { data, error } = await supabase.rpc('vd_update_order', {
     p_order_id: orderId,

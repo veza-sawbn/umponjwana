@@ -1,6 +1,7 @@
 import { supabase } from './auth'
 import { getEffectiveSupplierId } from './effective-supplier'
 import type { OrderLine } from './orders'
+import { supplierBilledAmount } from './line-discount'
 
 // Settlement engine + virtual supplier statements.
 //
@@ -120,7 +121,7 @@ export async function getSupplierBalances(): Promise<SupplierBalance[]> {
         gross: 0, commission: 0, fees: 0, net: 0,
       }
       b.unsettledLines.push(l)
-      b.gross += Number(l.gross_amount) - Number(l.discount_amount)
+      b.gross += supplierBilledAmount(l)
       b.commission += Number(l.commission_amount)
       b.fees += Number(l.platform_fee)
       b.net += Number(l.supplier_share)
@@ -192,7 +193,7 @@ export function buildStatements(lines: OrderLine[], settlements: Settlement[]): 
       category: l.category,
       customerName: l.share_customer_name ? l.customer_name : '',
       travelDates: fmtDates(l.service_date, l.end_date),
-      gross: Number(l.gross_amount) - Number(l.discount_amount),
+      gross: supplierBilledAmount(l),
       commission: Number(l.commission_amount),
       platformFees: Number(l.platform_fee),
       tax: Number(l.tax_amount),

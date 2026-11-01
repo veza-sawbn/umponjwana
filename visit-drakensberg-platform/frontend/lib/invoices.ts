@@ -14,7 +14,13 @@ export type InvoiceLine = {
   quantity: number
   unitLabel: string
   unitPrice: number
+  /** What the customer pays for the line, after any discount. */
   total: number
+  /** The line before its discount, when it has one (20261101_invoice_line_discounts.sql). */
+  grossTotal?: number
+  discount?: number
+  /** Why, e.g. "Included in the Northern Mini Traverse package". */
+  discountLabel?: string
 }
 
 export type Invoice = {
