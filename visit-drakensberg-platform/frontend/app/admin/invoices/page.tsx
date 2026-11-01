@@ -15,8 +15,9 @@ import {
 } from '@/lib/payment-schedule'
 import PaymentScheduleEditor from '@/components/admin/PaymentScheduleEditor'
 import {
-  createOrder, updateOrder, getOrderLines, updateOrderCustomer, validateCustomerDetails,
-  type OrderLineInput, type OrderLine, type OrderCustomerDetails,
+  createOrder, updateOrder, getOrderLines, getOrderById, updateOrderCustomer, validateCustomerDetails,
+  orderCustomerDetails,
+  type OrderLineInput, type OrderLine, type OrderCustomerDetails, type MasterOrder,
 } from '@/lib/orders'
 import {
   getInvoiceDrafts, saveInvoiceDraft, deleteInvoiceDraft,
@@ -378,6 +379,22 @@ function ScheduleNote({ invoice, className = '' }: { invoice: Invoice; className
   )
 }
 
+/**
+ * An issued invoice opened for editing, with its order so the customer and
+ * billing details can be changed too (null if the order could not be read).
+ */
+type EditingInvoice = { invoice: Invoice; lines: OrderLine[]; order: MasterOrder | null }
+
+/**
+ * The last nine digits of a phone number, for matching a contact saved
+ * without an email: "082 999 0000" and "+27 82 999 0000" are the same number.
+ * '' when there are too few digits to be a real number.
+ */
+const phoneKey = (s: string | null | undefined) => {
+  const d = (s ?? '').replace(/\D/g, '')
+  return d.length >= 9 ? d.slice(-9) : ''
+}
+
 /** Create / edit / draft form. `editing` switches it to updating an issued invoice. */
 /**
  * Registered accounts as contacts — what the picker shows when the contact
@@ -396,7 +413,7 @@ function InvoiceModal({ contacts, contactsLoading, suppliers, draft, editing, on
   contactsLoading: boolean
   suppliers: Person[]
   draft?: InvoiceDraft
-  editing?: { invoice: Invoice; lines: OrderLine[] }
+  editing?: EditingInvoice
   onClose: () => void
   onDone: () => void
 }) {
@@ -405,34 +422,58 @@ function InvoiceModal({ contacts, contactsLoading, suppliers, draft, editing, on
   // starts them blank. Either way the customer lands in the contact book
   // automatically once the invoice is issued (vd_contacts_on_invoice).
   const [contactId, setContactId] = useState<string | null>(null)
-  const [enteringNew, setEnteringNew] = useState(!!draft && !draft.user_id && !!(draft.customer_name || draft.customer_email))
+  // The customer the form opened with: a draft's, or an issued invoice's order.
+  const originalCustomer: OrderCustomerDetails | null = editing?.order ? orderCustomerDetails(editing.order) : null
+  const [enteringNew, setEnteringNew] = useState(
+    !!draft && !draft.user_id && !!(draft.customer_name || draft.customer_email || draft.customer_phone))
   // The registered account the order belongs to, when the contact has one.
-  const [customerId, setCustomerId] = useState(draft?.user_id ?? '')
-  const [guestName, setGuestName] = useState(draft?.customer_name ?? editing?.lines[0]?.customer_name ?? '')
-  const [guestEmail, setGuestEmail] = useState(draft?.customer_email ?? '')
-  const [guestPhone, setGuestPhone] = useState(draft?.customer_phone ?? '')
+  const [customerId, setCustomerId] = useState(draft?.user_id ?? editing?.order?.user_id ?? '')
+  const [guestName, setGuestName] = useState(
+    draft?.customer_name ?? originalCustomer?.name ?? editing?.lines[0]?.customer_name ?? '')
+  const [guestEmail, setGuestEmail] = useState(draft?.customer_email ?? originalCustomer?.email ?? '')
+  const [guestPhone, setGuestPhone] = useState(draft?.customer_phone ?? originalCustomer?.phone ?? '')
   const [billing, setBilling] = useState<DraftBilling>(() => ({
     isCompany: false, company: '', vatNumber: '', registrationNumber: '', address: '',
     ...(draft?.customer_billing ?? {}),
+    ...(originalCustomer ? {
+      isCompany: originalCustomer.isCompany, company: originalCustomer.company,
+      vatNumber: originalCustomer.vatNumber, registrationNumber: originalCustomer.registrationNumber,
+      address: originalCustomer.address,
+    } : {}),
   }))
   const setBill = (patch: Partial<DraftBilling>) => setBilling(b => ({ ...b, ...patch }))
   // Only worth a round trip when there is something beyond name and email.
   const hasBilling = billing.isCompany || !!billing.address.trim()
   const selectedContact = contacts.find(c => c.id === contactId) ?? null
 
-  // A draft remembers the customer, not the contact: find them in the book
-  // once it has loaded.
+  // A draft or an issued invoice remembers the customer, not the contact:
+  // find them in the book once it has loaded — by account, then email, then
+  // phone (Wix contacts often have only a number).
+  const openedWith = draft
+    ? { userId: draft.user_id, email: draft.customer_email, phone: draft.customer_phone }
+    : editing?.order
+      ? { userId: editing.order.user_id, email: editing.order.customer_email, phone: originalCustomer?.phone ?? '' }
+      : null
   useEffect(() => {
-    if (!draft || contactId || contacts.length === 0) return
-    const email = draft.customer_email.trim().toLowerCase()
-    const match = contacts.find(c => (draft.user_id && c.userId === draft.user_id) || (email && c.email === email))
+    if (!openedWith || contactId || contacts.length === 0) return
+    const email = (openedWith.email ?? '').trim().toLowerCase()
+    const digits = phoneKey(openedWith.phone)
+    const match =
+      (openedWith.userId && contacts.find(c => c.userId === openedWith.userId))
+      || (email && contacts.find(c => c.email === email))
+      || (digits && contacts.find(c => phoneKey(c.phone) === digits))
+      || null
     if (match) { setContactId(match.id); setEnteringNew(false) }
-  }, [contacts, draft, contactId])
+    // openedWith is derived from props that never change while the form is open.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [contacts, contactId])
 
   function chooseContact(c: Contact) {
     setContactId(c.id)
     setEnteringNew(false)
-    setCustomerId(c.userId ?? '')
+    // An issued invoice stays on the account it was raised against; only its
+    // customer details change.
+    if (!editing) setCustomerId(c.userId ?? '')
     setGuestName(c.name || c.company || '')
     setGuestEmail(c.email ?? '')
     setGuestPhone(c.phone)
@@ -452,15 +493,17 @@ function InvoiceModal({ contacts, contactsLoading, suppliers, draft, editing, on
   function startNewContact() {
     setContactId(null)
     setEnteringNew(true)
-    setCustomerId('')
+    if (!editing) setCustomerId('')
     setGuestName(''); setGuestEmail(''); setGuestPhone('')
     setBilling({ isCompany: false, company: '', vatNumber: '', registrationNumber: '', address: '' })
   }
 
   const showCustomerFields = enteringNew || !!selectedContact || !!guestName || !!guestEmail
-  const [tripName, setTripName] = useState(draft?.trip_name ?? '')
-  const [travelStart, setTravelStart] = useState(draft?.travel_start ?? '')
-  const [travelEnd, setTravelEnd] = useState(draft?.travel_end ?? '')
+  // An issued invoice opens with its order's trip and dates: saving sends
+  // them back, so blank fields would clear them on the order.
+  const [tripName, setTripName] = useState(draft?.trip_name ?? editing?.order?.trip_name ?? '')
+  const [travelStart, setTravelStart] = useState(draft?.travel_start ?? editing?.order?.travel_start ?? '')
+  const [travelEnd, setTravelEnd] = useState(draft?.travel_end ?? editing?.order?.travel_end ?? '')
   const [lines, setLines] = useState<DraftLine[]>(() => {
     if (draft?.lines?.length) return draft.lines
     if (editing?.lines.length) {
@@ -560,7 +603,9 @@ function InvoiceModal({ contacts, contactsLoading, suppliers, draft, editing, on
 
   async function submit() {
     const isGuest = !customerId
-    if (!editing) {
+    // An issued invoice whose order couldn't be read keeps its customer as is.
+    const editsCustomer = !editing || !!editing.order
+    if (editsCustomer) {
       if (!showCustomerFields) { toast.error('Select a contact, or add a new one.'); return }
       if (!guestName.trim()) { toast.error('Enter the customer name.'); return }
       if (!guestEmail.trim() || !guestEmail.includes('@')) {
@@ -579,7 +624,25 @@ function InvoiceModal({ contacts, contactsLoading, suppliers, draft, editing, on
       }
     }
     // The details vd_update_order_customer will write once the order exists.
-    const customerDetails: OrderCustomerDetails | null = editing || !hasBilling ? null : {
+    const typedCustomer: OrderCustomerDetails = {
+      name: guestName.trim(),
+      email: guestEmail.trim(),
+      phone: guestPhone.trim(),
+      isCompany: billing.isCompany,
+      company: billing.company.trim(),
+      vatNumber: billing.vatNumber.trim(),
+      registrationNumber: billing.registrationNumber.trim(),
+      address: billing.address.trim(),
+    }
+    // Editing: only write the customer when something about them changed.
+    const customerChanged = !!editing?.order && !!originalCustomer
+      && JSON.stringify(typedCustomer) !== JSON.stringify({
+        ...originalCustomer,
+        name: originalCustomer.name.trim(), email: originalCustomer.email.trim(), phone: originalCustomer.phone.trim(),
+        company: originalCustomer.company.trim(), vatNumber: originalCustomer.vatNumber.trim(),
+        registrationNumber: originalCustomer.registrationNumber.trim(), address: originalCustomer.address.trim(),
+      })
+    const customerDetails: OrderCustomerDetails | null = editing ? (customerChanged ? typedCustomer : null) : !hasBilling ? null : {
       name: guestName.trim(),
       email: guestEmail.trim(),
       phone: guestPhone.trim(),
@@ -628,6 +691,16 @@ function InvoiceModal({ contacts, contactsLoading, suppliers, draft, editing, on
           orderLines,
           { invoiceLines },
         )
+        // A changed customer goes on the order the invoice reads from — the
+        // same validated, audited path as the Orders page, which also keeps
+        // the contact book in step.
+        if (customerDetails) {
+          try { await updateOrderCustomer(editing.invoice.order_id, customerDetails) }
+          catch (e) {
+            toast.error(`Invoice ${res.invoiceNumber} updated, but the customer details were not (${e instanceof Error ? e.message : 'unknown error'}).`, { duration: 10000 })
+            onDone(); onClose(); return
+          }
+        }
         // Only touch the terms when there are, or were, any — so a plain
         // invoice still saves on a database without the schedules migration.
         if (schedule || editing.invoice.payment_schedule) {
@@ -703,11 +776,11 @@ function InvoiceModal({ contacts, contactsLoading, suppliers, draft, editing, on
 
         <div className="px-4 sm:px-6 py-4 sm:py-5">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-5">
-          {editing ? (
+          {editing && !editing.order ? (
             <div className="md:col-span-2 bg-[#F7F5F2] border border-gray-200 px-4 py-3">
               <p className="font-sans text-[10px] tracking-[0.12em] uppercase text-gray-400 mb-1">Customer</p>
               <p className="font-sans text-sm text-gray-700">{editing.lines[0]?.customer_name || '—'}</p>
-              <p className="font-sans text-xs text-gray-400 mt-0.5">Customer details are changed on the order, not here.</p>
+              <p className="font-sans text-xs text-gray-400 mt-0.5">The order could not be loaded, so the customer can only be changed from Orders.</p>
             </div>
           ) : (
             <div className="md:col-span-2">
@@ -720,9 +793,11 @@ function InvoiceModal({ contacts, contactsLoading, suppliers, draft, editing, on
                     {selectedContact ? <ContactAvatar contact={selectedContact} size={22} /> : null}
                     <p className="font-sans text-xs text-gray-500 flex-1 min-w-0">
                       {selectedContact
-                        ? <>Invoicing <strong className="text-gray-700">{contactLabel(selectedContact)}</strong>{customerId ? ' (registered account)' : ''}. Changes here apply to this invoice and update the contact.</>
+                        ? <>Invoicing <strong className="text-gray-700">{contactLabel(selectedContact)}</strong>{customerId ? ' (registered account)' : ''}. Changes here apply to this invoice and update the contact.{editing && selectedContact.userId && selectedContact.userId !== editing.order?.user_id ? ' The invoice stays on the account it was raised against.' : ''}</>
                         : enteringNew
-                          ? 'New contact. Saved to your contacts automatically when the invoice is issued.'
+                          ? (editing
+                              ? 'New contact. Saved to your contacts when you save these changes.'
+                              : 'New contact. Saved to your contacts automatically when the invoice is issued.')
                           : 'Customer details for this invoice.'}
                     </p>
                   </div>
@@ -748,7 +823,7 @@ function InvoiceModal({ contacts, contactsLoading, suppliers, draft, editing, on
               )}
             </div>
           )}
-          {!editing && (
+          {(!editing || !!editing.order) && (
             <div className="md:col-span-2 border border-gray-200 p-3">
               <label className="inline-flex items-center gap-2 font-sans text-sm text-gray-700 cursor-pointer">
                 <input type="checkbox" checked={billing.isCompany} onChange={e => setBill({ isCompany: e.target.checked })}
@@ -1199,7 +1274,7 @@ export default function AdminInvoicesPage() {
   const [loading, setLoading] = useState(true)
   const [showNew, setShowNew] = useState(false)
   const [editingDraft, setEditingDraft] = useState<InvoiceDraft | undefined>()
-  const [editingInvoice, setEditingInvoice] = useState<{ invoice: Invoice; lines: OrderLine[] } | undefined>()
+  const [editingInvoice, setEditingInvoice] = useState<EditingInvoice | undefined>()
   const [payingInvoice, setPayingInvoice] = useState<Invoice | undefined>()
   const [linkInvoice, setLinkInvoice] = useState<Invoice | undefined>()
   const [voidingInvoice, setVoidingInvoice] = useState<Invoice | undefined>()
@@ -1245,8 +1320,8 @@ export default function AdminInvoicesPage() {
   async function handleEdit(invoice: Invoice) {
     setOpening(invoice.id)
     try {
-      const lines = await getOrderLines(invoice.order_id)
-      setEditingInvoice({ invoice, lines })
+      const [lines, order] = await Promise.all([getOrderLines(invoice.order_id), getOrderById(invoice.order_id)])
+      setEditingInvoice({ invoice, lines, order })
     } catch (e) {
       toast.error(e instanceof Error ? e.message : 'Could not load invoice lines')
     } finally { setOpening(null) }
