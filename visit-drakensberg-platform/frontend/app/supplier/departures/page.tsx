@@ -20,7 +20,8 @@ import {
 } from '@/components/tours/PackageEditor'
 import { splitGuides, joinGuides, sameGuides } from '@/lib/departure-guides'
 import {
-  getGuestsForDeparture, addManualGuest, removeManualGuest, type DepartureGuest,
+  getGuestsForDeparture, addManualGuest, removeManualGuest, getBookingsForDeparture, duplicatedBooking,
+  type DepartureGuest, type DepartureBooking,
 } from '@/lib/departure-guests'
 
 type Guide = SupplierEntity & { name: string; guideType?: GuideType }
@@ -299,6 +300,8 @@ function GuestsModal({
   dep, tour, onClose, onSeatsChanged,
 }: { dep: Departure; tour: Tour | undefined; onClose: () => void; onSeatsChanged: (bookedSeats: number) => void }) {
   const [guests, setGuests] = useState<DepartureGuest[]>([])
+  // Guests who booked through checkout — paid, or still paying.
+  const [bookings, setBookings] = useState<DepartureBooking[]>([])
   const [loading, setLoading] = useState(true)
   const [form, setForm] = useState(emptyGuestForm)
   const [saving, setSaving] = useState(false)
@@ -311,7 +314,8 @@ function GuestsModal({
   const [bookedSeats, setBookedSeats] = useState(dep.bookedSeats)
 
   useEffect(() => {
-    getGuestsForDeparture(dep.id).then(g => { setGuests(g); setLoading(false) })
+    Promise.all([getGuestsForDeparture(dep.id), getBookingsForDeparture(dep.id)])
+      .then(([g, b]) => { setGuests(g); setBookings(b); setLoading(false) })
   }, [dep.id])
 
   const seatsLeft = Math.max(0, dep.maxSeats - bookedSeats)
@@ -389,15 +393,54 @@ function GuestsModal({
           <button onClick={onClose} className="text-black/30 hover:text-black/60"><X size={18} /></button>
         </div>
 
+        {loading && <p className="font-sans text-sm text-black/30">Loading…</p>}
+
+        {!loading && bookings.length > 0 && (
+          <div className="space-y-2">
+            <p className="font-sans text-[11px] font-semibold uppercase tracking-wider text-black/40">Booked online</p>
+            {bookings.map(b => {
+              const pkg = livePackages.find(p => p.id === b.packageId)
+              const rate = pkg?.name ?? b.rateTitle?.match(/\(([^)]+)\)\s*$/)?.[1]
+              const releases = b.releasesAt
+                ? new Date(b.releasesAt).toLocaleString('en-ZA', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
+                : ''
+              return (
+                <div key={b.bookingId} className={`border rounded-lg px-3 py-2 ${b.status === 'pending' ? 'border-amber-200 bg-amber-50/40' : 'border-black/8'}`}>
+                  <div className="flex items-start justify-between gap-3">
+                    <p className="font-sans text-sm text-black/80 min-w-0 truncate">
+                      {b.customerName} <span className="text-black/35">· {b.seats} seat{b.seats === 1 ? '' : 's'}{rate ? ` · ${rate}` : ''}</span>
+                    </p>
+                    <span className={`shrink-0 font-sans text-[10px] px-2 py-0.5 rounded-full ${b.status === 'confirmed' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
+                      {b.status === 'confirmed' ? 'Paid' : 'Not paid yet'}
+                    </span>
+                  </div>
+                  <p className="font-sans text-xs text-black/40 truncate">{[b.customerEmail, b.reference].filter(Boolean).join(' · ')}</p>
+                  {b.status === 'pending' && (
+                    <p className="font-sans text-[11px] text-amber-700 mt-0.5">
+                      {b.paymentOpen ? 'Payment page open. ' : 'Payment declined or not started. '}
+                      Seat{b.seats === 1 ? '' : 's'} released {releases ? `at ${releases}` : 'shortly'} unless they pay.
+                    </p>
+                  )}
+                </div>
+              )
+            })}
+          </div>
+        )}
+
         <div className="space-y-2">
-          {loading && <p className="font-sans text-sm text-black/30">Loading…</p>}
+          {!loading && (guests.length > 0 || bookings.length > 0) && (
+            <p className="font-sans text-[11px] font-semibold uppercase tracking-wider text-black/40">Added by hand</p>
+          )}
           {!loading && guests.length === 0 && (
-            <p className="font-sans text-sm text-black/30">No guests recorded yet. Add anyone who booked outside the platform below (e.g. migrating from Wix Events).</p>
+            <p className="font-sans text-sm text-black/30">
+              {bookings.length > 0 ? 'Nobody added by hand.' : 'No guests yet.'} Add anyone who booked outside the platform below (e.g. migrating from Wix Events).
+            </p>
           )}
           {guests.map(g => {
             const pkg = livePackages.find(p => p.id === g.packageId)
+            const dup = duplicatedBooking(g, bookings)
             return (
-              <div key={g.id} className="flex items-center justify-between gap-3 border border-black/8 rounded-lg px-3 py-2">
+              <div key={g.id} className={`flex items-center justify-between gap-3 border rounded-lg px-3 py-2 ${dup ? 'border-amber-300 bg-amber-50/40' : 'border-black/8'}`}>
                 <div className="min-w-0">
                   <p className="font-sans text-sm text-black/80 truncate">
                     {g.name} <span className="text-black/35">· {g.seats} seat{g.seats === 1 ? '' : 's'}{pkg ? ` · ${pkg.name}` : ''}</span>
@@ -406,6 +449,11 @@ function GuestsModal({
                     <p className="font-sans text-xs text-black/40 truncate">{[g.email, g.phone].filter(Boolean).join(' · ')}</p>
                   )}
                   {g.notes && <p className="font-sans text-xs text-black/35 truncate">{g.notes}</p>}
+                  {dup && (
+                    <p className="font-sans text-[11px] text-amber-700 mt-0.5">
+                      Also booked online as {dup.reference}, so this entry takes a second seat. Remove it if it&apos;s the same guest.
+                    </p>
+                  )}
                 </div>
                 <div className="flex items-center gap-3 shrink-0">
                   {g.email && (

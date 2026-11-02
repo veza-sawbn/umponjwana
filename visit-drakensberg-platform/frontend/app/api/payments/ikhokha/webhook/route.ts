@@ -155,8 +155,33 @@ export async function POST(req: Request) {
       const { data: confirmedBooking } = await admin.from('vd_bookings')
         .update({ status: 'confirmed' }).eq('id', order.booking_id).eq('status', 'pending')
         .select('reference, supplier_ids, value').maybeSingle()
-      await admin.from('vd_orders').update({ booking_status: 'confirmed' }).eq('id', link.order_id)
-      await admin.from('vd_booking_orders').update({ status: 'confirmed' }).eq('booking_id', order.booking_id)
+      if (confirmedBooking) {
+        await admin.from('vd_orders').update({ booking_status: 'confirmed' }).eq('id', link.order_id)
+        await admin.from('vd_booking_orders').update({ status: 'confirmed' }).eq('booking_id', order.booking_id)
+        // A guest whose first attempt was declined or abandoned and who then
+        // paid on a retry still had that first booking holding seats on the
+        // same departure. Give them back now rather than at the next sweep.
+        // Best-effort: the sweep releases them anyway.
+        const { error: supersedeError } = await admin.rpc('vd_supersede_pending_bookings', { p_booking_id: order.booking_id })
+        if (supersedeError) console.error('[ikhokha webhook] superseding earlier attempts failed:', supersedeError)
+      } else {
+        // Paid after the booking had already been released (the guest sat on
+        // the payment page past its 2-hour hold): the money is recorded, but
+        // their seats were given back. Someone has to re-seat or refund them.
+        const { data: lateBooking } = await admin.from('vd_bookings')
+          .select('reference, status, value').eq('id', order.booking_id).maybeSingle()
+        if (lateBooking && lateBooking.status !== 'confirmed') {
+          const { data: staff } = await admin.from('profiles').select('id').or('role.eq.admin,staff_role.eq.finance')
+          if (staff && staff.length > 0) {
+            await notifyServerMany(staff.map(f => (f as { id: string }).id), {
+              type: 'payment',
+              title: `Paid after booking expired: ${lateBooking.reference}`,
+              body: `${(lateBooking.value as { customerName?: string } | null)?.customerName || 'A guest'} paid ${link.amount} ${link.currency}, but the booking had already been released and its seats returned. Re-seat them or refund the payment.`,
+              link: '/admin/orders',
+            }, getSiteOrigin(req))
+          }
+        }
+      }
 
       // Mint the actual tickets now that payment is confirmed — this is what
       // makes an event's capacity real instead of decorative (see

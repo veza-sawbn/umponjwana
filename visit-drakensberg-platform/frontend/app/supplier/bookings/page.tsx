@@ -31,7 +31,7 @@ const STATUS_CHIP: Record<string, string> = {
 // What each state means from the operator's side of the desk.
 const STATUS_LABEL: Record<string, string> = {
   requested: 'awaiting your confirmation',
-  pending: 'guest paying',
+  pending: 'not paid yet',
 }
 
 function fmt(d?: string) {
@@ -327,8 +327,10 @@ export default function BookingsPage() {
                 {o.status === 'pending' && (
                   <div className="border-t border-black/6 px-5 py-3 bg-amber-50/50">
                     <p className="font-sans text-xs text-amber-800 flex items-center gap-1.5">
-                      <Clock size={12} /> You confirmed these dates. The room is held while {o.customerName} pays.
-                      It releases automatically if they don&apos;t.
+                      <Clock size={12} />
+                      {o.items.some(i => i.type === 'stay')
+                        ? <>You confirmed these dates. The room is held while {o.customerName} pays. It releases automatically if they don&apos;t.</>
+                        : <>{o.customerName} started checkout but hasn&apos;t paid yet. Their place is held for 30 minutes (2 hours while the payment page is open), then released automatically if they don&apos;t pay.</>}
                     </p>
                   </div>
                 )}
