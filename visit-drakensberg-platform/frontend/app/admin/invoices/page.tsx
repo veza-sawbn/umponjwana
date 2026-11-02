@@ -526,8 +526,16 @@ function InvoiceModal({ contacts, contactsLoading, suppliers, draft, editing, on
     return [emptyLine()]
   })
   const [rates, setRates] = useState({ serviceFeeRate: 0.12, vatRate: 0.15, currency: 'ZAR' })
-  const [feeOverride, setFeeOverride] = useState(draft?.fee_override ?? '')
-  const [taxOverride, setTaxOverride] = useState(draft?.tax_override ?? '')
+  // An issued invoice opens with the fee and VAT it was issued with, pinned in
+  // the override boxes, so opening and saving it never re-prices it at the
+  // default rates (a fee-free, zero-rated package would otherwise gain 12%
+  // and 15%). Clearing a box goes back to the configured rate.
+  const issuedAmount = (v: number | string | null | undefined) =>
+    v === null || v === undefined || v === '' ? '' : String(Number(v))
+  const [feeOverride, setFeeOverride] = useState(
+    draft?.fee_override ?? (editing ? issuedAmount(editing.invoice.service_fee) : ''))
+  const [taxOverride, setTaxOverride] = useState(
+    draft?.tax_override ?? (editing ? issuedAmount(editing.invoice.tax_amount) : ''))
   const [scheduleDraft, setScheduleDraft] = useState<ScheduleDraft>(
     () => draftFromSchedule(draft ? draft.payment_schedule : editing?.invoice.payment_schedule))
   const [busy, setBusy] = useState('')
