@@ -28,3 +28,14 @@ export function joinGuides(names: string[]): string {
 export function sameGuides(a: string | null | undefined, b: string | null | undefined): boolean {
   return joinGuides(splitGuides(a)) === joinGuides(splitGuides(b))
 }
+
+/** Whether `name` is one of the guides on a departure (case-insensitive). */
+export function hasGuide(value: string | null | undefined, name: string | null | undefined): boolean {
+  const n = (name ?? '').replace(/\s+/g, ' ').trim().toLowerCase()
+  return !!n && splitGuides(value).some(g => g.toLowerCase() === n)
+}
+
+/** "Lead Guide" for one guide, "Guides" when a departure has several. */
+export function guidesLabel(value: string | null | undefined): string {
+  return splitGuides(value).length > 1 ? 'Guides' : 'Lead Guide'
+}

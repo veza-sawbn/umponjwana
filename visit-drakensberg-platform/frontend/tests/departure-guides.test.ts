@@ -25,3 +25,19 @@ describe('departure guides', () => {
     expect(sameGuides('', undefined)).toBe(true)
   })
 })
+
+import { guidesLabel, hasGuide } from '@/lib/departure-guides'
+
+describe('guide profiles and labels', () => {
+  it('finds a guide on a multi-guide departure, so it stays on both profiles', () => {
+    expect(hasGuide('Sipho Dlamini + Thabo Ndlovu', 'Sipho Dlamini')).toBe(true)
+    expect(hasGuide('Sipho Dlamini + Thabo Ndlovu', 'thabo ndlovu')).toBe(true)
+    expect(hasGuide('Sipho Dlamini + Thabo Ndlovu', 'Sipho')).toBe(false)
+    expect(hasGuide('', 'Sipho Dlamini')).toBe(false)
+    expect(hasGuide('Sipho Dlamini', '')).toBe(false)
+  })
+  it('labels one guide as lead, several as guides', () => {
+    expect(guidesLabel('Sipho Dlamini')).toBe('Lead Guide')
+    expect(guidesLabel('Sipho Dlamini + Thabo Ndlovu')).toBe('Guides')
+  })
+})

@@ -10,6 +10,7 @@ import { getUpcomingExperiences, type TrekkingExperience } from '@/lib/experienc
 import { cleanBioSections, splitGuideName, toParagraphs } from '@/lib/guide-profile'
 import { publicSupabase } from '@/lib/supabase-public'
 import { formatMoney } from '@/lib/allocation'
+import { hasGuide } from '@/lib/departure-guides'
 
 const csv = (s?: string) => (s ?? '').split(',').map(x => x.trim()).filter(Boolean)
 
@@ -47,7 +48,7 @@ export default function GuideDetail({ guide }: { guide: GuideProfile }) {
     // a signed-in admin or ops session sees the same page a visitor does
     // rather than one including suspended suppliers. See lib/supabase-public.ts.
     getOperatorForGuide(guide, publicSupabase).then(setOperator)
-    getUpcomingExperiences(publicSupabase).then(exps => setDepartures(exps.filter(e => e.leadGuide === guide.name)))
+    getUpcomingExperiences(publicSupabase).then(exps => setDepartures(exps.filter(e => hasGuide(e.leadGuide, guide.name))))
   }, [guide])
 
   // A #availability or #reviews link opens that tab.
