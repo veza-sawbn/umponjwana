@@ -75,12 +75,38 @@ begin
   perform vdtest.raises(format('select * from vd_departure_bookings(%L)', v_dep),
     'not allowed', 'another customer cannot list a departure''s guests');
 
+  -- An unpaid booking that ALSO holds a second departure is not a repeat of
+  -- the retry: it must survive the retry being paid.
+  perform vdtest.act_as_nobody();
+  insert into vd_entities (id, kind, owner_id, status, value)
+  values (v_dep || '-b', 'departure', v_supplier, 'open',
+          jsonb_build_object('id', v_dep || '-b', 'maxSeats', 10, 'bookedSeats', 0, 'status', 'open'));
+  insert into vd_bookings (id, reference, user_id, status, value)
+  values (v_failed || '-multi', 'DBK-MULTI-1', v_guest, 'pending', '{}'::jsonb);
+  perform vdtest.act_as(v_guest);
+  perform vd_claim_inventory_holds(v_failed || '-multi', array[
+    vd_hold_inventory('departure', v_dep, '', 1),
+    vd_hold_inventory('departure', v_dep || '-b', '', 1)]);
+  -- And one with a stay alongside the same departure.
+  perform vdtest.act_as_nobody();
+  insert into vd_bookings (id, reference, user_id, status, value)
+  values (v_failed || '-stay', 'DBK-STAY-1', v_guest, 'pending', '{"stay":{"id":"prop-x"}}'::jsonb);
+  perform vdtest.act_as(v_guest);
+  perform vd_claim_inventory_holds(v_failed || '-stay', array[vd_hold_inventory('departure', v_dep, '', 1)]);
+
   -- ── Paying the retry releases the failed attempt at once ──────────────────
   perform vdtest.act_as_nobody();
   update vd_bookings set status = 'confirmed' where id = v_paid;
   perform vdtest.act_as_service();
   select vd_supersede_pending_bookings(v_paid) into v_n;
   perform vdtest.eq(v_n, 1, 'one earlier unpaid attempt is superseded');
+  perform vdtest.eq((select status from vd_bookings where reference = 'DBK-MULTI-1'), 'pending',
+    'a booking that also holds another departure is left alone');
+  perform vdtest.eq((select status from vd_bookings where reference = 'DBK-STAY-1'), 'pending',
+    'and so is one with a stay');
+  -- Clear them away so the seat counts below are about the retry only.
+  perform vd_cancel_pending_booking(v_failed || '-multi');
+  perform vd_cancel_pending_booking(v_failed || '-stay');
   perform vdtest.act_as_nobody();
   perform vdtest.eq((select status from vd_bookings where id = v_failed), 'cancelled', 'it is cancelled');
   select (value->>'bookedSeats')::int into v_booked from vd_entities where id = v_dep;

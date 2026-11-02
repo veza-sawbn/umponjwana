@@ -145,17 +145,28 @@ begin
   select user_id into v_user from vd_bookings where id = p_booking_id;
   if v_user is null then return 0; end if;
 
+  -- Only a true repeat of the paid booking: every seat it still holds is on a
+  -- departure/timeslot the paid booking also holds, and it has no stay (rooms
+  -- aren't holds, so a stay can't be matched). Anything more — a second hike,
+  -- a room — means it isn't just an earlier try at the same thing, and
+  -- cancelling it would take inventory the guest hasn't re-bought. Those wait
+  -- for the 30-minute sweep instead.
   for v_other in
-    select distinct b.id
+    select b.id
       from vd_bookings b
-      join vd_inventory_holds h on h.booking_id = b.id and h.released_at is null
      where b.user_id = v_user
        and b.status = 'pending'
        and b.id <> p_booking_id
-       and exists (
-         select 1 from vd_inventory_holds mine
-          where mine.booking_id = p_booking_id
-            and mine.kind = h.kind and mine.entity_id = h.entity_id and mine.slot_key = h.slot_key)
+       and coalesce(b.value->'stay'->>'id', '') = ''
+       and exists (select 1 from vd_inventory_holds h
+                    where h.booking_id = b.id and h.released_at is null)
+       and not exists (
+         select 1 from vd_inventory_holds h
+          where h.booking_id = b.id and h.released_at is null
+            and not exists (
+              select 1 from vd_inventory_holds mine
+               where mine.booking_id = p_booking_id and mine.released_at is null
+                 and mine.kind = h.kind and mine.entity_id = h.entity_id and mine.slot_key = h.slot_key))
   loop
     if vd_cancel_pending_booking(v_other.id) then v_count := v_count + 1; end if;
   end loop;
