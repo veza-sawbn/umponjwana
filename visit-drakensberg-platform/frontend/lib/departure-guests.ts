@@ -136,3 +136,62 @@ export async function removeManualGuest(guest: DepartureGuest): Promise<void> {
   if (error) throw new Error(error.message || 'Could not remove this guest.')
   await releaseDepartureSeats(guest.departureId, guest.seats)
 }
+
+/**
+ * A guest who booked this departure through checkout. Read through
+ * vd_departure_bookings (20261102_checkout_seat_cleanup.sql) — the supplier,
+ * people managing them, and ops only; name and email, never the phone.
+ */
+export type DepartureBooking = {
+  bookingId: string
+  reference: string
+  /** 'confirmed' = paid; 'pending' = checkout started, not paid yet. */
+  status: 'confirmed' | 'pending'
+  customerName: string
+  customerEmail: string | null
+  seats: number
+  packageId: string | null
+  rateTitle: string | null
+  bookedAt: string
+  paymentOpen: boolean
+  /** When an unpaid booking gives its seats back, if nobody pays. */
+  releasesAt: string | null
+}
+
+/** Checkout bookings holding seats on one departure, oldest first. */
+export async function getBookingsForDeparture(departureId: string): Promise<DepartureBooking[]> {
+  const { data, error } = await supabase.rpc('vd_departure_bookings', { p_departure_id: departureId })
+  if (error) {
+    // Before the migration is applied the function doesn't exist; the guests
+    // list still works, just without online bookings.
+    console.error('[departure-guests] online bookings unavailable:', error.message)
+    return []
+  }
+  return ((data ?? []) as any[]).map(r => ({
+    bookingId: r.booking_id,
+    reference: r.reference,
+    status: r.status === 'confirmed' ? 'confirmed' : 'pending',
+    customerName: r.customer_name || 'Guest',
+    customerEmail: r.customer_email ?? null,
+    seats: Number(r.seats) || 0,
+    packageId: r.package_id ?? null,
+    rateTitle: r.rate_title ?? null,
+    bookedAt: r.booked_at,
+    paymentOpen: !!r.payment_open,
+    releasesAt: r.releases_at ?? null,
+  }))
+}
+
+/**
+ * The online booking a hand-entered guest duplicates, if any: the same
+ * booking reference in their notes, or the same email. A duplicate holds a
+ * second seat for one person.
+ */
+export function duplicatedBooking(guest: DepartureGuest, bookings: DepartureBooking[]): DepartureBooking | null {
+  const notes = (guest.notes ?? '').toUpperCase()
+  const email = (guest.email ?? '').trim().toLowerCase()
+  return bookings.find(b =>
+    (b.reference && notes.includes(b.reference.toUpperCase()))
+    || (!!email && (b.customerEmail ?? '').toLowerCase() === email)
+  ) ?? null
+}
