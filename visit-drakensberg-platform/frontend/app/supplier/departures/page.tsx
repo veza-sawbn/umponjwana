@@ -2,7 +2,7 @@
 import { useState, useEffect, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
-import { CalendarDays, Plus, Users, Trash2, ChevronLeft, X, Settings2, UserPlus, Mail } from 'lucide-react'
+import { CalendarDays, Plus, Users, Trash2, ChevronLeft, X, Settings2, UserPlus, Mail, Pencil, ArrowUp, UserRound } from 'lucide-react'
 import { supabase } from '@/lib/auth'
 import { effectiveSupplierId } from '@/lib/effective-supplier'
 import { getSupplierEntities, type SupplierEntity } from '@/lib/supplier-entities'
@@ -18,6 +18,7 @@ import {
   PackagesEditor, InclusionChips, emptyPackage, packagesToForm, formToPackages, cheapest,
   resolveLivePackages, withTierOverrides, inp, type PackageForm,
 } from '@/components/tours/PackageEditor'
+import { splitGuides, joinGuides, sameGuides } from '@/lib/departure-guides'
 import {
   getGuestsForDeparture, addManualGuest, removeManualGuest, type DepartureGuest,
 } from '@/lib/departure-guests'
@@ -65,6 +66,142 @@ function RatesFieldset({
           </p>
         )}
         <PackagesEditor packages={packages} onChange={onChangePackages} itineraryDayCount={trailDayCount} />
+      </div>
+    </div>
+  )
+}
+
+/* ─── Guides ─────────────────────────────────────────────────────────────────── */
+
+/**
+ * Pick one or more guides for a departure, lead guide first. Team guides come
+ * from the supplier's roster; a guide who isn't on it (a freelancer, a guide
+ * borrowed from another operator) can be typed in. Stored joined with " + "
+ * in the departure's `guide` field — see lib/departure-guides.ts.
+ */
+function GuidesPicker({ value, onChange, guides }: {
+  value: string[]
+  onChange: (next: string[]) => void
+  guides: Guide[]
+}) {
+  const [other, setOther] = useState('')
+  const chosen = new Set(value.map(v => v.toLowerCase()))
+  const available = guides.filter(g => !chosen.has(g.name.toLowerCase()))
+  const typeOf = (name: string) => {
+    const g = guides.find(x => x.name.toLowerCase() === name.toLowerCase())
+    return g ? GUIDE_TYPE_LABEL[guideTypeOf(g)] : 'Not on your team'
+  }
+  const add = (name: string) => {
+    const n = name.replace(/\s+/g, ' ').trim()
+    if (n && !chosen.has(n.toLowerCase())) onChange([...value, n])
+  }
+  const move = (i: number) => onChange([value[i], ...value.filter((_, j) => j !== i)])
+
+  return (
+    <div className="space-y-2">
+      {value.length === 0 ? (
+        <p className="font-sans text-xs text-black/35">No guide assigned yet.</p>
+      ) : (
+        <ul className="space-y-1.5">
+          {value.map((name, i) => (
+            <li key={name} className="flex items-center gap-2 border border-black/10 rounded-lg px-3 py-2">
+              <UserRound size={14} className="text-[#C9A96E] shrink-0" />
+              <span className="min-w-0 flex-1">
+                <span className="block font-sans text-sm text-black/80 truncate">{name}</span>
+                <span className="block font-sans text-[11px] text-black/35">{i === 0 ? 'Lead guide · ' : ''}{typeOf(name)}</span>
+              </span>
+              {i > 0 && (
+                <button type="button" onClick={() => move(i)} title="Make lead guide" aria-label={`Make ${name} the lead guide`}
+                  className="text-black/30 hover:text-[#C9A96E] p-1"><ArrowUp size={14} /></button>
+              )}
+              <button type="button" onClick={() => onChange(value.filter((_, j) => j !== i))} aria-label={`Remove ${name}`}
+                className="text-black/30 hover:text-red-500 p-1"><X size={14} /></button>
+            </li>
+          ))}
+        </ul>
+      )}
+
+      <select value="" onChange={e => { if (e.target.value) add(e.target.value) }} className={inp}>
+        <option value="">{value.length ? 'Add another guide…' : 'Select guide…'}</option>
+        {available.length === 0 && <option disabled>{guides.length ? 'Every team guide is already on it' : 'No guides on your team yet'}</option>}
+        {/* The type rides along in the label: a trainee shouldn't be
+            assigned to lead a departure on their own. */}
+        {available.map(g => (
+          <option key={g.id} value={g.name}>{g.name} — {GUIDE_TYPE_LABEL[guideTypeOf(g)]}</option>
+        ))}
+      </select>
+      <div className="flex gap-2">
+        <input value={other} onChange={e => setOther(e.target.value)} placeholder="Or type a guide who isn't on your team"
+          onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); add(other); setOther('') } }}
+          className={`${inp} flex-1`} />
+        <button type="button" onClick={() => { add(other); setOther('') }} disabled={!other.trim()}
+          className="font-sans text-xs px-3 rounded-lg border border-black/15 text-black/60 disabled:opacity-40">Add</button>
+      </div>
+      {guides.length === 0 && (
+        <p className="font-sans text-[11px] text-black/30">
+          <Link href="/supplier/guides" className="text-[#C9A96E] hover:underline">Add a guide to your team</Link> to pick them here.
+        </p>
+      )}
+    </div>
+  )
+}
+
+/** Change who guides an existing departure — open, full or already booked. */
+function GuidesModal({ dep, guides, onClose, onSaved }: {
+  dep: Departure
+  guides: Guide[]
+  onClose: () => void
+  onSaved: (patch: Partial<Departure>) => void
+}) {
+  const [value, setValue] = useState<string[]>(() => splitGuides(dep.guide))
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const next = joinGuides(value)
+  const changed = !sameGuides(next, dep.guide)
+
+  async function save() {
+    if (!changed) { onClose(); return }
+    setSaving(true); setError(null)
+    // A different guide hasn't been told about this departure yet: clear the
+    // "guide notified" mark the staff page keeps, so it shows as pending again.
+    const patch = { guide: next, guideNotified: false }
+    try {
+      await updateDeparture(dep.id, patch)
+      onSaved({ guide: next })
+      onClose()
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Could not save the guides')
+    } finally { setSaving(false) }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 bg-black/40 flex items-end sm:items-center justify-center sm:p-6" onClick={onClose}>
+      <div className="bg-white sm:rounded-xl border border-black/8 w-full sm:max-w-md max-h-[90vh] overflow-y-auto p-6 space-y-5" onClick={e => e.stopPropagation()}>
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <h2 className="font-display italic text-xl text-black/90">Guides</h2>
+            <p className="font-sans text-xs text-black/40 mt-0.5">{dep.tour} · {dep.date}</p>
+          </div>
+          <button onClick={onClose} aria-label="Close" className="text-black/30 hover:text-black/60"><X size={18} /></button>
+        </div>
+
+        <GuidesPicker value={value} onChange={setValue} guides={guides} />
+
+        {dep.bookedSeats > 0 && changed && (
+          <p className="font-sans text-xs text-black/50 bg-[#F7F5F2] rounded-lg px-3 py-2">
+            {dep.bookedSeats} guest{dep.bookedSeats === 1 ? ' has' : 's have'} already booked. They&apos;ll see the new
+            guide{value.length === 1 ? '' : 's'} on the listing and their itinerary; resend their confirmation from the
+            guests list if you want to email them.
+          </p>
+        )}
+        {error && <p className="font-sans text-xs text-red-600">{error}</p>}
+
+        <div className="flex gap-3">
+          <button onClick={save} disabled={saving} className="flex-1 bg-[#C9A96E] text-white font-sans text-sm py-2.5 rounded-lg disabled:opacity-50">
+            {saving ? 'Saving…' : changed ? 'Save Guides' : 'Done'}
+          </button>
+          <button onClick={onClose} className="font-sans text-sm px-5 py-2.5 border border-black/15 rounded-lg text-black/50">Cancel</button>
+        </div>
       </div>
     </div>
   )
@@ -339,8 +476,9 @@ function DeparturesInner() {
   const [saving, setSaving] = useState(false)
   const [configuring, setConfiguring] = useState<Departure | null>(null)
   const [managingGuests, setManagingGuests] = useState<Departure | null>(null)
+  const [editingGuides, setEditingGuides] = useState<Departure | null>(null)
   const [form, setForm] = useState({
-    tourId: '', date: '', guide: '', maxSeats: '10',
+    tourId: '', date: '', guides: [] as string[], maxSeats: '10',
     inclusions: [] as string[],
     packages: [emptyPackage('Standard')] as PackageForm[],
   })
@@ -402,7 +540,7 @@ function DeparturesInner() {
         supplierId: tour.supplierId || '',
         tourDays: tour.days,
         date: form.date,
-        guide: form.guide,
+        guide: joinGuides(form.guides),
         maxSeats: +form.maxSeats,
         bookedSeats: 0,
         status: 'open',
@@ -412,7 +550,7 @@ function DeparturesInner() {
       })
       setRows(r => [...r, dep])
       setAdding(false)
-      setForm({ tourId: tourFilter ? form.tourId : '', date: '', guide: '', maxSeats: '10', inclusions: [], packages: [emptyPackage('Standard')] })
+      setForm({ tourId: tourFilter ? form.tourId : '', date: '', guides: [], maxSeats: '10', inclusions: [], packages: [emptyPackage('Standard')] })
     } catch (e) {
       console.error('[departures] save failed:', e)
       alert('Failed to save departure. Check the console for details.')
@@ -481,21 +619,8 @@ function DeparturesInner() {
               <input type="date" value={form.date} onChange={e => setForm(f => ({ ...f, date: e.target.value }))} className={inp} />
             </div>
             <div className="space-y-1.5">
-              <label className="font-sans text-sm font-medium text-black/70">Assigned Guide</label>
-              <select value={form.guide} onChange={e => setForm(f => ({ ...f, guide: e.target.value }))} className={inp}>
-                <option value="">Select guide…</option>
-                {guides.length === 0 && <option disabled>No guides on your team yet</option>}
-                {/* The type rides along in the label: a trainee shouldn't be
-                    assigned to lead a departure on their own. */}
-                {guides.map(g => (
-                  <option key={g.id} value={g.name}>{g.name} — {GUIDE_TYPE_LABEL[guideTypeOf(g)]}</option>
-                ))}
-              </select>
-              {guides.length === 0 && (
-                <p className="font-sans text-[11px] text-black/30">
-                  <Link href="/supplier/guides" className="text-[#C9A96E] hover:underline">Add a guide to your team</Link> to assign one here.
-                </p>
-              )}
+              <label className="font-sans text-sm font-medium text-black/70">Guides <span className="font-normal text-black/30">(lead first; change any time)</span></label>
+              <GuidesPicker value={form.guides} onChange={next => setForm(f => ({ ...f, guides: next }))} guides={guides} />
             </div>
             <div className="space-y-1.5">
               <label className="font-sans text-sm font-medium text-black/70">Max Seats</label>
@@ -545,7 +670,17 @@ function DeparturesInner() {
               <tr key={r.id} className={i < filtered.length - 1 ? 'border-b border-black/5' : ''}>
                 <td className="px-4 py-3 font-sans text-sm text-black/80">{r.tour}</td>
                 <td className="px-4 py-3 font-sans text-sm text-black/60">{r.date}</td>
-                <td className="px-4 py-3 font-sans text-sm text-black/60">{r.guide || '—'}</td>
+                <td className="px-4 py-3 font-sans text-sm text-black/60">
+                  <button onClick={() => setEditingGuides(r)} title="Change guides"
+                    className="group inline-flex items-start gap-1.5 text-left hover:text-[#C9A96E]">
+                    <span>
+                      {splitGuides(r.guide).length === 0
+                        ? <span className="text-[#C9A96E]">Assign guide</span>
+                        : splitGuides(r.guide).map(n => <span key={n} className="block">{n}</span>)}
+                    </span>
+                    <Pencil size={12} className="mt-1 shrink-0 text-black/25 group-hover:text-[#C9A96E]" />
+                  </button>
+                </td>
                 <td className="px-4 py-3 font-sans text-sm text-black/60">
                   <span className="flex items-center gap-1"><Users size={12} /> {r.bookedSeats}/{r.maxSeats}</span>
                 </td>
@@ -580,6 +715,15 @@ function DeparturesInner() {
           trailDayCount={trails.find(t => t.id === tours.find(x => x.id === configuring.tourId)?.trailId)?.days.length ?? 0}
           onClose={() => setConfiguring(null)}
           onSaved={patch => setRows(rs => rs.map(x => (x.id === configuring.id ? { ...x, ...patch } : x)))}
+        />
+      )}
+
+      {editingGuides && (
+        <GuidesModal
+          dep={editingGuides}
+          guides={guides}
+          onClose={() => setEditingGuides(null)}
+          onSaved={patch => setRows(rs => rs.map(x => (x.id === editingGuides.id ? { ...x, ...patch } : x)))}
         />
       )}
 

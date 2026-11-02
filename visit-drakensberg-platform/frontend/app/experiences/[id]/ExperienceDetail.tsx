@@ -15,6 +15,7 @@ import { isOnOrAfterToday } from '@/lib/upcoming'
 import { formatMoney } from '@/lib/allocation'
 import ReadMoreText from '@/components/ui/ReadMoreText'
 import SaveButton from '@/components/ui/SaveButton'
+import { guidesLabel } from '@/lib/departure-guides'
 
 const DIFF_COLOR: Record<string, string> = {
   Easy: '#4A7251', Moderate: '#C9A96E', Challenging: '#c0392b', Extreme: '#8e44ad', Strenuous: '#c0392b',
@@ -131,7 +132,7 @@ export default function ExperienceDetail({ exp }: { exp: TrekkingExperience }) {
               <h1 className="font-display italic text-5xl lg:text-6xl mb-4">{exp.title}</h1>
               <div className="flex items-center gap-4 font-sans text-sm text-white/70 flex-wrap">
                 <span>{exp.operator}</span>
-                {exp.leadGuide && <span className="flex items-center gap-1.5"><UserCircle size={14} /> Lead Guide: {exp.leadGuide}</span>}
+                {exp.leadGuide && <span className="flex items-center gap-1.5"><UserCircle size={14} /> {guidesLabel(exp.leadGuide)}: {exp.leadGuide}</span>}
                 {exp.rating !== null ? (
                   <span className="flex items-center gap-1">
                     <Star size={13} className="text-[#C9A96E] fill-[#C9A96E]" /> {exp.rating.toFixed(1)}
@@ -445,7 +446,7 @@ export default function ExperienceDetail({ exp }: { exp: TrekkingExperience }) {
               <h3 className="font-display italic text-xl mb-4">Experience Details</h3>
               <div className="space-y-3 font-sans text-sm">
                 <div className="flex justify-between gap-4"><span className="text-gray-400">Tour Operator</span><span className="text-right">{exp.operator}</span></div>
-                {exp.leadGuide && <div className="flex justify-between gap-4"><span className="text-gray-400">Lead Guide</span><span className="text-right">{exp.leadGuide}</span></div>}
+                {exp.leadGuide && <div className="flex justify-between gap-4"><span className="text-gray-400">{guidesLabel(exp.leadGuide)}</span><span className="text-right">{exp.leadGuide}</span></div>}
                 <div className="flex justify-between gap-4"><span className="text-gray-400">Departure</span><span className="text-right">{formatDate(itinerary.startDate)}</span></div>
                 {itinerary.startDate !== exp.departureDate && (
                   <div className="flex justify-between gap-4"><span className="text-gray-400">Hiking Date</span><span className="text-right">{formatDate(exp.departureDate)}</span></div>

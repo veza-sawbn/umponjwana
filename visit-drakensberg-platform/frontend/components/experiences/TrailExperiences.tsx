@@ -11,6 +11,7 @@ import type { TrekkingExperience } from '@/lib/experiences'
 import { StayDistance } from '@/lib/stay-distance'
 import { formatMoney } from '@/lib/allocation'
 import SaveButton from '@/components/ui/SaveButton'
+import { guidesLabel } from '@/lib/departure-guides'
 
 // "Upcoming Trekking Experiences" — the marketplace extension of a hiking
 // trail page. The trail remains the primary content; these are the commercial
@@ -118,7 +119,7 @@ export default function TrailExperiences({
                     <p className="font-sans text-xs text-black/50 mt-0.5">{e.operator}</p>
                     {e.leadGuide && (
                       <p className="font-sans text-xs text-[#2d6a4f] mt-0.5 flex items-center gap-1">
-                        <UserCircle size={11} /> Lead Guide: {e.leadGuide}
+                        <UserCircle size={11} /> {guidesLabel(e.leadGuide)}: {e.leadGuide}
                       </p>
                     )}
                     <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-2 font-sans text-xs text-gray-400">
