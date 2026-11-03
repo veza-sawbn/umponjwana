@@ -75,8 +75,22 @@ export async function resendConfirmation(email: string, next: string, captchaTok
   if (error) throw error
 }
 
+/** True from the moment someone clicks Sign out — see SessionGuard. */
+export let intentionalSignOut = false
+
+/**
+ * Signs out THIS browser only. supabase-js defaults to scope 'global', which
+ * revokes the account's sessions everywhere: signing out on a phone silently
+ * signed out a laptop mid-task, whose open pages then sent their writes with
+ * no user and failed with a bare "row-level security" error.
+ */
 export async function signOut() {
-  const { error } = await supabase.auth.signOut()
+  // The managed-supplier hint must not outlive the sign-in it belonged to.
+  try { sessionStorage.removeItem('vd_managed_supplier_id') } catch {}
+  // Tells SessionGuard this one was on purpose, so it doesn't greet the
+  // person with "you were signed out" on the way to the sign-in page.
+  intentionalSignOut = true
+  const { error } = await supabase.auth.signOut({ scope: 'local' })
   if (error) throw error
 }
 

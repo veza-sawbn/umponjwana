@@ -6,6 +6,7 @@ import { LogOut, Mountain } from 'lucide-react'
 import { signOut } from '@/lib/auth'
 import Logo from '@/components/Logo'
 import AdminMobileShell from '@/components/admin/AdminMobileShell'
+import SessionGuard from '@/components/auth/SessionGuard'
 import { ADMIN_NAV, isAdminNavActive } from '@/lib/admin-nav'
 
 // Desktop keeps the fixed sidebar. Below lg the sidebar is hidden and
@@ -23,6 +24,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
   return (
     <div className="min-h-screen bg-[#0a0a0a] flex">
+      <SessionGuard />
       {/* Sidebar — desktop only */}
       <aside className="hidden lg:flex w-60 shrink-0 bg-[#111111] border-r border-white/8 flex-col fixed inset-y-0 left-0 z-40">
         {/* Brand */}

@@ -32,9 +32,12 @@ export default function LoginPage() {
   // ?confirmed=1 — /api/auth/callback after a confirmation link that couldn't
   // also sign the person in (opened in a different browser).
   const [justConfirmed, setJustConfirmed] = useState(false)
+  // ?reason=signed_out — a portal page noticed its sign-in had ended.
+  const [signedOutNotice, setSignedOutNotice] = useState(false)
   useEffect(() => {
     const query = new URLSearchParams(window.location.search)
     setJustConfirmed(query.get('confirmed') === '1')
+    setSignedOutNotice(query.get('reason') === 'signed_out')
     // A refused email link: ?link_error= from /api/auth/callback, or GoTrue's
     // own #error_code= when it redirected straight here.
     const hash = new URLSearchParams(window.location.hash.slice(1))
@@ -150,6 +153,12 @@ export default function LoginPage() {
           </Link>
           <p className="font-sans text-xs tracking-[0.2em] uppercase text-forest/40 mb-2">Welcome back</p>
           <h1 className="font-display text-4xl text-forest mb-8">Sign in</h1>
+
+          {signedOutNotice && !authError && (
+            <div className="mb-6 px-4 py-3 bg-amber-50 border border-amber-200 font-sans text-sm text-amber-800">
+              You were signed out, so nothing was saved. Sign in again and you&apos;ll go straight back to where you were.
+            </div>
+          )}
 
           {justConfirmed && !authError && (
             <div className="mb-6 px-4 py-3 bg-green-50 border border-green-200 font-sans text-sm text-green-800">

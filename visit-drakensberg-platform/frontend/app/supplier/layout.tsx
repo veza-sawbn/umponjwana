@@ -9,6 +9,7 @@ import Logo from '@/components/Logo'
 import NotificationsBell from '@/components/ui/NotificationsBell'
 import ManagedSupplierBanner from '@/components/operations/ManagedSupplierBanner'
 import PortalShell from '@/components/layout/PortalShell'
+import SessionGuard from '@/components/auth/SessionGuard'
 
 function SidebarNav() {
   const pathname = usePathname()
@@ -129,6 +130,7 @@ export default function SupplierLayout({ children }: { children: React.ReactNode
           mobileActions={<NotificationsBell />}
           desktopActions={<NotificationsBell />}
         >
+          <SessionGuard />
           {/* Contextual banner shown when a VD Operations employee is managing a supplier */}
           <ManagedSupplierBanner />
           {children}
