@@ -473,6 +473,7 @@ export default function WaiversPage() {
           templates={templates.filter(t => t.is_active)}
           link={linkModal.mode === 'share' ? linkModal.link : undefined}
           requests={requests}
+          onSent={() => load()}
           onClose={() => setLinkModal(null)}
           onCreated={() => { load(); setTab('links') }}
         />

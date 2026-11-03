@@ -12,7 +12,7 @@
  * is how the Group links tab re-shows an existing link.
  */
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import QRCode from 'qrcode'
 import toast from 'react-hot-toast'
 import { Link2, Copy, Check, Share2, Download, Mail, CalendarDays, Loader2 } from 'lucide-react'
@@ -249,12 +249,14 @@ function ParticipantSendList({ participants, initiallySent, send }: {
 }
 
 export default function WaiverLinkModal({
-  templates, link: existing, onClose, onCreated, requests = [],
+  templates, link: existing, onClose, onCreated, onSent, requests = [],
 }: {
   templates: WaiverTemplate[]
   link?: SharedLink
   onClose: () => void
   onCreated?: () => void
+  /** A personal waiver was created for a guest (emailed or not): refresh Sent. */
+  onSent?: () => void
   /** Waivers already sent, so a guest who has one isn't offered another. */
   requests?: WaiverRequestDetails[]
 }) {
@@ -280,9 +282,15 @@ export default function WaiverLinkModal({
       .catch(() => setDepartures([]))
   }, [existing])
 
+  // Bumped on every pick: a slower answer for an earlier departure must never
+  // replace the guests of the one now selected (its Send buttons would email
+  // this trip's waiver to the other trip's guests).
+  const pickGeneration = useRef(0)
   async function pickDeparture(id: string) {
+    const generation = ++pickGeneration.current
     setDepartureId(id)
     setParticipants([])
+    setLoadingGuests(false)
     const d = departures.find(x => x.id === id)
     if (!d) return
     setActivityName(d.tour)
@@ -292,8 +300,11 @@ export default function WaiverLinkModal({
     setLoadingGuests(true)
     try {
       const [b, g] = await Promise.all([getBookingsForDeparture(id), getGuestsForDeparture(id)])
+      if (generation !== pickGeneration.current) return
       setParticipants(departureParticipants(b, g))
-    } finally { setLoadingGuests(false) }
+    } finally {
+      if (generation === pickGeneration.current) setLoadingGuests(false)
+    }
   }
 
   // Captured at creation so the per-guest emails match the link exactly.
@@ -369,7 +380,11 @@ export default function WaiverLinkModal({
                 <ParticipantSendList
                   participants={participants}
                   initiallySent={initiallySent}
-                  send={p => sendWaiverToParticipant({ templateId, ...sendBasis, name: p.name, email: p.email! })}
+                  send={async p => {
+                    const r = await sendWaiverToParticipant({ templateId, ...sendBasis, name: p.name, email: p.email! })
+                    onSent?.()
+                    return r
+                  }}
                 />
               </div>
             )}
