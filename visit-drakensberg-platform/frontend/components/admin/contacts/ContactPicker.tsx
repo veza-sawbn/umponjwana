@@ -29,13 +29,22 @@ export function ContactAvatar({ contact, size = 36 }: { contact: Contact; size?:
   )
 }
 
-export default function ContactPicker({ contacts, selected, onSelect, onAddNew, loading }: {
+export default function ContactPicker({ contacts: allContacts, selected, onSelect, onAddNew, loading, invoicedOnly }: {
   contacts: Contact[]
   selected: Contact | null
   onSelect: (c: Contact) => void
   onAddNew: () => void
   loading?: boolean
+  /**
+   * Only contacts who have been invoiced, with no All/Invoiced switch — for
+   * places like a departure's guest list, where the person being added has
+   * already booked and paid through Visit Drakensberg.
+   */
+  invoicedOnly?: boolean
 }) {
+  const contacts = useMemo(
+    () => invoicedOnly ? allContacts.filter(c => c.invoiceCount > 0) : allContacts,
+    [allContacts, invoicedOnly])
   const [open, setOpen] = useState(false)
   const [query, setQuery] = useState('')
   const [filter, setFilter] = useState<'all' | 'invoiced'>('all')
@@ -107,7 +116,7 @@ export default function ContactPicker({ contacts, selected, onSelect, onAddNew, 
           <>
             <Search size={16} className="text-gray-400 shrink-0" />
             <span className="flex-1 font-sans text-base sm:text-sm text-gray-400">
-              {loading ? 'Loading contacts…' : `Select a contact (${contacts.length.toLocaleString('en-ZA')})`}
+              {loading ? 'Loading contacts…' : `Select ${invoicedOnly ? 'an invoiced contact' : 'a contact'} (${contacts.length.toLocaleString('en-ZA')})`}
             </span>
             <ChevronDown size={16} className="text-gray-400 shrink-0" />
           </>
@@ -126,8 +135,12 @@ export default function ContactPicker({ contacts, selected, onSelect, onAddNew, 
           </div>
 
           <div className="shrink-0 flex gap-2 px-4 pt-3 overflow-x-auto">
-            {chip('all', 'All Contacts', contacts.length)}
-            {chip('invoiced', 'Invoiced', invoicedCount)}
+            {invoicedOnly
+              ? <span className="font-sans text-xs text-gray-500 py-1.5">Invoiced contacts <span className="text-gray-400">{contacts.length.toLocaleString('en-ZA')}</span></span>
+              : <>
+                  {chip('all', 'All Contacts', contacts.length)}
+                  {chip('invoiced', 'Invoiced', invoicedCount)}
+                </>}
           </div>
 
           <div className="shrink-0 flex items-center gap-3 px-4 py-3 border-b border-gray-100">

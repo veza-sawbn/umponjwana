@@ -19,6 +19,8 @@ import {
   resolveLivePackages, withTierOverrides, inp, type PackageForm,
 } from '@/components/tours/PackageEditor'
 import { splitGuides, joinGuides, sameGuides } from '@/lib/departure-guides'
+import { getContacts, type Contact } from '@/lib/contacts'
+import ContactPicker from '@/components/admin/contacts/ContactPicker'
 import {
   getGuestsForDeparture, addManualGuest, removeManualGuest, getBookingsForDeparture, duplicatedBooking,
   type DepartureGuest, type DepartureBooking,
@@ -309,6 +311,38 @@ function GuestsModal({
   const [sendingId, setSendingId] = useState<string | null>(null)
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
+  // Visit Drakensberg staff (admin, finance, operations) can pick the guest
+  // from the platform's contact book, filtered to people who have been
+  // invoiced. A supplier signed into their own portal never sees it: the
+  // contact book is staff-only by RLS, and the picker isn't shown either.
+  const [isStaff, setIsStaff] = useState(false)
+  const [contacts, setContacts] = useState<Contact[]>([])
+  const [contactsLoading, setContactsLoading] = useState(false)
+  const [pickedContact, setPickedContact] = useState<Contact | null>(null)
+  useEffect(() => {
+    let live = true
+    supabase.rpc('is_ops').then(({ data }) => {
+      if (!live || data !== true) return
+      setIsStaff(true)
+      setContactsLoading(true)
+      getContacts()
+        .then(c => { if (live) setContacts(c ?? []) })
+        .finally(() => { if (live) setContactsLoading(false) })
+    })
+    return () => { live = false }
+  }, [])
+  function pickContact(c: Contact) {
+    setPickedContact(c)
+    // Every field comes from the picked contact. A contact with no name leaves
+    // the name blank (never the previous guest's) so "Guest name is required"
+    // asks for it, rather than mailing this person an itinerary addressed to
+    // somebody else.
+    setForm(f => ({ ...f, name: c.name || c.company || '', email: c.email ?? '', phone: c.phone }))
+  }
+  function clearPicked() {
+    setPickedContact(null)
+    setForm(f => ({ ...f, name: '', email: '', phone: '' }))
+  }
   // Local copy of the running seat count, so "seats left" updates live as
   // guests are added/removed without waiting on the parent table to re-render.
   const [bookedSeats, setBookedSeats] = useState(dep.bookedSeats)
@@ -341,6 +375,7 @@ function GuestsModal({
       })
       setGuests(g => [...g, guest])
       setForm(emptyGuestForm)
+      setPickedContact(null)
       const next = bookedSeats + guest.seats
       setBookedSeats(next)
       onSeatsChanged(next)
@@ -474,6 +509,15 @@ function GuestsModal({
 
         <div className="space-y-3">
           <label className="font-sans text-sm font-medium text-black/70">Add a guest</label>
+          {isStaff && (
+            <div className="space-y-1">
+              <ContactPicker contacts={contacts} loading={contactsLoading} invoicedOnly
+                selected={pickedContact} onSelect={pickContact} onAddNew={clearPicked} />
+              <p className="font-sans text-[11px] text-black/35">
+                Pick someone Visit Drakensberg has invoiced to fill in their details, or type a new guest below.
+              </p>
+            </div>
+          )}
           <div className="grid grid-cols-2 gap-3">
             <input value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} placeholder="Guest name" className={inp} />
             <input type="number" min="1" value={form.seats} onChange={e => setForm(f => ({ ...f, seats: e.target.value }))} placeholder="Seats" className={inp} />
