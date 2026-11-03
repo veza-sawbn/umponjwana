@@ -29,10 +29,13 @@ export function readManagedSupplierId(): string | null {
  * Returns null when nobody is signed in.
  */
 export async function getEffectiveSupplierId(): Promise<string | null> {
-  const managed = readManagedSupplierId()
-  if (managed) return managed
-  const { data: { user } } = await supabase.auth.getUser()
-  return user?.id ?? null
+  // Nobody signed in means nothing to act on — even when a managed-supplier
+  // hint is still sitting in this tab. Returning the hint here sent writes
+  // with no user at all, which the database refused as a row-level security
+  // violation instead of the caller saying "sign in again".
+  const { data: { session } } = await supabase.auth.getSession()
+  if (!session) return null
+  return readManagedSupplierId() ?? session.user.id
 }
 
 /**

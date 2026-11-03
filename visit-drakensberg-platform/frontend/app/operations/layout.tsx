@@ -18,6 +18,7 @@ import { OPS_ROLE_LABEL } from '@/lib/ops-assignments'
 import Logo from '@/components/Logo'
 import NotificationsBell from '@/components/ui/NotificationsBell'
 import PortalShell from '@/components/layout/PortalShell'
+import SessionGuard from '@/components/auth/SessionGuard'
 
 function Sidebar() {
   const pathname = usePathname()
@@ -190,6 +191,7 @@ export default function OperationsLayout({ children }: { children: React.ReactNo
         mobileActions={<NotificationsBell />}
         desktopActions={<NotificationsBell />}
       >
+        <SessionGuard />
         <Guard>{children}</Guard>
       </PortalShell>
     </OperationsProvider>
