@@ -90,8 +90,15 @@ export async function signOut() {
   // Tells SessionGuard this one was on purpose, so it doesn't greet the
   // person with "you were signed out" on the way to the sign-in page.
   intentionalSignOut = true
-  const { error } = await supabase.auth.signOut({ scope: 'local' })
-  if (error) throw error
+  try {
+    const { error } = await supabase.auth.signOut({ scope: 'local' })
+    if (error) throw error
+  } catch (e) {
+    // Still signed in (e.g. the request never reached Supabase): keep watching
+    // for a real loss of the session rather than ignoring it from now on.
+    intentionalSignOut = false
+    throw e
+  }
 }
 
 export async function getSession() {
