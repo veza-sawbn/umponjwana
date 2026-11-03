@@ -333,7 +333,11 @@ function GuestsModal({
   }, [])
   function pickContact(c: Contact) {
     setPickedContact(c)
-    setForm(f => ({ ...f, name: c.name || c.company || f.name, email: c.email ?? '', phone: c.phone }))
+    // Every field comes from the picked contact. A contact with no name leaves
+    // the name blank (never the previous guest's) so "Guest name is required"
+    // asks for it, rather than mailing this person an itinerary addressed to
+    // somebody else.
+    setForm(f => ({ ...f, name: c.name || c.company || '', email: c.email ?? '', phone: c.phone }))
   }
   function clearPicked() {
     setPickedContact(null)
