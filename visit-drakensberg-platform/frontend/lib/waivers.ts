@@ -275,6 +275,59 @@ export async function sendWaiverRequests(input: {
   return (data ?? []) as unknown as WaiverRequestDetails[]
 }
 
+/**
+ * Creates one participant's personal waiver and emails it, reporting whether
+ * the email actually went — for a per-guest "Send email" button that has to
+ * say so when it didn't. The waiver exists either way and can be copied from
+ * the Sent tab.
+ */
+export async function sendWaiverToParticipant(input: {
+  templateId: string
+  activityName: string
+  serviceDate?: string | null
+  bookingReference?: string | null
+  expiresAt?: string | null
+  name: string
+  email: string
+}): Promise<{ requestId: string; emailed: boolean; error?: string }> {
+  const supplierId = await getEffectiveSupplierId()
+  if (!supplierId) throw new Error('You need to be signed in to send waivers.')
+  const email = input.email.trim().toLowerCase()
+  if (!email || !email.includes('@')) throw new Error('This guest has no email address.')
+
+  const { data, error } = await supabase.from('vd_waiver_requests').insert({
+    token: newToken(),
+    template_id: input.templateId,
+    supplier_id: supplierId,
+    participant_name: input.name.trim() || email,
+    participant_email: email,
+    activity_name: input.activityName.trim(),
+    service_date: input.serviceDate || null,
+    booking_reference: input.bookingReference?.trim() || null,
+    expires_at: input.expiresAt || null,
+    status: 'pending',
+  }).select('id').maybeSingle()
+  if (error || !data) throw new Error(error?.message || 'Could not create the waiver.')
+
+  return { requestId: data.id, ...(await emailWaiverRequest(data.id)) }
+}
+
+/** (Re)sends an existing waiver's email — a retry never creates a second waiver. */
+export async function emailWaiverRequest(requestId: string): Promise<{ emailed: boolean; error?: string }> {
+  try {
+    const res = await fetch('/api/waivers/send', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ requestId }),
+    })
+    if (res.ok) return { emailed: true }
+    const body = await res.json().catch(() => ({}))
+    return { emailed: false, error: body?.error || `HTTP ${res.status}` }
+  } catch (e) {
+    return { emailed: false, error: e instanceof Error ? e.message : 'network error' }
+  }
+}
+
 export async function voidWaiverRequest(id: string): Promise<void> {
   const { error } = await supabase
     .from('vd_waiver_requests')

@@ -15,11 +15,14 @@
 import { useEffect, useState } from 'react'
 import QRCode from 'qrcode'
 import toast from 'react-hot-toast'
-import { Link2, Copy, Check, Share2, Download } from 'lucide-react'
+import { Link2, Copy, Check, Share2, Download, Mail, CalendarDays, Loader2 } from 'lucide-react'
 import {
-  createWaiverLink, waiverUrl,
-  type WaiverTemplate,
+  createWaiverLink, waiverUrl, sendWaiverToParticipant, emailWaiverRequest,
+  type WaiverTemplate, type WaiverRequestDetails,
 } from '@/lib/waivers'
+import { getMyDepartures, type Departure } from '@/lib/departures'
+import { getBookingsForDeparture, getGuestsForDeparture } from '@/lib/departure-guests'
+import { departureParticipants, alreadySentTo, type WaiverParticipant } from '@/lib/waiver-participants'
 
 const inp = 'w-full font-sans text-sm border border-black/10 rounded-lg px-3 py-2 outline-none focus:border-[#C9A96E]/50 bg-white'
 const label = 'block font-sans text-[10px] tracking-[0.12em] uppercase text-black/35 mb-1.5'
@@ -157,13 +160,103 @@ function ShareView({ link }: { link: SharedLink }) {
   )
 }
 
+type SendState = 'idle' | 'sending' | 'sent' | 'already' | 'failed'
+
+/**
+ * The departure's guests, each with a Send email button: one personal waiver
+ * per guest (tracked by name in the Sent tab), on top of the group link.
+ */
+function ParticipantSendList({ participants, initiallySent, send }: {
+  participants: WaiverParticipant[]
+  initiallySent: Set<string>
+  send: (p: WaiverParticipant) => Promise<{ requestId: string; emailed: boolean; error?: string }>
+}) {
+  // The waiver made for each guest, so Retry re-sends it rather than making another.
+  const [made, setMade] = useState<Record<string, string>>({})
+  const [state, setState] = useState<Record<string, SendState>>(() =>
+    Object.fromEntries(participants.map(p => [p.key, initiallySent.has(p.key) ? 'already' : 'idle'])))
+  const [bulk, setBulk] = useState(false)
+
+  async function one(p: WaiverParticipant) {
+    setState(s => ({ ...s, [p.key]: 'sending' }))
+    try {
+      const existing = made[p.key]
+      const r = existing ? { requestId: existing, ...(await emailWaiverRequest(existing)) } : await send(p)
+      setMade(m => ({ ...m, [p.key]: r.requestId }))
+      setState(s => ({ ...s, [p.key]: r.emailed ? 'sent' : 'failed' }))
+      if (!r.emailed) toast.error(`Waiver created for ${p.name}, but the email didn't send${r.error ? ` (${r.error})` : ''}. Copy their link from Sent.`)
+    } catch (e) {
+      setState(s => ({ ...s, [p.key]: 'failed' }))
+      toast.error(e instanceof Error ? e.message : `Could not send to ${p.name}.`)
+    }
+  }
+
+  const pending = participants.filter(p => p.email && (state[p.key] === 'idle' || state[p.key] === 'failed'))
+  async function all() {
+    setBulk(true)
+    for (const p of pending) await one(p)
+    setBulk(false)
+  }
+
+  return (
+    <div className="border border-black/8 rounded-xl p-4 space-y-3">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <p className="font-sans text-sm font-medium text-black/80">Email each guest their own waiver</p>
+          <p className="font-sans text-[11px] text-black/40 mt-0.5">
+            Each guest gets a personal link to sign, tracked by name under Sent. The group link above still works for anyone else.
+          </p>
+        </div>
+        {pending.length > 1 && (
+          <button onClick={all} disabled={bulk}
+            className="shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#C9A96E] text-white font-sans text-xs disabled:opacity-50">
+            {bulk ? <Loader2 size={12} className="animate-spin" /> : <Mail size={12} />} Send to all ({pending.length})
+          </button>
+        )}
+      </div>
+      <ul className="divide-y divide-black/5">
+        {participants.map(p => {
+          const st = state[p.key]
+          return (
+            <li key={p.key} className="flex items-center justify-between gap-3 py-2">
+              <span className="min-w-0">
+                <span className="block font-sans text-sm text-black/80 truncate">
+                  {p.name}{p.seats > 1 && <span className="text-black/35"> · {p.seats} seats</span>}
+                </span>
+                <span className="block font-sans text-[11px] text-black/40 truncate">
+                  {p.email ?? 'No email: share the group link with them'}{p.source === 'online' ? ' · booked online' : ''}
+                </span>
+              </span>
+              {p.email && (
+                st === 'sent' || st === 'already' ? (
+                  <span className="shrink-0 inline-flex items-center gap-1 font-sans text-xs text-emerald-700">
+                    <Check size={12} /> {st === 'sent' ? 'Sent' : 'Already sent'}
+                  </span>
+                ) : (
+                  <button onClick={() => one(p)} disabled={st === 'sending' || bulk}
+                    className="shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-black/15 font-sans text-xs text-black/70 hover:border-[#C9A96E]/60 disabled:opacity-50">
+                    {st === 'sending' ? <Loader2 size={12} className="animate-spin" /> : <Mail size={12} />}
+                    {st === 'failed' ? 'Retry' : 'Send email'}
+                  </button>
+                )
+              )}
+            </li>
+          )
+        })}
+      </ul>
+    </div>
+  )
+}
+
 export default function WaiverLinkModal({
-  templates, link: existing, onClose, onCreated,
+  templates, link: existing, onClose, onCreated, requests = [],
 }: {
   templates: WaiverTemplate[]
   link?: SharedLink
   onClose: () => void
   onCreated?: () => void
+  /** Waivers already sent, so a guest who has one isn't offered another. */
+  requests?: WaiverRequestDetails[]
 }) {
   const [templateId, setTemplateId] = useState(templates[0]?.id ?? '')
   const [activityName, setActivityName] = useState('')
@@ -173,6 +266,41 @@ export default function WaiverLinkModal({
   const [maxSignatures, setMaxSignatures] = useState('')
   const [busy, setBusy] = useState(false)
   const [created, setCreated] = useState<SharedLink | null>(existing ?? null)
+
+  // Pull a scheduled departure: fills the trip details and loads its guests.
+  const [departures, setDepartures] = useState<Departure[]>([])
+  const [departureId, setDepartureId] = useState('')
+  const [participants, setParticipants] = useState<WaiverParticipant[]>([])
+  const [loadingGuests, setLoadingGuests] = useState(false)
+  useEffect(() => {
+    if (existing) return
+    const today = new Date().toISOString().slice(0, 10)
+    getMyDepartures()
+      .then(ds => setDepartures(ds.filter(d => d.date >= today).sort((a, b) => a.date.localeCompare(b.date))))
+      .catch(() => setDepartures([]))
+  }, [existing])
+
+  async function pickDeparture(id: string) {
+    setDepartureId(id)
+    setParticipants([])
+    const d = departures.find(x => x.id === id)
+    if (!d) return
+    setActivityName(d.tour)
+    setServiceDate(d.date)
+    setExpiresAt(d.date)
+    setMaxSignatures(d.bookedSeats > 0 ? String(d.bookedSeats) : '')
+    setLoadingGuests(true)
+    try {
+      const [b, g] = await Promise.all([getBookingsForDeparture(id), getGuestsForDeparture(id)])
+      setParticipants(departureParticipants(b, g))
+    } finally { setLoadingGuests(false) }
+  }
+
+  // Captured at creation so the per-guest emails match the link exactly.
+  const [sendBasis, setSendBasis] = useState<{ activityName: string; serviceDate: string | null; bookingReference: string | null; expiresAt: string | null } | null>(null)
+  const initiallySent = new Set(participants
+    .filter(p => alreadySentTo(p.email, serviceDate || null, activityName, requests))
+    .map(p => p.key))
 
   async function submit() {
     if (!templateId) { toast.error('Choose a waiver form.'); return }
@@ -199,6 +327,12 @@ export default function WaiverLinkModal({
         bookingReference: bookingReference || null,
         expiresAt: expiry,
         maxSignatures: cap,
+      })
+      setSendBasis({
+        activityName: activityName.trim(),
+        serviceDate: serviceDate || null,
+        bookingReference: bookingReference || null,
+        expiresAt: expiry,
       })
       setCreated({ token, activityName: activityName.trim() })
       onCreated?.()
@@ -230,6 +364,15 @@ export default function WaiverLinkModal({
         {created ? (
           <>
             <ShareView link={created} />
+            {sendBasis && participants.length > 0 && (
+              <div className="mt-4">
+                <ParticipantSendList
+                  participants={participants}
+                  initiallySent={initiallySent}
+                  send={p => sendWaiverToParticipant({ templateId, ...sendBasis, name: p.name, email: p.email! })}
+                />
+              </div>
+            )}
             <button
               onClick={onClose}
               className="w-full mt-6 py-2.5 font-sans text-sm bg-[#C9A96E] text-white rounded-lg hover:bg-[#b8965d] transition-colors"
@@ -240,6 +383,26 @@ export default function WaiverLinkModal({
         ) : (
           <>
             <div className="space-y-4">
+              <div>
+                <label className={label}>Departure <span className="normal-case tracking-normal text-black/20">optional</span></label>
+                <select value={departureId} onChange={e => pickDeparture(e.target.value)} className={inp}>
+                  <option value="">{departures.length ? 'Pick a scheduled departure…' : 'No upcoming departures'}</option>
+                  {departures.map(d => (
+                    <option key={d.id} value={d.id}>
+                      {d.tour} · {new Date(`${d.date}T00:00:00`).toLocaleDateString('en-ZA', { day: 'numeric', month: 'short', year: 'numeric' })} · {d.bookedSeats}/{d.maxSeats} booked
+                    </option>
+                  ))}
+                </select>
+                {departureId && (
+                  <p className="font-sans text-[11px] text-black/40 mt-1 flex items-center gap-1">
+                    <CalendarDays size={11} />
+                    {loadingGuests ? 'Loading guests…'
+                      : participants.length === 0 ? 'No guests on this departure yet. The link still works for anyone you share it with.'
+                      : `${participants.length} guest${participants.length === 1 ? '' : 's'} found. After creating the link you can email each one their waiver.`}
+                  </p>
+                )}
+              </div>
+
               <div>
                 <label className={label}>Waiver form</label>
                 <select value={templateId} onChange={e => setTemplateId(e.target.value)} className={inp}>
