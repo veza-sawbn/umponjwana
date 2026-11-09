@@ -7,7 +7,7 @@ import {
   bodyHeading, checklist, factPanel, noticePanel, stepList,
   type EmailItineraryDay,
 } from '@/lib/email-layout'
-import { getDepartures, type DeparturePackage } from '@/lib/departures'
+import { getDepartureById, type DeparturePackage } from '@/lib/departures'
 import { getTours, resolveItinerary, type Tour } from '@/lib/tours'
 import { getTrails } from '@/lib/trails'
 import { getSiteOrigin } from '@/lib/origin'
@@ -105,10 +105,11 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: `"${guest.email}" doesn't look like a valid email address. Edit the guest's email and try again` }, { status: 400 })
     }
 
-    const [departures, tours, trails] = await Promise.all([
-      getDepartures(supabase), getTours(supabase), getTrails(supabase),
+    // By id, not from the public catalog: a guest can be recorded on a draft
+    // departure, and their confirmation should still go out.
+    const [departure, tours, trails] = await Promise.all([
+      getDepartureById(guest.departure_id, supabase), getTours(supabase), getTrails(supabase),
     ])
-    const departure = departures.find(d => d.id === guest.departure_id)
     if (!departure) return NextResponse.json({ error: 'departure not found' }, { status: 404 })
     const tour = tours.find(t => t.id === departure.tourId)
     const trail = trails.find(t => t.id === (departure.trailId || tour?.trailId))

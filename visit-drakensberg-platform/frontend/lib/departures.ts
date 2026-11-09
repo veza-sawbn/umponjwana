@@ -1,6 +1,6 @@
 import { supabase } from './auth'
 import {
-  listEntities, listEntitiesByOwner, insertEntity, updateEntity, deleteEntity, newEntityId,
+  listEntities, listEntitiesByOwner, getEntity, insertEntity, updateEntity, deleteEntity, newEntityId,
 } from './entities'
 import { getEffectiveSupplierId } from './effective-supplier'
 import type { SupabaseClient } from '@supabase/supabase-js'
@@ -47,7 +47,10 @@ export type Departure = {
   guide: string
   maxSeats: number
   bookedSeats: number
-  status: 'open' | 'confirmed' | 'full'
+  // 'draft' — saved but not published: hidden from the public catalog (the
+  // vd_entities read policy doesn't list it) and not bookable (see
+  // 20261109_departure_drafts.sql). Only its supplier and ops see it.
+  status: 'draft' | 'open' | 'confirmed' | 'full'
   pricePerPerson: number
   // Baseline inclusions covered by every rate package on this departure
   // (e.g. guide, permits). Falls back to the parent tour's `included` list
@@ -72,7 +75,56 @@ export function newDeparturePackageId(): string {
  * Supplier-portal screens must use getMyDepartures() / getDeparturesBySupplier().
  */
 export async function getDepartures(client?: SupabaseClient): Promise<Departure[]> {
+  // Admins and the owning supplier can read drafts too; the catalog never
+  // shows them, whoever is signed in.
+  return (await listAllDepartures(client)).filter(d => !isDraftDeparture(d))
+}
+
+/**
+ * One departure by id, drafts included, as far as the caller may read it —
+ * for supplier-side screens and endpoints (e.g. a guest's confirmation email
+ * on a departure that isn't published yet). Never for public pages.
+ */
+export async function getDepartureById(id: string, client?: SupabaseClient): Promise<Departure | null> {
+  return client ? getEntity<Departure>(KIND, id, client) : getEntity<Departure>(KIND, id)
+}
+
+/** Every departure the caller can read, drafts included. */
+function listAllDepartures(client?: SupabaseClient): Promise<Departure[]> {
   return client ? listEntities<Departure>(KIND, client) : listEntities<Departure>(KIND)
+}
+
+export function isDraftDeparture(d: Pick<Departure, 'status'>): boolean {
+  return d.status === 'draft'
+}
+
+/** The status a departure takes when it is published. */
+export function publishedStatus(d: Pick<Departure, 'bookedSeats' | 'maxSeats'>): Departure['status'] {
+  return d.maxSeats > 0 && d.bookedSeats >= d.maxSeats ? 'full' : 'open'
+}
+
+/** Make a draft departure public and bookable. Returns its new status. */
+export async function publishDeparture(d: Departure): Promise<Departure['status']> {
+  const status = publishedStatus(d)
+  await updateEntity(KIND, d.id, { status })
+  return status
+}
+
+/**
+ * Take a departure back off the public catalog. Only while nobody holds a
+ * seat: the check here is just the page's snapshot — the database refuses it
+ * against the live count (vd_entities_keep_draft in 20261109_departure_drafts.sql).
+ */
+export async function unpublishDeparture(d: Departure): Promise<void> {
+  if (d.bookedSeats > 0) throw new Error('Guests already hold seats on this departure')
+  try {
+    await updateEntity(KIND, d.id, { status: 'draft' })
+  } catch (e) {
+    // A PostgREST error is a plain object with a message, not an Error.
+    const msg = String((e as { message?: unknown } | null)?.message ?? '')
+    if (/hold seats/i.test(msg)) throw new Error('Guests have booked seats on this departure since the page loaded, so it can\'t go back to draft. Refresh to see them.')
+    throw e
+  }
 }
 
 /** Only the departures owned by `supplierId`. */
@@ -101,10 +153,10 @@ export async function updateDeparture(id: string, patch: Partial<Departure> & Re
 
 // Owner-side edit (supplier adjusting counts on their own departure).
 export async function updateDepartureSeats(id: string, bookedSeats: number): Promise<void> {
-  const all = await getDepartures()
+  const all = await listAllDepartures()
   const dep = all.find(d => d.id === id)
   if (!dep) return
-  const status: Departure['status'] = bookedSeats >= dep.maxSeats ? 'full' : dep.status
+  const status: Departure['status'] = isDraftDeparture(dep) ? 'draft' : bookedSeats >= dep.maxSeats ? 'full' : dep.status
   await updateEntity(KIND, id, { bookedSeats, status })
 }
 
@@ -132,6 +184,6 @@ export async function deleteDeparture(id: string): Promise<void> {
 }
 
 export async function deleteDeparturesByTour(tourId: string): Promise<void> {
-  const all = await getDepartures()
+  const all = await listAllDepartures()
   await Promise.all(all.filter(d => d.tourId === tourId).map(d => deleteEntity(KIND, d.id)))
 }
