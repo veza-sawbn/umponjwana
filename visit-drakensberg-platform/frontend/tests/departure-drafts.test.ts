@@ -10,6 +10,7 @@ vi.mock('@/lib/entities', () => ({
 }))
 vi.mock('@/lib/effective-supplier', () => ({ getEffectiveSupplierId: vi.fn() }))
 
+import { updateEntity } from '@/lib/entities'
 import { getDepartures, isDraftDeparture, publishedStatus, unpublishDeparture } from '@/lib/departures'
 
 describe('draft departures', () => {
@@ -26,5 +27,9 @@ describe('draft departures', () => {
   })
   it('cannot be unpublished once guests hold seats', async () => {
     await expect(unpublishDeparture({ id: 'a', bookedSeats: 2 } as never)).rejects.toThrow(/hold seats/)
+  })
+  it('explain when the database refuses because seats were booked meanwhile', async () => {
+    vi.mocked(updateEntity).mockRejectedValueOnce({ message: 'guests already hold seats on this departure, so it cannot go back to draft' })
+    await expect(unpublishDeparture({ id: 'a', bookedSeats: 0 } as never)).rejects.toThrow(/since the page loaded/)
   })
 })

@@ -67,8 +67,17 @@ begin
   perform vdtest.eq((select status from vd_entities where id = v_dep), 'full',
     'a published departure still turns full as before');
 
-  -- A full draft published as full stays full.
+  -- ── Back to draft: only with no seats taken, by the live count ─────────
+  perform vdtest.raises(format(
+    'update vd_entities set status = ''draft'', value = value || ''{"status":"draft"}'' where id = %L', v_dep),
+    'cannot go back to draft', 'a departure with seats taken cannot go back to draft');
+  update vd_entities set value = value || '{"bookedSeats":0}', status = 'open' where id = v_dep;
   update vd_entities set status = 'draft', value = value || '{"status":"draft"}' where id = v_dep;
+  perform vdtest.eq((select status from vd_entities where id = v_dep), 'draft',
+    'an empty departure can go back to draft');
+
+  -- A full draft published as full stays full.
+  update vd_entities set value = value || '{"bookedSeats":2}' where id = v_dep;
   update vd_entities set status = 'full', value = value || '{"status":"full"}' where id = v_dep;
   perform vdtest.eq((select status from vd_entities where id = v_dep), 'full',
     'publishing a draft whose seats are all taken makes it full');

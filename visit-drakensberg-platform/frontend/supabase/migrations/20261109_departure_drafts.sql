@@ -14,6 +14,9 @@
 --   * vd_inventory_adjust turns a departure 'full' when its last seat goes
 --     (an operator adding guests by hand). That would publish a draft, so a
 --     seat-count change keeps a draft a draft.
+--   * A published departure can go back to draft only while no seat is taken,
+--     checked against the row as it is when the update lands (the same row
+--     vd_hold_inventory locks), not the supplier's page.
 -- ============================================================================
 -- @rollback: additive — drop trigger vd_inventory_holds_no_draft_trg on vd_inventory_holds; drop trigger vd_entities_keep_draft_trg on vd_entities; drop function vd_inventory_holds_no_draft(); drop function vd_entities_keep_draft()
 
@@ -44,6 +47,10 @@ begin
      and (new.value->'bookedSeats') is distinct from (old.value->'bookedSeats') then
     new.status := 'draft';
     new.value  := new.value || jsonb_build_object('status', 'draft');
+  end if;
+  if new.kind = 'departure' and new.status = 'draft' and old.status <> 'draft'
+     and coalesce((old.value->>'bookedSeats')::int, 0) > 0 then
+    raise exception 'guests already hold seats on this departure, so it cannot go back to draft';
   end if;
   return new;
 end;

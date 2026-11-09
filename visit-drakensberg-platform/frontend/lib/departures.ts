@@ -1,6 +1,6 @@
 import { supabase } from './auth'
 import {
-  listEntities, listEntitiesByOwner, insertEntity, updateEntity, deleteEntity, newEntityId,
+  listEntities, listEntitiesByOwner, getEntity, insertEntity, updateEntity, deleteEntity, newEntityId,
 } from './entities'
 import { getEffectiveSupplierId } from './effective-supplier'
 import type { SupabaseClient } from '@supabase/supabase-js'
@@ -80,6 +80,15 @@ export async function getDepartures(client?: SupabaseClient): Promise<Departure[
   return (await listAllDepartures(client)).filter(d => !isDraftDeparture(d))
 }
 
+/**
+ * One departure by id, drafts included, as far as the caller may read it —
+ * for supplier-side screens and endpoints (e.g. a guest's confirmation email
+ * on a departure that isn't published yet). Never for public pages.
+ */
+export async function getDepartureById(id: string, client?: SupabaseClient): Promise<Departure | null> {
+  return client ? getEntity<Departure>(KIND, id, client) : getEntity<Departure>(KIND, id)
+}
+
 /** Every departure the caller can read, drafts included. */
 function listAllDepartures(client?: SupabaseClient): Promise<Departure[]> {
   return client ? listEntities<Departure>(KIND, client) : listEntities<Departure>(KIND)
@@ -101,10 +110,21 @@ export async function publishDeparture(d: Departure): Promise<Departure['status'
   return status
 }
 
-/** Take a departure back off the public catalog. Only while nobody holds a seat. */
+/**
+ * Take a departure back off the public catalog. Only while nobody holds a
+ * seat: the check here is just the page's snapshot — the database refuses it
+ * against the live count (vd_entities_keep_draft in 20261109_departure_drafts.sql).
+ */
 export async function unpublishDeparture(d: Departure): Promise<void> {
   if (d.bookedSeats > 0) throw new Error('Guests already hold seats on this departure')
-  await updateEntity(KIND, d.id, { status: 'draft' })
+  try {
+    await updateEntity(KIND, d.id, { status: 'draft' })
+  } catch (e) {
+    // A PostgREST error is a plain object with a message, not an Error.
+    const msg = String((e as { message?: unknown } | null)?.message ?? '')
+    if (/hold seats/i.test(msg)) throw new Error('Guests have booked seats on this departure since the page loaded, so it can\'t go back to draft. Refresh to see them.')
+    throw e
+  }
 }
 
 /** Only the departures owned by `supplierId`. */
