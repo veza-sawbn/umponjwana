@@ -2,7 +2,7 @@
 import { useState, useEffect, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
-import { CalendarDays, Plus, Users, Trash2, ChevronLeft, X, Settings2, UserPlus, Mail, Pencil, ArrowUp, UserRound } from 'lucide-react'
+import { CalendarDays, Plus, Users, Trash2, ChevronLeft, X, Settings2, UserPlus, Mail, Pencil, ArrowUp, UserRound, Send } from 'lucide-react'
 import { supabase } from '@/lib/auth'
 import { effectiveSupplierId } from '@/lib/effective-supplier'
 import { getSupplierEntities, type SupplierEntity } from '@/lib/supplier-entities'
@@ -12,6 +12,7 @@ import { getTrails, type Trail } from '@/lib/trails'
 import { formatMoney } from '@/lib/allocation'
 import {
   getMyDepartures, addDeparture, updateDeparture, deleteDeparture, newDeparturePackageId,
+  isDraftDeparture, publishDeparture, unpublishDeparture,
   type Departure,
 } from '@/lib/departures'
 import {
@@ -29,6 +30,7 @@ import {
 type Guide = SupplierEntity & { name: string; guideType?: GuideType }
 
 const STATUS: Record<string, string> = {
+  draft:     'bg-amber-100 text-amber-700',
   confirmed: 'bg-emerald-100 text-emerald-700',
   open:      'bg-blue-100 text-blue-700',
   full:      'bg-slate-100 text-slate-600',
@@ -569,6 +571,7 @@ function DeparturesInner() {
   const [configuring, setConfiguring] = useState<Departure | null>(null)
   const [managingGuests, setManagingGuests] = useState<Departure | null>(null)
   const [editingGuides, setEditingGuides] = useState<Departure | null>(null)
+  const [publishing, setPublishing] = useState<string | null>(null)
   const [form, setForm] = useState({
     tourId: '', date: '', guides: [] as string[], maxSeats: '10',
     inclusions: [] as string[],
@@ -616,7 +619,9 @@ function DeparturesInner() {
     })
   }
 
-  async function handleAdd() {
+  // `asDraft` saves it without publishing: hidden from the site and not
+  // bookable until "Publish" is pressed in the table.
+  async function handleAdd(asDraft = false) {
     if (!form.tourId || !form.date) return
     const tour = tours.find(t => t.id === form.tourId)
     if (!tour) return
@@ -635,7 +640,7 @@ function DeparturesInner() {
         guide: joinGuides(form.guides),
         maxSeats: +form.maxSeats,
         bookedSeats: 0,
-        status: 'open',
+        status: asDraft ? 'draft' : 'open',
         pricePerPerson: cheapest(packages),
         inclusions: form.inclusions,
         packages: withTierOverrides(packages, tour),
@@ -648,6 +653,33 @@ function DeparturesInner() {
       alert('Failed to save departure. Check the console for details.')
     } finally {
       setSaving(false)
+    }
+  }
+
+  async function handlePublish(r: Departure) {
+    setPublishing(r.id)
+    try {
+      const status = await publishDeparture(r)
+      setRows(rs => rs.map(x => (x.id === r.id ? { ...x, status } : x)))
+    } catch (e) {
+      console.error('[departures] publish failed:', e)
+      alert(e instanceof Error ? e.message : 'Could not publish the departure.')
+    } finally {
+      setPublishing(null)
+    }
+  }
+
+  async function handleUnpublish(r: Departure) {
+    if (!confirm(`Move ${r.tour} on ${r.date} back to draft? It will disappear from the website until you publish it again.`)) return
+    setPublishing(r.id)
+    try {
+      await unpublishDeparture(r)
+      setRows(rs => rs.map(x => (x.id === r.id ? { ...x, status: 'draft' } : x)))
+    } catch (e) {
+      console.error('[departures] unpublish failed:', e)
+      alert(e instanceof Error ? e.message : 'Could not move the departure back to draft.')
+    } finally {
+      setPublishing(null)
     }
   }
 
@@ -731,15 +763,23 @@ function DeparturesInner() {
             trailDayCount={trails.find(t => t.id === tours.find(x => x.id === form.tourId)?.trailId)?.days.length ?? 0}
           />
 
-          <div className="flex gap-3">
+          <div className="flex flex-wrap items-center gap-3">
             <button
-              onClick={handleAdd}
+              onClick={() => handleAdd(false)}
               disabled={saving || !form.tourId || !form.date}
               className="bg-[#C9A96E] text-white font-sans text-sm px-4 py-2 rounded-lg disabled:opacity-50"
             >
-              {saving ? 'Saving…' : 'Add Departure'}
+              {saving ? 'Saving…' : 'Publish Departure'}
+            </button>
+            <button
+              onClick={() => handleAdd(true)}
+              disabled={saving || !form.tourId || !form.date}
+              className="font-sans text-sm px-4 py-2 border border-[#C9A96E] text-[#C9A96E] rounded-lg hover:bg-[#C9A96E]/5 disabled:opacity-50"
+            >
+              Save as Draft
             </button>
             <button onClick={() => setAdding(false)} className="font-sans text-sm px-4 py-2 border border-black/10 rounded-lg text-black/50">Cancel</button>
+            <p className="basis-full font-sans text-xs text-black/40">A draft stays hidden from the website and can&apos;t be booked until you publish it.</p>
           </div>
         </div>
       )}
@@ -778,7 +818,20 @@ function DeparturesInner() {
                 </td>
                 <td className="px-4 py-3 font-sans text-sm text-black/60 whitespace-nowrap">{rateSummary(r)}</td>
                 <td className="px-4 py-3">
-                  <span className={`font-sans text-xs px-2 py-0.5 rounded-full capitalize ${STATUS[r.status]}`}>{r.status}</span>
+                  <div className="flex flex-col items-start gap-1.5">
+                    <span className={`font-sans text-xs px-2 py-0.5 rounded-full capitalize ${STATUS[r.status]}`}>{r.status}</span>
+                    {isDraftDeparture(r) ? (
+                      <button onClick={() => handlePublish(r)} disabled={publishing === r.id}
+                        className="inline-flex items-center gap-1 font-sans text-xs font-medium text-white bg-[#C9A96E] hover:bg-[#b8965d] px-2.5 py-1 rounded-md disabled:opacity-50">
+                        <Send size={11} /> {publishing === r.id ? 'Publishing…' : 'Publish'}
+                      </button>
+                    ) : r.bookedSeats === 0 && (
+                      <button onClick={() => handleUnpublish(r)} disabled={publishing === r.id}
+                        className="font-sans text-[11px] text-black/35 hover:text-black/70 underline underline-offset-2 disabled:opacity-50">
+                        Move to draft
+                      </button>
+                    )}
+                  </div>
                 </td>
                 <td className="px-4 py-3">
                   <div className="flex items-center gap-3">
@@ -824,7 +877,7 @@ function DeparturesInner() {
           dep={managingGuests}
           tour={tours.find(t => t.id === managingGuests.tourId)}
           onClose={() => setManagingGuests(null)}
-          onSeatsChanged={bookedSeats => setRows(rs => rs.map(x => (x.id === managingGuests.id ? { ...x, bookedSeats, status: bookedSeats >= x.maxSeats ? 'full' : (x.status === 'full' ? 'open' : x.status) } : x)))}
+          onSeatsChanged={bookedSeats => setRows(rs => rs.map(x => (x.id === managingGuests.id ? { ...x, bookedSeats, status: isDraftDeparture(x) ? 'draft' : bookedSeats >= x.maxSeats ? 'full' : (x.status === 'full' ? 'open' : x.status) } : x)))}
         />
       )}
     </div>
