@@ -87,10 +87,16 @@ export type BookingStay = {
   address?: string
   lat?: string
   lng?: string
-  /** Party breakdown when the selected room has a configured child rate.
-   *  Absent otherwise — display-only, same shape as BookingAddon's. */
+  /** Party the room was priced for — set when the room has a child rate or
+   *  a per-person (B&B) rate. Absent otherwise. Checkout sends it with the
+   *  order line so the server prices the same party. */
   adults?: number
   children?: number
+  /** 'per_person' when price_per_night was built from a per-person-sharing
+   *  rate (B&B). Display-only. */
+  rateBasis?: 'per_room' | 'per_person'
+  /** The room includes breakfast. Display-only. */
+  breakfastIncluded?: boolean
 }
 
 export type ShuttleOption = {

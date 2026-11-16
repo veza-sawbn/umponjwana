@@ -18,6 +18,9 @@ export type RoomDetail = {
   cleaningFee?: number
   childPrice?: number
   childMaxAge?: number
+  /** 'per_person' for a B&B-style per-person-sharing rate. */
+  rateBasis?: 'per_room' | 'per_person'
+  breakfastIncluded?: boolean
 }
 
 export default function RoomDetailModal({
@@ -134,9 +137,14 @@ export default function RoomDetailModal({
             </div>
             <div className="text-right shrink-0">
               <p className="font-display italic text-3xl text-[#2d6a4f]">{formatMoney(room.price_per_night)}</p>
-              <p className="font-sans text-xs text-gray-400">per night</p>
+              <p className="font-sans text-xs text-gray-400">{room.rateBasis === 'per_person' ? 'per person sharing, per night' : 'per night'}</p>
+              {room.breakfastIncluded && <p className="font-sans text-xs text-[#2d6a4f] mt-0.5">Breakfast included</p>}
               {room.childMaxAge !== undefined && (
-                <p className="font-sans text-xs text-gray-400 mt-0.5">+{formatMoney(room.childPrice ?? 0)}/night per child ({room.childMaxAge} & under)</p>
+                <p className="font-sans text-xs text-gray-400 mt-0.5">
+                  {room.rateBasis === 'per_person'
+                    ? `${formatMoney(room.childPrice ?? 0)}/night per child (${room.childMaxAge} & under)`
+                    : `+${formatMoney(room.childPrice ?? 0)}/night per child (${room.childMaxAge} & under)`}
+                </p>
               )}
             </div>
           </div>

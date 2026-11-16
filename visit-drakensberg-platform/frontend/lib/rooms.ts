@@ -31,11 +31,52 @@ export type Room = {
   childPrice?: number
   /** Age in years, inclusive, at or under which the child rate applies. */
   childMaxAge?: number
+  /**
+   * What basePrice is a price *of*.
+   *
+   * 'per_room' (the default, and what an absent value means — every room
+   * created before this field) is a flat nightly price for the room; a child
+   * rate is a surcharge on top of it. 'per_person' is the B&B / guesthouse
+   * "per person sharing" rate: basePrice is charged per adult per night, and
+   * when a child rate is set each child pays childPrice *instead of* the
+   * adult rate. vd_canonical_stay_night_price() prices checkout the same way
+   * server-side, so this and stayNightPrice() below must stay in step.
+   */
+  rateBasis?: RateBasis
   status: 'active' | 'draft'
   createdAt: string
 }
 
+export type RateBasis = 'per_room' | 'per_person'
+
 const KIND = 'room'
+
+/** Breakfast is a room inclusion ("Breakfast", or "All Meals" which covers
+ *  it) rather than a separate flag, so a B&B room is one that lists it. */
+export function roomIncludesBreakfast(room: Pick<Room, 'inclusions'>): boolean {
+  return (room.inclusions ?? []).some(i => i === 'Breakfast' || i === 'All Meals')
+}
+
+/**
+ * One night's price for a party in this room — the client half of
+ * vd_canonical_stay_night_price() (supabase/migrations/20261116_bnb_stays.sql),
+ * which re-prices the line at checkout. `children` only counts when the room
+ * has a child rate (childMaxAge set) and is clamped to the party size.
+ */
+export function stayNightPrice(
+  room: Pick<Room, 'basePrice' | 'rateBasis' | 'childPrice' | 'childMaxAge'>,
+  guests: number,
+  children = 0,
+): number {
+  const party = Math.max(1, Math.floor(guests) || 1)
+  const hasChildRate = !!room.childMaxAge && room.childMaxAge > 0
+  const kids = hasChildRate ? Math.min(Math.max(0, Math.floor(children) || 0), party) : 0
+  const childRate = hasChildRate ? (room.childPrice || 0) : 0
+  if (room.rateBasis === 'per_person') {
+    return room.basePrice * (party - kids) + childRate * kids
+  }
+  return room.basePrice + childRate * kids
+}
 
 // A room has no public page of its own — its price/details render on its
 // parent property's /stays/[id] page, which is ISR-cached for up to 5

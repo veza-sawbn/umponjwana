@@ -13,7 +13,7 @@ import { useBooking } from '@/lib/booking-context'
 import { Check, Clock } from 'lucide-react'
 import type { Property } from '@/lib/properties'
 import { isRequestMode } from '@/lib/stay-requests'
-import { getRoomUnitsLeft, type Room } from '@/lib/rooms'
+import { getRoomUnitsLeft, roomIncludesBreakfast, stayNightPrice, type Room } from '@/lib/rooms'
 import SaveButton from '@/components/ui/SaveButton'
 import type { SaveableListing } from '@/lib/saved-listings'
 import { formatMoney } from '@/lib/allocation'
@@ -36,8 +36,14 @@ const COLLAGE_SPANS: Record<number, string[]> = {
   5: ['col-span-2 row-span-2', '', '', '', ''],
 }
 
+/** Unit beside a room's basePrice: B&B-style rooms are quoted per person sharing. */
+function rateUnit(rateBasis?: string): string {
+  return rateBasis === 'per_person' ? '/person/night' : '/night'
+}
+
 function propToStay(prop: Property, rooms: Room[]) {
-  const minPrice = rooms.length > 0 ? Math.min(...rooms.map(r => r.basePrice)) : 0
+  const cheapest = rooms.length > 0 ? rooms.reduce((a, b) => (b.basePrice < a.basePrice ? b : a)) : null
+  const minPrice = cheapest?.basePrice ?? 0
   return {
     title: prop.name,
     category: prop.type,
@@ -53,6 +59,7 @@ function propToStay(prop: Property, rooms: Room[]) {
     description: prop.description,
     highlights: prop.amenities.slice(0, 4),
     price_from: minPrice,
+    price_from_unit: rateUnit(cheapest?.rateBasis),
     hero: 'bg-[#2d6a4f]',
     amenities: prop.amenities.map(a => ({ label: a, icon: AMENITY_ICONS[a] ?? ShieldCheck })),
     images: prop.photos.length > 0 ? prop.photos : ['https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=1400&q=80'],
@@ -73,6 +80,8 @@ function propToStay(prop: Property, rooms: Room[]) {
       // extra per-night charge on top of price_per_night, not a discount off it.
       childPrice: r.childMaxAge ? (r.childPrice || 0) : undefined,
       childMaxAge: r.childMaxAge || undefined,
+      rateBasis: r.rateBasis ?? 'per_room',
+      breakfastIncluded: roomIncludesBreakfast(r),
     })),
     reviews_list: [] as any[],
   }
@@ -154,9 +163,14 @@ export default function StayDetail({ property, rooms: roomsData, id }: { propert
     : 1
   const hasChildRate = selectedRoom?.childMaxAge !== undefined
   const effectiveChildren = hasChildRate ? Math.min(children, guests) : 0
-  // The room's flat nightly price stays flat regardless of adult count — a
-  // child rate only adds a per-child, per-night surcharge on top of it.
-  const pricePerNight = selectedRoom ? selectedRoom.price_per_night + effectiveChildren * (selectedRoom.childPrice ?? 0) : 0
+  const perPerson = selectedRoom?.rateBasis === 'per_person'
+  // Per room: the flat nightly price, plus any per-child surcharge. Per
+  // person (B&B "per person sharing"): each adult pays the rate and each
+  // child the child rate. vd_canonical_stay_night_price prices it the same.
+  const pricePerNight = selectedRoom
+    ? stayNightPrice({ basePrice: selectedRoom.price_per_night, rateBasis: selectedRoom.rateBasis, childPrice: selectedRoom.childPrice, childMaxAge: selectedRoom.childMaxAge }, guests, effectiveChildren)
+    : 0
+  const adultsCharged = perPerson ? guests - effectiveChildren : 1
   const total = selectedRoom ? pricePerNight * nights : null
 
   return (
@@ -393,7 +407,8 @@ export default function StayDetail({ property, rooms: roomsData, id }: { propert
                         </div>
                         <div className="text-right shrink-0 pl-4">
                           <p className="font-display italic text-2xl text-[#2d6a4f]">{formatMoney(room.price_per_night)}</p>
-                          <p className="font-sans text-xs text-gray-400">/night</p>
+                          <p className="font-sans text-xs text-gray-400">{rateUnit(room.rateBasis)}</p>
+                          {room.breakfastIncluded && <p className="font-sans text-xs text-[#2d6a4f]">Breakfast included</p>}
                           <button
                             onClick={e => { e.stopPropagation(); setDetailRoom(room) }}
                             className="mt-3 block w-full px-4 py-2 font-sans text-xs text-gray-500 border border-gray-200 hover:border-gray-400 hover:text-gray-700 transition-colors"
@@ -479,7 +494,7 @@ export default function StayDetail({ property, rooms: roomsData, id }: { propert
                 <p className="font-sans text-[10px] tracking-[0.12em] uppercase text-gray-400">From</p>
                 <p className="font-display italic text-3xl text-[#2d6a4f]">
                   {stay.price_from > 0 ? `${formatMoney(stay.price_from)}` : 'Contact for rates'}
-                  {stay.price_from > 0 && <span className="font-sans text-sm text-gray-400">/night</span>}
+                  {stay.price_from > 0 && <span className="font-sans text-sm text-gray-400">{stay.price_from_unit}</span>}
                 </p>
               </div>
 
@@ -525,7 +540,7 @@ export default function StayDetail({ property, rooms: roomsData, id }: { propert
                       <label className="block font-sans text-[10px] tracking-[0.1em] uppercase text-gray-400 mb-1.5">Room</label>
                       <select value={selectedRoom?.id || ''} onChange={e => setSelectedRoom(stay.rooms.find((r: any) => r.id === e.target.value) || null)} className="w-full border border-gray-300 px-3 py-2.5 font-sans text-sm focus:outline-none bg-white">
                         <option value="">Select a room…</option>
-                        {stay.rooms.map((r: any) => <option key={r.id} value={r.id}>{r.name} · {formatMoney(r.price_per_night)}/night</option>)}
+                        {stay.rooms.map((r: any) => <option key={r.id} value={r.id}>{r.name} · {formatMoney(r.price_per_night)}{rateUnit(r.rateBasis)}{r.breakfastIncluded ? ' · B&B' : ''}</option>)}
                       </select>
                     </div>
                     {!showRooms && (
@@ -543,8 +558,12 @@ export default function StayDetail({ property, rooms: roomsData, id }: { propert
               {total && (
                 <div className="border-t border-gray-100 pt-4 mb-5">
                   <div className="flex justify-between font-sans text-sm mb-1 text-gray-600">
-                    <span>{formatMoney(selectedRoom.price_per_night)} × {nights} night{nights !== 1 ? 's' : ''}</span>
-                    <span>{formatMoney(selectedRoom.price_per_night * nights)}</span>
+                    <span>
+                      {formatMoney(selectedRoom.price_per_night)}
+                      {perPerson && <> × {adultsCharged} adult{adultsCharged !== 1 ? 's' : ''}</>}
+                      {' '}× {nights} night{nights !== 1 ? 's' : ''}
+                    </span>
+                    <span>{formatMoney(selectedRoom.price_per_night * adultsCharged * nights)}</span>
                   </div>
                   {effectiveChildren > 0 && (
                     <div className="flex justify-between font-sans text-sm mb-1 text-gray-600">
@@ -571,7 +590,9 @@ export default function StayDetail({ property, rooms: roomsData, id }: { propert
                     price_per_night: pricePerNight,
                     roomId: selectedRoom.id, roomName: selectedRoom.name,
                     img: stay.images?.[0], address: stay.address, lat: stay.gpsLat, lng: stay.gpsLng,
-                    ...(hasChildRate ? { adults: guests - effectiveChildren, children: effectiveChildren } : {}),
+                    ...(hasChildRate || perPerson ? { adults: guests - effectiveChildren, children: effectiveChildren } : {}),
+                    rateBasis: selectedRoom.rateBasis,
+                    breakfastIncluded: selectedRoom.breakfastIncluded,
                   })
                   router.push(`/search?region=${encodeURIComponent(stay.region)}&check_in=${checkIn}&check_out=${checkOut}&guests=${guests}`)
                 }}

@@ -33,6 +33,7 @@ function propToCard(p: Property, minPrice = 0): StayCard {
 const TYPE_LABELS: Record<string, string> = {
   Lodge: 'Lodges',
   Guesthouse: 'Guesthouses',
+  'Bed & Breakfast': 'B&Bs',
   Hotel: 'Hotels',
   'Self-catering Cottage': 'Self-catering Cottages',
   Campsite: 'Campsites',

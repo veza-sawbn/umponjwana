@@ -10,9 +10,12 @@ export const PROPERTY_REGIONS = DEFAULT_REGIONS.map(region => region.name)
 // wizard, the property edit form and the public listing application. Resort,
 // Glamping and Farm Stay were added for the "Stay" destination-graph
 // taxonomy — genuine, distinct South African tourism accommodation
-// categories, not just labels to complete a menu.
+// categories, not just labels to complete a menu. Bed & Breakfast sits next
+// to Guesthouse: the grading councils class them separately, and a B&B's
+// rooms usually include breakfast and are often quoted per person sharing —
+// see Room.rateBasis and roomIncludesBreakfast() in lib/rooms.ts.
 export const PROPERTY_TYPES = [
-  'Lodge', 'Guesthouse', 'Hotel', 'Self-catering Cottage', 'Campsite', 'Backpackers', 'Boutique Hotel',
+  'Lodge', 'Guesthouse', 'Bed & Breakfast', 'Hotel', 'Self-catering Cottage', 'Campsite', 'Backpackers', 'Boutique Hotel',
   'Resort', 'Glamping', 'Farm Stay',
 ]
 

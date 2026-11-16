@@ -276,12 +276,18 @@ export async function buildOrderLinesFromBooking(booking: SavedBooking): Promise
       title: booking.stay.roomName ? `${booking.stay.title} · ${booking.stay.roomName}` : booking.stay.title,
       serviceDate: booking.checkIn,
       endDate: booking.checkOut,
-      guests: booking.guests,
+      // The party the room was priced for on the stay page, when it recorded
+      // one — a per-person (B&B) or child rate depends on it, and the trip's
+      // search guest count can change after the room was chosen.
+      guests: booking.stay.adults !== undefined
+        ? booking.stay.adults + (booking.stay.children ?? 0)
+        : booking.guests,
       quantity: booking.nights || 1,
       unitLabel: 'night',
-      // roomId lets vd_create_order look up the room's canonical basePrice
-      // server-side and re-price this line instead of trusting the client.
-      value: { roomId: booking.stay.roomId },
+      // roomId lets vd_create_order re-price this line server-side from the
+      // room's canonical rate (vd_canonical_stay_night_price) instead of
+      // trusting the client; children feeds the room's child rate.
+      value: { roomId: booking.stay.roomId, children: booking.stay.children ?? 0 },
       unitPrice: booking.stay.price_per_night,
       grossAmount: booking.stay.price_per_night * booking.nights,
       validatePrice: true,

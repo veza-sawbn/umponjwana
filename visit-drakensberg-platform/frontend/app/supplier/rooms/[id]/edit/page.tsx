@@ -5,7 +5,7 @@ import { ChevronRight, ChevronLeft, Plus, Trash2 } from 'lucide-react'
 import { supabase } from '@/lib/auth'
 import { effectiveSupplierId } from '@/lib/effective-supplier'
 import { getPropertiesBySupplier, type Property } from '@/lib/properties'
-import { getRoomById, updateRoom, type Room } from '@/lib/rooms'
+import { getRoomById, updateRoom, type Room, type RateBasis } from '@/lib/rooms'
 import { supplierMediaSource } from '@/lib/supplier-media'
 import { MediaGalleryPicker } from '@/components/media/MediaPicker'
 import { formatMoney } from '@/lib/allocation'
@@ -83,6 +83,7 @@ type FormState = {
   cleaningFee: string
   childMaxAge: string
   childPrice: string
+  rateBasis: RateBasis
 }
 
 export default function EditRoomPage() {
@@ -100,7 +101,7 @@ export default function EditRoomPage() {
     basePrice: '', weekendSurcharge: '0',
     seasons: [{ name: '', from: '', to: '', price: '' }],
     minNights: '1', cleaningFee: '',
-    childMaxAge: '', childPrice: '',
+    childMaxAge: '', childPrice: '', rateBasis: 'per_room',
   })
 
   useEffect(() => {
@@ -130,6 +131,7 @@ export default function EditRoomPage() {
           cleaningFee: room.cleaningFee ? String(room.cleaningFee) : '',
           childMaxAge: room.childMaxAge ? String(room.childMaxAge) : '',
           childPrice: room.childPrice ? String(room.childPrice) : '',
+          rateBasis: room.rateBasis ?? 'per_room',
         })
       }
       setLoading(false)
@@ -179,6 +181,7 @@ export default function EditRoomPage() {
         cleaningFee: +form.cleaningFee || 0,
         childPrice: form.childMaxAge ? (+form.childPrice || 0) : undefined,
         childMaxAge: form.childMaxAge ? +form.childMaxAge : undefined,
+        rateBasis: form.rateBasis,
       })
       router.push('/supplier/rooms')
     } catch (e) {
@@ -271,8 +274,15 @@ export default function EditRoomPage() {
 
         {step === 2 && (
           <>
+            <Field label="Rate Quoted">
+              <select value={form.rateBasis} onChange={e => setField('rateBasis', e.target.value)} className={inp}>
+                <option value="per_room">Per room, per night</option>
+                <option value="per_person">Per person sharing, per night (B&amp;B style)</option>
+              </select>
+            </Field>
+
             <div className="grid grid-cols-2 gap-4">
-              <Field label="Base Price per Night (ZAR)" required>
+              <Field label={form.rateBasis === 'per_person' ? 'Price per Person per Night (ZAR)' : 'Base Price per Night (ZAR)'} required>
                 <input type="number" min="0" value={form.basePrice} onChange={e => setField('basePrice', e.target.value)} placeholder="2500" className={inp} />
               </Field>
               <Field label="Weekend Surcharge (%)">
@@ -319,12 +329,14 @@ export default function EditRoomPage() {
                 <input type="number" min="0" value={form.childMaxAge} onChange={e => setField('childMaxAge', e.target.value)} placeholder="e.g. 12" className={inp} />
               </Field>
               <Field label="Child Price per Night (ZAR)">
-                <input type="number" min="0" value={form.childPrice} onChange={e => setField('childPrice', e.target.value)} disabled={!form.childMaxAge} placeholder="Extra charge per child sharing" className={`${inp} disabled:opacity-40`} />
+                <input type="number" min="0" value={form.childPrice} onChange={e => setField('childPrice', e.target.value)} disabled={!form.childMaxAge} placeholder={form.rateBasis === 'per_person' ? 'Per child sharing' : 'Extra charge per child sharing'} className={`${inp} disabled:opacity-40`} />
               </Field>
             </div>
             {form.childMaxAge && (
               <p className="font-sans text-xs text-black/35 -mt-2">
-                Charged per child, per night, on top of the base room price — not instead of it.
+                {form.rateBasis === 'per_person'
+                  ? 'Each child pays this per night instead of the per-person rate.'
+                  : 'Charged per child, per night, on top of the base room price — not instead of it.'}
               </p>
             )}
           </>
@@ -346,10 +358,10 @@ export default function EditRoomPage() {
                 ['Units', form.units],
                 ['Room Size', form.sizeSqm ? `${form.sizeSqm} m²` : ''],
                 ['En-suite', form.enSuite ? 'Yes' : 'No'],
-                ['Base Price', form.basePrice ? `${formatMoney(Number(form.basePrice))}/night` : ''],
+                ['Base Price', form.basePrice ? `${formatMoney(Number(form.basePrice))}${form.rateBasis === 'per_person' ? '/person/night' : '/night'}` : ''],
                 ['Min Nights', form.minNights],
                 ['Cleaning Fee', form.cleaningFee ? `${formatMoney(Number(form.cleaningFee))}` : 'None'],
-                ['Child Rate', form.childMaxAge ? `${formatMoney(Number(form.childPrice || 0))}/night extra (${form.childMaxAge} & under)` : ''],
+                ['Child Rate', form.childMaxAge ? `${formatMoney(Number(form.childPrice || 0))}/night${form.rateBasis === 'per_person' ? '' : ' extra'} (${form.childMaxAge} & under)` : ''],
               ] as [string, string][]).map(([k, v]) => v ? (
                 <div key={k} className="flex gap-3 font-sans text-sm">
                   <span className="text-black/40 w-36 shrink-0">{k}</span>
