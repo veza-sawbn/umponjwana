@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import toast from 'react-hot-toast'
-import { Search, RefreshCw, Plus, Printer, Trash2, X, FileText, Send, Pencil, Wallet, Save, Link2, Check, Eye, EyeOff, ShieldOff, RotateCw, KeyRound, Ban, RotateCcw, Building2, Tag } from 'lucide-react'
+import { Search, RefreshCw, Plus, Printer, Trash2, X, FileText, Send, Pencil, Wallet, Save, Link2, Check, Eye, EyeOff, ShieldOff, RotateCw, KeyRound, Ban, RotateCcw, Building2, Tag, Bookmark, CopyPlus, Layers } from 'lucide-react'
 import {
   getInvoices, getFinanceSettings, sendInvoice, invoiceShareUrl, invoiceViewedLabel,
   revokeInvoiceLink, reissueInvoiceLink, voidInvoice, reissueInvoice, setInvoicePaymentSchedule,
@@ -33,6 +33,13 @@ import { copyToClipboard } from '@/lib/clipboard'
 import { useQuickParam } from '@/lib/admin-quick-param'
 import { supabase } from '@/lib/auth'
 import { getContacts, contactLabel, type Contact } from '@/lib/contacts'
+import {
+  INVOICE_LINE_CATEGORIES, draftLineFromOrderLine, getSavedItems, linesFromSaved, recordSavedItemUse,
+  type SavedItem,
+} from '@/lib/invoice-items'
+import SavedItemPicker from '@/components/admin/invoice-items/SavedItemPicker'
+import CopyFromInvoice from '@/components/admin/invoice-items/CopyFromInvoice'
+import SavedItemsManager, { type EditorStart } from '@/components/admin/invoice-items/SavedItemsManager'
 import ContactPicker, { ContactAvatar } from '@/components/admin/contacts/ContactPicker'
 
 // Invoice module: list every customer invoice and raise new ones manually
@@ -52,7 +59,7 @@ const STATUS_BADGE: Record<string, string> = {
   void: 'bg-red-50 text-red-400',
 }
 
-const CATEGORIES = ['accommodation', 'activity', 'tour', 'hike', 'event', 'shuttle', 'equipment', 'permit', 'levy', 'donation', 'meal', 'package', 'extra']
+const CATEGORIES = INVOICE_LINE_CATEGORIES
 
 type Person = { id: string; full_name: string | null; email: string | null; role: string }
 
@@ -408,10 +415,17 @@ function contactsFromProfiles(people: Person[]): Contact[] {
   }))
 }
 
-function InvoiceModal({ contacts, contactsLoading, suppliers, draft, editing, onClose, onDone }: {
+function InvoiceModal({ contacts, contactsLoading, suppliers, invoices, savedItems, onSavedItemsChange, onManageItems, draft, editing, onClose, onDone }: {
   contacts: Contact[]
   contactsLoading: boolean
   suppliers: Person[]
+  /** Past invoices, to copy lines from. */
+  invoices: InvoiceWithOrder[]
+  /** The saved-items library; null when it isn't available (migration not applied). */
+  savedItems: SavedItem[] | null
+  onSavedItemsChange: (items: SavedItem[]) => void
+  /** Opens the saved-items manager, optionally straight into its editor. */
+  onManageItems: (start?: EditorStart) => void
   draft?: InvoiceDraft
   editing?: EditingInvoice
   onClose: () => void
@@ -506,23 +520,7 @@ function InvoiceModal({ contacts, contactsLoading, suppliers, draft, editing, on
   const [travelEnd, setTravelEnd] = useState(draft?.travel_end ?? editing?.order?.travel_end ?? '')
   const [lines, setLines] = useState<DraftLine[]>(() => {
     if (draft?.lines?.length) return draft.lines
-    if (editing?.lines.length) {
-      return editing.lines.map(l => ({
-        title: l.title,
-        description: l.description ?? '',
-        category: l.category,
-        quantity: String(l.quantity),
-        unitLabel: l.unit_label,
-        unitPrice: String(l.unit_price),
-        supplierId: l.supplier_id ?? '',
-        ...(Number(l.discount_amount) > 0 ? {
-          discountType: 'amount' as const,
-          discountValue: String(Number(l.discount_amount)),
-          discountReason: l.discount_reason ?? '',
-          discountFundedBy: l.discount_funded_by ?? 'supplier',
-        } : {}),
-      }))
-    }
+    if (editing?.lines.length) return editing.lines.map(draftLineFromOrderLine)
     return [emptyLine()]
   })
   const [rates, setRates] = useState({ serviceFeeRate: 0.12, vatRate: 0.15, currency: 'ZAR' })
@@ -552,6 +550,36 @@ function InvoiceModal({ contacts, contactsLoading, suppliers, draft, editing, on
 
   function setLine(i: number, patch: Partial<DraftLine>) {
     setLines(ls => ls.map((l, idx) => idx === i ? { ...l, ...patch } : l))
+  }
+
+  /** Adds lines, filling the form's untouched blank line rather than leaving it above them. */
+  function addLines(added: DraftLine[]) {
+    const isBlank = (l: DraftLine) => !l.title.trim() && !l.unitPrice.trim() && !l.description.trim()
+    setLines(ls => [...ls.filter(l => !isBlank(l)), ...added])
+  }
+
+  const supplierIds = useMemo(() => suppliers.length ? new Set(suppliers.map(s => s.id)) : null, [suppliers])
+  const supplierLabel = (id: string) =>
+    id ? (suppliers.find(s => s.id === id)?.full_name || suppliers.find(s => s.id === id)?.email || 'Supplier') : 'Visit Drakensberg'
+
+  function pickSaved(item: SavedItem) {
+    const { lines: added, clearedSupplier } = linesFromSaved(item, supplierIds)
+    addLines(added)
+    if (clearedSupplier) {
+      toast(`A supplier saved on "${item.name}" is no longer listed. Those lines are set to Visit Drakensberg; choose the right supplier.`, { duration: 7000 })
+    } else if (added.some(l => !l.unitPrice)) {
+      toast(`Enter the price for "${item.name}".`)
+    }
+    recordSavedItemUse([item.id])
+    if (savedItems) {
+      const now = new Date().toISOString()
+      onSavedItemsChange(savedItems.map(i => i.id === item.id ? { ...i, use_count: i.use_count + 1, last_used_at: now } : i))
+    }
+  }
+
+  function saveLineAsItem(l: DraftLine) {
+    if (!l.title.trim()) { toast.error('Give the line a title before saving it.'); return }
+    onManageItems({ kind: 'item', name: l.title, lines: [l] })
   }
 
   const validLines = lines.filter(l => l.title.trim() && parseFloat(l.unitPrice) > 0)
@@ -884,6 +912,19 @@ function InvoiceModal({ contacts, contactsLoading, suppliers, draft, editing, on
         </div>
 
         <p className="font-sans text-[10px] tracking-[0.12em] uppercase text-gray-400 mb-2">Line Items</p>
+        {/* Reuse instead of retyping: saved items and bundles, or a past invoice's lines. */}
+        <div className="flex flex-col sm:flex-row gap-2 mb-3">
+          {savedItems && (
+            <SavedItemPicker items={savedItems} supplierName={supplierLabel} onPick={pickSaved} onManage={() => onManageItems()} />
+          )}
+          <CopyFromInvoice invoices={invoices} excludeInvoiceId={editing?.invoice.id}
+            onCopy={(copied, inv) => {
+              const { lines: added, clearedSupplier } = linesFromSaved({ lines: copied }, supplierIds)
+              addLines(added)
+              toast.success(`Copied ${added.length} ${added.length === 1 ? 'line' : 'lines'} from ${inv.invoice_number}.`)
+              if (clearedSupplier) toast('A supplier on that invoice is no longer listed. Those lines are set to Visit Drakensberg.', { duration: 7000 })
+            }} />
+        </div>
         <div className="space-y-3 mb-3">
           {lines.map((l, i) => (
             <div key={i} className="border border-gray-100 bg-[#FCFBFA] p-2.5">
@@ -911,12 +952,32 @@ function InvoiceModal({ contacts, contactsLoading, suppliers, draft, editing, on
               />
               <LineDiscountEditor line={l} onChange={patch => setLine(i, patch)}
                 supplierName={l.supplierId ? (suppliers.find(s => s.id === l.supplierId)?.full_name || 'The supplier') : null} />
+              <div className="mt-2 flex justify-end gap-4">
+                <button type="button" onClick={() => setLines(ls => [...ls.slice(0, i + 1), { ...l }, ...ls.slice(i + 1)])}
+                  className="inline-flex items-center gap-1.5 py-1 font-sans text-xs text-gray-500 hover:text-[#2d6a4f]">
+                  <CopyPlus size={12} /> Duplicate
+                </button>
+                {savedItems && (
+                  <button type="button" onClick={() => saveLineAsItem(l)}
+                    className="inline-flex items-center gap-1.5 py-1 font-sans text-xs text-gray-500 hover:text-[#2d6a4f]">
+                    <Bookmark size={12} /> Save as item
+                  </button>
+                )}
+              </div>
             </div>
           ))}
         </div>
-        <button onClick={() => setLines(ls => [...ls, emptyLine()])} className="inline-flex items-center gap-1.5 py-2 font-sans text-sm md:text-xs text-[#2d6a4f] hover:underline mb-6">
-          <Plus size={14} /> Add line
-        </button>
+        <div className="flex flex-wrap items-center gap-x-5 mb-6">
+          <button onClick={() => setLines(ls => [...ls, emptyLine()])} className="inline-flex items-center gap-1.5 py-2 font-sans text-sm md:text-xs text-[#2d6a4f] hover:underline">
+            <Plus size={14} /> Add line
+          </button>
+          {savedItems && validLines.length >= 2 && (
+            <button onClick={() => onManageItems({ kind: 'bundle', name: tripName.trim(), lines: validLines })}
+              className="inline-flex items-center gap-1.5 py-2 font-sans text-sm md:text-xs text-[#8B6914] hover:underline">
+              <Layers size={14} /> Save these lines as a bundle
+            </button>
+          )}
+        </div>
 
         <div className="border border-gray-200 p-3 mb-2">
           <div className="flex items-end gap-3">
@@ -1289,6 +1350,9 @@ export default function AdminInvoicesPage() {
   const [sending, setSending] = useState<string | null>(null)
   const [opening, setOpening] = useState<string | null>(null)
   const [reissuing, setReissuing] = useState<string | null>(null)
+  // null = the saved-items library isn't available (migration not applied yet).
+  const [savedItems, setSavedItems] = useState<SavedItem[] | null>(null)
+  const [managingItems, setManagingItems] = useState<{ start?: EditorStart } | null>(null)
 
   async function load() {
     setLoading(true)
@@ -1304,6 +1368,7 @@ export default function AdminInvoicesPage() {
     ])
     setInvoices(inv); setDrafts(drf); setPeople(prof)
     setLoading(false)
+    getSavedItems().then(setSavedItems).catch(() => setSavedItems(null))
     // Separately, so a large book never holds up the invoice list. Reloaded
     // after every save: issuing an invoice adds its customer to the book.
     getContacts()
@@ -1382,6 +1447,11 @@ export default function AdminInvoicesPage() {
           <button onClick={load} aria-label="Refresh" className="inline-flex items-center justify-center gap-2 border border-gray-200 px-4 py-3 sm:py-2 font-sans text-sm text-gray-600 hover:border-[#2d6a4f] hover:text-[#2d6a4f] transition-colors">
             <RefreshCw size={14} /> <span className="sm:inline">Refresh</span>
           </button>
+          {savedItems && (
+            <button onClick={() => setManagingItems({})} className="inline-flex items-center justify-center gap-2 border border-gray-200 px-4 py-3 sm:py-2 font-sans text-sm text-gray-600 hover:border-[#2d6a4f] hover:text-[#2d6a4f] transition-colors">
+              <Bookmark size={14} /> <span className="hidden sm:inline">Saved items</span>
+            </button>
+          )}
           <button onClick={() => setShowNew(true)} className="flex-1 sm:flex-none inline-flex items-center justify-center gap-2 bg-[#2d6a4f] text-white px-4 py-3 sm:py-2 font-sans text-sm hover:bg-[#245741] transition-colors">
             <Plus size={14} /> New Invoice
           </button>
@@ -1653,10 +1723,24 @@ export default function AdminInvoicesPage() {
           contacts={contacts}
           contactsLoading={contactsLoading}
           suppliers={suppliers}
+          invoices={invoices}
+          savedItems={savedItems}
+          onSavedItemsChange={setSavedItems}
+          onManageItems={start => setManagingItems({ start })}
           draft={editingDraft}
           editing={editingInvoice}
           onClose={() => { setShowNew(false); setEditingDraft(undefined); setEditingInvoice(undefined) }}
           onDone={load}
+        />
+      )}
+
+      {managingItems && savedItems && (
+        <SavedItemsManager
+          items={savedItems}
+          suppliers={suppliers.map(s => ({ id: s.id, label: s.full_name || s.email || 'Supplier' }))}
+          startWith={managingItems.start}
+          onChange={setSavedItems}
+          onClose={() => setManagingItems(null)}
         />
       )}
 

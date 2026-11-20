@@ -10,6 +10,10 @@ import { formatMoney } from '@/lib/allocation'
 import { useQuickParam } from '@/lib/admin-quick-param'
 import { supabase } from '@/lib/auth'
 import { getQuoteNextStep, nextStepBadgeClass } from '@/lib/next-step'
+import {
+  INVOICE_LINE_CATEGORIES, getSavedItems, quoteLinesFromSaved, recordSavedItemUse, type SavedItem,
+} from '@/lib/invoice-items'
+import SavedItemPicker from '@/components/admin/invoice-items/SavedItemPicker'
 
 // Quote module: build a sales quote for a prospective or existing customer,
 // send it, and let them accept it themselves — acceptance converts it into
@@ -23,7 +27,7 @@ const STATUS_BADGE: Record<string, string> = {
   expired: 'bg-red-50 text-red-400',
 }
 
-const CATEGORIES = ['accommodation', 'activity', 'tour', 'hike', 'event', 'shuttle', 'equipment', 'permit', 'levy', 'donation', 'meal', 'package', 'extra']
+const CATEGORIES = INVOICE_LINE_CATEGORIES
 
 type Person = { id: string; full_name: string | null; email: string | null; role: string }
 
@@ -50,6 +54,23 @@ function NewQuoteModal({ customers, onClose, onCreated }: { customers: Person[];
   const [busy, setBusy] = useState(false)
 
   useEffect(() => { getFinanceSettings().then(setRates) }, [])
+
+  // The saved items and bundles shared with the invoice form. null = not available.
+  const [savedItems, setSavedItems] = useState<SavedItem[] | null>(null)
+  useEffect(() => { getSavedItems().then(setSavedItems).catch(() => setSavedItems(null)) }, [])
+
+  function pickSaved(item: SavedItem) {
+    const { lines: added, included } = quoteLinesFromSaved(item)
+    const isBlank = (l: DraftLine) => !l.title.trim() && !l.unitPrice.trim()
+    setLines(ls => {
+      const next = [...ls.filter(l => !isBlank(l)), ...added]
+      return next.length ? next : [emptyLine()]
+    })
+    if (included.length) {
+      toast(`Included at no charge, so not listed on the quote: ${included.join(', ')}. Mention it in the notes if you'd like.`, { duration: 8000 })
+    }
+    recordSavedItemUse([item.id])
+  }
 
   const subtotal = lines.reduce((s, l) => s + (parseFloat(l.unitPrice) || 0) * (parseFloat(l.quantity) || 0), 0)
   const serviceFee = feeOverride !== '' ? (parseFloat(feeOverride) || 0) : 0
@@ -161,6 +182,12 @@ function NewQuoteModal({ customers, onClose, onCreated }: { customers: Person[];
         </div>
 
         <p className="font-sans text-[10px] tracking-[0.12em] uppercase text-gray-400 mb-2">Line Items</p>
+        {savedItems && (
+          <div className="flex mb-3">
+            <SavedItemPicker items={savedItems} onPick={pickSaved}
+              supplierName={id => id ? 'Supplier' : 'Visit Drakensberg'} />
+          </div>
+        )}
         <div className="space-y-2 mb-3">
           {lines.map((l, i) => (
             // Six columns on a phone, the original twelve from md up.
